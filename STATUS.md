@@ -8,7 +8,7 @@ NZA Sim gets its own Supabase project ("NZA Sim (dev)") and identity; the decodE
 Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs unchanged with the env unset.
 
 - **P0** (`a7d03e5`): reconnaissance, [`docs/audit/102/00_reconnaissance.md`](docs/audit/102/00_reconnaissance.md).
-- **P1** (`<this>`): the model document (zod), results shape, canonical JSON + SHA-256 hashes and the
+- **P1** (`f0cadf2`): the model document (zod), results shape, canonical JSON + SHA-256 hashes and the
   `building_config` → one-zone converter in `frontend/src/thermal/schema/`;
   [`docs/audit/102/01_model_document.md`](docs/audit/102/01_model_document.md). 13/13 tests (`npm test`); build
   clean; anchor `--fixture` still **132.6**. `package.json` adds zod, vitest, yaml: **run `npm install` locally**
