@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 102 — Simulate v2 Foundations: the model document, its hash, the database and one identity — ACTIVE 14 Nov 2026 on `chris/102-sim-v2-foundations`.**
+Brief 0 of the Simulate v2 sequence (design note: Notion `418d645e-05cc-811e-ad6b-fa8846f12148`, Revs A to A.4). Lays the floor the engine and zone briefs stand on: zod model-document and results schemas with a canonical sha256 `modelHash`; a converter from today's `building_config` to a one-zone document; a `sim` schema in decodED's Supabase project (projects, buildings, model_versions, library_items, runs; RLS; writes through security-definer functions); sign-in through decodED's organisations; the local library exported with provenance; one button that saves the live building as a model version and records today's instant-engine result against it. **No engine change; today's tool runs unchanged with the env unset; the 132.6 anchor must round-trip through the stored run.** Parts 0–6. Brief [`active/102_simulate-v2-foundations.md`](active/102_simulate-v2-foundations.md).
+
 **505 Reconciliation: Trace Their Savings to Assumptions — CLOSED 2026-07-15 on `chris/505-reconciliation` (PR to follow; register DRAFTS route to Claude Chat tone review, then Chris).**
 On branch `chris/505-reconciliation` (off `main` `4d8650b`, #20–#23 merged; Model-1/Model-2 pinned).
 Reproduce each 505-Design claimed saving under THEIR stated assumptions in the NZA engine (diagnostic,
