@@ -1,6 +1,7 @@
 # Current brief
 
-**No active brief.** Brief 102a (Simulate v2 foundations: the QA fixes) CLOSED and merged 14 Nov 2026 (PR #27); 0004 applied and the anchor round trip verified on NZA Sim (dev). The next Simulate v2 brief (103) is written by the architect.
+**Brief 103 — Simulate v2 Engine 1: a pure single-zone hourly engine from the model document — ACTIVE 14 Nov 2026 on `chris/103-engine-1`.**
+A pure TypeScript package (`frontend/src/thermal/engine/`) that runs one zone from the model document and an EPW, ISO 52016-1 hourly, envelope only (State 1 scope), with every term as a breakdown line; gated by analytic cases, a reference case, and the Bridgewater anchor's envelope demand against today's State 1 term by term. Also the store fixes left from the 102 QA (projects by id, library upsert, run summary lines, sign-in retry, invitation revoke). No change to today's engine or UI. Brief [`active/103_engine-1.md`](active/103_engine-1.md).
 
 **Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026; MERGED (PR #27).**
 The run key now pins the engine source (content hash, templates included) and the EPW bytes; the database stores and checks the client's canonical text, so float noise and huge numbers save; runs belong to their model version (no cross-organisation sharing); accepting an invitation never demotes. The anchor round trip checks the stored document and can be proved from the SQL editor. No engine change. Brief [`archive/102a_foundations-fixes_COMPLETED.md`](archive/102a_foundations-fixes_COMPLETED.md); evidence [`../audit/102a/`](../audit/102a/).

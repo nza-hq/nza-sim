@@ -2,6 +2,15 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔄 Brief 103 — Simulate v2 Engine 1 — IN PROGRESS on `chris/103-engine-1`
+
+Brief [`docs/briefs/active/103_engine-1.md`](docs/briefs/active/103_engine-1.md), written by this project's agent at
+Linzie's request (14 Nov, in place of the architect chat). Pure single-zone ISO 52016-1 engine, envelope only; QA
+store fixes. Five decisions flagged for Chris's review (anchor gate on envelope demand, ±5 % tolerance, location,
+reference case, fixed fixture id).
+
+- **Brief** (this commit).
+
 ## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 
 Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/archive/102a_foundations-fixes_COMPLETED.md). Four proven bugs
