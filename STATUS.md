@@ -20,8 +20,12 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   agree with `canonical.ts` byte for byte (`{"a":1,"b":[1,2]}` → `8baa7319…fb4874` in both); 17 checks in
   [`docs/audit/102/02_schema.md`](docs/audit/102/02_schema.md); `supabase/README.md` says which project and how.
   No decodED project touched.
-- **Next:** Part 3 (library export, Linzie's agent; the `--apply` run against the database is Claude Chat's),
-  Part 4 (frontend sign-in, Linzie's agent; Supabase auth settings, Claude Chat).
+- **P3 code side** (this commit): `scripts/102_export_library.py` (read-only, provenance) and
+  `scripts/102_seed_library.mjs` (dry run by default, versioned, refuses anything but NZA Sim (dev));
+  [`docs/audit/102/03_library.md`](docs/audit/102/03_library.md). The July-copy export matches the Part 0 counts
+  (15 / 18 / 15; 3 benchmarks skipped). **Still to do (Claude Chat, database):** re-export from Chris's live DB with
+  the dev server stopped, then the seed's dry run, `--apply`, and a second `--apply` that must add nothing.
+- **Next:** Part 4 (frontend sign-in, Linzie's agent; Supabase auth settings, Claude Chat).
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 
