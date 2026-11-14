@@ -6,9 +6,13 @@
  * (or finds the identical one), and records the instant engine's result for it. The result is the one the Systems
  * page already computed, through calculateInstant's existing entry point and options; the EUI is read only through
  * readModelledEui. Viewers get the database's refusal as a message.
+ *
+ * Brief 102a: the weather is pinned by the sha256 of the EPW the result was computed from (the backend reports it with
+ * the hourly arrays), and the run's engine version carries the engine's content hash (versions.ts).
  */
 import { useContext, useState } from 'react'
 import { ProjectContext } from '../../../context/ProjectContext.jsx'
+import { WeatherContext } from '../../../context/WeatherContext.jsx'
 import { useAuth } from '../../../auth/AuthGate.tsx'
 import { fromBuildingConfig } from '../../../thermal/schema/fromBuildingConfig'
 import {
@@ -18,13 +22,18 @@ import {
 export default function SaveModelVersionButton({ result, libraryConstructions }) {
   const auth = useAuth()
   const { params, constructions, comfortBand } = useContext(ProjectContext)
+  // The weather the Systems page's result was computed from (Brief 102a: its own bytes are pinned, never its name).
+  const { weatherData } = useContext(WeatherContext)
   const [state, setState] = useState({ busy: false, done: null, error: null })
   if (!auth) return null
 
-  const ready = !!(result && params && libraryConstructions)
+  const ready = !!(result && params && libraryConstructions && weatherData)
   const save = async () => {
     setState({ busy: true, done: null, error: null })
     try {
+      if (!/^[0-9a-f]{64}$/.test(weatherData?.file_sha256 ?? '') || !weatherData?.file_name) {
+        throw new Error('the weather data has no file hash: restart the backend so /api/weather/…/hourly reports it')
+      }
       const sb = auth.supabase
       const name = (params.name ?? '').trim() || 'Untitled building'
       const projectId = await ensureProject(sb, auth.org.id, name)
@@ -35,6 +44,7 @@ export default function SaveModelVersionButton({ result, libraryConstructions })
         comfort_band: comfortBand,
         library_constructions: libraryConstructions,
         building_id: buildingId,
+        weather: { file_name: weatherData.file_name, file_hash: weatherData.file_sha256 },
       })
       const version = await saveModelVersion(sb, buildingId, document, null)
       const summary = instantSummary(result)

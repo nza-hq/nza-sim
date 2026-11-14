@@ -2,7 +2,66 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *(PR `102 — Simulate v2 Foundations` open; independent review next)*
+## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
+
+Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/archive/102a_foundations-fixes_COMPLETED.md). Four proven bugs
+(QA H1, M1, M2, M3) and the round-trip gap (M5). No engine change; new SQL in `0004`, for Chris's agent to apply.
+
+- **P0** (`6626ef4`): brief, QA report copy, Brief 102 marked merged.
+- **P1** (this commit, QA H1): `engine_version` = `instant-1+<24 hex>`, the sha256 of the instant engine's whole
+  source import closure (15 files, the system templates included; `frontend/plugins/engineFingerprint.js`, served as
+  `virtual:engine-fingerprint` and recomputed on HMR). `/api/weather/{f}/hourly` now also reports `file_name` and
+  `file_sha256`; the Save button pins `weather_ref {kind:'epw'}` from the weather the result was computed from, and
+  refuses without a hash. 17/17 tests (4 new: closure covers engine + templates, stable, changes on any edit, refuses
+  no fingerprint); build clean; env unset: ZZ TEST Systems 132.6, no button, no page errors, nothing external;
+  anchor `--fixture` 132.6; Yeovilton EPW reports `c65711022b0e…` (= the anchor's). (`ad26bce`)
+- **P2** (this commit, QA M1 + M2's equality checks): `0004_qa_fixes.sql` replaces `create_model_version`: it takes
+  the client's canonical text `p_canonical`, checks `sha256(p_canonical)`, stores the text (`model_versions.canonical`)
+  and its jsonb; refuses a document naming another building, another schema version, or an EPW hash other than
+  `p_weather_hash`. `versions.ts` sends the text it hashed. Local Postgres 16 with all four migrations and a Supabase
+  stand-in, driving the real `versions.ts`: 15/15
+  ([`docs/audit/102a/p2_local_pg.txt`](docs/audit/102a/p2_local_pg.txt)): `-2.7755575615628914e-17`, `5e-7`,
+  `1e21`, `-1.5e-12` and astral-plane keys now save (0003's SQL re-hash disagreed on every one); the anchor still
+  saves once. **0004 must be applied before this branch's button is used** (the old signature is dropped). (`eb96075`)
+- **P3** (this commit, QA M2 + L1): runs are unique per `(model_version_id, engine_version, library_hash,
+  weather_hash)`; `record_run` inserts `on conflict do nothing` and re-selects, so it never returns another
+  organisation's run and a lost race returns the winner. Local PG 8/8
+  ([`docs/audit/102a/p3_local_pg.txt`](docs/audit/102a/p3_local_pg.txt)): the QA's case (two organisations, the same
+  four hashes) now gives two runs, each readable by its own organisation only; a repeat adds nothing and keeps the
+  first number; P2's 15 still pass. (`b3c2a27`)
+- **P4** (this commit, QA M3): `accept_invitation_token` keeps an active member's higher role (a removed member
+  rejoins with the invited one); `role_rank()` is internal, not granted. Local PG 9/9
+  ([`docs/audit/102a/p4_local_pg.txt`](docs/audit/102a/p4_local_pg.txt)): the sole admin accepting a viewer invite to
+  their own email stays admin (admin_count 1); invitations raise but never lower; the last-admin guard and the
+  email match still hold; anon can still validate a token. (`01cd5f5`)
+- **P5** (this commit, QA M5): `scripts/102_anchor_roundtrip_lib.mjs` (logic) + `102_anchor_roundtrip.mjs` (CLI).
+  "match" now means the STORED document hashes to the fixture's hash, by its stored text and by its jsonb; EUI and
+  total kWh are checked as 132.6 ± 0.05 and 558,972 ± 1 kWh, never by float equality; a missing comfort band is
+  refused (no 20/26 °C default). New `--emit-sql` writes
+  [`anchor_record.sql`](docs/audit/102a/anchor_record.sql) (records the anchor as the organisation's first admin,
+  through the app's functions and RLS, in one transaction; idempotent; refuses before 0004) and
+  [`anchor_readback.sql`](docs/audit/102a/anchor_readback.sql) (every `*_ok` column must be true): a real-database
+  proof without a token in a terminal. Local PG 10/10
+  ([`p5_local_pg.txt`](docs/audit/102a/p5_local_pg.txt)): record twice → 1 version, 1 run, as the admin; read-back
+  all true (EUI 132.6, 558,972 kWh); the token path verifies the same rows; a tampered stored text fails both.
+  0004 now records itself in `supabase_migrations.schema_migrations`. (`42d27a5`)
+- **P6 close** (this commit): the local-Postgres rig committed as `scripts/102a_pgtest/` (README; all four suites
+  pass from there: 15 / 8 / 9 / 10); brief archived; `current.md` repointed. Close-out: no engine file, lockfile or
+  `node_modules` in the diff; no key; 17/17 vitest; build clean; anchor `--fixture` 132.6; env unset unchanged.
+- **Verified on NZA Sim (dev)** (Chris's agent, 22:48): 0004 applied and read back; `anchor_record.sql` recorded the
+  anchor once and a second run added nothing; `anchor_readback.sql` all `*_ok` true, EUI 132.6, 558,972 kWh
+  ([`06_dev_verification.md`](docs/audit/102a/06_dev_verification.md)). Then PR #27 merged.
+- **Order on NZA Sim (dev):** apply 0004, then merge. 0004 drops the old `create_model_version(…, jsonb, …)`, so
+  `main`'s Save button refuses until this branch is merged. Then run `anchor_record.sql` and `anchor_readback.sql`.
+  The 102 ZZ TEST version and run stay (canonical null; their run key is the old `instant-1`).
+- **Still open from the QA (not this brief, for a later one):** M4 projects/buildings matched by name; M6
+  `upsert_library_item` keeps an old body silently; M7 `not_itemised` is auxiliary (name it) and missing values
+  become 0; L2 internal helpers granted to `authenticated`; L3 AuthGate has no retry when `my_access` fails; L4
+  lockfile lacks the 102 packages (`npm install` locally, regenerate before any CI/Vercel build); L5 seed from the July
+  copy (re-export before prod); L6 open dev sign-up, no `revoke_invitation`, no NZA-team read path; L7 the hash
+  includes the building id and name; L8 `library_refs` cannot be resolved back to a stored row.
+
+## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 
 NZA Sim gets its own Supabase project ("NZA Sim (dev)") and identity; the decodED link is optional (Rev B).
 Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs unchanged with the env unset.
@@ -68,7 +127,8 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   with; prefer a read-back the database owner runs in the SQL editor. Hash a library item's own definition, never the
   shape it was delivered in.
 - **Prod prerequisites (not this brief):** the prod project with the same migrations in order; custom SMTP.
-- **Next:** independent review of the PR, then merge on Chris's word.
+- **Merged** (PR #26, `affbd7f`) on Linzie's word, Chris approving verbally. The independent QA
+  ([`docs/audit/102a/qa_report.md`](docs/audit/102a/qa_report.md)) proved four bugs; they are Brief 102a.
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 

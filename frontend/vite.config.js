@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
+import engineFingerprint from './plugins/engineFingerprint.js'
 
 // Engine/app SHA stamped into exports (brief bridgwater-baseline-model1 D4).
 // Captured at dev-server / build start; git short SHA of the working tree.
@@ -32,6 +33,8 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     react(),
+    // Brief 102a: `virtual:engine-fingerprint`, the instant engine's content hash for the run key.
+    engineFingerprint(),
   ],
   server: {
     port: VITE_PORT,

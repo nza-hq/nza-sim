@@ -1,8 +1,11 @@
 # Current brief
 
-**No active brief.** Brief 102 (Simulate v2 Foundations, Rev B) CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations`; PR `102 — Simulate v2 Foundations` into `main` awaits the independent review. The next Simulate v2 brief is written by the architect.
+**No active brief.** Brief 102a (Simulate v2 foundations: the QA fixes) CLOSED and merged 14 Nov 2026 (PR #27); 0004 applied and the anchor round trip verified on NZA Sim (dev). The next Simulate v2 brief (103) is written by the architect.
 
-**Brief 102 — Simulate v2 Foundations — CLOSED 14 Nov 2026 (PR to `main` open for review).**
+**Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026; MERGED (PR #27).**
+The run key now pins the engine source (content hash, templates included) and the EPW bytes; the database stores and checks the client's canonical text, so float noise and huge numbers save; runs belong to their model version (no cross-organisation sharing); accepting an invitation never demotes. The anchor round trip checks the stored document and can be proved from the SQL editor. No engine change. Brief [`archive/102a_foundations-fixes_COMPLETED.md`](archive/102a_foundations-fixes_COMPLETED.md); evidence [`../audit/102a/`](../audit/102a/).
+
+**Brief 102 — Simulate v2 Foundations — CLOSED 14 Nov 2026; MERGED to `main` `affbd7f` (PR #26).**
 The model document (zod) with a canonical SHA-256 hash and a `building_config` → one-zone converter; NZA Sim's own Supabase project "NZA Sim (dev)" with tenancy, a model store, RLS and security-definer writes; NZA Sim's own magic-link sign-in and organisations; the local library exported and seeded (49 items) with provenance; a "Save as model version" button that stores the live building and its instant-engine run. Verified on NZA Sim (dev): two presses → one version and one run, EUI **132.6**, stored hash = SQL recompute. No engine file changed; env unset → today's tool unchanged. Brief [`archive/102_simulate-v2-foundations_COMPLETED.md`](archive/102_simulate-v2-foundations_COMPLETED.md); audit [`../audit/102/`](../audit/102/).
 
 **505 Reconciliation: Trace Their Savings to Assumptions — CLOSED 2026-07-15 on `chris/505-reconciliation` (PR to follow; register DRAFTS route to Claude Chat tone review, then Chris).**

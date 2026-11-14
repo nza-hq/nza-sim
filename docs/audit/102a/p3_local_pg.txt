@@ -1,0 +1,11 @@
+15 passed, 0 failed
+PASS  same four hashes in two organisations: two runs, not one  — 176946ef vs 109f31ff
+PASS  B reads its own run, with its own number
+PASS  B still cannot read A's run
+PASS  a repeat returns the same run, adds nothing
+PASS  and keeps the first number (runs are never updated)
+PASS  another engine version is another run
+PASS  insert conflict returns the existing row, no 23505
+PASS  B cannot record a run on A's version (42501)  — only an editor or admin can record a run
+
+8 passed, 0 failed

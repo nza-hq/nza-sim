@@ -10,6 +10,7 @@ GET /api/weather/{filename}/hourly
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import math
@@ -235,6 +236,10 @@ def parse_epw(filepath: Path) -> dict:
             "longitude": longitude,
         },
         "count": len(temperature),
+        # Brief 102a: which bytes these arrays came from, so a stored model version pins the EPW itself, never only
+        # its name (QA H1). Read-only; nothing here changes the arrays.
+        "file_name":   Path(filepath).name,
+        "file_sha256": hashlib.sha256(Path(filepath).read_bytes()).hexdigest(),
     }
 
 
