@@ -2,7 +2,14 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *(PR `102 — Simulate v2 Foundations` open; independent review next)*
+## 🔄 Brief 102a — Simulate v2 foundations: the QA fixes — IN PROGRESS on `chris/102a-foundations-fixes`
+
+Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_foundations-fixes.md). Four proven bugs
+(QA H1, M1, M2, M3) and the round-trip gap (M5). No engine change; new SQL in `0004`, for Chris's agent to apply.
+
+- **P0** (this commit): brief, QA report copy, Brief 102 marked merged.
+
+## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 
 NZA Sim gets its own Supabase project ("NZA Sim (dev)") and identity; the decodED link is optional (Rev B).
 Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs unchanged with the env unset.
@@ -68,7 +75,8 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   with; prefer a read-back the database owner runs in the SQL editor. Hash a library item's own definition, never the
   shape it was delivered in.
 - **Prod prerequisites (not this brief):** the prod project with the same migrations in order; custom SMTP.
-- **Next:** independent review of the PR, then merge on Chris's word.
+- **Merged** (PR #26, `affbd7f`) on Linzie's word, Chris approving verbally. The independent QA
+  ([`docs/audit/102a/qa_report.md`](docs/audit/102a/qa_report.md)) proved four bugs; they are Brief 102a.
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 

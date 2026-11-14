@@ -1,8 +1,9 @@
 # Current brief
 
-**No active brief.** Brief 102 (Simulate v2 Foundations, Rev B) CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations`; PR `102 — Simulate v2 Foundations` into `main` awaits the independent review. The next Simulate v2 brief is written by the architect.
+**Brief 102a — Simulate v2 foundations: the QA fixes — ACTIVE 14 Nov 2026 on `chris/102a-foundations-fixes`.**
+Fixes the four bugs the independent QA of Brief 102 proved (stale run key; tiny/huge numbers refused; runs shared across organisations; an admin demoted by accepting an invitation) and makes the anchor round trip prove what it says. New SQL in `supabase/migrations/0004_…`, applied to NZA Sim (dev) by Chris's agent. No engine change. Brief [`active/102a_foundations-fixes.md`](active/102a_foundations-fixes.md); QA report [`../audit/102a/qa_report.md`](../audit/102a/qa_report.md).
 
-**Brief 102 — Simulate v2 Foundations — CLOSED 14 Nov 2026 (PR to `main` open for review).**
+**Brief 102 — Simulate v2 Foundations — CLOSED 14 Nov 2026; MERGED to `main` `affbd7f` (PR #26).**
 The model document (zod) with a canonical SHA-256 hash and a `building_config` → one-zone converter; NZA Sim's own Supabase project "NZA Sim (dev)" with tenancy, a model store, RLS and security-definer writes; NZA Sim's own magic-link sign-in and organisations; the local library exported and seeded (49 items) with provenance; a "Save as model version" button that stores the live building and its instant-engine run. Verified on NZA Sim (dev): two presses → one version and one run, EUI **132.6**, stored hash = SQL recompute. No engine file changed; env unset → today's tool unchanged. Brief [`archive/102_simulate-v2-foundations_COMPLETED.md`](archive/102_simulate-v2-foundations_COMPLETED.md); audit [`../audit/102/`](../audit/102/).
 
 **505 Reconciliation: Trace Their Savings to Assumptions — CLOSED 2026-07-15 on `chris/505-reconciliation` (PR to follow; register DRAFTS route to Claude Chat tone review, then Chris).**
