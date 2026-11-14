@@ -2,6 +2,21 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔄 Brief 102 — Simulate v2 foundations (Rev B) — IN PROGRESS on `chris/102-sim-v2-foundations`
+
+NZA Sim gets its own Supabase project ("NZA Sim (dev)") and identity; the decodED link is optional (Rev B).
+Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs unchanged with the env unset.
+
+- **P0** (`a7d03e5`): reconnaissance, [`docs/audit/102/00_reconnaissance.md`](docs/audit/102/00_reconnaissance.md).
+- **P1** (`<this>`): the model document (zod), results shape, canonical JSON + SHA-256 hashes and the
+  `building_config` → one-zone converter in `frontend/src/thermal/schema/`;
+  [`docs/audit/102/01_model_document.md`](docs/audit/102/01_model_document.md). 13/13 tests (`npm test`); build
+  clean; anchor `--fixture` still **132.6**. `package.json` adds zod, vitest, yaml: **run `npm install` locally**
+  (lockfile not committed).
+- **Next:** Part 2 (migrations in NZA Sim's own project) is with Chris's agent, which has the database access.
+- **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
+  design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
+
 ## ✅ 505 Reconciliation (trace their savings to assumptions, compare under Model 2) — CLOSED 2026-07-15 on `chris/505-reconciliation` *(PR to follow; register DRAFTS → Claude Chat tone review → Chris)*
 
 Reproduced 505 Design's claimed savings **under their assumptions** (diagnostic, not deference) and
