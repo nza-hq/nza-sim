@@ -22,7 +22,13 @@ Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_f
   stand-in, driving the real `versions.ts`: 15/15
   ([`docs/audit/102a/p2_local_pg.txt`](docs/audit/102a/p2_local_pg.txt)): `-2.7755575615628914e-17`, `5e-7`,
   `1e21`, `-1.5e-12` and astral-plane keys now save (0003's SQL re-hash disagreed on every one); the anchor still
-  saves once. **0004 must be applied before this branch's button is used** (the old signature is dropped).
+  saves once. **0004 must be applied before this branch's button is used** (the old signature is dropped). (`eb96075`)
+- **P3** (this commit, QA M2 + L1): runs are unique per `(model_version_id, engine_version, library_hash,
+  weather_hash)`; `record_run` inserts `on conflict do nothing` and re-selects, so it never returns another
+  organisation's run and a lost race returns the winner. Local PG 8/8
+  ([`docs/audit/102a/p3_local_pg.txt`](docs/audit/102a/p3_local_pg.txt)): the QA's case (two organisations, the same
+  four hashes) now gives two runs, each readable by its own organisation only; a repeat adds nothing and keeps the
+  first number; P2's 15 still pass.
 
 ## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 

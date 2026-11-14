@@ -84,7 +84,7 @@ export async function saveModelVersion(sb: SupabaseClient, buildingId: string, d
   return { id: id as string, model_hash: mh, library_hash: lh, weather_hash: wh, created: true }
 }
 
-/** Records a run; a second call with the same four hashes returns the first run's id (record_run dedupes). */
+/** Records a run of this version; a second call with the same engine, library and weather returns the first run's id (record_run dedupes within the version, Brief 102a). */
 export async function recordRun(sb: SupabaseClient, versionId: string, results: unknown, summary: RunSummary, engineVersion: string, source: string): Promise<string> {
   RunSummary.parse(summary)
   const { data, error } = await sb.rpc('record_run', {
