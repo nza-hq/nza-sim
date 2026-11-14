@@ -1319,12 +1319,13 @@ function _calculateEnvelopeOnly(building, constructions, libraryData, weatherDat
       UA_roof_eff  * (stepRoof.b_inside_node  - 1) +
       UA_floor_eff * (stepFloor.b_inside_node - 1) -
       UA_glaz - UA_leakage - UA_permanent -
+      total_H_TB_W_per_K -   // Brief 102b: thermal bridging in the air-node balance (ISO 14683 H_TB, T_out-driven)
       C_air_per_dt
     const D_coef =
       UA_wall_eff  * stepWall.a_inside_node  +
       UA_roof_eff  * stepRoof.a_inside_node  +
       UA_floor_eff * stepFloor.a_inside_node +
-      (UA_glaz + UA_leakage + UA_permanent) * T_out +
+      (UA_glaz + UA_leakage + UA_permanent + total_H_TB_W_per_K) * T_out +
       C_air_per_dt * T_air +   // T_air on RHS is the previous-hour value
       Q_solar_to_zone_air      // convective fraction of glazing-transmitted solar
     // Avoid division by ≈ 0 in degenerate cases (no walls, no vent)
@@ -3221,12 +3222,13 @@ function _calculateState2(building, constructions, libraryData, weatherData, hou
       UA_roof_eff  * (stepRoof.b_inside_node  - 1) +
       UA_floor_eff * (stepFloor.b_inside_node - 1) -
       UA_glaz - UA_leakage - UA_permanent - UA_mech_vent_h -
+      total_H_TB_W_per_K -   // Brief 102b: thermal bridging in the air-node balance, so it reaches demand
       C_air_per_dt
     const D_coef =
       UA_wall_eff  * stepWall.a_inside_node +
       UA_roof_eff  * stepRoof.a_inside_node +
       UA_floor_eff * stepFloor.a_inside_node +
-      (UA_glaz + UA_leakage + UA_permanent + UA_mech_vent_h) * T_out +
+      (UA_glaz + UA_leakage + UA_permanent + UA_mech_vent_h + total_H_TB_W_per_K) * T_out +
       C_air_per_dt * T_air +
       Q_to_zone_air
     // Free-floating zone air temperature (implicit-Euler solve, no

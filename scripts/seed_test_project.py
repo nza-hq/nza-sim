@@ -64,7 +64,7 @@ def main():
                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 ZZ_ID, ZZ_NAME,
-                "Brief 95 EP-backend test project (frozen fixture, EUI 132.6). Do not use for real work.",
+                "Brief 95 EP-backend test project (frozen fixture, EUI 133.2). Do not use for real work.",
                 json.dumps(bc), json.dumps(systems_config), json.dumps(cc),
                 json.dumps(schedule_assignments), weather, json.dumps(metadata),
                 float(cb.get("lower_c", 20)), float(cb.get("upper_c", 26)),
