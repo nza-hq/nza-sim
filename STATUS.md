@@ -2,9 +2,9 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🔄 Brief 102a — Simulate v2 foundations: the QA fixes — IN PROGRESS on `chris/102a-foundations-fixes`
+## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *(PR open; 0004 to apply on NZA Sim (dev) first)*
 
-Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_foundations-fixes.md). Four proven bugs
+Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/archive/102a_foundations-fixes_COMPLETED.md). Four proven bugs
 (QA H1, M1, M2, M3) and the round-trip gap (M5). No engine change; new SQL in `0004`, for Chris's agent to apply.
 
 - **P0** (`6626ef4`): brief, QA report copy, Brief 102 marked merged.
@@ -44,7 +44,19 @@ Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_f
   proof without a token in a terminal. Local PG 10/10
   ([`p5_local_pg.txt`](docs/audit/102a/p5_local_pg.txt)): record twice → 1 version, 1 run, as the admin; read-back
   all true (EUI 132.6, 558,972 kWh); the token path verifies the same rows; a tampered stored text fails both.
-  0004 now records itself in `supabase_migrations.schema_migrations`.
+  0004 now records itself in `supabase_migrations.schema_migrations`. (`42d27a5`)
+- **P6 close** (this commit): the local-Postgres rig committed as `scripts/102a_pgtest/` (README; all four suites
+  pass from there: 15 / 8 / 9 / 10); brief archived; `current.md` repointed. Close-out: no engine file, lockfile or
+  `node_modules` in the diff; no key; 17/17 vitest; build clean; anchor `--fixture` 132.6; env unset unchanged.
+- **Order on NZA Sim (dev):** apply 0004, then merge. 0004 drops the old `create_model_version(…, jsonb, …)`, so
+  `main`'s Save button refuses until this branch is merged. Then run `anchor_record.sql` and `anchor_readback.sql`.
+  The 102 ZZ TEST version and run stay (canonical null; their run key is the old `instant-1`).
+- **Still open from the QA (not this brief, for a later one):** M4 projects/buildings matched by name; M6
+  `upsert_library_item` keeps an old body silently; M7 `not_itemised` is auxiliary (name it) and missing values
+  become 0; L2 internal helpers granted to `authenticated`; L3 AuthGate has no retry when `my_access` fails; L4
+  lockfile lacks the 102 packages (`npm install` locally, regenerate before any CI/Vercel build); L5 seed from the July
+  copy (re-export before prod); L6 open dev sign-up, no `revoke_invitation`, no NZA-team read path; L7 the hash
+  includes the building id and name; L8 `library_refs` cannot be resolved back to a stored row.
 
 ## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 
