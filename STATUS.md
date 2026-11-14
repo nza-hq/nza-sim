@@ -28,7 +28,12 @@ Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_f
   organisation's run and a lost race returns the winner. Local PG 8/8
   ([`docs/audit/102a/p3_local_pg.txt`](docs/audit/102a/p3_local_pg.txt)): the QA's case (two organisations, the same
   four hashes) now gives two runs, each readable by its own organisation only; a repeat adds nothing and keeps the
-  first number; P2's 15 still pass.
+  first number; P2's 15 still pass. (`b3c2a27`)
+- **P4** (this commit, QA M3): `accept_invitation_token` keeps an active member's higher role (a removed member
+  rejoins with the invited one); `role_rank()` is internal, not granted. Local PG 9/9
+  ([`docs/audit/102a/p4_local_pg.txt`](docs/audit/102a/p4_local_pg.txt)): the sole admin accepting a viewer invite to
+  their own email stays admin (admin_count 1); invitations raise but never lower; the last-admin guard and the
+  email match still hold; anon can still validate a token.
 
 ## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 

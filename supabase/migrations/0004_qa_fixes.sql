@@ -121,3 +121,54 @@ begin
   return run_id;
 end
 $$;
+
+-- ─── Part 4 (QA M3): accepting an invitation never demotes ─────────────────────────────────────────────────
+-- 0001 upserted the invited role over an existing membership, so the sole admin who accepted a viewer invitation
+-- to their own email became a viewer and the organisation had no admin; set_member_role and remove_member guard
+-- against exactly that, this path did not. An active member now keeps the higher of their role and the invited
+-- one; a removed member rejoins with the invited role. Changing a role down stays set_member_role's job.
+
+create or replace function public.role_rank(p_role text)
+returns int
+language sql immutable
+set search_path = public, pg_temp
+as $$ select case p_role when 'admin' then 3 when 'editor' then 2 when 'viewer' then 1 else 0 end $$;
+revoke all on function public.role_rank(text) from public, anon, authenticated;
+
+create or replace function public.accept_invitation_token(p_token text)
+returns uuid
+language plpgsql security definer
+set search_path = public, pg_temp
+as $$
+declare
+  uid uuid := public.caller_id();
+  inv public.invitations;
+  caller_email text := lower(auth.jwt() ->> 'email');
+begin
+  select * into inv from public.invitations
+   where token_hash = public.token_hash(p_token)
+     and used_at is null and revoked_at is null and expires_at > now();
+  if not found then
+    raise exception 'this invitation is not valid' using errcode = '42501';
+  end if;
+  if uid is null then
+    return inv.org_id;
+  end if;
+  if caller_email is distinct from inv.email then
+    raise exception 'this invitation was sent to a different email address' using errcode = '42501';
+  end if;
+  insert into public.memberships (org_id, user_id, role) values (inv.org_id, uid, inv.role)
+  on conflict (org_id, user_id) do update
+    set role = case
+                 when public.memberships.status = 'active'
+                      and public.role_rank(public.memberships.role) >= public.role_rank(excluded.role)
+                 then public.memberships.role
+                 else excluded.role
+               end,
+        joined_at = case when public.memberships.status = 'active' then public.memberships.joined_at else now() end,
+        status = 'active';
+  insert into public.profiles (user_id) values (uid) on conflict do nothing;
+  update public.invitations set used_at = now(), used_by = uid where id = inv.id;
+  return inv.org_id;
+end
+$$;

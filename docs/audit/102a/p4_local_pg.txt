@@ -1,0 +1,11 @@
+PASS  sole admin accepting a viewer invite to own email: accepted
+PASS  ...and is still admin; admin_count 1  — admin/active, admins 1
+PASS  new member joins with the invited role  — viewer/active
+PASS  an invitation can raise a role  — editor/active
+PASS  an invitation never lowers one  — editor/active
+PASS  admin removes b
+PASS  a removed member rejoins with the invited role  — viewer/active
+PASS  set_member_role still refuses demoting the last admin  — an organisation must keep at least one admin
+PASS  an invitation for another email is refused  — this invitation was sent to a different email address
+
+9 passed, 0 failed
