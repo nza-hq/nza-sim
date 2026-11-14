@@ -14,7 +14,9 @@ This tool is a sibling to Pablo (NZA's electricity cost analytics platform). It 
 
 ## Environment
 
-1. **Working directory:** `C:\Dev\nza-simulate` on Chris's machine. This is a local folder — NOT on OneDrive. The OneDrive copy rule is inherited from Pablo and is non-negotiable.
+1. **Working directory:** a local folder — NOT on OneDrive. The OneDrive copy rule is inherited from Pablo and is non-negotiable. Known checkouts:
+   - Chris's machine: `C:\Dev\nza-simulate`, with Chris's live DB in `data\`.
+   - IT15 (Linzie's sessions): `C:\Users\ChrisScott\Dev\nza-sim`. Its `data\nza_sim.db` is the 17 Jul 2026 transfer-pack copy, not Chris's live DB. Simulate v2 (Brief 102 onward) is worked in the git worktree `C:\Users\ChrisScott\Dev\nza-sim-102`, which has its own `data\` (never a junction to the main one, Backup discipline Rule 1).
 2. **Why not OneDrive:** OneDrive syncs `.git` internals and `node_modules` in the background, causing corrupted git objects, SQLite WAL desync, npm install failures, and ghost files. This is unfixable — these tools are fundamentally incompatible with OneDrive's sync. Do not suggest moving to OneDrive. Ever.
 3. **Servers:** Backend runs on port 8002 (`python -m uvicorn api.main:app --host 127.0.0.1 --port 8002` from project root). Frontend runs on port 5176 (`npm run dev` from `frontend/`). Two terminal windows required. Ports are deliberately different from Pablo (8001/5175) so both tools can run simultaneously.
 4. **Data files are local-only.** The `data/` folder (containing weather files, simulation outputs, and any SQLite databases) is in `.gitignore`. It does not exist on GitHub. If you clone the repo fresh, the backend creates an empty database on startup — but library items (constructions, system templates, profiles, weather files) will need to be re-ingested or copied from a working installation.
