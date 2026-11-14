@@ -97,11 +97,24 @@ function Gate({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase?.auth.signOut()
     setAccess(null)
+    setError(null)
   }, [supabase])
 
+  // Brief 103 P1 (QA L3): a failed load or a failed my_access is never a dead end: Retry, and Sign out once signed in.
+  if (!supabase && error) {
+    return <Screen><Err text={error} /><button className={primary} onClick={() => window.location.reload()}>Retry</button></Screen>
+  }
   if (!supabase || session === undefined || (session && !access && !error)) return <Screen><p className="text-caption text-mid-grey">Loading…</p></Screen>
   if (!session) return <SignIn supabase={supabase} />
-  if (!access) return <Screen><Err text={error} /></Screen>
+  if (!access) {
+    return (
+      <Screen>
+        <Err text={error} />
+        <button className={primary} onClick={async () => { setError(null); await refresh() }}>Retry</button>
+        <button className={secondary} onClick={signOut}>Sign out</button>
+      </Screen>
+    )
+  }
   if (access.orgs.length === 0) {
     return <Onboarding supabase={supabase} email={session.user.email ?? ''} error={error} onDone={async (id) => { setError(null); if (id) setOrgId(id); await refresh() }} onSignOut={signOut} />
   }

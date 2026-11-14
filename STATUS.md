@@ -23,6 +23,9 @@ reference case, fixed fixture id).
     (one zone, one year, under 100 ms in a worker; 50-zone scaling measured).
   - The fix for the thermal-bridging bug in today's engine (132.6 → about 133.2) is not approved and stays out.
   - NZA Sim (dev) is now in the Net Zero Advisory Supabase org; migrations go through the connector, dev only.
+- **P1 store fixes** ([`docs/audit/103/01_store_fixes.md`](docs/audit/103/01_store_fixes.md)).
+  - M4: projects are matched by the local id; M6: library versions are immutable; M7: auxiliary has its own line and a missing figure fails loudly; L2: helpers gated; L3: Retry and Sign out; L6: `revoke_invitation`.
+  - `0005` is applied to NZA Sim (dev) through the connector and read back. Tests: rig 37/37 plus 42 earlier checks, vitest 25/25, build clean.
 
 ## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 
