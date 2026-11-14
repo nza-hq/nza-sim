@@ -12,17 +12,19 @@
  * Environment (PowerShell: `$env:NAME = '...'`):
  *   NZASIM_SUPABASE_URL       (or VITE_NZASIM_SUPABASE_URL)       https://jbjxduathkklruvbmeho.supabase.co
  *   NZASIM_SUPABASE_ANON_KEY  (or VITE_NZASIM_SUPABASE_ANON_KEY)  the publishable key
- *   NZASIM_ACCESS_TOKEN       a signed-in session's access token (optional; or use --email)
+ *   NZASIM_ACCESS_TOKEN       the NZA-team user's access token, from a browser session (below)
+ *
+ * The session: sign in to the app (magic link), then in that tab's browser console run
+ *   JSON.parse(localStorage['sb-jbjxduathkklruvbmeho-auth-token']).access_token
+ * and set the result as NZASIM_ACCESS_TOKEN. It lasts an hour; never commit or log it.
+ * (The project's emails carry a link, not a code, until custom SMTP lets the template change; 04_auth_config.md.)
  *
  * Run, from the repo root:
- *   node scripts/102_seed_library.mjs                       counts from the export only (no network)
- *   node scripts/102_seed_library.mjs --email you@example   sign in with an emailed code, then plan (no writes)
- *   node scripts/102_seed_library.mjs --email you@example --apply
- * `--email` needs the project's email template to include the 6-digit code ({{ .Token }}).
+ *   node scripts/102_seed_library.mjs           counts from the export only; with the env set, the plan (no writes)
+ *   node scripts/102_seed_library.mjs --apply
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import readline from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -54,9 +56,8 @@ console.log('items per kind:', JSON.stringify(counts))
 
 const URL_ = process.env.NZASIM_SUPABASE_URL ?? process.env.VITE_NZASIM_SUPABASE_URL
 const KEY = process.env.NZASIM_SUPABASE_ANON_KEY ?? process.env.VITE_NZASIM_SUPABASE_ANON_KEY
-const EMAIL = opt('--email')
-if (!URL_ || !KEY || (!process.env.NZASIM_ACCESS_TOKEN && !EMAIL)) {
-  if (APPLY) { console.error('--apply needs NZASIM_SUPABASE_URL, NZASIM_SUPABASE_ANON_KEY and a session (--email or NZASIM_ACCESS_TOKEN)'); process.exit(2) }
+if (!URL_ || !KEY || !process.env.NZASIM_ACCESS_TOKEN) {
+  if (APPLY) { console.error('--apply needs NZASIM_SUPABASE_URL, NZASIM_SUPABASE_ANON_KEY and NZASIM_ACCESS_TOKEN (see the header)'); process.exit(2) }
   console.log('dry run: no project or session configured, so nothing was read or written.')
   process.exit(0)
 }
@@ -77,14 +78,7 @@ async function call(method, p, body, token) {
   return data
 }
 
-let token = process.env.NZASIM_ACCESS_TOKEN
-if (!token) {
-  await call('POST', '/auth/v1/otp', { email: EMAIL, create_user: false })
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  const code = (await rl.question(`code emailed to ${EMAIL}: `)).trim()
-  rl.close()
-  token = (await call('POST', '/auth/v1/verify', { type: 'email', email: EMAIL, token: code })).access_token
-}
+const token = process.env.NZASIM_ACCESS_TOKEN
 
 const access = await call('POST', '/rest/v1/rpc/my_access', {}, token)
 if (!access?.nza_team) { console.error('this user is not in nza_team: global library items cannot be written'); process.exit(2) }

@@ -41,5 +41,11 @@ move nothing (Part 1). No age-band data exists anywhere, so `age_band_default` i
 
 1. On Chris's machine, stop the dev server, then `python scripts/102_export_library.py` against the **live**
    `data/nza_sim.db` (this export is from the July copy) and commit the new JSON.
-2. `node scripts/102_seed_library.mjs --email <NZA-team user>` (dry run), then `--apply`, then `--apply` again
-   (plan must be all unchanged). Paste the output here.
+2. Sign in to the app as the NZA-team user (magic link), then in that tab's console run
+   `JSON.parse(localStorage['sb-jbjxduathkklruvbmeho-auth-token']).access_token` and set it as
+   `$env:NZASIM_ACCESS_TOKEN` (with `$env:NZASIM_SUPABASE_URL` and `$env:NZASIM_SUPABASE_ANON_KEY`).
+   Then `node scripts/102_seed_library.mjs` (the plan), `--apply`, and `--apply` again (plan must be all
+   unchanged). Paste the output here. The token lasts an hour; never commit or log it.
+
+(The emailed-code sign-in originally planned here was dropped: without custom SMTP the email template cannot carry
+the code, `04_auth_config.md`.)
