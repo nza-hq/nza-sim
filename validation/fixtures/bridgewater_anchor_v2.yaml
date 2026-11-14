@@ -1,11 +1,12 @@
-# Frozen reference incl. aux-load experiments (EUI 132.6) — do not "correct"; frozen is the point.
+# Frozen reference incl. aux-load experiments — inputs frozen, do not "correct". EUI 133.2 since Brief 102b
+# (thermal bridging in the air-node balance; 132.6 before, docs/audit/102b/).
 _meta:
   brief: Brief 94 — frozen Bridgewater anchor fixture (engine-direct, no DB/API)
   source_project: 12cf7cc4-9bdc-41bc-ab4e-24e044fbad9d (Bridgewater Hotel)
   captured: '2026-07-07'
   note: Aux = External lighting 1.5 W/m2 (Chris aux-toggle testing) — frozen input, NOT engine drift. The live DB is Chris playground; this fixture is the regression reference. Do NOT re-capture from the
     live DB.
-  expected_eui_kwh_per_m2: 132.6
+  expected_eui_kwh_per_m2: 133.2
 weather_file: GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw
 comfort_band:
   lower_c: 21.0

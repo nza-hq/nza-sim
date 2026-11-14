@@ -8,7 +8,7 @@
  * "match" means the STORED document hashes to the fresh conversion's hash, both through its stored canonical text
  * and through re-serialising its jsonb in JavaScript (QA M5: 102 compared two fresh conversions with each other,
  * which always match). The figures are checked against the reference with stated tolerances, never by exact float
- * equality: total 558,972 kWh ± 1 kWh, EUI 132.6 ± 0.05 (the engine rounds the EUI to one decimal place; QA trap 1).
+ * equality: total 561,572 kWh ± 1 kWh, EUI 133.2 ± 0.05 (Brief 102b; 558,972 / 132.6 before) (the engine rounds the EUI to one decimal place; QA trap 1).
  *
  * Engine files are imported, never changed.
  */
@@ -28,7 +28,7 @@ export const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 // yaml through Node's own require from frontend/ (vite-node mis-resolves a bare 'yaml' imported from scripts/).
 const { parse: parseYaml } = createRequire(path.join(REPO, 'frontend/package.json'))('yaml')
 export const NAME = 'Bridgewater anchor fixture'
-export const EXPECTED = { eui_kwh_m2: 132.6, eui_tol: 0.05, total_kwh: 558972, total_tol: 1 }
+export const EXPECTED = { eui_kwh_m2: 133.2, eui_tol: 0.05, total_kwh: 561572, total_tol: 1 }
 /** Stands in for the database building id in the emitted SQL's document template (a v4-shaped, never-issued uuid). */
 export const BUILDING_SENTINEL = '00000000-0000-4000-8000-00000000b1d0'
 
