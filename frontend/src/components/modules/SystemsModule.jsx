@@ -37,6 +37,7 @@ import { useUISettings } from '../../context/UISettingsContext.jsx'
 import { WeatherContext } from '../../context/WeatherContext.jsx'
 import { useHourlySolar } from '../../hooks/useHourlySolar.js'
 import { calculateInstant } from '../../utils/instantCalc.js'
+import SaveModelVersionButton from './systems/SaveModelVersionButton.jsx'
 import { SCHEDULES, allScheduleNames } from '../../utils/scheduleLibrary.js'
 import { SYSTEM_TEMPLATES_LIBRARY } from '../../data/systemTemplatesLibrary.js'
 import WeatherSynchronisedProfile from '../profiles/WeatherSynchronisedProfile.jsx'
@@ -311,6 +312,8 @@ export default function SystemsModule() {
           profiles, schedules, monthly bars and a summary table in the centre;
           live EUI + fuel split on the right.
         </p>
+        {/* Brief 102 P5: renders nothing unless signed in to NZA Sim with an organisation. */}
+        <SaveModelVersionButton result={result} libraryConstructions={constructionsLib} />
       </div>
 
       {/* ── Three-column workspace ────────────────────────────────────── */}

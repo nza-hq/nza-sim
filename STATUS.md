@@ -25,7 +25,7 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   [`docs/audit/102/03_library.md`](docs/audit/102/03_library.md). The July-copy export matches the Part 0 counts
   (15 / 18 / 15; 3 benchmarks skipped). **Still to do (Claude Chat, database):** re-export from Chris's live DB with
   the dev server stopped, then the seed's dry run, `--apply`, and a second `--apply` that must add nothing.
-- **P4 code side** (this commit): `frontend/src/auth/` (`supabase.ts`, `AuthGate.tsx` with `OrgBadge`), `<AuthGate>`
+- **P4 code side** (`462f24f`): `frontend/src/auth/` (`supabase.ts`, `AuthGate.tsx` with `OrgBadge`), `<AuthGate>`
   in `main.jsx`, one `<OrgBadge />` line in `TopBar.jsx`, `@supabase/supabase-js` in package.json (**run
   `npm install`**), `frontend/.env.example`, CLAUDE.md section. Env unset: ZZ TEST shows 132.6 before and after,
   screenshots pixel-identical, nothing leaves localhost. Env set: the whole flow passes against a mocked Supabase;
@@ -37,9 +37,14 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   copied). From a browser: anon denied on `my_access` and every table, allowed only on `accept_invitation_token`.
   Email templates are read-only without custom SMTP, so the email carries the link, not a code; `AuthGate.tsx`
   uses the link, so nothing is blocked. Custom SMTP (Resend or M365) is a prod prerequisite.
-- **Next:** Chris: `npm install` in `frontend/`, the two env values into `frontend/.env`, a real sign-in; Claude Chat:
-  seed `nza_team` with Chris's user, then Part 3 `--apply`; then Part 5 (save as model version; Linzie's agent
-  writes, needs the database to verify).
+- **Sign-in done (14 Nov):** Linzie signed in on her machine (worktree `nza-sim-102`) and created the organisation "NZA".
+- **P5 code side** (this commit): `frontend/src/thermal/store/versions.ts`, `SaveModelVersionButton.jsx` on the
+  Systems page (signed in only), `scripts/102_anchor_roundtrip.mjs`; `body_hash` now over `config_json`.
+  Env unset: Systems 132.6 before and after, pixel-identical. Against a mocked Supabase: one version and one run for
+  two presses, viewer refused, round trip prints 132.6 `match`.
+  [`docs/audit/102/05_save_version.md`](docs/audit/102/05_save_version.md).
+- **Next:** Claude Chat: `nza_team`, Part 3 `--apply`; then the Part 5 checks against NZA Sim (dev) (button twice on
+  ZZ TEST, round trip `--record` then read); then Part 6 (close).
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 

@@ -22,7 +22,7 @@ tests), `"test": "vitest run"`. **Lockfile not changed; run `npm install` locall
 
 - `npm test`: 13/13 pass. `npm run build`: clean.
 - `node scripts/_brief93_anchor.mjs --fixture`: **132.6** EUI, 401.544 MWh elec, 157.428 MWh gas, unchanged.
-- Anchor document: `model_hash ae86b9bd…c90ff`, `library_hash dada68b7…1ba4`, weather hash = the EPW's
+- Anchor document: `model_hash 7b2d6f21…b3f4`, `library_hash ade2bf98…99b6` (after Part 5's body_hash change; Part 1 had `ae86b9bd…`, `dada68b7…`), weather hash = the EPW's
   sha256 `c6571102…cf2`. 12,218 bytes canonical. 1 zone, 10 surfaces, 9 system groups, 3 ventilation entries,
   6 profiles, 4 construction refs.
 
@@ -90,8 +90,9 @@ nearest concept the note already has.
    is refused, not dropped.
 4. **`use_type`** is `building_type` when set, else `unassigned` (the anchor's is empty). A label; the engine does
    not read it.
-5. **`body_hash`** hashes the library item as stored (the fixture's `library_constructions` entry), not the
-   engine's reshaped copy. Same information, and it does not depend on engine code.
+5. **`body_hash`** hashes the item's own definition, `config_json` (= `library_items.body` after Part 3), not the
+   wrapper the engine receives around it. Changed in Part 5: the fixture's wrapper and the UI's differ
+   (`y_factor: null` vs `1`) for the same item, and the hash should not care how an item was delivered.
 6. **Glazing `g_value` is null** on the surface: g comes from the construction (or `g_value_override`).
 7. **Refusals**: no `systems_config_v40`; a v25-only enabled service; first-class `operable_openings` (non-empty);
    a stale service-level field; an unknown key on a system, vent, opening, schedule or construction choice;

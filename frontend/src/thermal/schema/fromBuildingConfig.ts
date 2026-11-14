@@ -184,7 +184,10 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     if (!libraryRefs.some((r) => r.kind === 'construction' && r.key === ref.key)) {
       const item = input.library_constructions.find((c) => c?.name === ref.key)
       if (!item) throw new ConversionError(`construction "${ref.key}" is not in the library`, path)
-      libraryRefs.push({ kind: 'construction', key: ref.key, version: null, body_hash: await sha256Hex(canonicalJSON(item)) })
+      // The pin is the item's own definition (config_json, which is library_items.body after Part 3), not the
+      // engine's reshaped copy around it: the same item hashes the same however it was delivered.
+      const body = isObj(item.config_json) ? item.config_json : item
+      libraryRefs.push({ kind: 'construction', key: ref.key, version: null, body_hash: await sha256Hex(canonicalJSON(body)) })
     }
     return ref
   }
