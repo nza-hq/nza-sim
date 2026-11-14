@@ -5,6 +5,20 @@ Brief 1 of the engine sequence (design note Notion `418d645e-05cc-811e-ad6b-fa88
 ("Do we need that other guy to write the brief… do as much as you can", 22:50), in place of Chris's architect chat.
 Branch `chris/103-engine-1`, off `main` `bbc7893` (Briefs 102 and 102a merged).
 
+**Rev B, 14 Nov 2026, 23:50, after Part 0 and the cooling-gap investigation (Linzie: "YES", 23:47).**
+
+- **The referee changes.** EnergyPlus is now the referee for demand. Today's State 1 is a reference only for the
+  per-path arithmetic (conductances and losses at setpoint); its demand is shown for information only.
+- **Why.** Tonight's clean EnergyPlus run (`docs/audit/103/ep_confirm_results.md`, Run Bi) put the
+  fabric-only demand at **68.7 MWh heating / 34.8 MWh cooling**, against State 1's 129.2 / 98.6. State 1's demand
+  method overstates both (`cooling_gap_root_cause.md`).
+- **Two additions:** a tidy-up of how the EnergyPlus reference model carries thermal bridging, and a performance
+  budget.
+- **Not in this brief:** the thermal-bridging bug in today's dynamic engine (132.6 → about 133.2) is not approved and
+  stays out of 103.
+- **Database route:** NZA Sim (dev) moved into the Net Zero Advisory org on 14 Nov, so migrations are applied and
+  read back through the Supabase connector, dev only.
+
 ## Brief-writing checklist (NZA Development Bible, rendered)
 
 - [x] Read the checklist, CLAUDE.md and STATUS.md.
@@ -42,9 +56,15 @@ most useful being that NZA Sim projects are matched by name.
    opaque conduction, glazing conduction, thermal bridging, solar through glazing and on opaque surfaces,
    infiltration from q50, permanent vents, a comfort band, the resulting heating and cooling demand.
 5. Every term as a breakdown line (Rule 9), and an energy-balance closure check every hour.
-6. Gates: analytic hand cases to rounding; a published reference case; the Bridgewater anchor's **envelope** demand
-   against today's State 1 within a stated tolerance, term by term, or the difference explained and recorded.
-7. The open QA items that touch the store (project matching by id, library upsert, run summary lines, AuthGate retry,
+6. Gates:
+   - analytic hand cases to rounding;
+   - a published reference case;
+   - the Bridgewater building's per-path conductances and losses at setpoint against today's State 1, within 1 %;
+   - its fabric-only heating and cooling demand against the **EnergyPlus referee**, within the decision 2
+     tolerance, or the difference explained and recorded.
+7. **Instant:** a full year for one zone in well under 100 ms in a browser worker, with a measured scaling estimate
+   to about 50 zones (decision 7).
+8. The open QA items that touch the store (project matching by id, library upsert, run summary lines, AuthGate retry,
    invitation revoke), each with a test.
 
 ## Scope
@@ -54,6 +74,7 @@ per hour and annual for the one zone; the breakdown and closure; the analytic, r
 QA store fixes listed in Part 1; a migration `0005` if Part 1 needs SQL.
 
 **Out** (later briefs; do not start them): multi-zone, partitions, floors, the loft buffer and roof cases (104);
+the thermal-bridging fix in today's engine (`instantCalc.js`, 132.6 → about 133.2; not approved);
 ventilation systems, MVHR/MEV, natural ventilation with control, internal gains from profiles (105); systems, DHW,
 delivered energy, fuel, EUI, the EnergyPlus referee (106); any UI (107+); the library moving into Postgres (110);
 age-band defaults (111); anything in decodED (113). Also out, by the scope fence (contract bump to change): airflow
@@ -82,16 +103,30 @@ Simulate v2 store only (`frontend/src/thermal/store/`, `supabase/migrations/`, `
 
 ## Decisions this brief takes (flagged for Chris's review; the design note is updated to match at close)
 
-1. **Where the anchor gate sits.** The design note gives Engine 1 "the box reproduces the anchor". The anchor's 132.6
-   is an EUI: it includes systems, DHW, fans, lighting and small power, which arrive in 105 and 106. Engine 1 therefore
-   gates on the anchor's **State 1 envelope demand** (annual heating and cooling demand at the comfort band, and each
-   envelope term), against today's `_calculateEnvelopeOnly` on the same fixture. The 132.6 EUI gate moves to 106.
-2. **Tolerance for the anchor envelope gate:** annual heating demand and annual cooling demand within **±5 %** of
-   today's State 1; each annual conduction, bridging, infiltration, vent and solar term within ±5 % or 0.5 MWh,
-   whichever is larger. Beyond that is a finding: instrument, name the term and its magnitude, record it in the audit;
-   never tune either engine to close it (Rule 10). The two engines are different physics on purpose (ISO 52016-1
-   element nodes against a 2-node wall model), so agreement is evidence, not the definition of right; the analytic and
-   reference cases are the definition of right.
+1. **Where the gates sit (Rev B).** The anchor's 132.6 is an EUI, so its gate moves to 106. Engine 1 is gated on the
+   Bridgewater envelope in two ways.
+   - **(a) Per-path arithmetic against today's State 1.** Each conductance, in W/K, must agree within **1 %**:
+     each opaque element, glazing, leakage, permanent vents and bridging. So must each annual loss at the setpoint
+     convention, in kWh, and the annual transmitted solar.
+     - This is algebra on the same inputs, so a gap is a bug in one of them.
+     - Part 0 §2 holds the State 1 figures.
+   - **(b) Demand against the EnergyPlus referee:** fabric-only heating and cooling at the flat 21/24 °C band.
+     - Model: EnergyPlus 25.2.0 with IdealLoads, Run Bi's set-up, on `validation/fixtures/report_baseline_v1.yaml`.
+       Its envelope is the anchor's, byte for byte.
+     - Settings: no people, lights or equipment; no mechanical ventilation; infiltration, permanent vents and
+       bridging kept.
+     - Weather: the anchor EPW (sha256 `c6571102…cf2`).
+     - The bridging is re-allocated per decision 6 (Part 5). Until Part 5 re-runs it, the reference is Run Bi:
+       **68.7 MWh heating / 34.8 MWh cooling**.
+   - Today's State 1 demand (129.2 / 98.6) is printed alongside **for information only**. It is not a gate, and
+     nothing is tuned toward it.
+2. **Tolerance for gate (b):** annual heating and cooling within **±10 %** of the EnergyPlus referee.
+   - Beyond that is a finding: instrument it, name the term and its magnitude, and record it in the audit.
+   - Never tune either engine to close it (Rule 10).
+   - **Known structural difference, reported and not tuned:** the referee has five stacked floor zones and Engine 1
+     one zone.
+   - For context, ASHRAE 140's spread between programs on its own cases is of this order. Hourly differences against
+     EnergyPlus are reported, not gated.
 3. **Engine location:** `frontend/src/thermal/engine/`, beside the schema and the store. A separate package folder or
    repo can come later; the provenance header pattern makes that reversible.
 4. **Reference case:** ISO 52016-1's own validation cases are in the paid standard (and ISO/TR 52016-2). If Part 0
@@ -99,6 +134,26 @@ Simulate v2 store only (`frontend/src/thermal/store/`, `supabase/migrations/`, `
    BESTEST Case 600 and 900** inputs as published in open literature, compared against the published range of
    programs, and says so. Buying the standard is a decision for Chris (escalation).
 5. **Fixture building id:** engine fixtures use a fixed `building.id` (QA L7); the hash includes it by design.
+6. **EnergyPlus reference model: bridging on its own element (Rev B).**
+   - **Today.** The assembler (`_apply_thermal_bridging`, `epjson_assembler.py` ~L854) spreads the whole H_TB as one
+     uniform ΔU over walls, roof *and ground floor*. Ground-floor bridging is then driven by the ground temperature,
+     not the outdoor temperature, and the junction losses sit on the wrong elements.
+   - **The referee instead allocates each ISO 14683 junction to its own element:**
+     - wall-to-roof goes on the roof;
+     - wall-to-ground-floor (the floor edge), wall-to-intermediate-floor, external corners and window perimeters go
+       on the external walls;
+     - nothing goes on the ground floor.
+   - **This is a referee-only script under `validation/energyplus/`.** It builds with bridging off, then degrades
+     each element's NoMass layer by its own ΔU. `nza_engine/` is untouched, so the product's EnergyPlus path does
+     not change.
+7. **Performance budget (Rev B, Linzie: instant results now and multi-zone later).**
+   - **Budget:** `runZoneModel` on the Bridgewater zone for a full year in **under 100 ms** in a browser Web Worker
+     (median of 5 after one warm-up) and in Node.
+   - **Design rule:** coefficient matrices are assembled and factorised **once per run** wherever they do not change
+     hour to hour; only the right-hand side is rebuilt each hour.
+   - **Scaling:** Part 4 measures 1, 10 and 50 copies of the zone and records the time and how it grows, so 104 has
+     a budget for about 50 zones. Target: 50 zones in under 2 s in a worker.
+   - Missing the 100 ms budget is an escalation, not a waiver.
 
 ## Principles
 
@@ -119,11 +174,13 @@ Simulate v2 store only (`frontend/src/thermal/store/`, `supabase/migrations/`, `
       ("How the old engine makes 132.6").
 - [ ] `git status` clean; `git fetch`; the branch is current with `main`.
 - [ ] `npm test` (frontend) passes; `node scripts/_brief93_anchor.mjs --fixture` prints 132.6.
+- [ ] Read `docs/audit/103/00_reconnaissance.md` and `docs/audit/103/{cooling_gap_root_cause.md,
+      ep_confirm_results.md}`.
 - [ ] The brief is on disk in `docs/briefs/active/` and `current.md` points at it (this commit).
 
 ## Parts
 
-### Part 0 — Reconnaissance (read-only, no code)
+### Part 0 — Reconnaissance (read-only, no code) — DONE `3b84614`
 
 File: `docs/audit/103/00_reconnaissance.md`. Commit: `103 P0: reconnaissance`.
 
@@ -131,7 +188,7 @@ File: `docs/audit/103/00_reconnaissance.md`. Commit: `103 P0: reconnaissance`.
    integrates, with line numbers, units and the inputs it reads; mark which model-document path carries each input.
 2. **The anchor's State 1 numbers.** Run today's engine on `validation/fixtures/bridgewater_anchor_v2.yaml` exactly
    as `_brief93_anchor.mjs --fixture` does and record the State 1 annual heating and cooling demand and each envelope
-   term (MWh), so Part 5 has a fixed target. Read-only: engine files imported, never changed.
+   term (MWh), so Part 6 has a fixed target. Read-only: engine files imported, never changed.
 3. **Ports.** For `solarCalc.js`, `wallModel.js`, `thermalBridges.js`, `thermalMass.js`, `openingCoefficients.js` and
    the permanent-vent flow code: what each does, what it depends on, whether it is portable as-is into a pure package,
    and what ISO 52016-1 replaces (e.g. the 2-node wall model by element nodes).
@@ -165,10 +222,13 @@ Commit: `103 P1: store fixes from the 102 QA (projects by id, library upsert, ru
   unlisted, and fails loudly on a missing or non-finite figure instead of writing 0; district heat lands in heating.
 - **L3:** AuthGate's error screen offers Retry and Sign out.
 - **L6:** `revoke_invitation(p_invitation)` for admins.
-- **L2** only if Part 0 finds a safe form; otherwise recorded as accepted risk.
+- **L2:** move `org_of_*`, `admin_count` and `role_in` to a `private` schema that PostgREST does not expose.
+  - Keep EXECUTE for `authenticated`.
+  - Recreate the three RLS policies that call them (`0002:295-301`).
+  - Do this only if the local rig proves that reads still work; otherwise record it as an accepted risk.
 
 Done when: the local-Postgres rig passes the new cases and all earlier ones; 0005 is applied to NZA Sim (dev) by the
-route Part 0 agreed and read back; `npm test` and the build pass; env unset unchanged (ZZ TEST Systems 132.6, no
+Supabase connector (`apply_migration` on `jbjxduathkklruvbmeho` only) and read back; `npm test` and the build pass; env unset unchanged (ZZ TEST Systems 132.6, no
 button). The ZZ TEST and anchor rows already stored keep working (their `local_ref` is null; first save after 0005 sets it).
 
 ### Part 2 — Package skeleton, EPW parser, solar on any surface
@@ -209,24 +269,56 @@ provenance, tests. Commit: `103 P4: infiltration, permanent vents, solar gains, 
 - `ZoneResults`: hourly air temperature, operative temperature, heating and cooling demand; annual totals; the
   breakdown lines (one per term, per element where useful); the closure residual. Shapes in `results.ts` (102), one
   canonical exposure per quantity and a `readZone*` helper per quantity (Rule 11).
-- Gates: the reference case (decision 4) within its published range for annual heating and cooling; closure ≤ 1 Wh per
-  hour on the reference case.
+- Gates:
+  - the reference case (decision 4) within its published range for annual heating and cooling;
+  - closure ≤ 1 Wh per hour on the reference case;
+  - the performance budget (decision 7): the one-zone year printed in Node; 1, 10 and 50 zone copies timed and
+    recorded in `docs/audit/103/04_performance.md`.
 
-### Part 5 — The anchor's envelope, term by term
+### Part 5 — The EnergyPlus referee, with bridging on its own element
 
-Files: `scripts/103_anchor_envelope.mjs`, `docs/audit/103/05_anchor_envelope.md`.
-Commit: `103 P5: the Bridgewater anchor's envelope demand against today's State 1, term by term`.
+Files:
+- `validation/energyplus/103_referee.py`, a referee-only driver based on tonight's scratch driver
+  (`C:\Users\ChrisScott\Dev\_epcheck_scratch\epcheck_driver.py`, Run Bi);
+- `validation/energyplus/results/103_referee_fabric_only.json`;
+- `docs/audit/103/05_referee.md`.
 
-- Convert the anchor fixture with `fromBuildingConfig` (fixed building id), run `runZoneModel` on the anchor EPW, and
-  print a table: term · today's State 1 (Part 0) · Engine 1 · Δ · Δ% · within tolerance (decision 2).
-- Every term outside tolerance gets a diagnosis by instrumentation (hourly traces, a perturbation that isolates it)
-  with its magnitude, recorded in the audit. Not tuned away.
+Commit: `103 P5: EnergyPlus fabric-only referee for Bridgewater, bridging allocated per element`.
 
-### Part 6 — Close
+- **Build.** Use `report_baseline_v1` and `mode="full"`, with the systems config's mode set to `ideal_loads`.
+  - Gains, occupancy and mechanical ventilation off, as Run Bi.
+  - Lights and ElectricEquipment objects deleted from the generated epJSON.
+  - Bridging set to absent in the copy passed to the assembler, then re-applied per element (decision 6).
+- **Checks, printed:** IdealLoads present and no VRF; setpoints a flat 21/24; people, lights and equipment 0; only
+  the permanent-vent louvres in ZoneVentilation; H_TB applied equal to `_nza_thermal_bridging_H_TB` within 0.1 W/K;
+  0 severe and 0 fatal errors.
+- **Runs** on IT15, EnergyPlus 25.2.0 (`C:\EnergyPlusV25-2-0`), in the `nza-sim-epcheck` worktree's own `data\`.
+  The committed JSON records:
+  - the EnergyPlus version, the EPW sha and the fixture sha;
+  - annual heating and cooling;
+  - monthly heating and cooling;
+  - the per-element H used.
+- **Report Run Bi (uniform) against Part 5 (per element) side by side.** The difference is the allocation's effect;
+  explain it by element.
+
+### Part 6 — The Bridgewater envelope: arithmetic against State 1, demand against EnergyPlus
+
+Files: `scripts/103_anchor_envelope.mjs`, `docs/audit/103/06_anchor_envelope.md`.
+Commit: `103 P6: Bridgewater envelope, per-path arithmetic against State 1 and demand against the EnergyPlus referee`.
+
+- Convert the fixture with `fromBuildingConfig` (fixed building id) and run `runZoneModel` on the anchor EPW.
+- **Table 1, gate (a):** path · conductance (W/K) and annual loss at setpoint, State 1 against Engine 1 · Δ% · within
+  1 %.
+- **Table 2, gate (b):** annual and monthly heating and cooling, EnergyPlus referee (Part 5) against Engine 1 · Δ% ·
+  within ±10 %. State 1 demand and today's dynamic engine are shown in information columns.
+- **Every miss gets a diagnosis by instrumentation,** recorded in the audit with its magnitude: hourly traces, or a
+  perturbation that isolates the term. Not tuned away.
+
+### Part 7 — Close
 
 Files: STATUS.md, `docs/briefs/current.md`, `git mv` this brief to
-`docs/briefs/archive/103_engine-1_COMPLETED.md`, `docs/audit/103/`, the design note (Notion) updated for decisions 1–5.
-PR `103 — Simulate v2 Engine 1` into `main`. Commit: `103 P6: close`.
+`docs/briefs/archive/103_engine-1_COMPLETED.md`, `docs/audit/103/`, the design note (Notion) updated for decisions 1–7.
+PR `103 — Simulate v2 Engine 1` into `main`. Commit: `103 P7: close`.
 
 ## Verification (falsifiable)
 
@@ -234,20 +326,24 @@ PR `103 — Simulate v2 Engine 1` into `main`. Commit: `103 P6: close`.
 2. `parseEpw` equals the backend parser on the anchor EPW, value for value; sha256 `c6571102…cf2`.
 3. `solarOnSurface` equals `computeHourlySolarByFacade` on the anchor's four facades within 1e-6 W/m².
 4. The reference case's annual heating and cooling within its published range, or the gap reported with magnitude.
-5. The anchor envelope table: heating and cooling demand within ±5 % of today's State 1, or each excess diagnosed and
-   recorded.
-6. The engine runs the anchor year in Node in under 1 s (printed), and the same numbers in a browser (a Playwright
-   check that imports the package in a page and compares totals to the Node run to the last digit).
-7. `git diff main...HEAD --stat` touches no engine file (`instantCalc.js`, `systemsEngine.js`, `interventionsEngine.js`,
+5. Per-path conductances and losses at setpoint within 1 % of State 1 (Part 6, table 1).
+6. Fabric-only heating and cooling within ±10 % of the EnergyPlus referee (Part 6, table 2), or each miss diagnosed
+   and recorded. The referee JSON is committed with the EnergyPlus version, EPW sha and fixture sha.
+7. Performance: the one-zone year in under 100 ms in a browser Web Worker and in Node (median of 5, printed). The
+   browser totals equal the Node totals to the last digit (Playwright). The 1, 10 and 50 zone timings are recorded.
+8. `git diff main...HEAD --stat` touches no engine file (`instantCalc.js`, `systemsEngine.js`, `interventionsEngine.js`,
    `solarCalc.js`, `wallModel.js`, `nza_engine/`); ported code is copied with a provenance header.
-8. Env unset: ZZ TEST Systems shows 132.6 and no Save button; `_brief93_anchor.mjs --fixture` 132.6.
-9. Part 1: the local-Postgres rig passes old and new cases; 0005 applied to NZA Sim (dev) and read back.
+9. Env unset: ZZ TEST Systems shows 132.6 and no Save button; `_brief93_anchor.mjs --fixture` 132.6.
+10. Part 1: the local-Postgres rig passes old and new cases; 0005 applied to NZA Sim (dev) and read back.
 
 ## What MUST NOT happen
 
 - No edit to `instantCalc.js`, `systemsEngine.js`, `interventionsEngine.js`, `solarCalc.js`, `wallModel.js`,
   `thermalBridges.js`, `thermalMass.js`, `openingCoefficients.js`, `nza_engine/` or any UI module. Ports are copies.
 - No number tuned to match another engine. No default hidden inside the engine.
+- No fix to today's thermal-bridging bug in `instantCalc.js` (not approved; 132.6 stays 132.6).
+- No change to `nza_engine/` for the referee. The per-element bridging lives in `validation/energyplus/` only.
+- No migration applied to anything other than NZA Sim (dev) `jbjxduathkklruvbmeho`.
 - No engine import of `frontend/src/utils/` at run time; no DOM, `window`, `fetch` or file access in the engine.
 - No UI change beyond Part 1's AuthGate buttons. No cut-over.
 - Nothing touches NZA Decoded or NZA Decoded Test. No service-role key anywhere. No lockfile or `node_modules` commit.
@@ -257,15 +353,17 @@ PR `103 — Simulate v2 Engine 1` into `main`. Commit: `103 P6: close`.
 
 - Part 0 shows the model document cannot express an input State 1 reads, and the fix is more than a field.
 - No lawful reference case exists (decision 4) and BESTEST inputs cannot be sourced openly.
-- The anchor envelope gap exceeds the tolerance on heating or cooling and instrumentation does not explain it after
-  three approaches (process rule 4).
+- The fabric-only gap against the EnergyPlus referee exceeds ±10 % on heating or cooling, and instrumentation does
+  not explain it after three approaches (process rule 4).
+- A per-path conductance misses 1 % and the cause is in State 1, not Engine 1. Report it; do not fix State 1.
+- The one-zone year exceeds 100 ms in a worker after the factorise-once design.
 - Anything that would widen the scope fence, or any number a client could see changing.
 - A migration step that would need anything other than the agreed route.
 
 ## Independent review
 
 Mandatory (engine, physics, hashes). Before close, a fresh reviewer (Claude Chat or a separate thread) reads
-`frontend/src/thermal/engine/` against this brief's intent and ISO 52016-1's structure, and the Part 5 table. The
+`frontend/src/thermal/engine/` against this brief's intent and ISO 52016-1's structure, and the Part 5 referee and Part 6 tables. The
 thread that built it does not grade it.
 
 ## Final report
