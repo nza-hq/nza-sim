@@ -2,7 +2,7 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *(PR open; 0004 to apply on NZA Sim (dev) first)*
+## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 
 Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/archive/102a_foundations-fixes_COMPLETED.md). Four proven bugs
 (QA H1, M1, M2, M3) and the round-trip gap (M5). No engine change; new SQL in `0004`, for Chris's agent to apply.
@@ -48,6 +48,9 @@ Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/ar
 - **P6 close** (this commit): the local-Postgres rig committed as `scripts/102a_pgtest/` (README; all four suites
   pass from there: 15 / 8 / 9 / 10); brief archived; `current.md` repointed. Close-out: no engine file, lockfile or
   `node_modules` in the diff; no key; 17/17 vitest; build clean; anchor `--fixture` 132.6; env unset unchanged.
+- **Verified on NZA Sim (dev)** (Chris's agent, 22:48): 0004 applied and read back; `anchor_record.sql` recorded the
+  anchor once and a second run added nothing; `anchor_readback.sql` all `*_ok` true, EUI 132.6, 558,972 kWh
+  ([`06_dev_verification.md`](docs/audit/102a/06_dev_verification.md)). Then PR #27 merged.
 - **Order on NZA Sim (dev):** apply 0004, then merge. 0004 drops the old `create_model_version(…, jsonb, …)`, so
   `main`'s Save button refuses until this branch is merged. Then run `anchor_record.sql` and `anchor_readback.sql`.
   The 102 ZZ TEST version and run stay (canonical null; their run key is the old `instant-1`).

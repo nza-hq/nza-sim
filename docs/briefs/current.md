@@ -1,8 +1,8 @@
 # Current brief
 
-**No active brief.** Brief 102a (Simulate v2 foundations: the QA fixes) CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes`; PR open. Before it merges, Chris's agent applies `supabase/migrations/0004_qa_fixes.sql` to NZA Sim (dev) and runs `docs/audit/102a/anchor_record.sql` then `anchor_readback.sql`.
+**No active brief.** Brief 102a (Simulate v2 foundations: the QA fixes) CLOSED and merged 14 Nov 2026 (PR #27); 0004 applied and the anchor round trip verified on NZA Sim (dev). The next Simulate v2 brief (103) is written by the architect.
 
-**Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 (PR open).**
+**Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026; MERGED (PR #27).**
 The run key now pins the engine source (content hash, templates included) and the EPW bytes; the database stores and checks the client's canonical text, so float noise and huge numbers save; runs belong to their model version (no cross-organisation sharing); accepting an invitation never demotes. The anchor round trip checks the stored document and can be proved from the SQL editor. No engine change. Brief [`archive/102a_foundations-fixes_COMPLETED.md`](archive/102a_foundations-fixes_COMPLETED.md); evidence [`../audit/102a/`](../audit/102a/).
 
 **Brief 102 — Simulate v2 Foundations — CLOSED 14 Nov 2026; MERGED to `main` `affbd7f` (PR #26).**
