@@ -13,7 +13,15 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   [`docs/audit/102/01_model_document.md`](docs/audit/102/01_model_document.md). 13/13 tests (`npm test`); build
   clean; anchor `--fixture` still **132.6**. `package.json` adds zod, vitest, yaml: **run `npm install` locally**
   (lockfile not committed).
-- **Next:** Part 2 (migrations in NZA Sim's own project) is with Chris's agent, which has the database access.
+- **P2** (Claude Chat, through Chris's browser into the dashboard SQL editor; the connector cannot reach the project):
+  `supabase/migrations/0001_tenancy.sql`, `0002_model_store.sql`, `0003_canonical_collation.sql` applied to
+  **NZA Sim (dev)** `jbjxduathkklruvbmeho` and recorded in `supabase_migrations.schema_migrations`; RLS on all 11
+  tables, nothing granted to anon, writes through security-definer functions; SQL `canonical_json`/`model_hash`
+  agree with `canonical.ts` byte for byte (`{"a":1,"b":[1,2]}` → `8baa7319…fb4874` in both); 17 checks in
+  [`docs/audit/102/02_schema.md`](docs/audit/102/02_schema.md); `supabase/README.md` says which project and how.
+  No decodED project touched.
+- **Next:** Part 3 (library export, Linzie's agent; the `--apply` run against the database is Claude Chat's),
+  Part 4 (frontend sign-in, Linzie's agent; Supabase auth settings, Claude Chat).
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 
