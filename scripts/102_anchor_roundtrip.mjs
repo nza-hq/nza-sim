@@ -34,6 +34,16 @@ import {
   ensureBuilding, ensureProject, INSTANT_ENGINE_VERSION, INSTANT_SOURCE, instantSummary, recordRun, saveModelVersion,
 } from '../frontend/src/thermal/store/versions.ts'
 
+/** Supabase errors are plain objects, not Errors: print what they say and exit 1, never an unreadable rejection. */
+function die(e) {
+  const msg = e?.message ?? e?.msg ?? (typeof e === 'object' ? JSON.stringify(e) : String(e))
+  console.error(`error: ${msg}${e?.code ? ` (code ${e.code})` : ''}${e?.hint ? ` hint: ${e.hint}` : ''}`)
+  if (/JWT|jwt|token/.test(msg)) console.error('check NZASIM_ACCESS_TOKEN: a fresh access_token from the signed-in browser tab (it lasts an hour).')
+  process.exit(1)
+}
+process.on('unhandledRejection', die)
+process.on('uncaughtException', die)
+
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const RECORD = argv.includes('--record')
@@ -55,7 +65,7 @@ const fx = parseYaml(fs.readFileSync(path.join(REPO, 'validation/fixtures/bridge
 
 // The organisation.
 const { data: access, error: accErr } = await sb.rpc('my_access')
-if (accErr) throw accErr
+if (accErr) die(accErr)
 const orgs = access.orgs.filter((o) => (orgArg ? o.name === orgArg : true))
 if (orgs.length !== 1) { console.error(`pick one organisation with --org; yours: ${access.orgs.map((o) => o.name).join(', ') || 'none'}`); process.exit(2) }
 const org = orgs[0]
@@ -64,10 +74,10 @@ const org = orgs[0]
 let buildingId = null
 {
   const { data: projects, error } = await sb.from('projects').select('id').eq('org_id', org.id).eq('name', NAME)
-  if (error) throw error
+  if (error) die(error)
   for (const p of projects) {
     const { data: b, error: e2 } = await sb.from('buildings').select('id').eq('project_id', p.id).eq('name', NAME).limit(1)
-    if (e2) throw e2
+    if (e2) die(e2)
     if (b.length) { buildingId = b[0].id; break }
   }
 }
@@ -94,11 +104,11 @@ if (RECORD) {
 
 // Read back.
 const { data: versions, error: vErr } = await sb.from('model_versions').select('id, model_hash').eq('building_id', buildingId).eq('model_hash', hash)
-if (vErr) throw vErr
+if (vErr) die(vErr)
 if (!versions.length) { console.error(`no stored version with model hash ${hash}`); process.exit(1) }
 const { data: runs, error: rErr } = await sb.from('runs').select('id, summary, source, engine_version, model_hash')
   .eq('model_version_id', versions[0].id).eq('engine_version', INSTANT_ENGINE_VERSION)
-if (rErr) throw rErr
+if (rErr) die(rErr)
 if (!runs.length) { console.error(`version ${versions[0].id} has no ${INSTANT_ENGINE_VERSION} run`); process.exit(1) }
 const run = runs[0]
 const again = await modelHash((await conv()).document)
