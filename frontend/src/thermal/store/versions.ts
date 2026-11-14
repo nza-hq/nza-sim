@@ -12,7 +12,19 @@ import { RunSummary } from '../schema/results'
 // @ts-expect-error: plain JS module
 import { readModelledEui } from '../../utils/engineReads.js'
 
-export const INSTANT_ENGINE_VERSION = 'instant-1'
+import { ENGINE_SHA } from 'virtual:engine-fingerprint'
+
+/**
+ * The run key's engine version: the instant engine's label plus a content hash of its whole source import closure,
+ * the built-in system templates included (frontend/plugins/engineFingerprint.js). An engine edit is a new key, so a
+ * stored run is never served for numbers a different engine would give (Brief 102a, QA H1).
+ */
+export const INSTANT_ENGINE_VERSION = engineVersionFor(ENGINE_SHA)
+
+export function engineVersionFor(sha: string): string {
+  if (!/^[0-9a-f]{64}$/.test(sha ?? '')) throw new Error('no engine fingerprint: run through Vite (dev server, build or vite-node)')
+  return `instant-1+${sha.slice(0, 24)}`
+}
 export const INSTANT_SOURCE = 'engineReads.readModelledEui'
 
 function fail(what: string, err: { code?: string; message?: string }): never {

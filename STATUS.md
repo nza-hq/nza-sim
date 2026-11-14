@@ -7,7 +7,14 @@
 Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_foundations-fixes.md). Four proven bugs
 (QA H1, M1, M2, M3) and the round-trip gap (M5). No engine change; new SQL in `0004`, for Chris's agent to apply.
 
-- **P0** (this commit): brief, QA report copy, Brief 102 marked merged.
+- **P0** (`6626ef4`): brief, QA report copy, Brief 102 marked merged.
+- **P1** (this commit, QA H1): `engine_version` = `instant-1+<24 hex>`, the sha256 of the instant engine's whole
+  source import closure (15 files, the system templates included; `frontend/plugins/engineFingerprint.js`, served as
+  `virtual:engine-fingerprint` and recomputed on HMR). `/api/weather/{f}/hourly` now also reports `file_name` and
+  `file_sha256`; the Save button pins `weather_ref {kind:'epw'}` from the weather the result was computed from, and
+  refuses without a hash. 17/17 tests (4 new: closure covers engine + templates, stable, changes on any edit, refuses
+  no fingerprint); build clean; env unset: ZZ TEST Systems 132.6, no button, no page errors, nothing external;
+  anchor `--fixture` 132.6; Yeovilton EPW reports `c65711022b0e…` (= the anchor's).
 
 ## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 

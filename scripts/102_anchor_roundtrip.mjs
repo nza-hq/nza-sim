@@ -23,6 +23,7 @@
  * Run (TypeScript imports, so through vite-node from frontend/):
  *   cd frontend; npx vite-node ../scripts/102_anchor_roundtrip.mjs [--record] [--org "NZA"]
  */
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -84,8 +85,13 @@ let buildingId = null
 if (!buildingId && RECORD) buildingId = await ensureBuilding(sb, await ensureProject(sb, org.id, NAME), NAME)
 if (!buildingId) { console.error(`no "${NAME}" building in ${org.name}: run once with --record`); process.exit(1) }
 
+// The EPW the engine reads, pinned by its own bytes (Brief 102a, QA H1).
+const EPW_NAME = fx.building_config.weather_file
+const EPW_SHA = crypto.createHash('sha256').update(fs.readFileSync(path.join(REPO, 'data/weather/current', EPW_NAME))).digest('hex')
+
 // A fresh conversion of the fixture, with the stored building's id.
 const conv = () => fromBuildingConfig({
+  weather: { file_name: EPW_NAME, file_hash: EPW_SHA },
   building_config: fx.building_config,
   construction_choices: fx.construction_choices,
   comfort_band: fx.comfort_band,
