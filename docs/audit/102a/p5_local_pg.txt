@@ -1,0 +1,15 @@
+PASS  emitted record SQL runs in the editor (as postgres, switching to the admin)
+PASS  one building, one version, one run  — 1/1/1
+PASS  running it again adds nothing  — 1/1/1
+PASS  the version is recorded as the organisation's admin, not the editor superuser
+readback: {"version_id":"f105b2e3-d120-4eef-b6fb-9d8afcf96214","stored_text_hash_ok":true,"same_document_as_javascript_ok":true,"weather_is_the_epw_bytes_ok":true,"engine_version_ok":true,"eui_ok":true,"total_kwh_ok":true,"eui":"132.6","total_kwh":558972,"runs_on_version":1}
+PASS  read-back: every *_ok column true
+  version f105b2e3-d120-4eef-b6fb-9d8afcf96214: stored text → d8625d3ae0f7, stored jsonb → d8625d3ae0f7, fixture → d8625d3ae0f7: match
+  run 4c17b06a-4f38-49c4-8f67-edc243767a17 (instant-1+16ad63056bf28ea2f90d9b37, engineReads.readModelledEui): EUI 132.6 kWh/m2, total 558972 kWh: match
+PASS  readAnchor (the token path) verifies the SQL-recorded anchor
+PASS  recordAnchor on top adds nothing (same version, same run)  — 1/1/1
+PASS  a tampered stored text fails readAnchor  — version f105b2e3-d120-4eef-b6fb-9d8afcf96214: stored text → 2342633a80e0, stored jsonb → d8625d3ae0f7, fixture → d8625d3ae0f7: MISMATCH
+PASS  ...and the SQL read-back
+PASS  without 0004 recorded, the record SQL refuses with a clear message  — apply supabase/migrations/0004_qa_fixes.sql first
+
+10 passed, 0 failed

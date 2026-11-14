@@ -172,3 +172,6 @@ begin
   return inv.org_id;
 end
 $$;
+
+insert into supabase_migrations.schema_migrations (version, name)
+values ('20261114230004', '0004_qa_fixes') on conflict do nothing;

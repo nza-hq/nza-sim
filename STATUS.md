@@ -33,7 +33,18 @@ Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_f
   rejoins with the invited one); `role_rank()` is internal, not granted. Local PG 9/9
   ([`docs/audit/102a/p4_local_pg.txt`](docs/audit/102a/p4_local_pg.txt)): the sole admin accepting a viewer invite to
   their own email stays admin (admin_count 1); invitations raise but never lower; the last-admin guard and the
-  email match still hold; anon can still validate a token.
+  email match still hold; anon can still validate a token. (`01cd5f5`)
+- **P5** (this commit, QA M5): `scripts/102_anchor_roundtrip_lib.mjs` (logic) + `102_anchor_roundtrip.mjs` (CLI).
+  "match" now means the STORED document hashes to the fixture's hash, by its stored text and by its jsonb; EUI and
+  total kWh are checked as 132.6 ± 0.05 and 558,972 ± 1 kWh, never by float equality; a missing comfort band is
+  refused (no 20/26 °C default). New `--emit-sql` writes
+  [`anchor_record.sql`](docs/audit/102a/anchor_record.sql) (records the anchor as the organisation's first admin,
+  through the app's functions and RLS, in one transaction; idempotent; refuses before 0004) and
+  [`anchor_readback.sql`](docs/audit/102a/anchor_readback.sql) (every `*_ok` column must be true): a real-database
+  proof without a token in a terminal. Local PG 10/10
+  ([`p5_local_pg.txt`](docs/audit/102a/p5_local_pg.txt)): record twice → 1 version, 1 run, as the admin; read-back
+  all true (EUI 132.6, 558,972 kWh); the token path verifies the same rows; a tampered stored text fails both.
+  0004 now records itself in `supabase_migrations.schema_migrations`.
 
 ## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 
