@@ -14,7 +14,15 @@ Brief [`docs/briefs/active/102a_foundations-fixes.md`](docs/briefs/active/102a_f
   `file_sha256`; the Save button pins `weather_ref {kind:'epw'}` from the weather the result was computed from, and
   refuses without a hash. 17/17 tests (4 new: closure covers engine + templates, stable, changes on any edit, refuses
   no fingerprint); build clean; env unset: ZZ TEST Systems 132.6, no button, no page errors, nothing external;
-  anchor `--fixture` 132.6; Yeovilton EPW reports `c65711022b0e…` (= the anchor's).
+  anchor `--fixture` 132.6; Yeovilton EPW reports `c65711022b0e…` (= the anchor's). (`ad26bce`)
+- **P2** (this commit, QA M1 + M2's equality checks): `0004_qa_fixes.sql` replaces `create_model_version`: it takes
+  the client's canonical text `p_canonical`, checks `sha256(p_canonical)`, stores the text (`model_versions.canonical`)
+  and its jsonb; refuses a document naming another building, another schema version, or an EPW hash other than
+  `p_weather_hash`. `versions.ts` sends the text it hashed. Local Postgres 16 with all four migrations and a Supabase
+  stand-in, driving the real `versions.ts`: 15/15
+  ([`docs/audit/102a/p2_local_pg.txt`](docs/audit/102a/p2_local_pg.txt)): `-2.7755575615628914e-17`, `5e-7`,
+  `1e21`, `-1.5e-12` and astral-plane keys now save (0003's SQL re-hash disagreed on every one); the anchor still
+  saves once. **0004 must be applied before this branch's button is used** (the old signature is dropped).
 
 ## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 

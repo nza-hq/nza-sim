@@ -1,0 +1,17 @@
+PASS  anchor saves
+PASS  anchor again: the same version, nothing new
+PASS  stored: sha256(canonical) = model_hash; the jsonb re-hash agrees too for the anchor  — t|t|c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2
+PASS  weather pinned by the EPW sha256
+PASS  float noise 0.3-0.1-0.2 = -2.7755575615628914e-17: saves (0003's SQL re-hash DISAGREED, so 102 refused it)
+PASS  5e-7: saves (0003's SQL re-hash DISAGREED, so 102 refused it)
+PASS  1e21: saves (0003's SQL re-hash DISAGREED, so 102 refused it)
+PASS  -1.5e-12: saves (0003's SQL re-hash DISAGREED, so 102 refused it)
+PASS  astral-plane keys save (0003's SQL order disagreed)
+PASS  wrong hash refused, 23514, both hashes named  — model_hash ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff does not match the document text (sha256 8f6968d5d715b2cc65dd6c5217ff2dd0efcaf6b56d2a350b5cd153c00c7ee38d)
+PASS  document naming another building refused  — the document names building 00000000-0000-0000-0000-000000000000, not 505a4cb3-2f5c-4c20-9f8e-83f7396490b1
+PASS  schema version mismatch refused  — the document is schema version 2.0, not 9.9
+PASS  weather_hash not the document's EPW hash refused  — weather_hash 5900c7ab040e036b26281ae2ff05a94f850f26fdb96cc7512cf7c31e3058a7b9 is not the document's EPW hash c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2
+PASS  another organisation cannot save into this building (42501)  — only an editor or admin can save a model version
+PASS  anon cannot call it  — permission denied for function create_model_version
+
+15 passed, 0 failed

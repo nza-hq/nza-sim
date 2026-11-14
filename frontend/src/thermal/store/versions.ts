@@ -6,7 +6,8 @@
  * the one canonical EUI read (engineReads.readModelledEui, CLAUDE.md rule 11).
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { libraryHash, modelHash, weatherHash } from '../schema/hash'
+import { canonicalJSON, sha256Hex } from '../schema/canonical'
+import { libraryHash, weatherHash } from '../schema/hash'
 import type { ModelDocument } from '../schema/model'
 import { RunSummary } from '../schema/results'
 // @ts-expect-error: plain JS module
@@ -65,14 +66,17 @@ export interface SavedVersion {
  * building already (then that one is returned). Versions are immutable; the newest becomes the parent.
  */
 export async function saveModelVersion(sb: SupabaseClient, buildingId: string, doc: ModelDocument, note: string | null): Promise<SavedVersion> {
-  const [mh, lh, wh] = await Promise.all([modelHash(doc), libraryHash(doc.library_refs), weatherHash(doc.weather_ref)])
+  // The exact text that is hashed is what the database stores and checks (Brief 102a, QA M1): SQL never re-serialises
+  // it, so float noise such as -2.8e-17 or a value of 1e21 hashes the same on both sides.
+  const canonical = canonicalJSON(doc)
+  const [mh, lh, wh] = await Promise.all([sha256Hex(canonical), libraryHash(doc.library_refs), weatherHash(doc.weather_ref)])
   const same = await sb.from('model_versions').select('id').eq('building_id', buildingId).eq('model_hash', mh).limit(1)
   if (same.error) fail('reading model versions', same.error)
   if (same.data && same.data.length) return { id: same.data[0].id, model_hash: mh, library_hash: lh, weather_hash: wh, created: false }
   const latest = await sb.from('model_versions').select('id').eq('building_id', buildingId).order('created_at', { ascending: false }).limit(1)
   if (latest.error) fail('reading model versions', latest.error)
   const { data: id, error } = await sb.rpc('create_model_version', {
-    p_building: buildingId, p_schema_version: doc.schema_version, p_document: doc,
+    p_building: buildingId, p_schema_version: doc.schema_version, p_canonical: canonical,
     p_model_hash: mh, p_library_hash: lh, p_weather_hash: wh,
     p_parent: latest.data?.[0]?.id ?? null, p_note: note,
   })
