@@ -14,7 +14,9 @@ This tool is a sibling to Pablo (NZA's electricity cost analytics platform). It 
 
 ## Environment
 
-1. **Working directory:** `C:\Dev\nza-simulate` on Chris's machine. This is a local folder — NOT on OneDrive. The OneDrive copy rule is inherited from Pablo and is non-negotiable.
+1. **Working directory:** a local folder — NOT on OneDrive. The OneDrive copy rule is inherited from Pablo and is non-negotiable. Known checkouts:
+   - Chris's machine: `C:\Dev\nza-simulate`, with Chris's live DB in `data\`.
+   - IT15 (Linzie's sessions): `C:\Users\ChrisScott\Dev\nza-sim`. Its `data\nza_sim.db` is the 17 Jul 2026 transfer-pack copy, not Chris's live DB. Simulate v2 (Brief 102 onward) is worked in the git worktree `C:\Users\ChrisScott\Dev\nza-sim-102`, which has its own `data\` (never a junction to the main one, Backup discipline Rule 1).
 2. **Why not OneDrive:** OneDrive syncs `.git` internals and `node_modules` in the background, causing corrupted git objects, SQLite WAL desync, npm install failures, and ghost files. This is unfixable — these tools are fundamentally incompatible with OneDrive's sync. Do not suggest moving to OneDrive. Ever.
 3. **Servers:** Backend runs on port 8002 (`python -m uvicorn api.main:app --host 127.0.0.1 --port 8002` from project root). Frontend runs on port 5176 (`npm run dev` from `frontend/`). Two terminal windows required. Ports are deliberately different from Pablo (8001/5175) so both tools can run simultaneously.
 4. **Data files are local-only.** The `data/` folder (containing weather files, simulation outputs, and any SQLite databases) is in `.gitignore`. It does not exist on GitHub. If you clone the repo fresh, the backend creates an empty database on startup — but library items (constructions, system templates, profiles, weather files) will need to be re-ingested or copied from a working installation.
@@ -76,6 +78,14 @@ These rules were learned the hard way during the May 2026 audit and dynamic-engi
     (Brief 39, May 2026. Audit chain: `docs/audit/39_state2_permanent_vent_diagnosis.md` → `docs/audit/39_calculation_flow_map.md` → Brief 39 Parts 1–6. Extended by Brief 41 Parts 0–7 + Part 6 close: operable openings, mirror-vs-physics-correctness, UI parity. Extended by Brief 42 Parts 1–6: per-opening cd + flow_mode — each facade and each operable opening declares its own physics; building-wide `openings.cd` and `openings.flow_mode` removed; site exposure stays building-wide. Engine reads switch under Rule 14 three-location parity in a single commit, `docs/audit/42_per_opening_migration.md`.)
 
 ---
+
+## NZA Sim's own Supabase project (Brief 102, Nov 2026)
+
+1. **NZA Sim has its own Supabase project and its own identity.** Dev: "NZA Sim (dev)", ref `jbjxduathkklruvbmeho`. A prod project is created, with the same migrations in order, before the first client; until then everything is dev only. Migrations live in `supabase/migrations/`; how to apply them is in `supabase/README.md`.
+2. **Never decodED's database.** Nothing here reads from or writes to `NZA Decoded` (`weeaadpwofvbmcilxpkt`, live) or `NZA Decoded Test` (`stxitqwhaesraisfwyes`). The decodED link is Brief 113: an optional integration through `org_links` and a scoped token. NZA Sim reads nothing from decodED's database.
+3. **Env names:** `VITE_NZASIM_SUPABASE_URL` and `VITE_NZASIM_SUPABASE_ANON_KEY` in `frontend/.env` (gitignored; names in `frontend/.env.example`; values in Bitwarden org "NZA"). With either unset, `AuthGate` renders the app unchanged and nothing calls Supabase, so today's tool runs exactly as before.
+4. **The anon key is public by design**, safe only because every table has RLS and every write goes through a security-definer function. **No service-role key** in the repo, a laptop `.env`, a log or Notion. Scripts (e.g. `scripts/102_seed_library.mjs`) use the anon key plus a signed-in user's own session.
+5. **Sign-in** is an email magic link. Organisations, roles (admin / editor / viewer) and invitations come from `my_access()` and the tenancy functions in `0001_tenancy.sql`; the current organisation is `useAuth().org` (`frontend/src/auth/AuthGate.tsx`).
 
 ## Module scopes
 

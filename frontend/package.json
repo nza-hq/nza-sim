@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "validate": "node ../scripts/validate_engine.mjs"
+    "validate": "node ../scripts/validate_engine.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
+    "@supabase/supabase-js": "^2.46.1",
     "d3-sankey": "^0.12.3",
     "d3-shape": "^3.2.0",
     "html2canvas": "^1.4.1",
@@ -22,13 +24,16 @@
     "react-router-dom": "^6.26.2",
     "recharts": "^2.13.0",
     "three": "^0.168.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-react": "^4.3.2",
     "playwright": "^1.60.0",
     "tailwindcss": "^4.0.0",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "vitest": "^2.1.9",
+    "yaml": "^2.6.1"
   }
 }

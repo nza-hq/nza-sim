@@ -1,0 +1,3230 @@
+{
+ "_note": "Brief 102 P3. Read-only export of the local nza-sim SQLite library. Seed with scripts/102_seed_library.mjs.",
+ "exported_at": "2026-11-14T19:36:56+00:00",
+ "machine": "vm",
+ "source_db_sha256": "5a41bcf1e23808ea5ccbd5fc9f9a0c276c0f4a32d257c189d776d5525b5dd51b",
+ "counts": {
+  "construction": 15,
+  "profile": 15,
+  "system_template": 18,
+  "weather": 1
+ },
+ "skipped": {
+  "benchmark": {
+   "reason": "CRREM benchmark pathways: not a model input and no sim.library_items kind",
+   "keys": [
+    "crrem_hotel_uk_15",
+    "crrem_hotel_uk_2",
+    "uk_grid_carbon_fes_leading"
+   ]
+  }
+ },
+ "items": [
+  {
+   "kind": "construction",
+   "key": "bridgwater_ext_wall",
+   "body": {
+    "name": "bridgwater_ext_wall",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.14,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "HIEX Bridgwater external wall — precast insulated panel, BRUKL U=0.14",
+    "epjson": {
+     "Material": {
+      "Brdg_Wall_Concrete150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2300,
+       "specific_heat": 1000
+      },
+      "Brdg_Wall_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "Brdg_Wall_Insul": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 6.759
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "bridgwater_ext_wall": {
+       "outside_layer": "Brdg_Wall_Insul",
+       "layer_2": "Brdg_Wall_Concrete150",
+       "layer_3": "Brdg_Wall_Plasterboard"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_bridgwater_ext_wall",
+    "library_type": "construction",
+    "display_name": "HIEX Bridgwater external wall — precast insulated panel, BRUKL U=0.14",
+    "description": "HIEX Bridgwater external wall — precast insulated panel, BRUKL U=0.14",
+    "is_default": false,
+    "created_at": "2026-06-25 12:21:41",
+    "updated_at": "2026-06-25 15:26:59",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "bridgwater_glazing",
+   "body": {
+    "name": "bridgwater_glazing",
+    "type": "glazing",
+    "u_value_W_per_m2K": 1.4,
+    "g_value": 0.55,
+    "thermal_mass": null,
+    "description": "HIEX Bridgwater glazing — area-weighted G1/G2 bedroom DGU dominant, BRUKL U=1.4 / g=0.55",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "bridgwater_glazing_pane": {
+       "u_factor": 1.4,
+       "solar_heat_gain_coefficient": 0.55,
+       "visible_transmittance": 0.7
+      }
+     },
+     "Construction": {
+      "bridgwater_glazing": {
+       "outside_layer": "bridgwater_glazing_pane"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_bridgwater_glazing",
+    "library_type": "construction",
+    "display_name": "HIEX Bridgwater glazing — area-weighted G1/G2 bedroom DGU dominant, BRUKL U=1.4 / g=0.55",
+    "description": "HIEX Bridgwater glazing — area-weighted G1/G2 bedroom DGU dominant, BRUKL U=1.4 / g=0.55",
+    "is_default": false,
+    "created_at": "2026-06-25 12:21:41",
+    "updated_at": "2026-06-25 15:26:59",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "bridgwater_ground_floor",
+   "body": {
+    "name": "bridgwater_ground_floor",
+    "type": "floor",
+    "u_value_W_per_m2K": 0.13,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "HIEX Bridgwater ground floor — insulated precast slab + screed, BRUKL U=0.13",
+    "epjson": {
+     "Material": {
+      "Brdg_GF_Concrete150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2300,
+       "specific_heat": 1000
+      },
+      "Brdg_GF_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "Brdg_GF_Insul": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 7.191
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "bridgwater_ground_floor": {
+       "outside_layer": "Brdg_GF_Insul",
+       "layer_2": "Brdg_GF_Concrete150",
+       "layer_3": "Brdg_GF_Screed"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_bridgwater_ground_floor",
+    "library_type": "construction",
+    "display_name": "HIEX Bridgwater ground floor — insulated precast slab + screed, BRUKL U=0.13",
+    "description": "HIEX Bridgwater ground floor — insulated precast slab + screed, BRUKL U=0.13",
+    "is_default": false,
+    "created_at": "2026-06-25 12:21:41",
+    "updated_at": "2026-06-25 15:26:59",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "bridgwater_roof",
+   "body": {
+    "name": "bridgwater_roof",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.15,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "HIEX Bridgwater roof — precast concrete deck + insulation, BRUKL U=0.15",
+    "epjson": {
+     "Material": {
+      "Brdg_Roof_Waterproof": {
+       "roughness": "Smooth",
+       "thickness": 0.005,
+       "conductivity": 0.2,
+       "density": 1100,
+       "specific_heat": 1000
+      },
+      "Brdg_Roof_Concrete150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {
+      "Brdg_Roof_Insul": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 6.369
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "bridgwater_roof": {
+       "outside_layer": "Brdg_Roof_Waterproof",
+       "layer_2": "Brdg_Roof_Insul",
+       "layer_3": "Brdg_Roof_Concrete150"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_bridgwater_roof",
+    "library_type": "construction",
+    "display_name": "HIEX Bridgwater roof — precast concrete deck + insulation, BRUKL U=0.15",
+    "description": "HIEX Bridgwater roof — precast concrete deck + insulation, BRUKL U=0.15",
+    "is_default": false,
+    "created_at": "2026-06-25 12:21:41",
+    "updated_at": "2026-06-25 15:26:59",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "cavity_wall_enhanced",
+   "body": {
+    "name": "cavity_wall_enhanced",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.18,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Brick outer leaf, 150mm PIR cavity insulation, dense concrete block, plasterboard",
+    "epjson": {
+     "Material": {
+      "CavWall_Enh_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "CavWall_Enh_PIR150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 0.022,
+       "density": 30,
+       "specific_heat": 1400
+      },
+      "CavWall_Enh_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "CavWall_Enh_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "cavity_wall_enhanced": {
+       "outside_layer": "CavWall_Enh_BrickOuter",
+       "layer_2": "CavWall_Enh_PIR150",
+       "layer_3": "CavWall_Enh_ConcreteBlock",
+       "layer_4": "CavWall_Enh_Plasterboard"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_cavity_wall_enhanced",
+    "library_type": "construction",
+    "display_name": "Brick outer leaf, 150mm PIR cavity insulation, dense concrete block, plasterboard",
+    "description": "Brick outer leaf, 150mm PIR cavity insulation, dense concrete block, plasterboard",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "cavity_wall_standard",
+   "body": {
+    "name": "cavity_wall_standard",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.28,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Brick outer leaf, 100mm mineral wool cavity, dense concrete block inner, plasterboard",
+    "epjson": {
+     "Material": {
+      "CavWall_Std_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "CavWall_Std_MineralWool100": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "CavWall_Std_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "CavWall_Std_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "cavity_wall_standard": {
+       "outside_layer": "CavWall_Std_BrickOuter",
+       "layer_2": "CavWall_Std_MineralWool100",
+       "layer_3": "CavWall_Std_ConcreteBlock",
+       "layer_4": "CavWall_Std_Plasterboard"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_cavity_wall_standard",
+    "library_type": "construction",
+    "display_name": "Brick outer leaf, 100mm mineral wool cavity, dense concrete block inner, plasterboard",
+    "description": "Brick outer leaf, 100mm mineral wool cavity, dense concrete block inner, plasterboard",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "double_low_e",
+   "body": {
+    "name": "double_low_e",
+    "type": "glazing",
+    "u_value_W_per_m2K": 1.4,
+    "g_value": 0.42,
+    "thermal_mass": null,
+    "description": "Double glazing, low-e coating, argon filled",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "double_low_e_glazing": {
+       "u_factor": 1.4,
+       "solar_heat_gain_coefficient": 0.42
+      }
+     },
+     "Construction": {
+      "double_low_e": {
+       "outside_layer": "double_low_e_glazing"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_double_low_e",
+    "library_type": "construction",
+    "display_name": "Double glazing, low-e coating, argon filled",
+    "description": "Double glazing, low-e coating, argon filled",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "flat_roof_enhanced",
+   "body": {
+    "name": "flat_roof_enhanced",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.11,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Concrete deck, vapour barrier, 200mm PIR insulation, waterproofing",
+    "epjson": {
+     "Material": {
+      "FlatRoof_Enh_Waterproof": {
+       "roughness": "MediumSmooth",
+       "thickness": 0.005,
+       "conductivity": 0.2,
+       "density": 1100,
+       "specific_heat": 1000
+      },
+      "FlatRoof_Enh_PIR200": {
+       "roughness": "MediumRough",
+       "thickness": 0.2,
+       "conductivity": 0.022,
+       "density": 30,
+       "specific_heat": 1400
+      },
+      "FlatRoof_Enh_VapourBarrier": {
+       "roughness": "MediumRough",
+       "thickness": 0.002,
+       "conductivity": 0.19,
+       "density": 920,
+       "specific_heat": 2090
+      },
+      "FlatRoof_Enh_ConcreteDeck": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "flat_roof_enhanced": {
+       "outside_layer": "FlatRoof_Enh_Waterproof",
+       "layer_2": "FlatRoof_Enh_PIR200",
+       "layer_3": "FlatRoof_Enh_VapourBarrier",
+       "layer_4": "FlatRoof_Enh_ConcreteDeck"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_flat_roof_enhanced",
+    "library_type": "construction",
+    "display_name": "Concrete deck, vapour barrier, 200mm PIR insulation, waterproofing",
+    "description": "Concrete deck, vapour barrier, 200mm PIR insulation, waterproofing",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "flat_roof_standard",
+   "body": {
+    "name": "flat_roof_standard",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.18,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Concrete deck, vapour barrier, 120mm PIR insulation, waterproofing",
+    "epjson": {
+     "Material": {
+      "FlatRoof_Std_Waterproof": {
+       "roughness": "MediumSmooth",
+       "thickness": 0.005,
+       "conductivity": 0.2,
+       "density": 1100,
+       "specific_heat": 1000
+      },
+      "FlatRoof_Std_PIR120": {
+       "roughness": "MediumRough",
+       "thickness": 0.12,
+       "conductivity": 0.022,
+       "density": 30,
+       "specific_heat": 1400
+      },
+      "FlatRoof_Std_VapourBarrier": {
+       "roughness": "MediumRough",
+       "thickness": 0.002,
+       "conductivity": 0.19,
+       "density": 920,
+       "specific_heat": 2090
+      },
+      "FlatRoof_Std_ConcreteDeck": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "flat_roof_standard": {
+       "outside_layer": "FlatRoof_Std_Waterproof",
+       "layer_2": "FlatRoof_Std_PIR120",
+       "layer_3": "FlatRoof_Std_VapourBarrier",
+       "layer_4": "FlatRoof_Std_ConcreteDeck"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_flat_roof_standard",
+    "library_type": "construction",
+    "display_name": "Concrete deck, vapour barrier, 120mm PIR insulation, waterproofing",
+    "description": "Concrete deck, vapour barrier, 120mm PIR insulation, waterproofing",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "ground_floor_enhanced",
+   "body": {
+    "name": "ground_floor_enhanced",
+    "type": "floor",
+    "u_value_W_per_m2K": 0.15,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Carpet, screed, 150mm concrete slab, 150mm XPS insulation, hardcore",
+    "epjson": {
+     "Material": {
+      "GFloor_Enh_Carpet": {
+       "roughness": "MediumRough",
+       "thickness": 0.01,
+       "conductivity": 0.06,
+       "density": 200,
+       "specific_heat": 1300
+      },
+      "GFloor_Enh_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFloor_Enh_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "GFloor_Enh_XPS150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 0.033,
+       "density": 35,
+       "specific_heat": 1400
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_enhanced": {
+       "outside_layer": "GFloor_Enh_Carpet",
+       "layer_2": "GFloor_Enh_Screed",
+       "layer_3": "GFloor_Enh_ConcreteSlab",
+       "layer_4": "GFloor_Enh_XPS150"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_ground_floor_enhanced",
+    "library_type": "construction",
+    "display_name": "Carpet, screed, 150mm concrete slab, 150mm XPS insulation, hardcore",
+    "description": "Carpet, screed, 150mm concrete slab, 150mm XPS insulation, hardcore",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "ground_floor_slab",
+   "body": {
+    "name": "ground_floor_slab",
+    "type": "floor",
+    "u_value_W_per_m2K": 0.22,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Carpet, screed, 150mm concrete slab, 100mm XPS insulation, hardcore",
+    "epjson": {
+     "Material": {
+      "GFloor_Std_Carpet": {
+       "roughness": "MediumRough",
+       "thickness": 0.01,
+       "conductivity": 0.06,
+       "density": 200,
+       "specific_heat": 1300
+      },
+      "GFloor_Std_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFloor_Std_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "GFloor_Std_XPS100": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.033,
+       "density": 35,
+       "specific_heat": 1400
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_slab": {
+       "outside_layer": "GFloor_Std_Carpet",
+       "layer_2": "GFloor_Std_Screed",
+       "layer_3": "GFloor_Std_ConcreteSlab",
+       "layer_4": "GFloor_Std_XPS100"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_ground_floor_slab",
+    "library_type": "construction",
+    "display_name": "Carpet, screed, 150mm concrete slab, 100mm XPS insulation, hardcore",
+    "description": "Carpet, screed, 150mm concrete slab, 100mm XPS insulation, hardcore",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "interior_floor_ceiling",
+   "body": {
+    "name": "interior_floor_ceiling",
+    "type": "interior",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Carpet, screed, 200mm reinforced concrete, plaster skim",
+    "epjson": {
+     "Material": {
+      "IntFloor_Carpet": {
+       "roughness": "MediumRough",
+       "thickness": 0.01,
+       "conductivity": 0.06,
+       "density": 200,
+       "specific_heat": 1300
+      },
+      "IntFloor_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "IntFloor_Concrete200": {
+       "roughness": "MediumRough",
+       "thickness": 0.2,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "IntFloor_Plaster": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "interior_floor_ceiling": {
+       "outside_layer": "IntFloor_Carpet",
+       "layer_2": "IntFloor_Screed",
+       "layer_3": "IntFloor_Concrete200",
+       "layer_4": "IntFloor_Plaster"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_interior_floor_ceiling",
+    "library_type": "construction",
+    "display_name": "Carpet, screed, 200mm reinforced concrete, plaster skim",
+    "description": "Carpet, screed, 200mm reinforced concrete, plaster skim",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "pitched_roof_standard",
+   "body": {
+    "name": "pitched_roof_standard",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.16,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Tiles, battens, membrane, 200mm mineral wool between rafters, plasterboard",
+    "epjson": {
+     "Material": {
+      "PitchedRoof_Std_Tiles": {
+       "roughness": "Rough",
+       "thickness": 0.012,
+       "conductivity": 0.84,
+       "density": 1900,
+       "specific_heat": 800
+      },
+      "PitchedRoof_Std_MineralWool200": {
+       "roughness": "MediumRough",
+       "thickness": 0.2,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "PitchedRoof_Std_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "PitchedRoof_Std_Membrane": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 0.06
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "pitched_roof_standard": {
+       "outside_layer": "PitchedRoof_Std_Tiles",
+       "layer_2": "PitchedRoof_Std_Membrane",
+       "layer_3": "PitchedRoof_Std_MineralWool200",
+       "layer_4": "PitchedRoof_Std_Plasterboard"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_pitched_roof_standard",
+    "library_type": "construction",
+    "display_name": "Tiles, battens, membrane, 200mm mineral wool between rafters, plasterboard",
+    "description": "Tiles, battens, membrane, 200mm mineral wool between rafters, plasterboard",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "timber_frame_standard",
+   "body": {
+    "name": "timber_frame_standard",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.22,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Brick outer leaf, cavity, OSB sheathing, 140mm mineral wool between studs, plasterboard",
+    "epjson": {
+     "Material": {
+      "TF_Std_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "TF_Std_OSB": {
+       "roughness": "MediumRough",
+       "thickness": 0.012,
+       "conductivity": 0.13,
+       "density": 650,
+       "specific_heat": 1700
+      },
+      "TF_Std_MineralWool140": {
+       "roughness": "MediumRough",
+       "thickness": 0.14,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "TF_Std_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "TF_Std_AirCavity": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 0.18
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "timber_frame_standard": {
+       "outside_layer": "TF_Std_BrickOuter",
+       "layer_2": "TF_Std_AirCavity",
+       "layer_3": "TF_Std_OSB",
+       "layer_4": "TF_Std_MineralWool140",
+       "layer_5": "TF_Std_Plasterboard"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_timber_frame_standard",
+    "library_type": "construction",
+    "display_name": "Brick outer leaf, cavity, OSB sheathing, 140mm mineral wool between studs, plasterboard",
+    "description": "Brick outer leaf, cavity, OSB sheathing, 140mm mineral wool between studs, plasterboard",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "triple_glazing",
+   "body": {
+    "name": "triple_glazing",
+    "type": "glazing",
+    "u_value_W_per_m2K": 0.8,
+    "g_value": 0.35,
+    "thermal_mass": null,
+    "description": "Triple glazing, double low-e coatings, argon filled",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "triple_glazing_glazing": {
+       "u_factor": 0.8,
+       "solar_heat_gain_coefficient": 0.35
+      }
+     },
+     "Construction": {
+      "triple_glazing": {
+       "outside_layer": "triple_glazing_glazing"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_construction_triple_glazing",
+    "library_type": "construction",
+    "display_name": "Triple glazing, double low-e coatings, argon filled",
+    "description": "Triple glazing, double low-e coatings, argon filled",
+    "is_default": true,
+    "created_at": "2026-04-02 17:39:48",
+    "updated_at": "2026-04-02 17:39:48",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_bedroom_equipment",
+   "body": {
+    "schedule_type": "equipment",
+    "building_type": "hotel",
+    "zone_type": "bedroom",
+    "time_resolution": "hourly",
+    "display_name": "Hotel Bedroom — Equipment",
+    "description": "Hotel bedroom equipment (TV, chargers, HVAC) — loosely follows occupancy",
+    "day_types": {
+     "weekday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.3,
+      0.6,
+      0.1,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.1,
+      0.3,
+      0.6,
+      0.7,
+      0.6,
+      0.4,
+      0.2,
+      0.1
+     ],
+     "saturday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.5,
+      0.3,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.4,
+      0.6,
+      0.7,
+      0.6,
+      0.4,
+      0.2,
+      0.1
+     ],
+     "sunday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.4,
+      0.4,
+      0.2,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.3,
+      0.5,
+      0.6,
+      0.5,
+      0.3,
+      0.2,
+      0.1
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_bedroom_equipment"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_bedroom_equipment",
+    "library_type": "schedule",
+    "display_name": "Hotel Bedroom — Equipment",
+    "description": "Hotel bedroom equipment (TV, chargers, HVAC) — loosely follows occupancy",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_bedroom_lighting",
+   "body": {
+    "schedule_type": "lighting",
+    "building_type": "hotel",
+    "zone_type": "bedroom",
+    "time_resolution": "hourly",
+    "display_name": "Hotel Bedroom — Lighting",
+    "description": "Hotel bedroom lighting — minimal overnight, peaks at wakeup and bedtime",
+    "day_types": {
+     "weekday": [
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.4,
+      0.7,
+      0.2,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.5,
+      0.8,
+      0.8,
+      0.6,
+      0.2,
+      0.05
+     ],
+     "saturday": [
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.2,
+      0.6,
+      0.4,
+      0.2,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.3,
+      0.5,
+      0.8,
+      0.8,
+      0.6,
+      0.2,
+      0.05
+     ],
+     "sunday": [
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.2,
+      0.5,
+      0.5,
+      0.3,
+      0.2,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.3,
+      0.5,
+      0.8,
+      0.7,
+      0.5,
+      0.2,
+      0.05
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     0.9,
+     0.8,
+     0.7,
+     0.7,
+     0.7,
+     0.7,
+     0.8,
+     0.9,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_bedroom_lighting"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_bedroom_lighting",
+    "library_type": "schedule",
+    "display_name": "Hotel Bedroom — Lighting",
+    "description": "Hotel bedroom lighting — minimal overnight, peaks at wakeup and bedtime",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_bedroom_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "hotel",
+    "zone_type": "bedroom",
+    "time_resolution": "hourly",
+    "display_name": "Hotel Bedroom — Occupancy",
+    "description": "Hotel bedroom occupancy — high at night, low during day, seasonal variation for UK tourism",
+    "day_types": {
+     "weekday": [
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.7,
+      0.4,
+      0.3,
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.9,
+      0.9
+     ],
+     "saturday": [
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.8,
+      0.5,
+      0.4,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.9,
+      0.9,
+      0.9
+     ],
+     "sunday": [
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.8,
+      0.6,
+      0.5,
+      0.4,
+      0.4,
+      0.4,
+      0.4,
+      0.4,
+      0.4,
+      0.5,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      0.9,
+      0.9,
+      0.9
+     ]
+    },
+    "monthly_multipliers": [
+     0.7,
+     0.7,
+     0.8,
+     0.9,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     0.9,
+     0.8,
+     0.7
+    ],
+    "name": "hotel_bedroom_occupancy"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_bedroom_occupancy",
+    "library_type": "schedule",
+    "display_name": "Hotel Bedroom — Occupancy",
+    "description": "Hotel bedroom occupancy — high at night, low during day, seasonal variation for UK tourism",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_cooling_setpoint",
+   "body": {
+    "schedule_type": "cooling_setpoint",
+    "building_type": "hotel",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "Hotel — Cooling Setpoint",
+    "description": "Hotel cooling setpoint — 24°C occupied, 28°C setback",
+    "day_types": {
+     "weekday": [
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      28
+     ],
+     "saturday": [
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      28
+     ],
+     "sunday": [
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      28
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_cooling_setpoint"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_cooling_setpoint",
+    "library_type": "schedule",
+    "display_name": "Hotel — Cooling Setpoint",
+    "description": "Hotel cooling setpoint — 24°C occupied, 28°C setback",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_corridor_lighting",
+   "body": {
+    "schedule_type": "lighting",
+    "building_type": "hotel",
+    "zone_type": "corridor",
+    "time_resolution": "hourly",
+    "display_name": "Hotel Corridor — Lighting",
+    "description": "Hotel corridor lighting — near-constant throughout the day, reduced overnight",
+    "day_types": {
+     "weekday": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.7,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.7,
+      0.6,
+      0.5
+     ],
+     "saturday": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.6,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.7,
+      0.6,
+      0.5,
+      0.5
+     ],
+     "sunday": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.8,
+      0.7,
+      0.7,
+      0.7,
+      0.6,
+      0.6,
+      0.5,
+      0.5
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     0.9,
+     0.8,
+     0.7,
+     0.7,
+     0.7,
+     0.7,
+     0.8,
+     0.9,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_corridor_lighting"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_corridor_lighting",
+    "library_type": "schedule",
+    "display_name": "Hotel Corridor — Lighting",
+    "description": "Hotel corridor lighting — near-constant throughout the day, reduced overnight",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_corridor_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "hotel",
+    "zone_type": "corridor",
+    "time_resolution": "hourly",
+    "display_name": "Hotel Corridor — Occupancy",
+    "description": "Hotel corridor occupancy — busiest at morning checkout and evening arrival",
+    "day_types": {
+     "weekday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.3,
+      0.6,
+      0.5,
+      0.4,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.5,
+      0.4,
+      0.3,
+      0.2,
+      0.1,
+      0.1
+     ],
+     "saturday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.5,
+      0.6,
+      0.5,
+      0.4,
+      0.4,
+      0.4,
+      0.4,
+      0.4,
+      0.5,
+      0.6,
+      0.6,
+      0.5,
+      0.4,
+      0.3,
+      0.2,
+      0.1,
+      0.1
+     ],
+     "sunday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.4,
+      0.6,
+      0.6,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.4,
+      0.5,
+      0.5,
+      0.5,
+      0.4,
+      0.3,
+      0.2,
+      0.2,
+      0.1,
+      0.1
+     ]
+    },
+    "monthly_multipliers": [
+     0.7,
+     0.7,
+     0.8,
+     0.9,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     0.9,
+     0.8,
+     0.7
+    ],
+    "name": "hotel_corridor_occupancy"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_corridor_occupancy",
+    "library_type": "schedule",
+    "display_name": "Hotel Corridor — Occupancy",
+    "description": "Hotel corridor occupancy — busiest at morning checkout and evening arrival",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_dhw_demand",
+   "body": {
+    "schedule_type": "dhw",
+    "building_type": "hotel",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "Hotel — DHW Demand",
+    "description": "Hotel DHW demand — morning shower peak (06-10) and evening peak (17-22)",
+    "day_types": {
+     "weekday": [
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.15,
+      0.8,
+      1.0,
+      0.9,
+      0.6,
+      0.3,
+      0.2,
+      0.2,
+      0.15,
+      0.15,
+      0.2,
+      0.4,
+      0.6,
+      0.7,
+      0.65,
+      0.55,
+      0.3,
+      0.1,
+      0.05
+     ],
+     "saturday": [
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.1,
+      0.6,
+      0.9,
+      1.0,
+      0.8,
+      0.4,
+      0.25,
+      0.2,
+      0.2,
+      0.2,
+      0.25,
+      0.45,
+      0.65,
+      0.7,
+      0.65,
+      0.55,
+      0.3,
+      0.1,
+      0.05
+     ],
+     "sunday": [
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.1,
+      0.5,
+      0.8,
+      1.0,
+      0.9,
+      0.5,
+      0.3,
+      0.25,
+      0.2,
+      0.2,
+      0.25,
+      0.45,
+      0.6,
+      0.65,
+      0.6,
+      0.5,
+      0.3,
+      0.1,
+      0.05
+     ]
+    },
+    "monthly_multipliers": [
+     0.8,
+     0.8,
+     0.9,
+     0.95,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     0.95,
+     0.9,
+     0.85
+    ],
+    "name": "hotel_dhw_demand"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_dhw_demand",
+    "library_type": "schedule",
+    "display_name": "Hotel — DHW Demand",
+    "description": "Hotel DHW demand — morning shower peak (06-10) and evening peak (17-22)",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_heating_setpoint",
+   "body": {
+    "schedule_type": "heating_setpoint",
+    "building_type": "hotel",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "Hotel — Heating Setpoint",
+    "description": "Hotel heating setpoint — 21°C occupied, 18°C setback",
+    "day_types": {
+     "weekday": [
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      18
+     ],
+     "saturday": [
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      18
+     ],
+     "sunday": [
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      21,
+      18
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_heating_setpoint"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_heating_setpoint",
+    "library_type": "schedule",
+    "display_name": "Hotel — Heating Setpoint",
+    "description": "Hotel heating setpoint — 21°C occupied, 18°C setback",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_reception_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "hotel",
+    "zone_type": "reception",
+    "time_resolution": "hourly",
+    "display_name": "Hotel Reception — Occupancy",
+    "description": "Hotel reception occupancy — daytime operation with check-in/out peaks",
+    "day_types": {
+     "weekday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.5,
+      0.8,
+      0.7,
+      0.6,
+      0.6,
+      0.5,
+      0.5,
+      0.7,
+      0.8,
+      0.9,
+      0.7,
+      0.5,
+      0.3,
+      0.2,
+      0.2,
+      0.1,
+      0.1
+     ],
+     "saturday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.4,
+      0.7,
+      0.8,
+      0.7,
+      0.6,
+      0.5,
+      0.5,
+      0.6,
+      0.8,
+      0.9,
+      0.7,
+      0.5,
+      0.3,
+      0.2,
+      0.2,
+      0.1,
+      0.1
+     ],
+     "sunday": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.2,
+      0.4,
+      0.6,
+      0.8,
+      0.7,
+      0.6,
+      0.5,
+      0.4,
+      0.4,
+      0.5,
+      0.6,
+      0.5,
+      0.4,
+      0.3,
+      0.2,
+      0.2,
+      0.1,
+      0.1
+     ]
+    },
+    "monthly_multipliers": [
+     0.7,
+     0.7,
+     0.8,
+     0.9,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     0.9,
+     0.8,
+     0.7
+    ],
+    "name": "hotel_reception_occupancy"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_reception_occupancy",
+    "library_type": "schedule",
+    "display_name": "Hotel Reception — Occupancy",
+    "description": "Hotel reception occupancy — daytime operation with check-in/out peaks",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_ventilation_continuous",
+   "body": {
+    "schedule_type": "ventilation",
+    "building_type": "hotel",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "Hotel — Ventilation Continuous",
+    "description": "24/7 continuous ventilation at full rate. Typical for centralised extract systems.",
+    "day_types": {
+     "weekday": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "saturday": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "sunday": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_ventilation_continuous"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_ventilation_continuous",
+    "library_type": "schedule",
+    "display_name": "Hotel — Ventilation Continuous",
+    "description": "24/7 continuous ventilation at full rate. Typical for centralised extract systems.",
+    "is_default": true,
+    "created_at": "2026-04-02 23:05:50",
+    "updated_at": "2026-04-02 23:05:50",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_ventilation_occupied",
+   "body": {
+    "schedule_type": "ventilation",
+    "building_type": "hotel",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "Hotel — Ventilation Occupied",
+    "description": "Full rate 06:00–23:00 (1.0), reduced overnight 23:00–06:00 (0.3). Better for energy, may need building regs check.",
+    "day_types": {
+     "weekday": [
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.3
+     ],
+     "saturday": [
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.3
+     ],
+     "sunday": [
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.3
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_ventilation_occupied"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_ventilation_occupied",
+    "library_type": "schedule",
+    "display_name": "Hotel — Ventilation Occupied",
+    "description": "Full rate 06:00–23:00 (1.0), reduced overnight 23:00–06:00 (0.3). Better for energy, may need building regs check.",
+    "is_default": true,
+    "created_at": "2026-04-02 23:05:50",
+    "updated_at": "2026-04-02 23:05:50",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "hotel_ventilation_timer",
+   "body": {
+    "schedule_type": "ventilation",
+    "building_type": "hotel",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "Hotel — Ventilation Timer",
+    "description": "Fixed timer: 07:00–22:00 full rate (1.0), 22:00–07:00 at 50%. Typical for time-clock controls.",
+    "day_types": {
+     "weekday": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.5,
+      0.5
+     ],
+     "saturday": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.5,
+      0.5
+     ],
+     "sunday": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.5,
+      0.5
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "hotel_ventilation_timer"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_hotel_ventilation_timer",
+    "library_type": "schedule",
+    "display_name": "Hotel — Ventilation Timer",
+    "description": "Fixed timer: 07:00–22:00 full rate (1.0), 22:00–07:00 at 50%. Typical for time-clock controls.",
+    "is_default": true,
+    "created_at": "2026-04-02 23:05:50",
+    "updated_at": "2026-04-02 23:05:50",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "office_lighting",
+   "body": {
+    "schedule_type": "lighting",
+    "building_type": "office",
+    "zone_type": "open_plan",
+    "time_resolution": "hourly",
+    "display_name": "Office — Lighting",
+    "description": "Office lighting — follows occupancy, reduced in summer by daylight",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.1,
+      0.5,
+      0.8,
+      0.9,
+      0.9,
+      0.7,
+      0.85,
+      0.9,
+      0.85,
+      0.65,
+      0.25,
+      0.05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     0.9,
+     0.8,
+     0.7,
+     0.6,
+     0.6,
+     0.65,
+     0.75,
+     0.85,
+     0.95,
+     1.0
+    ],
+    "name": "office_lighting"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_office_lighting",
+    "library_type": "schedule",
+    "display_name": "Office — Lighting",
+    "description": "Office lighting — follows occupancy, reduced in summer by daylight",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "office_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "office",
+    "zone_type": "open_plan",
+    "time_resolution": "hourly",
+    "display_name": "Office — Occupancy",
+    "description": "Office occupancy — 9-5 weekday pattern with lunch dip, empty at weekends",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.1,
+      0.5,
+      0.9,
+      0.95,
+      0.95,
+      0.75,
+      0.9,
+      0.95,
+      0.9,
+      0.7,
+      0.3,
+      0.1,
+      0.05,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.9,
+     0.9,
+     1.0,
+     1.0,
+     1.0,
+     0.9,
+     0.8,
+     0.8,
+     1.0,
+     1.0,
+     1.0,
+     0.85
+    ],
+    "name": "office_occupancy"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_office_occupancy",
+    "library_type": "schedule",
+    "display_name": "Office — Occupancy",
+    "description": "Office occupancy — 9-5 weekday pattern with lunch dip, empty at weekends",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "retail_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "retail",
+    "zone_type": "sales_floor",
+    "time_resolution": "hourly",
+    "display_name": "Retail — Occupancy",
+    "description": "Retail occupancy — 10-6 pattern, busier at weekends",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.1,
+      0.5,
+      0.8,
+      0.9,
+      0.85,
+      0.8,
+      0.75,
+      0.7,
+      0.4,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.1,
+      0.6,
+      0.9,
+      1.0,
+      0.95,
+      0.9,
+      0.85,
+      0.8,
+      0.6,
+      0.1,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.2,
+      0.6,
+      0.8,
+      0.85,
+      0.8,
+      0.7,
+      0.5,
+      0.2,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.8,
+     0.9,
+     1.0,
+     1.0,
+     1.0,
+     0.95,
+     0.9,
+     0.95,
+     0.95,
+     1.0,
+     1.1,
+     1.2
+    ],
+    "name": "retail_occupancy"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_schedule_retail_occupancy",
+    "library_type": "schedule",
+    "display_name": "Retail — Occupancy",
+    "description": "Retail occupancy — 10-6 pattern, busier at weekends",
+    "is_default": true,
+    "created_at": "2026-04-02 18:00:15",
+    "updated_at": "2026-04-02 18:00:15",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "ashp_dhw",
+   "body": {
+    "display_name": "ASHP — DHW Preheat",
+    "type": "ashp_dhw",
+    "category": "dhw",
+    "serves": "dhw",
+    "description": "Air source heat pump for domestic hot water pre-heating. Preheat to 45°C; top up to 60°C with electric immersion or gas boiler.",
+    "cop": 2.8,
+    "efficiency_type": "cop",
+    "efficiency_value": 2.8,
+    "hot_water_setpoint_c": 60.0,
+    "preheat_setpoint_c": 45.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "ashp_dhw"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_ashp_dhw",
+    "library_type": "system",
+    "display_name": "ASHP — DHW Preheat",
+    "description": "Air source heat pump for domestic hot water pre-heating. Preheat to 45°C; top up to 60°C with electric immersion or gas boiler.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "ashp_dhw_preheat",
+   "body": {
+    "display_name": "ASHP — DHW Preheat Stage",
+    "type": "ashp_dhw",
+    "category": "dhw",
+    "serves": "dhw",
+    "description": "ASHP preheat stage for domestic hot water. Heats from mains temperature (~10°C) to preheat setpoint (45°C). Gas boiler or immersion tops up to 60°C.",
+    "cop": 2.8,
+    "efficiency_type": "cop",
+    "efficiency_value": 2.8,
+    "hot_water_setpoint_c": 60.0,
+    "preheat_setpoint_c": 45.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "ashp_dhw_preheat"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_ashp_dhw_preheat",
+    "library_type": "system",
+    "display_name": "ASHP — DHW Preheat Stage",
+    "description": "ASHP preheat stage for domestic hot water. Heats from mains temperature (~10°C) to preheat setpoint (45°C). Gas boiler or immersion tops up to 60°C.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "ashp_heating",
+   "body": {
+    "display_name": "Air Source Heat Pump — Space Heating",
+    "type": "ashp",
+    "category": "heating",
+    "serves": "heating",
+    "description": "Centralised ASHP providing space heating via a heat distribution network. Cooling provided separately (e.g. chiller or VRF in cooling mode).",
+    "scop": 3.2,
+    "efficiency_type": "scop",
+    "efficiency_value": 3.2,
+    "fan_power_w_per_m2": 2.0,
+    "min_outdoor_temp_c": -10.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "ashp_heating"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_ashp_heating",
+    "library_type": "system",
+    "display_name": "Air Source Heat Pump — Space Heating",
+    "description": "Centralised ASHP providing space heating via a heat distribution network. Cooling provided separately (e.g. chiller or VRF in cooling mode).",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "ashp_space",
+   "body": {
+    "display_name": "Air Source Heat Pump — Space Heating",
+    "type": "ashp",
+    "category": "hvac",
+    "serves": "heating",
+    "description": "Centralised ASHP providing space heating via a heat distribution network. Cooling provided separately (e.g. chiller).",
+    "scop": 3.0,
+    "heating_cop": 3.0,
+    "cooling_eer": null,
+    "efficiency_type": "scop",
+    "efficiency_value": 3.0,
+    "fan_power_w_per_m2": 2.0,
+    "min_outdoor_temp_c": -10.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "ashp_space"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_ashp_space",
+    "library_type": "system",
+    "display_name": "Air Source Heat Pump — Space Heating",
+    "description": "Centralised ASHP providing space heating via a heat distribution network. Cooling provided separately (e.g. chiller).",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "electric_immersion",
+   "body": {
+    "display_name": "Electric Immersion — DHW",
+    "type": "electric_immersion",
+    "category": "dhw",
+    "serves": "dhw",
+    "description": "Direct electric water heating. 100% efficient at point of use but high running cost. Often used as backup.",
+    "efficiency": 1.0,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 1.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "electric_immersion"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_electric_immersion",
+    "library_type": "system",
+    "display_name": "Electric Immersion — DHW",
+    "description": "Direct electric water heating. 100% efficient at point of use but high running cost. Often used as backup.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "electric_panel_heating",
+   "body": {
+    "display_name": "Electric Panel Heaters",
+    "type": "electric_panel",
+    "category": "heating",
+    "serves": "heating",
+    "description": "Direct electric resistance heating panels. 100% efficient at point of use but high running cost and carbon. Useful as a baseline comparison or for individual room override.",
+    "efficiency": 1.0,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 1.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "electric_panel_heating"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_electric_panel_heating",
+    "library_type": "system",
+    "display_name": "Electric Panel Heaters",
+    "description": "Direct electric resistance heating panels. 100% efficient at point of use but high running cost and carbon. Useful as a baseline comparison or for individual room override.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "gas_boiler_dhw",
+   "body": {
+    "display_name": "Gas Boiler — DHW",
+    "type": "gas_boiler_dhw",
+    "category": "dhw",
+    "serves": "dhw",
+    "description": "Condensing gas boiler for domestic hot water. Typically the primary DHW system, optionally paired with ASHP preheat.",
+    "efficiency": 0.92,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 0.92,
+    "fuel_type": "gas",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": true,
+    "name": "gas_boiler_dhw"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_gas_boiler_dhw",
+    "library_type": "system",
+    "display_name": "Gas Boiler — DHW",
+    "description": "Condensing gas boiler for domestic hot water. Typically the primary DHW system, optionally paired with ASHP preheat.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "gas_boiler_heating",
+   "body": {
+    "display_name": "Gas Boiler — Condensing (Heating)",
+    "type": "gas_boiler",
+    "category": "heating",
+    "serves": "heating",
+    "description": "Condensing gas boiler for space heating via radiators or underfloor heating. High carbon intensity — generally not preferred for new hotels targeting net zero.",
+    "efficiency": 0.92,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 0.92,
+    "fuel_type": "gas",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": true,
+    "name": "gas_boiler_heating"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_gas_boiler_heating",
+    "library_type": "system",
+    "display_name": "Gas Boiler — Condensing (Heating)",
+    "description": "Condensing gas boiler for space heating via radiators or underfloor heating. High carbon intensity — generally not preferred for new hotels targeting net zero.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "gas_boiler_standard",
+   "body": {
+    "display_name": "Gas Boiler — Condensing Standard",
+    "type": "gas_boiler",
+    "category": "hvac",
+    "serves": "heating",
+    "description": "Condensing gas boiler for space heating. Common legacy plant. High carbon intensity — generally not preferred for new hotels.",
+    "efficiency": 0.92,
+    "heating_cop": 0.92,
+    "cooling_eer": null,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 0.92,
+    "fuel_type": "gas",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": true,
+    "name": "gas_boiler_standard"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_gas_boiler_standard",
+    "library_type": "system",
+    "display_name": "Gas Boiler — Condensing Standard",
+    "description": "Condensing gas boiler for space heating. Common legacy plant. High carbon intensity — generally not preferred for new hotels.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "mev_standard",
+   "body": {
+    "display_name": "Mechanical Extract Ventilation",
+    "type": "mev",
+    "category": "ventilation",
+    "serves": "ventilation",
+    "description": "Centralised mechanical extract with trickle vent supply. No heat recovery. Standard for UK hotel bedrooms under Part F.",
+    "specific_fan_power": 1.5,
+    "sfp": 1.5,
+    "heat_recovery_efficiency": 0.0,
+    "efficiency_type": "sfp",
+    "efficiency_value": 1.5,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": true,
+    "name": "mev_standard"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_mev_standard",
+    "library_type": "system",
+    "display_name": "Mechanical Extract Ventilation",
+    "description": "Centralised mechanical extract with trickle vent supply. No heat recovery. Standard for UK hotel bedrooms under Part F.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "mvhr_standard",
+   "body": {
+    "display_name": "MVHR — Mechanical Ventilation with Heat Recovery",
+    "type": "mvhr",
+    "category": "ventilation",
+    "serves": "ventilation",
+    "description": "Balanced supply and extract with heat recovery. Recovers 75-85% of exhaust heat. Reduces heating demand significantly.",
+    "specific_fan_power": 1.8,
+    "sfp": 1.8,
+    "heat_recovery_efficiency": 0.82,
+    "efficiency_type": "heat_recovery",
+    "efficiency_value": 0.82,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "mvhr_standard"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_mvhr_standard",
+    "library_type": "system",
+    "display_name": "MVHR — Mechanical Ventilation with Heat Recovery",
+    "description": "Balanced supply and extract with heat recovery. Recovers 75-85% of exhaust heat. Reduces heating demand significantly.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "none_cooling",
+   "body": {
+    "display_name": "No Mechanical Cooling",
+    "type": "natural_cooling",
+    "category": "cooling",
+    "serves": "cooling",
+    "description": "Reliance on natural ventilation and passive cooling only. Only appropriate if the building has low cooling loads or effective passive design.",
+    "seer": null,
+    "efficiency_type": null,
+    "efficiency_value": null,
+    "fuel_type": null,
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "none_cooling"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_none_cooling",
+    "library_type": "system",
+    "display_name": "No Mechanical Cooling",
+    "description": "Reliance on natural ventilation and passive cooling only. Only appropriate if the building has low cooling loads or effective passive design.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "solar_thermal_dhw",
+   "body": {
+    "display_name": "Solar Thermal — DHW Preheat",
+    "type": "solar_thermal",
+    "category": "dhw",
+    "serves": "dhw",
+    "description": "Solar thermal panels for DHW preheat. Zero operating emissions. Contribution varies by season — backup system always required.",
+    "efficiency": 0.5,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 0.5,
+    "fuel_type": "renewable",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "solar_thermal_dhw"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_solar_thermal_dhw",
+    "library_type": "system",
+    "display_name": "Solar Thermal — DHW Preheat",
+    "description": "Solar thermal panels for DHW preheat. Zero operating emissions. Contribution varies by season — backup system always required.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "split_system_cooling",
+   "body": {
+    "display_name": "Split AC System",
+    "type": "split_ac",
+    "category": "cooling",
+    "serves": "cooling",
+    "description": "Conventional split-system air conditioning. Lower efficiency than VRF. Suitable for smaller areas or supplementary cooling.",
+    "seer": 2.8,
+    "efficiency_type": "seer",
+    "efficiency_value": 2.8,
+    "fan_power_w_per_m2": 3.5,
+    "fuel_type": "electricity",
+    "has_heat_rejection": true,
+    "has_exhaust_waste": false,
+    "name": "split_system_cooling"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_split_system_cooling",
+    "library_type": "system",
+    "display_name": "Split AC System",
+    "description": "Conventional split-system air conditioning. Lower efficiency than VRF. Suitable for smaller areas or supplementary cooling.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "vrf_cooling",
+   "body": {
+    "display_name": "VRF System — Cooling Mode",
+    "type": "vrf",
+    "category": "cooling",
+    "serves": "cooling",
+    "description": "VRF system operating in cooling mode only. Rejects heat to outdoor air. Commonly paired with a gas boiler or ASHP for heating.",
+    "seer": 3.2,
+    "efficiency_type": "seer",
+    "efficiency_value": 3.2,
+    "fan_power_w_per_m2": 3.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": true,
+    "has_exhaust_waste": false,
+    "name": "vrf_cooling"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_vrf_cooling",
+    "library_type": "system",
+    "display_name": "VRF System — Cooling Mode",
+    "description": "VRF system operating in cooling mode only. Rejects heat to outdoor air. Commonly paired with a gas boiler or ASHP for heating.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "vrf_heating",
+   "body": {
+    "display_name": "VRF System — Heating Mode",
+    "type": "vrf",
+    "category": "heating",
+    "serves": "heating",
+    "description": "VRF system operating in heating mode only. High SCOP makes this the preferred choice for decarbonised heating in hotel bedrooms.",
+    "scop": 3.5,
+    "efficiency_type": "scop",
+    "efficiency_value": 3.5,
+    "fan_power_w_per_m2": 3.0,
+    "min_outdoor_temp_c": -15.0,
+    "fuel_type": "electricity",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": false,
+    "name": "vrf_heating"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_vrf_heating",
+    "library_type": "system",
+    "display_name": "VRF System — Heating Mode",
+    "description": "VRF system operating in heating mode only. High SCOP makes this the preferred choice for decarbonised heating in hotel bedrooms.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "vrf_high_efficiency",
+   "body": {
+    "display_name": "VRF System — High Efficiency",
+    "type": "vrf",
+    "category": "hvac",
+    "serves": "heating_and_cooling",
+    "description": "Premium VRF system with higher SCOP/SEER. Suitable for BREEAM Excellent or net-zero carbon projects.",
+    "scop": 4.2,
+    "seer": 4.0,
+    "heating_cop": 4.2,
+    "cooling_eer": 4.0,
+    "efficiency_type": "scop",
+    "efficiency_value": 4.2,
+    "fan_power_w_per_m2": 2.5,
+    "min_outdoor_temp_c": -20.0,
+    "defrost_strategy": "reverse_cycle",
+    "fuel_type": "electricity",
+    "has_heat_rejection": true,
+    "has_exhaust_waste": false,
+    "name": "vrf_high_efficiency"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_vrf_high_efficiency",
+    "library_type": "system",
+    "display_name": "VRF System — High Efficiency",
+    "description": "Premium VRF system with higher SCOP/SEER. Suitable for BREEAM Excellent or net-zero carbon projects.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "vrf_standard",
+   "body": {
+    "display_name": "VRF System — Standard",
+    "type": "vrf",
+    "category": "hvac",
+    "serves": "heating_and_cooling",
+    "description": "Variable Refrigerant Flow split system. Industry-standard choice for hotel bedrooms. Provides both heating and cooling from a single outdoor unit.",
+    "scop": 3.5,
+    "seer": 3.2,
+    "heating_cop": 3.5,
+    "cooling_eer": 3.2,
+    "efficiency_type": "scop",
+    "efficiency_value": 3.5,
+    "fan_power_w_per_m2": 3.0,
+    "min_outdoor_temp_c": -15.0,
+    "defrost_strategy": "reverse_cycle",
+    "fuel_type": "electricity",
+    "has_heat_rejection": true,
+    "has_exhaust_waste": false,
+    "name": "vrf_standard"
+   },
+   "provenance": {
+    "source": "nza-sim sqlite",
+    "sqlite_id": "lib_system_vrf_standard",
+    "library_type": "system",
+    "display_name": "VRF System — Standard",
+    "description": "Variable Refrigerant Flow split system. Industry-standard choice for hotel bedrooms. Provides both heating and cooling from a single outdoor unit.",
+    "is_default": true,
+    "created_at": "2026-07-17 13:39:56",
+    "updated_at": "2026-07-17 13:39:56",
+    "brief": 102
+   }
+  },
+  {
+   "kind": "weather",
+   "key": "GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw",
+   "body": {
+    "file_name": "GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw",
+    "file_hash": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+    "bytes": 1590735
+   },
+   "provenance": {
+    "source": "nza-sim data/weather/current",
+    "brief": 102
+   }
+  }
+ ]
+}

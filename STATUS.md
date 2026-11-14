@@ -2,6 +2,76 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *(PR `102 — Simulate v2 Foundations` open; independent review next)*
+
+NZA Sim gets its own Supabase project ("NZA Sim (dev)") and identity; the decodED link is optional (Rev B).
+Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs unchanged with the env unset.
+
+- **P0** (`a7d03e5`): reconnaissance, [`docs/audit/102/00_reconnaissance.md`](docs/audit/102/00_reconnaissance.md).
+- **P1** (`f0cadf2`): the model document (zod), results shape, canonical JSON + SHA-256 hashes and the
+  `building_config` → one-zone converter in `frontend/src/thermal/schema/`;
+  [`docs/audit/102/01_model_document.md`](docs/audit/102/01_model_document.md). 13/13 tests (`npm test`); build
+  clean; anchor `--fixture` still **132.6**. `package.json` adds zod, vitest, yaml: **run `npm install` locally**
+  (lockfile not committed).
+- **P2** (Claude Chat, through Chris's browser into the dashboard SQL editor; the connector cannot reach the project):
+  `supabase/migrations/0001_tenancy.sql`, `0002_model_store.sql`, `0003_canonical_collation.sql` applied to
+  **NZA Sim (dev)** `jbjxduathkklruvbmeho` and recorded in `supabase_migrations.schema_migrations`; RLS on all 11
+  tables, nothing granted to anon, writes through security-definer functions; SQL `canonical_json`/`model_hash`
+  agree with `canonical.ts` byte for byte (`{"a":1,"b":[1,2]}` → `8baa7319…fb4874` in both); 17 checks in
+  [`docs/audit/102/02_schema.md`](docs/audit/102/02_schema.md); `supabase/README.md` says which project and how.
+  No decodED project touched.
+- **P3 code side** (`d2c2da3`; seed now signs in with a browser session token, the emails carry no code): `scripts/102_export_library.py` (read-only, provenance) and
+  `scripts/102_seed_library.mjs` (dry run by default, versioned, refuses anything but NZA Sim (dev));
+  [`docs/audit/102/03_library.md`](docs/audit/102/03_library.md). The July-copy export matches the Part 0 counts
+  (15 / 18 / 15; 3 benchmarks skipped). **Still to do (Claude Chat, database):** re-export from Chris's live DB with
+  the dev server stopped, then the seed's dry run, `--apply`, and a second `--apply` that must add nothing.
+- **P4 code side** (`462f24f`): `frontend/src/auth/` (`supabase.ts`, `AuthGate.tsx` with `OrgBadge`), `<AuthGate>`
+  in `main.jsx`, one `<OrgBadge />` line in `TopBar.jsx`, `@supabase/supabase-js` in package.json (**run
+  `npm install`**), `frontend/.env.example`, CLAUDE.md section. Env unset: ZZ TEST shows 132.6 before and after,
+  screenshots pixel-identical, nothing leaves localhost. Env set: the whole flow passes against a mocked Supabase;
+  [`docs/audit/102/04_sign_in.md`](docs/audit/102/04_sign_in.md). **Still to do (Claude Chat):** auth settings on
+  NZA Sim (dev), the env values, then the walkthrough against the real project.
+- **P4 Supabase side** (`a3184e0`, Claude Chat): magic link on, OTP length 6, anonymous sign-ins off, confirm email
+  on, Site URL `http://localhost:5176`, redirect `http://localhost:5176/**`; URL and publishable key in
+  [`docs/audit/102/04_auth_config.md`](docs/audit/102/04_auth_config.md) (public by design; secret key never
+  copied). From a browser: anon denied on `my_access` and every table, allowed only on `accept_invitation_token`.
+  Email templates are read-only without custom SMTP, so the email carries the link, not a code; `AuthGate.tsx`
+  uses the link, so nothing is blocked. Custom SMTP (Resend or M365) is a prod prerequisite.
+- **Sign-in done (14 Nov):** Linzie signed in on her machine (worktree `nza-sim-102`) and created the organisation "NZA".
+- **P5 code side** (this commit): `frontend/src/thermal/store/versions.ts`, `SaveModelVersionButton.jsx` on the
+  Systems page (signed in only), `scripts/102_anchor_roundtrip.mjs`; `body_hash` now over `config_json`.
+  Env unset: Systems 132.6 before and after, pixel-identical. Against a mocked Supabase: one version and one run for
+  two presses, viewer refused, round trip prints 132.6 `match`.
+  [`docs/audit/102/05_save_version.md`](docs/audit/102/05_save_version.md).
+- **P3 `--apply` and `nza_team`** (`a9ddce2`, Claude Chat, 21:06): Chris added to `nza_team` after his first real
+  sign-in (20:28); 49 global library items seeded on NZA Sim (dev) through `upsert_library_item` as Chris from the
+  committed export; a second run added nothing; provenance read back
+  ([`docs/audit/102/03_library.md`](docs/audit/102/03_library.md)).
+- **P5 verified on NZA Sim (dev)** (this commit; read back by Claude Chat, 21:45): two Save presses on ZZ TEST gave one
+  version and one run; stored EUI 132.6 (source `engineReads.readModelledEui`), fuels = end uses incl. the named
+  `not_itemised` line; stored model hash = `public.model_hash(document)` in SQL. The round-trip script ran against a
+  mock only; it now prints Supabase errors readably (`c6ce5fd`).
+- **P6 close** (this commit): brief archived as
+  [`archive/102_simulate-v2-foundations_COMPLETED.md`](docs/briefs/archive/102_simulate-v2-foundations_COMPLETED.md),
+  `current.md` repointed, PR `102 — Simulate v2 Foundations` into `main` opened (not merged).
+  Close-out checks: `git diff main...HEAD` touches no engine file (`instantCalc.js`, `systemsEngine.js`,
+  `interventionsEngine.js`, `nza_engine/`); no key in the diff (the publishable key is in `04_auth_config.md` by
+  design); `frontend/.env.example` holds the two names only; anchor `--fixture` 132.6; 13/13 tests; build clean.
+  **Part 0 decision as taken:** NZA Sim is standalone with its own Supabase project and identity (Rev B); the decodED
+  link is brief 113.
+- **Divergences:** (1) the round-trip script records the fixture's own version (`--record`), because the live
+  library need not equal the frozen fixture's; it ran against a mock only, and the real-project evidence is the
+  SQL read-back. (2) `body_hash` hashes `config_json`, not the delivered wrapper. (3) Emails carry a magic link, not
+  a code, until custom SMTP. (4) Database steps were done by Claude Chat through Chris's browser, since no connector
+  here reaches NZA Sim (dev). (5) A named `not_itemised` line in the run summary (27,699 kWh on the anchor).
+- **Lessons proposed (for the Bible, not adopted):** a token-in-a-terminal step is too fiddly for a human to verify
+  with; prefer a read-back the database owner runs in the SQL editor. Hash a library item's own definition, never the
+  shape it was delivered in.
+- **Prod prerequisites (not this brief):** the prod project with the same migrations in order; custom SMTP.
+- **Next:** independent review of the PR, then merge on Chris's word.
+- **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
+  design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
+
 ## ✅ 505 Reconciliation (trace their savings to assumptions, compare under Model 2) — CLOSED 2026-07-15 on `chris/505-reconciliation` *(PR to follow; register DRAFTS → Claude Chat tone review → Chris)*
 
 Reproduced 505 Design's claimed savings **under their assumptions** (diagnostic, not deference) and

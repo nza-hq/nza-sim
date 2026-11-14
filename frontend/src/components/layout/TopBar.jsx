@@ -9,6 +9,7 @@ import { calculateInstant } from '../../utils/instantCalc.js'
 import { exportAssumptionsXlsx } from '../../utils/assumptionsExport.js'
 import { SYSTEM_TEMPLATES_LIBRARY } from '../../data/systemTemplatesLibrary.js'
 import ProjectPicker from './ProjectPicker.jsx'
+import { OrgBadge } from '../../auth/AuthGate.tsx'
 
 // ── Baseline control (global, every module) ──────────────────────────────────
 // The pinned project baseline interventions measure against. Shows sync state,
@@ -471,6 +472,9 @@ export default function TopBar() {
           <ExternalLink size={11} />
           Pop Out
         </button>
+
+        {/* Brief 102 P4: NZA Sim organisation (renders nothing when sign-in is not configured). */}
+        <OrgBadge />
 
         {/* Auto-simulate removed (Chris UX overhaul 2026-05-17). The toggle
             existed in SimulationContext as autoSimulate / setAutoSimulate
