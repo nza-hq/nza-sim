@@ -43,8 +43,12 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   Env unset: Systems 132.6 before and after, pixel-identical. Against a mocked Supabase: one version and one run for
   two presses, viewer refused, round trip prints 132.6 `match`.
   [`docs/audit/102/05_save_version.md`](docs/audit/102/05_save_version.md).
-- **Next:** Claude Chat: `nza_team`, Part 3 `--apply`; then the Part 5 checks against NZA Sim (dev) (button twice on
-  ZZ TEST, round trip `--record` then read); then Part 6 (close).
+- **P3 `--apply` and `nza_team`** (`a9ddce2`, Claude Chat, 21:06): Chris added to `nza_team` after his first real
+  sign-in (20:28); 49 global library items seeded on NZA Sim (dev) through `upsert_library_item` as Chris from the
+  committed export; a second run added nothing; provenance read back
+  ([`docs/audit/102/03_library.md`](docs/audit/102/03_library.md)).
+- **Next:** the Part 5 checks against NZA Sim (dev) (button twice on ZZ TEST, round trip `--record` then read; Claude
+  Chat reads the stored run back); then Part 6 (close) and the independent review.
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 
