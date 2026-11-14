@@ -2,7 +2,7 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🔄 Brief 102 — Simulate v2 foundations (Rev B) — IN PROGRESS on `chris/102-sim-v2-foundations`
+## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *(PR `102 — Simulate v2 Foundations` open; independent review next)*
 
 NZA Sim gets its own Supabase project ("NZA Sim (dev)") and identity; the decodED link is optional (Rev B).
 Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs unchanged with the env unset.
@@ -51,7 +51,24 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   version and one run; stored EUI 132.6 (source `engineReads.readModelledEui`), fuels = end uses incl. the named
   `not_itemised` line; stored model hash = `public.model_hash(document)` in SQL. The round-trip script ran against a
   mock only; it now prints Supabase errors readably (`c6ce5fd`).
-- **Next:** Part 6 (close) on Linzie's word, then the independent review.
+- **P6 close** (this commit): brief archived as
+  [`archive/102_simulate-v2-foundations_COMPLETED.md`](docs/briefs/archive/102_simulate-v2-foundations_COMPLETED.md),
+  `current.md` repointed, PR `102 — Simulate v2 Foundations` into `main` opened (not merged).
+  Close-out checks: `git diff main...HEAD` touches no engine file (`instantCalc.js`, `systemsEngine.js`,
+  `interventionsEngine.js`, `nza_engine/`); no key in the diff (the publishable key is in `04_auth_config.md` by
+  design); `frontend/.env.example` holds the two names only; anchor `--fixture` 132.6; 13/13 tests; build clean.
+  **Part 0 decision as taken:** NZA Sim is standalone with its own Supabase project and identity (Rev B); the decodED
+  link is brief 113.
+- **Divergences:** (1) the round-trip script records the fixture's own version (`--record`), because the live
+  library need not equal the frozen fixture's; it ran against a mock only, and the real-project evidence is the
+  SQL read-back. (2) `body_hash` hashes `config_json`, not the delivered wrapper. (3) Emails carry a magic link, not
+  a code, until custom SMTP. (4) Database steps were done by Claude Chat through Chris's browser, since no connector
+  here reaches NZA Sim (dev). (5) A named `not_itemised` line in the run summary (27,699 kWh on the anchor).
+- **Lessons proposed (for the Bible, not adopted):** a token-in-a-terminal step is too fiddly for a human to verify
+  with; prefer a read-back the database owner runs in the SQL editor. Hash a library item's own definition, never the
+  shape it was delivered in.
+- **Prod prerequisites (not this brief):** the prod project with the same migrations in order; custom SMTP.
+- **Next:** independent review of the PR, then merge on Chris's word.
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 
