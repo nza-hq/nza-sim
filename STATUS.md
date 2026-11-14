@@ -9,7 +9,11 @@ Linzie's request (14 Nov, in place of the architect chat). Pure single-zone ISO 
 store fixes. Five decisions flagged for Chris's review (anchor gate on envelope demand, ±5 % tolerance, location,
 reference case, fixed fixture id).
 
-- **Brief** (this commit).
+- **Brief** (d1d295b).
+- **P0 reconnaissance** ([`docs/audit/103/00_reconnaissance.md`](docs/audit/103/00_reconnaissance.md)). Findings:
+  - State 1 demand is a quasi-steady setpoint convention that is already known to differ from EnergyPlus (cooling +56 % on Bridgewater). The proposal re-gates the anchor on conductances and setpoint losses (±1 %) plus an EnergyPlus envelope-only referee, with State 1 demand shown for information only. **Awaiting the word.**
+  - IT15 has no Supabase CLI and no EnergyPlus. The proposed database route keeps Chris's agent pasting SQL, or moves NZA Sim (dev) into the Net Zero Advisory organisation (Chris's call).
+  - Engine 1 needs a model schema v2 (absorptance, emissivity, frame fraction, internal mass and ground as explicit fields).
 
 ## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 
