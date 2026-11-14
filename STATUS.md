@@ -61,6 +61,18 @@ Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/ar
   copy (re-export before prod); L6 open dev sign-up, no `revoke_invitation`, no NZA-team read path; L7 the hash
   includes the building id and name; L8 `library_refs` cannot be resolved back to a stored row.
 
+
+## ✅ Brief 102b — thermal bridging in the air-node balance — CLOSED 15 Nov 2026 on `chris/102b-bridging-in-balance`
+
+**Anchor EUI: 132.6 → 133.2.** Thermal bridging (ISO 14683 H_TB, 278 W/K on Bridgewater) was reported as a 24.0 MWh loss line but left out of the zone air-node balance, so it never reached demand (a Rule 9 breach).
+
+- **Fix:** bridging is added to `C_coef` / `D_coef` in State 1 and State 2/3 of `instantCalc.js`. Inline-legacy has no air-node balance or bridging term, so it is unchanged (stated in the brief).
+- **Bridgewater:** heating 87.7 → 102.7 and cooling 101.1 → 92.4 MWh. EnergyPlus (IdealLoads, matched inputs) gives 112.7 / 85.3.
+- **Unchanged:** State 1 (Building page) demand stays at 129.2 / 98.6.
+- **Report baseline:** `report_baseline_v1` goes from 126.0 to 126.6. The report-pipeline constants are left as the July record.
+- **Approval:** Linzie, 14 Nov 23:53, as an exception to the Simulate v2 "no engine change" rule.
+- **Records:** brief [`docs/briefs/archive/102b_bridging-in-balance_COMPLETED.md`](docs/briefs/archive/102b_bridging-in-balance_COMPLETED.md), audit [`docs/audit/102b/`](docs/audit/102b/).
+
 ## ✅ Brief 102 — Simulate v2 foundations (Rev B) — CLOSED 14 Nov 2026 on `chris/102-sim-v2-foundations` *MERGED to `main` `affbd7f` (PR #26), 14 Nov 2026*
 
 NZA Sim gets its own Supabase project ("NZA Sim (dev)") and identity; the decodED link is optional (Rev B).
