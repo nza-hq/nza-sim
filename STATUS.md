@@ -47,8 +47,11 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   sign-in (20:28); 49 global library items seeded on NZA Sim (dev) through `upsert_library_item` as Chris from the
   committed export; a second run added nothing; provenance read back
   ([`docs/audit/102/03_library.md`](docs/audit/102/03_library.md)).
-- **Next:** the Part 5 checks against NZA Sim (dev) (button twice on ZZ TEST, round trip `--record` then read; Claude
-  Chat reads the stored run back); then Part 6 (close) and the independent review.
+- **P5 verified on NZA Sim (dev)** (this commit; read back by Claude Chat, 21:45): two Save presses on ZZ TEST gave one
+  version and one run; stored EUI 132.6 (source `engineReads.readModelledEui`), fuels = end uses incl. the named
+  `not_itemised` line; stored model hash = `public.model_hash(document)` in SQL. The round-trip script ran against a
+  mock only; it now prints Supabase errors readably (`c6ce5fd`).
+- **Next:** Part 6 (close) on Linzie's word, then the independent review.
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 

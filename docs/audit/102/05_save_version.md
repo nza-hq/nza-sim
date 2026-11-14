@@ -49,9 +49,20 @@
    are updated.
 3. **`not_itemised` line in the summary** (above). Whether Engine 1's results name auxiliary loads is for its brief.
 
-## Still to do (with the real project)
+## Evidence on the real project (NZA Sim (dev), 14 Nov 2026)
 
-- Chris (or whoever is signed in as an editor or admin), on ZZ TEST: press the button twice → one version and one
-  run, the second press says "Unchanged".
-- `cd frontend; npx vite-node ../scripts/102_anchor_roundtrip.mjs --record`, then without `--record`. Both must
-  print `132.6` and `match`. It uses the same browser-session token as the seed script.
+Linzie pressed Save twice on ZZ TEST, signed in as Chris on her PC (worktree `nza-sim-102`). Chris's agent (Claude
+Chat) read the result back in the Supabase SQL editor at 21:45 UTC:
+
+1. One building (ZZ TEST — do not use), **one** `model_versions` row (`b031007c…`, schema 2.0, 21:12:31) and **one**
+   `runs` row (`0bb40750…`, `instant-1`, 21:12:31). The second press added nothing.
+2. `runs.summary.eui_kwh_m2` = **132.6**, source `engineReads.readModelledEui`. Fuels gas 157,428 + electricity
+   401,544 = 558,972 kWh = end uses dhw 199,653 + cooling 33,700 + heating 32,157 + lighting 39,014 + equipment
+   186,136 + ventilation_fans 40,613 + not_itemised 27,699 (rule 9: the remainder is a named line).
+3. Stored `model_hash` `d8bb5408876e…` = `public.model_hash(document)` recomputed in SQL: true. The run's four hashes
+   match the version's.
+
+**Not run on the real project:** `scripts/102_anchor_roundtrip.mjs`. It passed against a mocked database only (above).
+Running it on IT15 needs a browser-session token pasted into PowerShell, and that was dropped as too fiddly; the SQL
+read-back above was taken as Part 5's real-project evidence instead. On the first attempt it died with an unreadable
+`#<Object>` rejection, so it now prints the Supabase error message and code and exits 1 (`c6ce5fd`).
