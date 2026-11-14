@@ -25,7 +25,13 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   [`docs/audit/102/03_library.md`](docs/audit/102/03_library.md). The July-copy export matches the Part 0 counts
   (15 / 18 / 15; 3 benchmarks skipped). **Still to do (Claude Chat, database):** re-export from Chris's live DB with
   the dev server stopped, then the seed's dry run, `--apply`, and a second `--apply` that must add nothing.
-- **Next:** Part 4 (frontend sign-in, Linzie's agent; Supabase auth settings, Claude Chat).
+- **P4 code side** (this commit): `frontend/src/auth/` (`supabase.ts`, `AuthGate.tsx` with `OrgBadge`), `<AuthGate>`
+  in `main.jsx`, one `<OrgBadge />` line in `TopBar.jsx`, `@supabase/supabase-js` in package.json (**run
+  `npm install`**), `frontend/.env.example`, CLAUDE.md section. Env unset: ZZ TEST shows 132.6 before and after,
+  screenshots pixel-identical, nothing leaves localhost. Env set: the whole flow passes against a mocked Supabase;
+  [`docs/audit/102/04_sign_in.md`](docs/audit/102/04_sign_in.md). **Still to do (Claude Chat):** auth settings on
+  NZA Sim (dev), the env values, then the walkthrough against the real project.
+- **Next:** Part 5 (save as model version; Linzie's agent writes, needs the database to verify).
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 

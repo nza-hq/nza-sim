@@ -77,6 +77,14 @@ These rules were learned the hard way during the May 2026 audit and dynamic-engi
 
 ---
 
+## NZA Sim's own Supabase project (Brief 102, Nov 2026)
+
+1. **NZA Sim has its own Supabase project and its own identity.** Dev: "NZA Sim (dev)", ref `jbjxduathkklruvbmeho`. A prod project is created, with the same migrations in order, before the first client; until then everything is dev only. Migrations live in `supabase/migrations/`; how to apply them is in `supabase/README.md`.
+2. **Never decodED's database.** Nothing here reads from or writes to `NZA Decoded` (`weeaadpwofvbmcilxpkt`, live) or `NZA Decoded Test` (`stxitqwhaesraisfwyes`). The decodED link is Brief 113: an optional integration through `org_links` and a scoped token. NZA Sim reads nothing from decodED's database.
+3. **Env names:** `VITE_NZASIM_SUPABASE_URL` and `VITE_NZASIM_SUPABASE_ANON_KEY` in `frontend/.env` (gitignored; names in `frontend/.env.example`; values in Bitwarden org "NZA"). With either unset, `AuthGate` renders the app unchanged and nothing calls Supabase, so today's tool runs exactly as before.
+4. **The anon key is public by design**, safe only because every table has RLS and every write goes through a security-definer function. **No service-role key** in the repo, a laptop `.env`, a log or Notion. Scripts (e.g. `scripts/102_seed_library.mjs`) use the anon key plus a signed-in user's own session.
+5. **Sign-in** is an email magic link. Organisations, roles (admin / editor / viewer) and invitations come from `my_access()` and the tenancy functions in `0001_tenancy.sql`; the current organisation is `useAuth().org` (`frontend/src/auth/AuthGate.tsx`).
+
 ## Module scopes
 
 These statements define what each module computes and what it does not.
