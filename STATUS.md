@@ -31,7 +31,15 @@ Never NZA Decoded or NZA Decoded Test. No engine file changes; today's tool runs
   screenshots pixel-identical, nothing leaves localhost. Env set: the whole flow passes against a mocked Supabase;
   [`docs/audit/102/04_sign_in.md`](docs/audit/102/04_sign_in.md). **Still to do (Claude Chat):** auth settings on
   NZA Sim (dev), the env values, then the walkthrough against the real project.
-- **Next:** Part 5 (save as model version; Linzie's agent writes, needs the database to verify).
+- **P4 Supabase side** (`a3184e0`, Claude Chat): magic link on, OTP length 6, anonymous sign-ins off, confirm email
+  on, Site URL `http://localhost:5176`, redirect `http://localhost:5176/**`; URL and publishable key in
+  [`docs/audit/102/04_auth_config.md`](docs/audit/102/04_auth_config.md) (public by design; secret key never
+  copied). From a browser: anon denied on `my_access` and every table, allowed only on `accept_invitation_token`.
+  Email templates are read-only without custom SMTP, so the email carries the link, not a code; `AuthGate.tsx`
+  uses the link, so nothing is blocked. Custom SMTP (Resend or M365) is a prod prerequisite.
+- **Next:** Chris: `npm install` in `frontend/`, the two env values into `frontend/.env`, a real sign-in; Claude Chat:
+  seed `nza_team` with Chris's user, then Part 3 `--apply`; then Part 5 (save as model version; Linzie's agent
+  writes, needs the database to verify).
 - **For review:** the DHW circulation pump is carried (it moves the anchor) but is a distribution loss, which the
   design note's scope fence excludes; `ventilation.kind` is derived from recovery %.
 
