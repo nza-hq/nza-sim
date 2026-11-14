@@ -49,3 +49,24 @@ move nothing (Part 1). No age-band data exists anywhere, so `age_band_default` i
 
 (The emailed-code sign-in originally planned here was dropped: without custom SMTP the email template cannot carry
 the code, `04_auth_config.md`.)
+
+## The `--apply` run (Claude Chat, 14 Nov 2026 21:06, database side)
+
+Chris was on his MacBook; the PowerShell/token route needed a running app and a pasted session token, so the
+seed was applied from the dashboard SQL editor instead, **through the same function with the same checks**:
+`set local role authenticated` with Chris's real user id in `request.jwt.claims`, then
+`upsert_library_item(null, kind, key, 1, body, provenance)` for every item of the committed export
+(`docs/audit/102/library_export.json`, fetched from the branch on GitHub; `exported_at 2026-11-14T19:36:56Z`,
+`machine vm`, `source_db_sha256 5a41bcf1e238…`, the same database Chris's own export on IT15 read, by sha).
+No service-role key, no direct insert; RLS and the NZA-team check applied (`nza_team = true` was asserted in
+the same statement).
+
+| Check | Result |
+|---|---|
+| items seeded | 49 (construction 15, profile 15, system_template 18, weather 1), all version 1 |
+| second run of the same statement | 49 rows still, one `created_at` for all rows: nothing added |
+| provenance | 49 of 49 carry `source_db_sha256`; 48 of 49 carry `sqlite_id` (the weather item's provenance has no sqlite row id, by the export's design) |
+
+Consequence for the script: `node scripts/102_seed_library.mjs` now prints `unchanged: 49` against this project
+and `--apply` writes nothing, which is the state Part 3's verification asks for. When a fresh export (IT15) is
+committed, the bodies hash the same, so provenance stays as above unless an item really changed.
