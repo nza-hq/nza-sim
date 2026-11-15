@@ -1,0 +1,718 @@
+{
+ "runs": {
+  "r0": {
+   "flags": [],
+   "notes": [],
+   "heating_mwh": 90.458,
+   "cooling_mwh": 13.655,
+   "heating_monthly_mwh": [
+    19.837,
+    14.608,
+    12.848,
+    3.547,
+    0.269,
+    0.0,
+    0.0,
+    0.0,
+    0.259,
+    6.102,
+    14.157,
+    18.832
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.026,
+    3.444,
+    8.439,
+    1.725,
+    0.022,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 5
+  },
+  "one_zone": {
+   "flags": [
+    "one_zone"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5"
+   ],
+   "heating_mwh": 90.566,
+   "cooling_mwh": 13.386,
+   "heating_monthly_mwh": [
+    19.863,
+    14.631,
+    12.867,
+    3.547,
+    0.228,
+    0.0,
+    0.0,
+    0.0,
+    0.247,
+    6.142,
+    14.183,
+    18.858
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.011,
+    3.326,
+    8.401,
+    1.638,
+    0.01,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 8
+  },
+  "sky_fixed": {
+   "flags": [
+    "sky_fixed"
+   ],
+   "notes": [
+    "sky_fixed: sky temperature = dry bulb - 11 K"
+   ],
+   "heating_mwh": 90.181,
+   "cooling_mwh": 13.753,
+   "heating_monthly_mwh": [
+    19.695,
+    14.558,
+    12.762,
+    3.34,
+    0.229,
+    0.0,
+    0.0,
+    0.0,
+    0.252,
+    6.268,
+    14.168,
+    18.91
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.044,
+    3.541,
+    8.464,
+    1.686,
+    0.018,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 6
+  },
+  "one_zone_no_slab": {
+   "flags": [
+    "one_zone",
+    "no_slab"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted"
+   ],
+   "heating_mwh": 91.018,
+   "cooling_mwh": 12.401,
+   "heating_monthly_mwh": [
+    19.251,
+    14.17,
+    12.51,
+    4.11,
+    0.832,
+    0.003,
+    0.0,
+    0.027,
+    1.498,
+    6.597,
+    13.95,
+    18.07
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.664,
+    3.401,
+    7.082,
+    1.215,
+    0.039,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 6
+  },
+  "e1_building": {
+   "flags": [
+    "one_zone",
+    "no_slab",
+    "airmass"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone"
+   ],
+   "heating_mwh": 89.587,
+   "cooling_mwh": 10.146,
+   "heating_monthly_mwh": [
+    19.241,
+    14.17,
+    12.439,
+    3.69,
+    0.479,
+    0.0,
+    0.0,
+    0.0,
+    0.961,
+    6.585,
+    13.95,
+    18.07
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.561,
+    6.88,
+    0.705,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 6
+  },
+  "lw_area": {
+   "flags": [
+    "lw_area"
+   ],
+   "notes": [
+    "lw_area: view factors A_j / A_zone in 5 zone(s)"
+   ],
+   "heating_mwh": 90.687,
+   "cooling_mwh": 13.266,
+   "heating_monthly_mwh": [
+    19.818,
+    14.618,
+    12.894,
+    3.632,
+    0.31,
+    0.0,
+    0.0,
+    0.0,
+    0.292,
+    6.161,
+    14.159,
+    18.803
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.022,
+    3.287,
+    8.276,
+    1.659,
+    0.021,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 5
+  },
+  "ts_1": {
+   "flags": [
+    "ts_1"
+   ],
+   "notes": [
+    "ts_1: one time step per hour"
+   ],
+   "heating_mwh": 93.124,
+   "cooling_mwh": 10.965,
+   "heating_monthly_mwh": [
+    20.074,
+    14.722,
+    13.273,
+    3.958,
+    0.44,
+    0.0,
+    0.0,
+    0.0,
+    0.434,
+    6.597,
+    14.537,
+    19.09
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.006,
+    2.404,
+    7.497,
+    1.055,
+    0.003,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 6
+  },
+  "iso_conv": {
+   "flags": [
+    "iso_conv"
+   ],
+   "notes": [
+    "iso_conv: fixed coefficients on 50 surfaces"
+   ],
+   "heating_mwh": 93.316,
+   "cooling_mwh": 14.893,
+   "heating_monthly_mwh": [
+    20.668,
+    15.125,
+    13.025,
+    3.382,
+    0.261,
+    0.0,
+    0.0,
+    0.0,
+    0.194,
+    6.471,
+    14.718,
+    19.473
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.017,
+    4.005,
+    8.618,
+    2.224,
+    0.029,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 5
+  },
+  "fullint": {
+   "flags": [
+    "fullint"
+   ],
+   "notes": [
+    "fullint: FullInteriorAndExterior"
+   ],
+   "heating_mwh": 90.807,
+   "cooling_mwh": 13.299,
+   "heating_monthly_mwh": [
+    19.868,
+    14.644,
+    12.889,
+    3.623,
+    0.293,
+    0.0,
+    0.0,
+    0.0,
+    0.278,
+    6.155,
+    14.198,
+    18.86
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.019,
+    3.296,
+    8.311,
+    1.655,
+    0.019,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 5
+  },
+  "e1_like": {
+   "flags": [
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "sky_fixed",
+    "lw_area",
+    "ts_1",
+    "iso_conv"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)",
+    "ts_1: one time step per hour",
+    "iso_conv: fixed coefficients on 42 surfaces"
+   ],
+   "heating_mwh": 94.713,
+   "cooling_mwh": 9.332,
+   "heating_monthly_mwh": [
+    20.072,
+    14.873,
+    13.21,
+    4.02,
+    0.639,
+    0.0,
+    0.0,
+    0.0,
+    1.104,
+    7.255,
+    14.594,
+    18.946
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.259,
+    6.349,
+    0.724,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 8
+  },
+  "e1_building_sky": {
+   "flags": [
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "sky_fixed"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K"
+   ],
+   "heating_mwh": 89.28,
+   "cooling_mwh": 10.221,
+   "heating_monthly_mwh": [
+    19.102,
+    14.12,
+    12.359,
+    3.464,
+    0.438,
+    0.0,
+    0.0,
+    0.0,
+    0.944,
+    6.744,
+    13.959,
+    18.149
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.654,
+    6.904,
+    0.663,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 7
+  },
+  "e1_building_lw": {
+   "flags": [
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "lw_area"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)"
+   ],
+   "heating_mwh": 90.086,
+   "cooling_mwh": 9.579,
+   "heating_monthly_mwh": [
+    19.244,
+    14.208,
+    12.531,
+    3.844,
+    0.551,
+    0.0,
+    0.0,
+    0.0,
+    1.034,
+    6.649,
+    13.965,
+    18.06
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.337,
+    6.657,
+    0.586,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 6
+  },
+  "e1_building_ts": {
+   "flags": [
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "ts_1"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "ts_1: one time step per hour"
+   ],
+   "heating_mwh": 92.218,
+   "cooling_mwh": 7.837,
+   "heating_monthly_mwh": [
+    19.463,
+    14.278,
+    12.846,
+    4.096,
+    0.761,
+    0.0,
+    0.0,
+    0.0,
+    1.228,
+    6.959,
+    14.284,
+    18.303
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.705,
+    6.049,
+    0.083,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 7
+  },
+  "e1_building_conv": {
+   "flags": [
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "iso_conv"
+   ],
+   "notes": [
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "iso_conv: fixed coefficients on 42 surfaces"
+   ],
+   "heating_mwh": 93.026,
+   "cooling_mwh": 11.272,
+   "heating_monthly_mwh": [
+    20.041,
+    14.805,
+    12.911,
+    3.799,
+    0.447,
+    0.0,
+    0.0,
+    0.0,
+    0.91,
+    6.876,
+    14.432,
+    18.806
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.937,
+    7.058,
+    1.278,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 6
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.15 18:11",
+ "source": "validation/energyplus/104_attribution.py",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "bestest": {
+  "900": {
+   "flags": [],
+   "notes": [],
+   "heating_mwh": 1.652,
+   "cooling_mwh": 2.507,
+   "peak_heating_kw": 2.688,
+   "peak_cooling_kw": 3.106
+  },
+  "900_iso3": {
+   "flags": [
+    "hce20",
+    "hci_iso",
+    "simple_window"
+   ],
+   "notes": [],
+   "heating_mwh": 2.082,
+   "cooling_mwh": 2.37,
+   "peak_heating_kw": 2.885,
+   "peak_cooling_kw": 2.822
+  },
+  "900_iso3_sky": {
+   "flags": [
+    "hce20",
+    "hci_iso",
+    "simple_window",
+    "sky_fixed"
+   ],
+   "notes": [
+    "sky_fixed: sky temperature = dry bulb - 11 K"
+   ],
+   "heating_mwh": 2.057,
+   "cooling_mwh": 2.413,
+   "peak_heating_kw": 2.863,
+   "peak_cooling_kw": 2.86
+  },
+  "900_iso3_lw": {
+   "flags": [
+    "hce20",
+    "hci_iso",
+    "simple_window",
+    "lw_area"
+   ],
+   "notes": [
+    "lw_area: view factors A_j / A_zone in 1 zone(s)"
+   ],
+   "heating_mwh": 2.094,
+   "cooling_mwh": 2.282,
+   "peak_heating_kw": 2.86,
+   "peak_cooling_kw": 2.742
+  },
+  "900_iso3_ts": {
+   "flags": [
+    "hce20",
+    "hci_iso",
+    "simple_window",
+    "ts_1"
+   ],
+   "notes": [
+    "ts_1: one time step per hour"
+   ],
+   "heating_mwh": 2.032,
+   "cooling_mwh": 2.321,
+   "peak_heating_kw": 2.888,
+   "peak_cooling_kw": 2.847
+  },
+  "900_e1_like": {
+   "flags": [
+    "hce20",
+    "hci_iso",
+    "simple_window",
+    "sky_fixed",
+    "lw_area",
+    "ts_1"
+   ],
+   "notes": [
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)",
+    "ts_1: one time step per hour"
+   ],
+   "heating_mwh": 2.018,
+   "cooling_mwh": 2.276,
+   "peak_heating_kw": 2.839,
+   "peak_cooling_kw": 2.814
+  },
+  "600": {
+   "flags": [],
+   "notes": [],
+   "heating_mwh": 4.289,
+   "cooling_mwh": 6.016,
+   "peak_heating_kw": 3.197,
+   "peak_cooling_kw": 6.364
+  },
+  "600_e1_like": {
+   "flags": [
+    "hce20",
+    "hci_iso",
+    "simple_window",
+    "sky_fixed",
+    "lw_area",
+    "ts_1"
+   ],
+   "notes": [
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)",
+    "ts_1: one time step per hour"
+   ],
+   "heating_mwh": 4.162,
+   "cooling_mwh": 4.858,
+   "peak_heating_kw": 3.299,
+   "peak_cooling_kw": 5.355
+  }
+ }
+}

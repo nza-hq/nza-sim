@@ -2,6 +2,14 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔄 Brief 104 — Simulate v2 Engine 2 — IN PROGRESS on `chris/104-engine-2` (stacked on 103, PR #30)
+
+Brief [`docs/briefs/active/104_engine-2.md`](docs/briefs/active/104_engine-2.md). Multi-zone, starting from the open
+Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/104/00_reconnaissance.md)): referee zones and slab (0.528 m²K/W, 485 kJ/m²K); the Bridgewater referee uses FullExterior (103 said FullInteriorAndExterior; beam still on the floor).
+- **P1 cooling gap attributed** ([`01_cooling_gap.md`](docs/audit/104/01_cooling_gap.md)): not the slabs. The main cause is window solar kept — Engine 1 134.6 MWh against EnergyPlus about 122.5 (EnergyPlus loses 9.4 MWh back out through the glass) — 4.39 of the 5.99 MWh between Engine 1 and EnergyPlus-with-Engine-1's-simplifications; solar convective fraction 0.65; remainder 0.95. Slabs about 1 MWh; zone count 0.27; the referee lacked the document's 250 kJ/m²K internal mass (−2.25 MWh in one zone). 103's near-match was net of these. Next: P1b, window solar from the window's optics.
+
 ## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
 
 Brief [`docs/briefs/archive/103_engine-1_COMPLETED.md`](docs/briefs/archive/103_engine-1_COMPLETED.md), written by this project's agent at

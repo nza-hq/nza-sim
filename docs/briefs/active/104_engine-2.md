@@ -176,6 +176,30 @@ Each run is the Part 5 referee (r0) with exactly one change. Report annual and m
   from e1_like to r0, each with a magnitude. Whatever is left is named as a remainder.
 - If e1_like and Engine 1 differ by more than 3 %, instrument hourly before going further.
 
+**Part 1 result (15 Nov):** the gap is mainly window solar kept (Engine 1 134.6 MWh, EnergyPlus about 122.5): 4.39 MWh
+of the 5.99 between Engine 1 and EnergyPlus-with-Engine-1's-simplifications. Slabs about 1 MWh; zone count 0.27.
+Remainder 0.95 MWh. `docs/audit/104/01_cooling_gap.md`. This adds Part 1b.
+
+### Part 1b — Window solar: the window's own optics (added 15 Nov after Part 1)
+
+Files: `frontend/src/thermal/engine/{glazing,model,zone}.ts` (new `glazing.ts`), tests, `docs/audit/104/01b_window_solar.md`.
+Commit: `104 P1b: window solar from the window's optics (SHGC split, angular beam, diffuse lost back out)`.
+
+- The window's normal-incidence transmittance and inward-flowing fraction come from its U and SHGC. Use EnergyPlus's
+  documented SimpleGlazingSystem method (Engineering Reference, "Simple Window Model"), cited clause by clause. It is
+  a published method, not a fitted one.
+- Beam transmittance follows the incidence angle by the same method's angular curves. Diffuse uses the
+  hemispherical average.
+- Diffuse solar that falls on a window from inside leaves through it at the diffuse transmittance, and is a breakdown
+  line (`solar_lost_through_glazing`).
+- This replaces F_W for the run options that select it (`glazing_solar: 'optical'`). `REFEREE_OPTIONS` moves to it
+  only if both referees model windows this way, which they do.
+- **Done when:**
+  - BESTEST and Bridgewater are re-measured with no overrides, and every recorded number that moves is re-recorded
+    with its reason;
+  - the remainder from Part 1 is reported again;
+  - the analytic tests are unchanged.
+
 ### Part 2 — Schema 2.2: interzone surfaces and internal mass
 
 Files: `frontend/src/thermal/schema/{model,upgrade,fromBuildingConfig}.ts`, tests. Commit: `104 P2: schema 2.2,
