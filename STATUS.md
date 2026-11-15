@@ -2,6 +2,13 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 111 — Simulate v2: "Results include" levels (Parts 1–2 here; 3–4 the editor's) — IN PROGRESS on `chris/111-results-levels` (stacked on 108)
+
+Brief [`docs/briefs/active/111_results-include.md`](docs/briefs/active/111_results-include.md). Linzie approved the plan 15 Nov 21:53.
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/111/00_reconnaissance.md)): what each level removes.
+- **P1 levels in the seam** ([`01_levels.md`](docs/audit/111/01_levels.md)): `simulate(doc, { level, fabric_heat_c })` runs a copy with objects removed (Rule 8); systems is today's run value for value; every level's breakdowns close; the fabric temperature is required, never defaulted.
+
 ## 🟡 Brief 108 — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
 
 Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.

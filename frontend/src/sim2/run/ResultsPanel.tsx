@@ -216,7 +216,9 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           </div>
 
           <h3>Energy used <i>estimate</i></h3>
-          {s.energy.ok ? (
+          {s.energy === null ? (
+            <p className="rp-none">Energy used is shown when results include systems.</p>
+          ) : s.energy.ok ? (
             <>
               <div className="rp-totals">
                 <div>
