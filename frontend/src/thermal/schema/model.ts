@@ -15,6 +15,7 @@ import { z } from 'zod'
 
 const finite = z.number().finite()
 const nonNeg = finite.nonnegative()
+const fraction = finite.min(0).max(1)
 const id = z.string().min(1)
 
 export const FACADES = ['north', 'east', 'south', 'west'] as const
@@ -53,6 +54,8 @@ export const OccupancyProfile = z
     density: z.object({ value: finite, basis: z.string().min(1) }).strict(),
     sensible_w_per_person: finite.optional(),
     latent_w_per_person: finite.optional(),
+    /** Schema 2.3 (Brief 105 Part 1): the share of the sensible gain given off as long-wave radiation. Null until stated. */
+    radiant_fraction: fraction.nullable(),
   })
   .strict()
 
@@ -68,6 +71,8 @@ const GainProfileFields = {
   baseload: Magnitude.optional(),
   standby_factor: finite.optional(),
   daylight_factor: finite.optional(),
+  /** Schema 2.3 (Brief 105 Part 1): the share of the heat gain given off as long-wave radiation. Null until stated. */
+  radiant_fraction: fraction.nullable(),
 }
 export const LightingProfile = z.object({ ...GainProfileFields, kind: z.literal('lighting') }).strict()
 export const EquipmentProfile = z.object({ ...GainProfileFields, kind: z.literal('equipment') }).strict()
@@ -408,7 +413,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.2' as const
+export const SCHEMA_VERSION = '2.3' as const
 
 export const ModelDocument = z
   .object({

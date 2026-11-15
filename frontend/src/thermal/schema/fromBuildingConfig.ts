@@ -20,7 +20,7 @@
  */
 import { canonicalJSON, sha256Hex } from './canonical'
 import { FACADES, ModelDocument, SCHEMA_VERSION } from './model'
-import { TODAY } from './upgrade'
+import { TODAY, stateTodaysGainInputs } from './upgrade'
 import type { LibraryRef } from './model'
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
@@ -307,7 +307,9 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
   const profileRefs = { occupancy: null as string | null, lighting: [] as string[], equipment: [] as string[], auxiliary: [] as string[] }
   if (src.get(`${B}.occupancy`) != null) {
     const i = profiles.length
-    profiles.push({ id: 'occupancy', kind: 'occupancy', ...(src.tree(`${B}.occupancy`, `profiles[${i}]`) as Obj) })
+    const occ: Obj = { id: 'occupancy', kind: 'occupancy', ...(src.tree(`${B}.occupancy`, `profiles[${i}]`) as Obj) }
+    stateTodaysGainInputs(occ)
+    profiles.push(occ)
     profileRefs.occupancy = 'occupancy'
   }
   for (const kind of ['lighting', 'equipment', 'auxiliary'] as const) {
@@ -319,7 +321,9 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
       const i = profiles.length
       const body = src.tree(`${B}.gains.${kind}.profiles[${j}]`, `profiles[${i}]`) as Obj
       if (typeof body.id !== 'string') throw new ConversionError('a gains profile has no id', `${B}.gains.${kind}.profiles[${j}].id`)
-      profiles.push({ ...body, kind })
+      const gp: Obj = { ...body, kind }
+      stateTodaysGainInputs(gp)
+      profiles.push(gp)
       profileRefs[kind].push(body.id)
     })
   }

@@ -81,19 +81,25 @@ Room-level results on screen must say plainly that they are **not yet validated*
 
 ## Decisions this brief takes (flagged for review; the design note is updated at close)
 
-1. **Schema 2.3, zone gains and ventilation in physical units.**
-   - Each zone gets `gains`, with fields:
-     - `people_per_m2`
-     - `sensible_w_per_person`
-     - `lighting_w_per_m2`
-     - `equipment_w_per_m2`
-     - `radiant_fraction` (one per kind)
-   - Each value is `null` until stated. A zone with a profile ref but a null density refuses to run, naming the
-     field.
-   - The editor's space type writes them.
-   - Ventilation entries keep the 2.x shape (`kind`, `flow_rate`, `flow_rate_basis`, `recovery_sensible_pct`,
-     `control_schedule_ref`).
-   - The upgrade 2.2 → 2.3 adds `gains` with nulls.
+1. **Schema 2.3: gains stay on the document's profiles** *(amended at P1)*.
+   - **P1 found that schema 2.x already carries the gain densities.** Each zone refers, by `profile_refs`, to
+     document profiles that hold them:
+     - occupancy: `density {value, basis}`, `occupancy_rate`, `sensible_w_per_person`;
+     - lighting, equipment and auxiliary: `magnitude`, `active` / `baseload`, `gain_fraction`, `area_share`,
+       `relationship_to_occupancy`, `daylight_factor`, `standby_factor`.
+
+     The zone has `area_m2` and `rooms` to scale them. A new `zones[].gains` field would be a second exposure of the
+     same quantities (CLAUDE.md Rule 11), so it is not added.
+   - **What 2.3 adds:** `radiant_fraction` on each occupancy, lighting, equipment and auxiliary profile. It is
+     null until stated.
+   - **The upgrade 2.2 → 2.3, and the converter,** write today's fallbacks into any profile that leaves them out
+     (`instantCalc.js` `computeHourlyGains`), and a radiant fraction of 0.3 (today's 30/70 split for internal gains).
+     A converted document therefore says exactly what today's engine assumed.
+   - **The engine names a missing input.** A zone with a profile ref whose density, or any other input the engine
+     reads, is absent or null refuses to run and names the field.
+   - **The editor's space type writes document profiles,** with their densities, and the zone's `profile_refs`.
+   - **Ventilation entries keep the 2.x shape** (`kind`, `flow_rate`, `flow_rate_basis`, `recovery_sensible_pct`,
+     `control_schedule_ref`). There is no schema change for them.
 2. **Profiles reach the engine as hourly fractions,** expanded from the library shape over the weather year:
    - by day type (weekday, Saturday, Sunday);
    - with monthly multipliers;
@@ -140,7 +146,8 @@ Files: `docs/audit/105/00_reconnaissance.md`. Commit: `105 P0: reconnaissance`.
 
 ### Part 1 — Schema 2.3
 
-Files: `frontend/src/thermal/schema/{model,upgrade}.ts`, tests. Commit: `105 P1: schema 2.3, zone gains and ventilation inputs`.
+Files: `frontend/src/thermal/schema/{model,upgrade,fromBuildingConfig}.ts`, tests, `docs/audit/105/01_schema.md`.
+Commit: `105 P1: schema 2.3, radiant fractions and today's gain fallbacks stated`.
 
 ### Part 2 — Internal gains on both paths
 
