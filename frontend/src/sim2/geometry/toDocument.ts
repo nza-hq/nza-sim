@@ -40,7 +40,7 @@ export type Built = {
 export function buildDocument(plan: Plan): Built {
   const notes: string[] = []
   const h = plan.storey_height_m
-  const { walls: roomWalls, shares: roomShares, open } = edgesOf(plan.footprint, plan.rooms)
+  const { walls: roomWalls, shares: roomShares, open } = edgesOf(plan.blocks, plan.rooms)
   const { windows, problems } = allWindows(plan)
   problems.forEach((p) => notes.push(`Window set ${p.set}: ${p.why}`))
   const roomOf = new Map(plan.rooms.map((r) => [r.id, r]))
@@ -50,7 +50,7 @@ export function buildDocument(plan: Plan): Built {
 
   // A zone's walls: its rooms' stretches of each footprint run, joined where they meet (two rooms of one zone side by
   // side along a wall make one wall).
-  const runs = wallRuns(plan.footprint)
+  const runs = wallRuns(plan.blocks)
   const walls: Array<{ zone: string; run: number; t0: number; t1: number; length_m: number; azimuth_deg: number }> = []
   for (const z of used) {
     for (const run of runs) {
@@ -185,9 +185,6 @@ export function buildDocument(plan: Plan): Built {
     }
     return [{ id: sys.id, service: sys.service, label: sys.label, zones: served, enabled: true, share_pct: 100, source: null, efficiency_metric: null }]
   })
-  for (const z of used) {
-    if (!z.heating) notes.push(`${z.name} has no heating system`)
-  }
 
   const doc = {
     schema_version: SCHEMA_VERSION,

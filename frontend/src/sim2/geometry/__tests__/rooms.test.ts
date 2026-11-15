@@ -25,7 +25,7 @@ describe('rooms', () => {
     expect(p.rooms).toHaveLength(3)
     p = ok(boxRoom(p, [[14, 0], [20, 0], [20, 4], [14, 4]]))
     expect(p.rooms).toHaveLength(4)
-    expect(covers(p.footprint!, p.rooms)).toBe(true)
+    expect(covers(p.blocks, p.rooms)).toBe(true)
   })
   it('a box outside the building is refused in words', () => {
     expect(boxRoom(start(), [[30, 0], [35, 0], [35, 5], [30, 5]])).toHaveProperty('why')
@@ -54,7 +54,7 @@ describe('rooms', () => {
     const p = ok(halveRoom(start(), 'r1'))
     const q = ok(addShape(p, [[0, 10], [6, 10], [6, 16], [0, 16]]))
     expect(q.rooms).toHaveLength(3)
-    expect(covers(q.footprint!, q.rooms)).toBe(true)
+    expect(covers(q.blocks, q.rooms)).toBe(true)
   })
 })
 
@@ -91,5 +91,32 @@ describe('a room side partly on the outside wall', () => {
     const b = buildDocument(p)
     expect(b.notes.filter((n) => n.includes('neither'))).toEqual([])
     expect(b.ok).toBe(true)
+  })
+})
+
+describe('blocks', () => {
+  it('a shape apart is its own block; a copy dropped against the building joins it', async () => {
+    const { copyBlock, dropBlocks, moveBlocks, pushWall } = await import('../outline')
+    let p = start()
+    p = ok(addShape(p, [[30, 0], [36, 0], [36, 6], [30, 6]]))
+    expect(p.blocks).toHaveLength(2)
+    expect(p.rooms).toHaveLength(2)
+    p = ok(copyBlock(p, 1))
+    expect(p.blocks).toHaveLength(3)
+    // The copy (6 × 6) moved back against the first block's east wall (x = 20).
+    const copy = p.blocks[2]!
+    const dx = 20 - Math.min(...copy.map((q) => q[0]))
+    const dy = 0 - Math.min(...copy.map((q) => q[1]))
+    p = ok(dropBlocks(moveBlocks(p, [2], [dx, dy]), 'Moved'))
+    expect(p.blocks).toHaveLength(2)
+    expect(covers(p.blocks, p.rooms)).toBe(true)
+    expect(buildDocument(p).ok).toBe(true)
+    // Push the first block's south wall out 2 m: 26 × 12 + 6 × 6 = … area grows by 2 × 26.
+    const before = p.blocks[0]!.reduce((t, a, i, r) => t + a[0] * r[(i + 1) % r.length]![1] - r[(i + 1) % r.length]![0] * a[1], 0) / 2
+    const south = p.blocks[0]!.findIndex((a, i, r) => a[1] === 0 && r[(i + 1) % r.length]![1] === 0 && r[(i + 1) % r.length]![0] > a[0])
+    const q = ok(pushWall(p, 0, south, 2))
+    const after = q.blocks[0]!.reduce((t, a, i, r) => t + a[0] * r[(i + 1) % r.length]![1] - r[(i + 1) % r.length]![0] * a[1], 0) / 2
+    expect(after - before).toBeGreaterThan(39)
+    expect(covers(q.blocks, q.rooms)).toBe(true)
   })
 })

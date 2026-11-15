@@ -5,16 +5,16 @@ import { fitRooms } from '../rooms'
 import { buildDocument } from '../toDocument'
 
 const box: XY[] = [[0, 0], [12, 0], [12, 8], [0, 8]]
-const plan = (fp: XY[]): Plan => fitRooms(emptyPlan(), fp).plan
+const plan = (fp: XY[]): Plan => fitRooms(emptyPlan(), [fp]).plan
 
 describe('walls and windows', () => {
   it('azimuth of outward normals on an anticlockwise box', () => {
-    expect(wallRuns(box).map((r) => r.azimuth_deg)).toEqual([180, 90, 0, 270])
+    expect(wallRuns([box]).map((r) => r.azimuth_deg)).toEqual([180, 90, 0, 270])
     // A 45° diagonal side facing south-east.
     expect(azimuthOf([0, 0], [10, 10])).toBeCloseTo(135, 6)
   })
   it('three 1 m² windows, equally spaced, on a 12 m wall', () => {
-    const run = wallRuns(box)[0]!
+    const run = wallRuns([box])[0]!
     const l = layoutSet(run, { id: 'w1', wall: 0, count: 3, width_m: 1 / 1.2, height_m: 1.2, sill_m: 0.9 }, 3)
     if ('why' in l) throw new Error(l.why)
     const gaps = [l.windows[0]!.offset_m, l.windows[1]!.offset_m - l.windows[0]!.offset_m - l.windows[0]!.width_m]
@@ -22,7 +22,7 @@ describe('walls and windows', () => {
     expect(l.windows[2]!.offset_m + l.windows[2]!.width_m + l.gap_m).toBeCloseTo(12, 9)
   })
   it('says why when they do not fit', () => {
-    const run = wallRuns(box)[0]!
+    const run = wallRuns([box])[0]!
     expect(layoutSet(run, { id: 'w', wall: 0, count: 10, width_m: 1.5, height_m: 1, sill_m: 1 }, 3)).toHaveProperty('why')
     expect(layoutSet(run, { id: 'w', wall: 0, count: 1, width_m: 1, height_m: 2.5, sill_m: 1 }, 3)).toHaveProperty('why')
   })

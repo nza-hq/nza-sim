@@ -1,19 +1,25 @@
 /**
- * Sim2 geometry prototype: changes to the building outline, without a screen. Each one hands back a new plan, or a
+ * Sim2 geometry prototype: changes to the building's outline, without a screen. Each one hands back a new plan, or a
  * reason in plain words (decodED's rule, Brief 101 D7: never refuse in silence).
  *
- *   - addShape: a drawn box, triangle or shape joins the outline (the first one is the outline); it must touch it.
- *   - cutShape: a drawn box is taken out of the outline; it must leave one piece with no hole.
- *   - setRing: the outline after a corner was dragged, added or taken away; it must not cross itself.
- *   - moveBy / turnBy: the whole building (outline, rooms, windows) moves or turns; nothing else changes.
+ * The outline is one or more blocks (separate shapes). Blocks never touch: a shape drawn touching a block, or a block
+ * moved or pasted against another, is joined into it.
  *
- * When the outline's shape changes, rooms are clipped to it and new floor becomes new rooms (rooms.ts fitRooms); window
- * sets stay on any wall that is still there, exactly as it was; the rest are dropped, and the reply says so.
+ *   - addShape: a drawn box, triangle or shape joins the blocks it touches, or is a new block on its own.
+ *   - cutShape: a drawn box is taken out of the blocks under it; it must not leave a hole.
+ *   - setBlock: one block after a corner was dragged, added or taken away; it must not cross itself.
+ *   - pushWall: one side of a block moved straight out (or in), square to itself.
+ *   - moveBlocks / turnBlocks: chosen blocks (with their rooms and windows) move or turn.
+ *   - copyBlock: a copy of a block (its rooms too) beside the building.
+ *   - removeBlock: a block and its rooms go.
+ *
+ * When an outline changes, rooms are clipped to it and new floor becomes new rooms (rooms.ts fitRooms); window sets
+ * stay on any wall that is still there, exactly as it was; the rest are dropped, and the reply says so.
  */
 import pc from 'polygon-clipping'
 import { ringCrossings } from './ported/drawCore'
-import { area, ccw, type XY } from './ported/zones'
-import { type Plan, wallRuns } from './plan'
+import { area, ccw, inside, labelAt, type XY } from './ported/zones'
+import { type Plan, type PlanRoom, type WindowSet, wallRuns } from './plan'
 import { fitRooms } from './rooms'
 
 export type Changed = { plan: Plan; said?: string } | { why: string }
@@ -56,63 +62,114 @@ export function cleanRing(r: readonly XY[]): XY[] {
 }
 
 const closed = (r: readonly XY[]): [number, number][][] => [[...r.map((p) => [p[0], p[1]] as [number, number]), [r[0]![0], r[0]![1]]]]
+const touches = (a: readonly XY[], b: readonly XY[]) => pc.union(closed(a), closed(b)).length === 1
 
-/** The plan with a new outline: rooms fitted to it, windows kept on walls that did not change. */
-export function withOutline(plan: Plan, ring: XY[], what: string): { plan: Plan; said?: string } {
-  const before = wallRuns(plan.footprint)
-  const after = wallRuns(ring)
+/** Blocks that touch or overlap, joined; refused when a join would leave a courtyard. */
+function settle(blocks: XY[][]): XY[][] | { why: string } {
+  const out = blocks.map((b) => [...b])
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      if (!touches(out[i]!, out[j]!)) continue
+      const u = pc.union(closed(out[i]!), closed(out[j]!))
+      if (u[0]!.length > 1) return { why: 'That would leave a courtyard (a hole). Not yet supported.' }
+      out[i] = cleanRing(u[0]![0] as XY[])
+      out.splice(j, 1)
+      j = i
+    }
+  }
+  return out
+}
+
+/** The plan with new blocks: rooms fitted to them, windows kept on walls that did not change. */
+export function withBlocks(plan: Plan, blocks: XY[][], what: string, extraWindows: WindowSet[] = []): { plan: Plan; said?: string } {
+  const before = wallRuns(plan.blocks)
+  const after = wallRuns(blocks)
   const same = (a: XY, b: XY) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-6
   let lost = 0
-  const windows = plan.windows.flatMap((w) => {
-    const old = before[w.wall]
+  const windows = [...plan.windows, ...extraWindows].flatMap((w) => {
+    const old = w.at ?? (before[w.wall] ? { a: before[w.wall]!.a, b: before[w.wall]!.b } : undefined)
     const now = old && after.find((r) => same(r.a, old.a) && same(r.b, old.b))
     if (!now) {
       lost++
       return []
     }
-    return [{ ...w, wall: now.index }]
+    const { at: _at, ...rest } = w
+    return [{ ...rest, wall: now.index }]
   })
-  const fitted = fitRooms(plan, ring)
+  const fitted = fitRooms(plan, blocks)
   const notes = [fitted.said ?? '', lost ? `${lost} window set${lost > 1 ? 's' : ''} removed (the wall changed)` : ''].filter(Boolean)
   return { plan: { ...fitted.plan, windows }, said: notes.length ? `${what}: ${notes.join('; ')}` : undefined }
 }
 
+function settled(plan: Plan, blocks: XY[][], what: string): Changed {
+  const s = settle(blocks)
+  if ('why' in s) return s
+  const r = withBlocks(plan, s, what)
+  const joined = blocks.length - s.length
+  return joined > 0 ? { plan: r.plan, said: [r.said, `joined to the block it touches`].filter(Boolean).join('; ') } : r
+}
+
 export function addShape(plan: Plan, shape: XY[]): Changed {
   if (area(shape) < 1) return { why: 'Too small. Drag a bigger shape.' }
-  if (!plan.footprint) return withOutline({ ...plan, rooms: [], windows: [] }, cleanRing(shape), 'Added')
-  const u = pc.union(closed(plan.footprint), closed(shape))
-  if (u.length !== 1) return { why: 'Draw it touching the building.' }
-  if (u[0]!.length > 1) return { why: 'That would leave a courtyard (a hole). Not yet supported.' }
-  const ring = cleanRing(u[0]![0] as XY[])
-  if (Math.abs(area(ring) - area(plan.footprint)) < 0.01) return { why: 'That is already inside the building.' }
-  return withOutline(plan, ring, 'Added')
+  const ring = cleanRing(shape)
+  if (plan.blocks.some((b) => Math.abs(area(pc.union(closed(b), closed(ring))[0]![0] as XY[]) - area(b)) < 0.01 && touches(b, ring))) return { why: 'That is already inside the building.' }
+  return settled(plan, [...plan.blocks, ring], 'Added')
 }
 
 export function cutShape(plan: Plan, shape: XY[]): Changed {
-  if (!plan.footprint) return { why: 'Draw the building first, then cut a piece out of it.' }
-  const d = pc.difference(closed(plan.footprint), closed(shape))
-  if (!d.length) return { why: 'That would cut away the whole building.' }
-  if (d.length > 1) return { why: 'That would cut the building in two.' }
-  if (d[0]!.length > 1) return { why: 'That would make a hole in the middle. Cut from an edge.' }
-  const ring = cleanRing(d[0]![0] as XY[])
-  if (Math.abs(area(ring) - area(plan.footprint)) < 0.01) return { why: 'That box does not overlap the building.' }
-  return withOutline(plan, ring, 'Cut')
+  if (!plan.blocks.length) return { why: 'Draw the building first, then cut a piece out of it.' }
+  const out: XY[][] = []
+  let changed = false
+  for (const b of plan.blocks) {
+    const d = pc.difference(closed(b), closed(shape))
+    if (d.some((poly) => poly.length > 1)) return { why: 'That would make a hole in the middle. Cut from an edge.' }
+    const pieces = d.map((poly) => cleanRing(poly[0] as XY[])).filter((r) => area(r) >= 0.5)
+    if (Math.abs(pieces.reduce((t, r) => t + area(r), 0) - area(b)) > 0.01) changed = true
+    out.push(...pieces)
+  }
+  if (!changed) return { why: 'That box does not overlap the building.' }
+  if (!out.length) return { why: 'That would cut away the whole building.' }
+  return withBlocks(plan, out, 'Cut')
 }
 
-export function setRing(plan: Plan, ring: XY[]): Changed {
+/** One block's new outline (a corner dragged, added or taken away). */
+export function setBlock(plan: Plan, i: number, ring: XY[]): Changed {
   if (ring.length < 3) return { why: 'A building needs at least 3 corners.' }
   if (ringCrossings(ring, true).length) return { why: 'Those walls cross. Move the corner.' }
   if (area(ring) < 1) return { why: 'Too small.' }
-  return withOutline(plan, ccw(ring), 'Reshaped')
+  const blocks = plan.blocks.map((b, j) => (j === i ? ccw(ring) : b))
+  return settled(plan, blocks, 'Reshaped')
 }
 
-const mapPlan = (plan: Plan, f: (p: XY) => XY): Plan => ({
-  ...plan,
-  footprint: plan.footprint ? plan.footprint.map(f) : null,
-  rooms: plan.rooms.map((z) => ({ ...z, ring: z.ring.map(f) })),
-})
+/** Push side `side` of block `i` out by `by` metres (in, when negative), square to the side. */
+export function pushWall(plan: Plan, i: number, side: number, by: number): Changed {
+  const b = plan.blocks[i]
+  if (!b) return { why: 'That wall is gone.' }
+  const a = b[side]!
+  const c = b[(side + 1) % b.length]!
+  const L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1
+  // Outward is on the right of an anticlockwise ring.
+  const n: XY = [(c[1] - a[1]) / L, -(c[0] - a[0]) / L]
+  const ring = b.map((p, k) => (k === side || k === (side + 1) % b.length ? ([p[0] + n[0] * by, p[1] + n[1] * by] as XY) : p))
+  return setBlock(plan, i, ring)
+}
 
-export const moveBy = (plan: Plan, d: XY): Plan => mapPlan(plan, (p) => [p[0] + d[0], p[1] + d[1]])
+/** Which block a point is in (-1 for none). */
+export const blockAt = (plan: Plan, p: XY) => plan.blocks.findIndex((b) => inside(b, p))
+/** The rooms in block `i`. */
+export const roomsOfBlock = (plan: Plan, i: number): PlanRoom[] => plan.rooms.filter((r) => inside(plan.blocks[i] ?? [], labelAt(r.ring)))
+
+const mapBlocks = (plan: Plan, idx: readonly number[], f: (p: XY) => XY): Plan => {
+  const moving = new Set(idx.flatMap((i) => roomsOfBlock(plan, i).map((r) => r.id)))
+  return {
+    ...plan,
+    blocks: plan.blocks.map((b, i) => (idx.includes(i) ? b.map(f) : b)),
+    rooms: plan.rooms.map((r) => (moving.has(r.id) ? { ...r, ring: r.ring.map(f) } : r)),
+  }
+}
+
+/** Move blocks while dragging (no joining yet). Wall numbers do not change. */
+export const moveBlocks = (plan: Plan, idx: readonly number[], d: XY): Plan => mapBlocks(plan, idx, (p) => [p[0] + d[0], p[1] + d[1]])
 
 export function centreOf(ring: readonly XY[]): XY {
   const xs = ring.map((p) => p[0])
@@ -120,12 +177,64 @@ export function centreOf(ring: readonly XY[]): XY {
   return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
 }
 
-/** Turn the whole building by `rad` (anticlockwise) round `c`. Wall indices do not change. */
-export function turnBy(plan: Plan, rad: number, c: XY): Plan {
+/** Turn blocks by `rad` (anticlockwise) round `c` while dragging. */
+export function turnBlocks(plan: Plan, idx: readonly number[], rad: number, c: XY): Plan {
   const cos = Math.cos(rad)
   const sin = Math.sin(rad)
-  return mapPlan(plan, (p) => {
+  return mapBlocks(plan, idx, (p) => {
     const d: XY = [p[0] - c[0], p[1] - c[1]]
     return [c[0] + d[0] * cos - d[1] * sin, c[1] + d[0] * sin + d[1] * cos]
   })
+}
+
+/** After a move or turn is let go: blocks now touching are joined (their rooms and windows kept). */
+export function dropBlocks(moved: Plan, what: string): Changed {
+  const s = settle(moved.blocks)
+  if ('why' in s) return s
+  if (s.length === moved.blocks.length) return { plan: moved }
+  // The windows' walls are found by their ends, as they were after the move.
+  const runs = wallRuns(moved.blocks)
+  const pinned = moved.windows.map((w) => ({ ...w, at: { a: runs[w.wall]!.a, b: runs[w.wall]!.b } }))
+  const r = withBlocks({ ...moved, windows: [] }, s, what, pinned)
+  return { plan: r.plan, said: [`${what}: joined to the block it touches`, r.said?.replace(`${what}: `, '')].filter(Boolean).join('; ') }
+}
+
+/** A copy of block `i`, with its rooms (in the same zones) and windows, placed clear to its right. */
+export function copyBlock(plan: Plan, i: number): Changed {
+  const b = plan.blocks[i]
+  if (!b) return { why: 'Choose a block to copy.' }
+  const xs = plan.blocks.flat().map((p) => p[0])
+  const bx = b.map((p) => p[0])
+  const dx = Math.max(...xs) - Math.min(...bx) + 5
+  const f = (p: XY): XY => [p[0] + dx, p[1]]
+  let n = plan.next.room
+  const rooms = roomsOfBlock(plan, i).map((r) => ({ ...r, id: `r${n}`, name: `Room ${n++}`, ring: r.ring.map(f) }))
+  const runs = wallRuns(plan.blocks)
+  const ring = b.map(f)
+  const newRuns = wallRuns([...plan.blocks, ring]).filter((r) => r.block === plan.blocks.length)
+  const windows = plan.windows.flatMap((w) => {
+    const r = runs[w.wall]
+    if (!r || r.block !== i) return []
+    const to = newRuns.find((q) => q.side === r.side)
+    return to ? [{ ...w, id: `${w.id}c${n}`, wall: to.index }] : []
+  })
+  return {
+    plan: { ...plan, blocks: [...plan.blocks, ring], rooms: [...plan.rooms, ...rooms], windows: [...plan.windows, ...windows], next: { ...plan.next, room: n } },
+    said: 'Copied. Drag it against the building to join it on.',
+  }
+}
+
+/** Take block `i` away, with its rooms and windows. */
+export function removeBlock(plan: Plan, i: number): Plan {
+  const gone = new Set(roomsOfBlock(plan, i).map((r) => r.id))
+  const runs = wallRuns(plan.blocks)
+  const keep = plan.blocks.filter((_, j) => j !== i)
+  const after = wallRuns(keep)
+  const windows = plan.windows.flatMap((w) => {
+    const r = runs[w.wall]
+    if (!r || r.block === i) return []
+    const to = after.find((q) => q.block === (r.block > i ? r.block - 1 : r.block) && q.side === r.side)
+    return to ? [{ ...w, wall: to.index }] : []
+  })
+  return { ...plan, blocks: keep, rooms: plan.rooms.filter((r) => !gone.has(r.id)), windows }
 }

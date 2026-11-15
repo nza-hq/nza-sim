@@ -1,13 +1,14 @@
 /**
  * Sim2 geometry prototype: the plan as the editor holds it, and the sums on it (no screen, no React).
  *
- * A plan is one floor: a footprint (drawn with decodED's drawing core), filled with rooms (decodED's room editor and
- * zone cut), and window sets on the footprint's walls. Rooms always cover the floor exactly, wall to wall, with no
+ * A plan is one floor: one or more blocks (each a separate outline, drawn with decodED's drawing core; blocks that
+ * touch are joined into one), filled with rooms (decodED's room editor and zone cut), and window sets on the blocks'
+ * outside walls. Rooms always cover the floor exactly, wall to wall, with no
  * gaps and no overlaps (partitions have no thickness here). Each room sits in one zone; a zone is what the model
  * document calls a zone, and carries what is assigned to it (its use, its heating and its cooling system).
  * Everything is in local metres, x east, y north, north up (orientation 0).
  *
- * A "wall run" is one side of the footprint (index i: footprint[i] → footprint[i+1]). Windows belong to a run and are
+ * A "wall run" is one side of a block; runs are numbered through the blocks in order (block 0's sides, then block 1's). Windows belong to a run and are
  * placed along it by distance from its start, so cutting the floor into rooms never moves or loses a window; when the
  * model document is written, each zone's stretch of the run takes the windows whose middles fall on it.
  */
@@ -15,7 +16,7 @@ import { area, ccw, type XY } from './ported/zones'
 
 export type { XY }
 
-/** A room: drawn, always inside the footprint, in exactly one zone. */
+/** A room: drawn, always inside a block, in exactly one zone. */
 export type PlanRoom = { id: string; name: string; ring: XY[]; zone: string }
 /** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
 export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
@@ -41,10 +42,13 @@ export type WindowSet = {
   width_m: number
   height_m: number
   sill_m: number
+  /** Only while blocks are being rebuilt: the wall's ends, to find it again. */
+  at?: { a: XY; b: XY }
 }
 
 export type Plan = {
-  footprint: XY[] | null
+  /** Separate outlines, each anticlockwise. Blocks never touch or overlap (touching ones are joined). */
+  blocks: XY[][]
   rooms: PlanRoom[]
   zones: PlanZone[]
   systems: PlanSystem[]
@@ -54,7 +58,7 @@ export type Plan = {
   next: { room: number; zone: number; system: number }
 }
 
-export const emptyPlan = (): Plan => ({ footprint: null, rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], next: { room: 1, zone: 1, system: 1 } })
+export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], next: { room: 1, zone: 1, system: 1 } })
 
 /** A new zone with nothing assigned. */
 export const blankZone = (n: number): PlanZone => ({ id: `z${n}`, name: `Zone ${n}`, use: null, heating: null, cooling: null })
@@ -62,8 +66,9 @@ export const blankZone = (n: number): PlanZone => ({ id: `z${n}`, name: `Zone ${
 export const dist = (a: XY, b: XY) => Math.hypot(b[0] - a[0], b[1] - a[1])
 const round = (n: number, dp = 3) => Math.round(n * 10 ** dp) / 10 ** dp
 
-/** A footprint side: its two ends, length, and the true azimuth of its outward normal (degrees clockwise from north). */
-export type WallRun = { index: number; a: XY; b: XY; length_m: number; azimuth_deg: number }
+/** A block side: its block, its two ends, length, and the true azimuth of its outward normal (degrees clockwise from
+ *  north). `index` runs through every block; `side` is the side within its block. */
+export type WallRun = { index: number; block: number; side: number; a: XY; b: XY; length_m: number; azimuth_deg: number }
 
 /** Outward normal azimuth of side a→b of an anticlockwise ring (outside is on the right). */
 export function azimuthOf(a: XY, b: XY): number {
@@ -74,14 +79,21 @@ export function azimuthOf(a: XY, b: XY): number {
   return round(((deg % 360) + 360) % 360, 6) % 360
 }
 
-export function wallRuns(footprint: readonly XY[] | null): WallRun[] {
-  if (!footprint || footprint.length < 3) return []
-  const r = ccw(footprint)
-  return r.map((a, i) => {
-    const b = r[(i + 1) % r.length] as XY
-    return { index: i, a, b, length_m: dist(a, b), azimuth_deg: azimuthOf(a, b) }
+export function wallRuns(blocks: readonly (readonly XY[])[]): WallRun[] {
+  const out: WallRun[] = []
+  blocks.forEach((ring, bi) => {
+    if (ring.length < 3) return
+    const r = ccw(ring)
+    r.forEach((a, i) => {
+      const b = r[(i + 1) % r.length] as XY
+      out.push({ index: out.length, block: bi, side: i, a, b, length_m: dist(a, b), azimuth_deg: azimuthOf(a, b) })
+    })
   })
+  return out
 }
+
+/** All the blocks' floor area. */
+export const floorArea = (blocks: readonly (readonly XY[])[]) => blocks.reduce((t, b) => t + area(b), 0)
 
 /** Compass label for an azimuth: 16 points for the screen. */
 export function compass16(az: number): string {
@@ -118,7 +130,7 @@ export function layoutSet(run: WallRun, s: WindowSet, storeyHeight: number): Lay
 
 /** Every window on the plan (sets that no longer fit are skipped and reported). */
 export function allWindows(plan: Plan): { windows: PlacedWindow[]; problems: Array<{ set: string; why: string }> } {
-  const runs = wallRuns(plan.footprint)
+  const runs = wallRuns(plan.blocks)
   const windows: PlacedWindow[] = []
   const problems: Array<{ set: string; why: string }> = []
   for (const s of plan.windows) {
@@ -140,7 +152,7 @@ export const along = (run: WallRun, t: number): XY => {
   return [run.a[0] + (run.b[0] - run.a[0]) * f, run.a[1] + (run.b[1] - run.a[1]) * f]
 }
 
-// ─── Rooms (or any pieces of the floor) against the footprint ──────────────────────────────────────────────────────────────────
+// ─── Rooms (or any pieces of the floor) against the blocks' outside walls ──────────────────────────────────────────────────────────────────
 
 const EPS = 0.05
 
@@ -162,8 +174,8 @@ export type PieceWall = { piece: string; side: number; run: number; t0: number; 
 export type PieceShare = { a: string; b: string; length_m: number }
 export type Piece = { id: string; ring: XY[] }
 
-export function edgesOf(footprint: readonly XY[] | null, pieces: readonly Piece[]): { walls: PieceWall[]; shares: PieceShare[]; open: Array<{ piece: string; side: number; length_m: number }> } {
-  const runs = wallRuns(footprint)
+export function edgesOf(blocks: readonly (readonly XY[])[], pieces: readonly Piece[]): { walls: PieceWall[]; shares: PieceShare[]; open: Array<{ piece: string; side: number; length_m: number }> } {
+  const runs = wallRuns(blocks)
   const walls: PieceWall[] = []
   const open: Array<{ piece: string; side: number; length_m: number }> = []
   const inner: Array<{ zone: string; a: XY; b: XY }> = []

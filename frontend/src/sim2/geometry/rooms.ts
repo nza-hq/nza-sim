@@ -15,7 +15,7 @@
  *   - moveWall: a wall between rooms moves; every room side on it moves with it (decodED's dragWall).
  */
 import pc from 'polygon-clipping'
-import { area, axisOf, ccw, cutZones, type XY } from './ported/zones'
+import { area, axisOf, ccw, cutZones, inside, labelAt, type XY } from './ported/zones'
 import { blankZone, type Plan, type PlanRoom, wallRuns } from './plan'
 import { cleanRing } from './outline'
 
@@ -43,9 +43,11 @@ function roomNamer(plan: Plan) {
   return { made, next: () => n }
 }
 
-/** Do the rooms cover the footprint exactly, with no overlaps? */
-export function covers(footprint: readonly XY[], rooms: readonly PlanRoom[]): boolean {
-  const A = area(footprint)
+const multi = (blocks: readonly (readonly XY[])[]): pc.MultiPolygon => blocks.map((b) => [closed(b)])
+
+/** Do the rooms cover the blocks exactly, with no overlaps? */
+export function covers(blocks: readonly (readonly XY[])[], rooms: readonly PlanRoom[]): boolean {
+  const A = sum(blocks.map((b) => area(b)))
   const parts = sum(rooms.map((r) => area(r.ring)))
   if (Math.abs(parts - A) > 0.01 + 1e-4 * A) return false
   const u = pc.union(...(rooms.map((r) => [closed(r.ring)]) as [PcRing[], ...PcRing[][]]))
@@ -53,20 +55,22 @@ export function covers(footprint: readonly XY[], rooms: readonly PlanRoom[]): bo
   return Math.abs(ua - A) <= 0.01 + 1e-4 * A
 }
 
-/** Rooms after the outline became `ring`: each clipped to it, new floor made into rooms, crumbs given to a neighbour. */
-export function fitRooms(plan: Plan, ring: XY[]): { plan: Plan; said?: string } {
+/** Rooms after the outline became `blocks`: each clipped to them (and clear of the rooms before it), new floor made
+ *  into rooms, crumbs given to a neighbour. */
+export function fitRooms(plan: Plan, blocks: XY[][]): { plan: Plan; said?: string } {
+  const shell = multi(blocks)
   const names = roomNamer(plan)
   let zones = plan.zones
   if (!zones.length) zones = [blankZone(plan.next.zone)]
   const zoneNext = plan.zones.length ? plan.next.zone : plan.next.zone + 1
-  if (!plan.rooms.length) {
-    const { id, name } = names.made()
-    return { plan: { ...plan, footprint: ring, zones, rooms: [{ id, name, ring, zone: zones[0]!.id }], next: { ...plan.next, room: names.next(), zone: zoneNext } } }
-  }
+  if (!blocks.length) return { plan: { ...plan, blocks, rooms: [] } }
+  // A room that was a whole block (its floor not cut up yet) grows with its block instead of new floor becoming a room.
+  const whole = new Set(plan.rooms.filter((r) => plan.blocks.some((b) => Math.abs(area(b) - area(r.ring)) < 0.01 && inside(b, labelAt(r.ring)))).map((r) => r.id))
   const out: PlanRoom[] = []
   let lost = 0
   for (const r of plan.rooms) {
-    const pieces = outerRings(pc.intersection([closed(r.ring)], [closed(ring)])).sort((a, b) => area(b) - area(a))
+    const clear = out.length ? pc.difference(pc.intersection([closed(r.ring)], shell), ...out.map((o) => [closed(o.ring)])) : pc.intersection([closed(r.ring)], shell)
+    const pieces = outerRings(clear).sort((a, b) => area(b) - area(a))
     const keep = pieces.filter((p) => area(p) >= CRUMB_M2)
     if (!keep.length) {
       lost++
@@ -75,7 +79,7 @@ export function fitRooms(plan: Plan, ring: XY[]): { plan: Plan; said?: string } 
     keep.forEach((p, i) => out.push(i === 0 ? { ...r, ring: p } : { ...names.made(), ring: p, zone: r.zone }))
   }
   let made = 0
-  const gaps = out.length ? outerRings(pc.difference([closed(ring)], ...out.map((r) => [closed(r.ring)]))) : [ring]
+  const gaps = out.length ? outerRings(pc.difference(shell, ...out.map((r) => [closed(r.ring)]))) : blocks.map((b) => ccw(b))
   for (const g of gaps.sort((a, b) => area(b) - area(a))) {
     if (area(g) < 1e-3) continue
     // A crumb joins the first room it touches (the union stays one piece); a real gap becomes a room in the zone of
@@ -87,20 +91,40 @@ export function fitRooms(plan: Plan, ring: XY[]): { plan: Plan; said?: string } 
       continue
     }
     if (area(g) < CRUMB_M2) continue
+    if (touch >= 0 && whole.has(out[touch]!.id)) {
+      const u = pc.union([closed(out[touch]!.ring)], [closed(g)])
+      if (u.length === 1 && u[0]!.length === 1) {
+        out[touch] = { ...out[touch]!, ring: cleanRing(u[0]![0] as XY[]) }
+        continue
+      }
+    }
     out.push({ ...names.made(), ring: g, zone: touch >= 0 ? out[touch]!.zone : zones[0]!.id })
     made++
   }
-  const said = [made ? `${made} new room${made > 1 ? 's' : ''} for the new floor` : '', lost ? `${lost} room${lost > 1 ? 's' : ''} removed (outside the building now)` : ''].filter(Boolean).join('; ')
-  return { plan: { ...plan, footprint: ring, zones, rooms: out, next: { ...plan.next, room: names.next(), zone: zoneNext } }, said: said || undefined }
+  // Uncut blocks that were joined: their whole-block rooms (same zone) join too, so a joined block is one room again.
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      const a = out[i]!
+      const b = out[j]!
+      if (!whole.has(a.id) || !whole.has(b.id) || a.zone !== b.zone) continue
+      const u = pc.union([closed(a.ring)], [closed(b.ring)])
+      if (u.length !== 1 || u[0]!.length !== 1) continue
+      out[i] = { ...a, ring: cleanRing(u[0]![0] as XY[]) }
+      out.splice(j, 1)
+      j = i
+    }
+  }
+  const said = [made && plan.rooms.length ? `${made} new room${made > 1 ? 's' : ''} for the new floor` : '', lost ? `${lost} room${lost > 1 ? 's' : ''} removed (outside the building now)` : ''].filter(Boolean).join('; ')
+  return { plan: { ...plan, blocks, zones, rooms: out, next: { ...plan.next, room: names.next(), zone: zoneNext } }, said: said || undefined }
 }
 
 /** A box drawn over the floor becomes a room; the rooms under it give that space up (and may fall into parts). */
 export function boxRoom(plan: Plan, box: XY[]): RoomsChanged {
-  if (!plan.footprint) return { why: 'Draw the building first.' }
-  const inside = outerRings(pc.intersection([closed(box)], [closed(plan.footprint)]))
-  if (!inside.length) return { why: 'Draw the room inside the building.' }
-  if (inside.length > 1) return { why: 'That box crosses outside the building. Draw it inside one part.' }
-  const ring = inside[0]!
+  if (!plan.blocks.length) return { why: 'Draw the building first.' }
+  const within = outerRings(pc.intersection([closed(box)], multi(plan.blocks)))
+  if (!within.length) return { why: 'Draw the room inside the building.' }
+  if (within.length > 1) return { why: 'That box crosses outside the building. Draw it inside one part.' }
+  const ring = within[0]!
   if (area(ring) < MIN_ROOM_M2) return { why: 'Drag a bigger box.' }
   const names = roomNamer(plan)
   const out: PlanRoom[] = []
@@ -126,7 +150,7 @@ export function boxRoom(plan: Plan, box: XY[]): RoomsChanged {
   const made = { ...names.made(), ring, zone: zone! }
   out.push(made)
   const next = { ...plan, rooms: out, next: { ...plan.next, room: names.next() } }
-  if (!covers(plan.footprint, out)) return { why: 'That box does not fit the rooms here. Try it a little smaller.' }
+  if (!covers(plan.blocks, out)) return { why: 'That box does not fit the rooms here. Try it a little smaller.' }
   return { plan: next, said: gone ? `${made.name} replaces ${gone} room${gone > 1 ? 's' : ''}` : undefined }
 }
 
@@ -141,8 +165,8 @@ function frameOf(shell: readonly XY[]) {
 export function halveRoom(plan: Plan, id: string): RoomsChanged {
   const i = plan.rooms.findIndex((r) => r.id === id)
   const r = plan.rooms[i]
-  if (!r || !plan.footprint) return { why: 'Tap a room to halve it.' }
-  const f = frameOf(plan.footprint)
+  if (!r || !plan.blocks.length) return { why: 'Tap a room to halve it.' }
+  const f = frameOf(plan.blocks.find((b) => inside(b, labelAt(r.ring))) ?? plan.blocks[0]!)
   const uv = r.ring.map(f.toUV)
   const u0 = Math.min(...uv.map((p) => p[0]))
   const u1 = Math.max(...uv.map((p) => p[0]))
@@ -200,7 +224,7 @@ const TOL = 0.05
 /** Is the side a→b along the outside wall? */
 function onShell(plan: Plan, a: XY, b: XY): boolean {
   const m: XY = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
-  return wallRuns(plan.footprint).some((r) => {
+  return wallRuns(plan.blocks).some((r) => {
     const d = sub(r.b, r.a)
     const L = len(d) || 1
     const off = Math.abs((m[0] - r.a[0]) * d[1] - (m[1] - r.a[1]) * d[0]) / L
@@ -271,7 +295,7 @@ export function sideNormal(plan: Plan, pick: Side): XY {
 
 /** Move the wall under `pick` by `by` metres along its normal: every room side on it moves together. */
 export function moveWall(plan: Plan, pick: Side, by: number): RoomsChanged {
-  if (!plan.footprint) return { why: 'Draw the building first.' }
+  if (!plan.blocks.length) return { why: 'Draw the building first.' }
   if (Math.abs(by) < 1e-6) return { plan }
   const n = sideNormal(plan, pick)
   const move: XY = [n[0] * by, n[1] * by]
@@ -292,7 +316,7 @@ export function moveWall(plan: Plan, pick: Side, by: number): RoomsChanged {
     const now = signed(r.ring)
     if (Math.sign(was) !== Math.sign(now) || Math.abs(now) < MIN_ROOM_M2) return { why: `${r.name} would be too small.` }
   }
-  if (!covers(plan.footprint, rooms)) return { why: 'That wall meets another one partway along. Move it from the other side, or join rooms first.' }
+  if (!covers(plan.blocks, rooms)) return { why: 'That wall meets another one partway along. Move it from the other side, or join rooms first.' }
   return { plan: { ...plan, rooms: rooms.map((r, ri) => (corners.has(ri) ? { ...r, ring: cleanRing(r.ring) } : r)) } }
 }
 const signed = (r: readonly XY[]) => r.reduce((t, p, i) => { const q = r[(i + 1) % r.length]!; return t + p[0] * q[1] - q[0] * p[1] }, 0) / 2
