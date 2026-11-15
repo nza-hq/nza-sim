@@ -14,8 +14,8 @@ Branch `chris/103-engine-1`, off `main` `bbc7893` (Briefs 102 and 102a merged).
   method overstates both (`cooling_gap_root_cause.md`).
 - **Two additions:** a tidy-up of how the EnergyPlus reference model carries thermal bridging, and a performance
   budget.
-- **Not in this brief:** the thermal-bridging bug in today's dynamic engine (132.6 → about 133.2) is not approved and
-  stays out of 103.
+- **Not in this brief:** the thermal-bridging bug in today's dynamic engine was fixed separately by **Brief 102b**
+  (PR #28, merged 15 Nov). The anchor is now **133.2** (heating 102.7, cooling 92.4), and 103 changes no engine file.
 - **Database route:** NZA Sim (dev) moved into the Net Zero Advisory org on 14 Nov, so migrations are applied and
   read back through the Supabase connector, dev only.
 
@@ -74,7 +74,6 @@ per hour and annual for the one zone; the breakdown and closure; the analytic, r
 QA store fixes listed in Part 1; a migration `0005` if Part 1 needs SQL.
 
 **Out** (later briefs; do not start them): multi-zone, partitions, floors, the loft buffer and roof cases (104);
-the thermal-bridging fix in today's engine (`instantCalc.js`, 132.6 → about 133.2; not approved);
 ventilation systems, MVHR/MEV, natural ventilation with control, internal gains from profiles (105); systems, DHW,
 delivered energy, fuel, EUI, the EnergyPlus referee (106); any UI (107+); the library moving into Postgres (110);
 age-band defaults (111); anything in decodED (113). Also out, by the scope fence (contract bump to change): airflow
@@ -103,7 +102,7 @@ Simulate v2 store only (`frontend/src/thermal/store/`, `supabase/migrations/`, `
 
 ## Decisions this brief takes (flagged for Chris's review; the design note is updated to match at close)
 
-1. **Where the gates sit (Rev B).** The anchor's 132.6 is an EUI, so its gate moves to 106. Engine 1 is gated on the
+1. **Where the gates sit (Rev B).** The anchor's EUI (133.2 since 102b), so its gate moves to 106. Engine 1 is gated on the
    Bridgewater envelope in two ways.
    - **(a) Per-path arithmetic against today's State 1.** Each conductance, in W/K, must agree within **1 %**:
      each opaque element, glazing, leakage, permanent vents and bridging. So must each annual loss at the setpoint
@@ -173,7 +172,7 @@ Simulate v2 store only (`frontend/src/thermal/store/`, `supabase/migrations/`, `
 - [ ] Read `frontend/src/thermal/schema/` (model, results, hash, fromBuildingConfig) and `docs/audit/102a/qa_report.md`
       ("How the old engine makes 132.6").
 - [ ] `git status` clean; `git fetch`; the branch is current with `main`.
-- [ ] `npm test` (frontend) passes; `node scripts/_brief93_anchor.mjs --fixture` prints 132.6.
+- [ ] `npm test` (frontend) passes; `node scripts/_brief93_anchor.mjs --fixture` prints 133.2 (since 102b).
 - [ ] Read `docs/audit/103/00_reconnaissance.md` and `docs/audit/103/{cooling_gap_root_cause.md,
       ep_confirm_results.md}`.
 - [ ] The brief is on disk in `docs/briefs/active/` and `current.md` points at it (this commit).
@@ -228,7 +227,7 @@ Commit: `103 P1: store fixes from the 102 QA (projects by id, library upsert, ru
   - Do this only if the local rig proves that reads still work; otherwise record it as an accepted risk.
 
 Done when: the local-Postgres rig passes the new cases and all earlier ones; 0005 is applied to NZA Sim (dev) by the
-Supabase connector (`apply_migration` on `jbjxduathkklruvbmeho` only) and read back; `npm test` and the build pass; env unset unchanged (ZZ TEST Systems 132.6, no
+Supabase connector (`apply_migration` on `jbjxduathkklruvbmeho` only) and read back; `npm test` and the build pass; env unset unchanged (ZZ TEST Systems 133.2, no
 button). The ZZ TEST and anchor rows already stored keep working (their `local_ref` is null; first save after 0005 sets it).
 
 ### Part 2 — Package skeleton, EPW parser, solar on any surface
@@ -333,7 +332,7 @@ PR `103 — Simulate v2 Engine 1` into `main`. Commit: `103 P7: close`.
    browser totals equal the Node totals to the last digit (Playwright). The 1, 10 and 50 zone timings are recorded.
 8. `git diff main...HEAD --stat` touches no engine file (`instantCalc.js`, `systemsEngine.js`, `interventionsEngine.js`,
    `solarCalc.js`, `wallModel.js`, `nza_engine/`); ported code is copied with a provenance header.
-9. Env unset: ZZ TEST Systems shows 132.6 and no Save button; `_brief93_anchor.mjs --fixture` 132.6.
+9. Env unset: ZZ TEST Systems shows 133.2 and no Save button; `_brief93_anchor.mjs --fixture` 133.2.
 10. Part 1: the local-Postgres rig passes old and new cases; 0005 applied to NZA Sim (dev) and read back.
 
 ## What MUST NOT happen
@@ -341,7 +340,7 @@ PR `103 — Simulate v2 Engine 1` into `main`. Commit: `103 P7: close`.
 - No edit to `instantCalc.js`, `systemsEngine.js`, `interventionsEngine.js`, `solarCalc.js`, `wallModel.js`,
   `thermalBridges.js`, `thermalMass.js`, `openingCoefficients.js`, `nza_engine/` or any UI module. Ports are copies.
 - No number tuned to match another engine. No default hidden inside the engine.
-- No fix to today's thermal-bridging bug in `instantCalc.js` (not approved; 132.6 stays 132.6).
+- No engine change to `instantCalc.js` here: the bridging fix was 102b; 133.2 stays 133.2.
 - No change to `nza_engine/` for the referee. The per-element bridging lives in `validation/energyplus/` only.
 - No migration applied to anything other than NZA Sim (dev) `jbjxduathkklruvbmeho`.
 - No engine import of `frontend/src/utils/` at run time; no DOM, `window`, `fetch` or file access in the engine.

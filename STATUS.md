@@ -21,7 +21,7 @@ reference case, fixed fixture id).
     demand is shown for information only.
   - Added: per-element thermal bridging in a referee-only EnergyPlus script (Part 5), and a performance budget
     (one zone, one year, under 100 ms in a worker; 50-zone scaling measured).
-  - The fix for the thermal-bridging bug in today's engine (132.6 → about 133.2) is not approved and stays out.
+  - The fix for the thermal-bridging bug in today's engine landed separately as Brief 102b (PR #28): the anchor is now 133.2.
   - NZA Sim (dev) is now in the Net Zero Advisory Supabase org; migrations go through the connector, dev only.
 - **P1 store fixes** ([`docs/audit/103/01_store_fixes.md`](docs/audit/103/01_store_fixes.md)).
   - M4: projects are matched by the local id; M6: library versions are immutable; M7: auxiliary has its own line and a missing figure fails loudly; L2: helpers gated; L3: Retry and Sign out; L6: `revoke_invitation`.
