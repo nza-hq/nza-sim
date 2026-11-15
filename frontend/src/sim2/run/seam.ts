@@ -5,7 +5,8 @@
  *
  * The document is checked against the schema (an older stored version is upgraded first). Then the inputs a run
  * needs and the editor may not have yet are checked together, so the person sees every gap at once:
- *   weather, each construction, the building's thermal bridging, each zone's setpoints and air leakage.
+ *   weather, each construction, the building's thermal bridging, each zone's setpoints and air leakage. A zone with
+ *   its control stated and only a heating (or only a cooling) setpoint is heated only (or cooled only).
  * Anything the engine itself still refuses (a gain profile without a density, a ventilation entry without a flow…)
  * comes back the same way, named by its path. Nothing is filled in (CLAUDE.md rules 2 and 3).
  *
@@ -32,7 +33,8 @@ export interface Summary {
   run_ms: number
   weather: { file_name: string; station: string; sha256: string }
   building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number }
-  zones: { id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number }[]
+  /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
+  zones: { id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; heated: boolean; cooled: boolean }[]
   /** The building's balance by term, kWh a year: positive is heat into the building. Heating and cooling included. */
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
 }
@@ -42,6 +44,7 @@ export type SimulateResult =
   | { ok: false; missing: Missing[] }
 
 const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null) => string][] = [
+  [/^zones$/, () => 'Draw the building and put its rooms in at least one zone.'],
   [/^zones\[(\d+)\]\.setpoints\.heat_c$/, (m, d) => `Set the heating setpoint for ${zoneName(d, m[1])}.`],
   [/^zones\[(\d+)\]\.setpoints\.cool_c$/, (m, d) => `Set the cooling setpoint for ${zoneName(d, m[1])}.`],
   [/^zones\[(\d+)\]\.infiltration_q50$/, (m, d) => `Set the air leakage (q50) for ${zoneName(d, m[1])}.`],
@@ -79,8 +82,13 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
   missing.push(...lib.missing)
   if (doc.building.thermal_bridging.mode == null) missing.push({ path: 'building.thermal_bridging.mode', what: 'Set the thermal bridging for the building.' })
   doc.zones.forEach((z, i) => {
-    if (z.setpoints.heat_c == null) missing.push(explain(`zones[${i}].setpoints.heat_c`, 'required', doc))
-    if (z.setpoints.cool_c == null) missing.push(explain(`zones[${i}].setpoints.cool_c`, 'required', doc))
+    // A zone that states its control and one setpoint is heated only (or cooled only): the other side floats, and the
+    // engine is told so by a null setpoint (no system for it, Rule 8). With no control stated, both are still to set.
+    const sp = z.setpoints
+    if (sp.control_strategy == null || (sp.heat_c == null && sp.cool_c == null)) {
+      if (sp.heat_c == null) missing.push(explain(`zones[${i}].setpoints.heat_c`, 'required', doc))
+      if (sp.cool_c == null) missing.push(explain(`zones[${i}].setpoints.cool_c`, 'required', doc))
+    }
     if (z.infiltration_q50 == null && z.infiltration_ach == null) missing.push(explain(`zones[${i}].infiltration_q50`, 'required', doc))
   })
   return { missing, library: lib.library }
@@ -121,7 +129,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
       peak_heating_w: readBuildingPeakW(results, 'heating'), peak_cooling_w: readBuildingPeakW(results, 'cooling'),
     },
-    zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh })),
+    zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh, heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null })),
     breakdown: [...byTerm].map(([term, kwh]) => ({ term, kwh })),
   }
   return { ok: true, results, summary }

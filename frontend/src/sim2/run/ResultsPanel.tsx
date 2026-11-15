@@ -1,0 +1,198 @@
+/**
+ * Brief 105 Part 5: results in the editor. Heating and cooling demand for the drawn building, from the run seam in a
+ * worker, rerun about a quarter of a second after each edit.
+ *
+ * Mounted in the editor by one line (`<ResultsPanel doc={built.doc} />`); it positions itself and owns nothing of the
+ * editor's. Shows the building total first, then each zone, then the building's breakdown. A figure carries the one
+ * word "estimate"; the basis is behind ⓘ (brief decision 7). Where an input is missing it lists what, and shows no
+ * number (CLAUDE.md rules 2 and 3). The weather file is always named, with its station (decision 4).
+ */
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useAuth } from '../../auth/AuthGate'
+import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
+import { BUCKET, listOrganisationWeather } from './weather'
+import type { Summary } from './seam'
+import './run.css'
+
+const TERMS: Record<string, string> = {
+  heating: 'Heating', cooling: 'Cooling', conduction: 'Fabric (conduction)', opaque_solar_absorbed: 'Sun on walls and roof',
+  sky_longwave: 'Radiation to the sky', bridging: 'Thermal bridges', infiltration: 'Air leakage', permanent_vents: 'Permanent vents',
+  solar_transmitted: 'Sun through windows', solar_lost_through_glazing: 'Sun lost back out through windows',
+  glazing_solar_absorbed: 'Sun absorbed in the glass', other_gains: 'Other gains', storage: 'Heat stored in the building',
+  occupancy_gains: 'People', lighting_gains: 'Lighting', equipment_gains: 'Equipment', auxiliary_gains: 'Other equipment',
+  mechanical_ventilation: 'Ventilation',
+}
+const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const signed = (kwh: number) => `${kwh >= 0 ? '+' : '−'}${mwh(Math.abs(kwh))}`
+const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
+interface Row { key: string; label: string; kwh: number; parts?: Row[] }
+const perM2 = (kwh: number, m2: number) => (m2 > 0 ? Math.round(kwh / m2).toLocaleString('en-GB') : '–')
+
+type State =
+  | { kind: 'idle' }
+  | { kind: 'running' }
+  | { kind: 'missing'; items: { path: string; what: string }[] }
+  | { kind: 'error'; message: string }
+  | { kind: 'done'; summary: Summary; ms: number }
+
+export default function ResultsPanel({ doc }: { doc: unknown }) {
+  const auth = useAuth()
+  const [open, setOpen] = useState(true)
+  const [state, setState] = useState<State>({ kind: 'idle' })
+  const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
+  const [weatherError, setWeatherError] = useState<string | null>(null)
+  const [orgFiles, setOrgFiles] = useState<string[] | null>(null)
+  const [info, setInfo] = useState(false)
+  const client = useRef<RunClient | null>(null)
+  const latestDoc = useRef(doc)
+  latestDoc.current = doc
+
+  useEffect(() => {
+    const c = new RunClient(
+      (a: RunAnswer) => {
+        const r = a.result
+        if (r.ok) setState({ kind: 'done', summary: r.summary, ms: a.ms })
+        else if ('missing' in r) setState({ kind: 'missing', items: r.missing })
+        else setState({ kind: 'error', message: r.error })
+      },
+      (w: WeatherAnswer) => {
+        if (w.ok) { setWeather({ file_name: w.file_name, station: w.station }); setWeatherError(null) }
+        else { setWeather(null); setWeatherError(w.error) }
+        setState({ kind: 'running' })
+        c.run(latestDoc.current, 0)
+      },
+    )
+    client.current = c
+    return () => c.dispose()
+  }, [])
+
+  useEffect(() => {
+    if (!client.current) return
+    setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
+    client.current.run(doc)
+  }, [doc])
+
+  // The organisation's weather files, when signed in.
+  useEffect(() => {
+    if (!auth) return
+    listOrganisationWeather(auth.supabase, auth.org.id).then(setOrgFiles, () => setOrgFiles([]))
+  }, [auth?.org.id])
+
+  const onLocal = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f || !client.current) return
+    client.current.setWeather(new Uint8Array(await f.arrayBuffer()), f.name, 'local')
+    e.target.value = ''
+  }
+  const onOrg = async (name: string) => {
+    if (!auth || !client.current || !name) return
+    const { data, error } = await auth.supabase.storage.from(BUCKET).download(`${auth.org.id}/${name}`)
+    if (error || !data) { setWeatherError(error?.message ?? 'The weather file could not be downloaded.'); return }
+    client.current.setWeather(new Uint8Array(await data.arrayBuffer()), name, 'organisation')
+  }
+
+  const s = state.kind === 'done' ? state.summary : null
+  // Every term is listed (Rule 9). The outside faces' three terms (sun on them, radiation to the sky, conduction) are
+  // large and mostly cancel, so they show as one net line for walls, roof and floor, opened to see the three.
+  const [fabricOpen, setFabricOpen] = useState(false)
+  const breakdown = useMemo(() => {
+    if (!s) return []
+    const parts = s.breakdown.filter((l) => FABRIC.includes(l.term))
+    const rows: Row[] = s.breakdown.filter((l) => !FABRIC.includes(l.term)).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh }))
+    if (parts.length) rows.push({ key: 'fabric', label: 'Walls, roof and floor', kwh: parts.reduce((a, l) => a + l.kwh, 0), parts: parts.sort((a, b) => b.kwh - a.kwh).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh })) })
+    return rows.sort((a, b) => b.kwh - a.kwh)
+  }, [s])
+
+  if (!open) {
+    return <button type="button" className="rp-tab" onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : ''}</button>
+  }
+  return (
+    <section className="rp" aria-label="Results">
+      <header className="rp-head">
+        <h2>Heating and cooling demand</h2>
+        <button type="button" className="rp-x" onClick={() => setOpen(false)} aria-label="Hide results">–</button>
+      </header>
+
+      <div className="rp-weather">
+        <span className="rp-label">Weather</span>
+        {weather ? <span><b>{weather.file_name}</b> · {weather.station}</span> : <span className="rp-none">No weather file</span>}
+        <div className="rp-weather-pick">
+          <label className="rp-btn">
+            Choose a file…
+            <input type="file" accept=".epw" onChange={onLocal} hidden />
+          </label>
+          {auth && orgFiles && orgFiles.length > 0 && (
+            <select defaultValue="" onChange={(e) => onOrg(e.target.value)} aria-label="Your organisation's weather files">
+              <option value="" disabled>Your organisation's files</option>
+              {orgFiles.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
+        </div>
+        {weatherError && <p className="rp-error">That file could not be read: {weatherError}</p>}
+      </div>
+
+      {state.kind === 'missing' && (
+        <div className="rp-missing" role="status">
+          <p>To show results, the building needs:</p>
+          <ul>{state.items.map((m) => <li key={m.path + m.what}>{m.what}</li>)}</ul>
+        </div>
+      )}
+      {state.kind === 'error' && <p className="rp-error" role="alert">The run failed: {state.message}</p>}
+      {(state.kind === 'idle' || (state.kind === 'running' && !s)) && <p className="rp-wait">Working it out…</p>}
+
+      {s && (
+        <div className={state.kind === 'running' ? 'rp-stale' : undefined}>
+          <div className="rp-totals">
+            <div>
+              <span className="rp-label">Heating <i>estimate</i></span>
+              <span className="rp-metric">{mwh(s.building.heating_kwh)} <small>MWh a year</small></span>
+              <span className="rp-sub">{perM2(s.building.heating_kwh, s.building.floor_m2)} kWh/m² · peak {Math.round(s.building.peak_heating_w / 1000)} kW</span>
+            </div>
+            <div>
+              <span className="rp-label">Cooling <i>estimate</i></span>
+              <span className="rp-metric">{mwh(s.building.cooling_kwh)} <small>MWh a year</small></span>
+              <span className="rp-sub">{perM2(s.building.cooling_kwh, s.building.floor_m2)} kWh/m² · peak {Math.round(s.building.peak_cooling_w / 1000)} kW</span>
+            </div>
+          </div>
+
+          <h3>
+            By zone <i>estimate</i>
+            <button type="button" className="rp-info" aria-expanded={info} onClick={() => setInfo((v) => !v)} aria-label="About these figures">ⓘ</button>
+          </h3>
+          {info && (
+            <p className="rp-note">
+              Demand to hold each zone's setpoints, from the multi-room engine. The building total is checked against
+              EnergyPlus on a five-storey hotel (heating within 4 %, cooling within 10 %). Figures for single zones and
+              rooms are not yet validated: storeys differed from EnergyPlus by up to 31 % for cooling. Delivered energy,
+              fuel and carbon are not included yet.
+            </p>
+          )}
+          <table className="rp-table">
+            <thead><tr><th>Zone</th><th>Heating MWh</th><th>Cooling MWh</th></tr></thead>
+            <tbody>
+              {s.zones.map((z) => <tr key={z.id}><td>{z.name || z.id}</td><td>{z.heated ? mwh(z.heating_kwh) : <span className="rp-none">not heated</span>}</td><td>{z.cooled ? mwh(z.cooling_kwh) : <span className="rp-none">not cooled</span>}</td></tr>)}
+            </tbody>
+          </table>
+
+          <h3>Where the heat goes <i>estimate</i></h3>
+          <table className="rp-table rp-breakdown">
+            <tbody>
+              {breakdown.flatMap((l) => [
+                <tr key={l.key}>
+                  <td>{l.parts
+                    ? <button type="button" className="rp-expand" aria-expanded={fabricOpen} onClick={() => setFabricOpen(!fabricOpen)}>{fabricOpen ? '▾' : '▸'} {l.label}</button>
+                    : l.label}</td>
+                  <td className={l.kwh >= 0 ? 'in' : 'out'}>{signed(l.kwh)}</td>
+                </tr>,
+                ...(l.parts && fabricOpen ? l.parts.map((q) => (
+                  <tr key={q.key} className="rp-part"><td>{q.label}</td><td className={q.kwh >= 0 ? 'in' : 'out'}>{signed(q.kwh)}</td></tr>
+                )) : []),
+              ])}
+            </tbody>
+          </table>
+          <p className="rp-foot">MWh a year; + into the building, − out. Ran in {Math.round(state.kind === 'done' ? state.ms : 0)} ms.</p>
+        </div>
+      )}
+    </section>
+  )
+}

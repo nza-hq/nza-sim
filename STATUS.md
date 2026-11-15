@@ -31,6 +31,10 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - The library's epJSON layers match the fixture for all 15 constructions.
   - Weather is a local EPW (never uploaded) or the organisation's private `weather` bucket. Migration 0006 is applied on dev and allows reads only; uploads await a decision.
   - The run happens in a worker.
+- **P5 results in the editor** ([`05_panel.md`](docs/audit/105/05_panel.md)): `ResultsPanel.tsx`, mounted by the editor with one line.
+  - Building and per-zone heating and cooling ("estimate"), the full breakdown with the outside-face terms as one expandable net line.
+  - A zone with its control stated and only a heating setpoint runs heated only ("not cooled").
+  - Browser-checked on the editor's two-zone plan: it refuses until a partition construction and the space types' gain fields are stated (asked of the editor). With them stated in a scratch copy, 9.1 MWh heating; a rerun shows in about 0.4 s.
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 

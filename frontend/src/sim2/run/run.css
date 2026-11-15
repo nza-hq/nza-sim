@@ -1,0 +1,46 @@
+/* Brief 105 Part 5: the results panel. Colours and type from the shared tokens (design-system/tokens.css). */
+.rp, .rp-tab {
+  position: absolute; right: 16px; bottom: 72px; z-index: 30;
+  font-family: var(--font-sans, system-ui); font-size: 13px; line-height: 20px; color: #1E2B27;
+}
+.rp {
+  width: 340px; max-height: calc(100% - 140px); overflow: auto;
+  background: var(--color-surface, #fff); border: 1px solid #DCE2DF; border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(20, 40, 34, 0.12); padding: 12px 14px 10px;
+}
+.rp-tab { background: #235546; color: #fff; border: 0; border-radius: 18px; padding: 6px 14px; cursor: pointer; }
+.rp-head { display: flex; align-items: center; justify-content: space-between; }
+.rp h2 { margin: 0; font: 600 14px/20px var(--font-display, var(--font-sans, system-ui)); color: #235546; }
+.rp h3 { margin: 14px 0 4px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.rp i { font-style: normal; font-weight: 400; color: #6B7A75; font-size: 11px; }
+.rp-x { border: 0; background: none; font-size: 18px; cursor: pointer; color: #6B7A75; }
+.rp-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6B7A75; }
+.rp-weather { margin: 8px 0; padding: 8px; background: #F5F4F1; border-radius: 8px; }
+.rp-weather-pick { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.rp-btn { display: inline-block; border: 1px solid #235546; color: #235546; border-radius: 6px; padding: 2px 10px; cursor: pointer; font-size: 12px; }
+.rp-weather select { font: inherit; font-size: 12px; }
+.rp-none { color: #A0522D; font-weight: 600; }
+.rp-missing { background: #FFF6E5; border: 1px solid #F0D9A8; border-radius: 8px; padding: 8px 10px; }
+.rp-missing p { margin: 0 0 4px; font-weight: 600; }
+.rp-missing ul { margin: 0; padding-left: 18px; }
+.rp-error { color: #A0281E; }
+.rp-wait { color: #6B7A75; }
+.rp-stale { opacity: .55; transition: opacity .15s; }
+.rp-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.rp-metric { display: block; font: 600 20px/26px var(--font-figures, system-ui); color: #1E2B27; }
+.rp-metric small { font-size: 11px; font-weight: 400; color: #6B7A75; }
+.rp-sub { font-size: 11px; color: #6B7A75; }
+.rp-info { border: 0; background: none; cursor: pointer; color: #235546; font-size: 13px; padding: 0; }
+.rp-note { font-size: 12px; line-height: 18px; color: #3A4743; background: #F5F4F1; border-radius: 6px; padding: 6px 8px; margin: 4px 0; }
+.rp-table { width: 100%; border-collapse: collapse; font: 12px/18px var(--font-figures, system-ui); }
+.rp-table th { text-align: left; font-weight: 500; color: #6B7A75; border-bottom: 1px solid #DCE2DF; }
+.rp-table td, .rp-table th { padding: 2px 4px; }
+.rp-table td + td, .rp-table th + th { text-align: right; }
+.rp-breakdown td.in { color: #235546; }
+.rp-breakdown td.out { color: #A0522D; }
+.rp-foot { margin: 6px 0 0; font-size: 11px; color: #6B7A75; }
+@media (max-width: 760px) { .rp { left: 16px; right: 16px; width: auto; bottom: 16px; } }
+.rp-none { color: #6B7A75; font-size: 11px; }
+.rp-expand { all: unset; cursor: pointer; color: #235546; }
+.rp-expand:focus-visible { outline: 2px solid #235546; outline-offset: 2px; border-radius: 2px; }
+.rp-part td { color: #6B7A75; padding-left: 14px; }

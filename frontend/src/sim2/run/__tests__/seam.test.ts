@@ -47,7 +47,7 @@ describe('simulate', () => {
     const d = await doc()
     d.surfaces.forEach((s: any) => { if (s.kind === 'roof') s.construction_ref.key = 'unassigned:roof' })
     d.building.thermal_bridging.mode = null
-    d.zones[1].setpoints.heat_c = null
+    d.zones[1].setpoints.heat_c = null; d.zones[1].setpoints.control_strategy = null
     d.zones[2].infiltration_q50 = null; d.zones[2].infiltration_ach = null
     const r = simulate(d, { weather: null })
     expect(r.ok).toBe(false)
@@ -60,6 +60,18 @@ describe('simulate', () => {
       'Set the air leakage (q50) for "Storey 3".',
     ])
     expect(r).not.toHaveProperty('summary')
+  })
+  it('a zone with its control stated and only a heating setpoint is heated only: it is not cooled', async () => {
+    const d = await doc()
+    d.zones[0].setpoints.cool_c = null
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.zones[0].cooling_kwh).toBe(0)
+    expect(r.summary.zones[0].heating_kwh).toBeGreaterThan(0)
+    expect(r.summary.zones[1].cooling_kwh).toBeGreaterThan(0)
+    d.zones[0].setpoints.heat_c = null
+    const both = simulate(d, { weather: WEATHER })
+    expect(both.ok ? [] : both.missing.map((m) => m.what)).toEqual(['Set the heating setpoint for "Storey 1".', 'Set the cooling setpoint for "Storey 1".'])
   })
   it('what the engine refuses comes back named, in words', async () => {
     const d = await doc()
