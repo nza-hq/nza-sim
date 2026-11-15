@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 106 — Simulate v2: the room-by-room breakdown and pinned constructions — ACTIVE 15 Nov 2026 on `chris/106-zone-breakdown`.**
+Review F3 and F6 from Brief 105: each zone's own balance on tap in the results panel, and every construction a run uses pinned to its library version. Run seam and panel only; no engine change. Brief [`active/106_zone-breakdown.md`](active/106_zone-breakdown.md). Claims: `frontend/src/sim2/run/`.
+
 **Brief 105 — Simulate v2: the drawn building runs (editor to multi-room engine, gains, ventilation, per-floor accuracy) — CLOSED 15 Nov 2026 on `chris/105-editor-engine` (PR open, awaiting Linzie).**
 Schema 2.3; internal gains and ventilation on both engine paths, gated against EnergyPlus (five storeys −3.9 % heating / +9.3 % cooling like for like); a run seam (library with layers, local or organisation weather, a worker) and a results panel in the v2 editor, so a drawn building with fabric and space types shows heating and cooling in about 0.4 s after an edit. Per-floor: Engine 2's own 1 h step error is ≤0.1 % on Bridgewater; TARP inside convection brings the worst storey's cooling error from 31 % to 17 % but is 25× too slow at 50 zones, so it stays an option. Editors can save weather files to their organisation (migration 0007). Independent review addressed. No change to today's engine (anchor 133.2). Brief [`archive/105_editor-engine_COMPLETED.md`](archive/105_editor-engine_COMPLETED.md); final report [`../audit/105/09_final_report.md`](../audit/105/09_final_report.md). **Next:** a per-zone breakdown on tap (review F3), pins for every construction (F6), a fast TARP, and saving plans.
 
