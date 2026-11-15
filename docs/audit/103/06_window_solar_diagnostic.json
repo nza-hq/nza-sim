@@ -1,0 +1,124 @@
+{
+ "by_facade_mwh": {
+  "E": {
+   "incident": 4.078027438727622,
+   "absorbed_in_glazing": 0.7823625311148649,
+   "transmitted": 1.2577507109734056
+  },
+  "N": {
+   "incident": 218.9418864490653,
+   "absorbed_in_glazing": 41.48896324230483,
+   "transmitted": 64.75175098282266
+  },
+  "S": {
+   "incident": 119.04620843614556,
+   "absorbed_in_glazing": 22.831393788965507,
+   "transmitted": 36.664279844638436
+  },
+  "W": {
+   "incident": 2.362672858335756,
+   "absorbed_in_glazing": 0.4488072238210881,
+   "transmitted": 0.7083546604823194
+  }
+ },
+ "monthly_mwh": {
+  "incident": [
+   12.099218881530149,
+   15.181285231580304,
+   26.197534261655843,
+   40.15527232261335,
+   44.73993166065787,
+   50.20083253103505,
+   49.13066070551065,
+   37.73355563432314,
+   28.828919980305443,
+   18.980698961022348,
+   11.925100297098426,
+   9.255784714941568
+  ],
+  "absorbed_in_glazing": [
+   2.3123116708338927,
+   2.883452428333656,
+   4.974079567079385,
+   7.631071516035697,
+   8.515160332329629,
+   9.565231404347868,
+   9.357689628309096,
+   7.1868949655580225,
+   5.471219357508139,
+   3.6095900454026,
+   2.273197741294318,
+   1.7716281291739782
+  ],
+  "transmitted": [
+   3.7951493677637123,
+   4.641721030073908,
+   7.869781927299892,
+   11.92298386233372,
+   13.31043516824596,
+   14.974185594178254,
+   14.6193566504921,
+   11.270421331945709,
+   8.570150322113602,
+   5.801180469372906,
+   3.7080939675906506,
+   2.8986765075064196
+  ]
+ },
+ "total_mwh": {
+  "incident": 344.42879518227426,
+  "transmitted": 103.38213619891681,
+  "absorbed_in_glazing": 65.55152678620628
+ },
+ "annual_transmitted_over_incident": 0.3001553227981598,
+ "window_construction_eio": {
+  "header": "! <WindowConstruction>,Construction Name,Index,#Layers,Roughness,Conductance {W/m2-K},Conductance (Before Adjusted) {W/m2-K},Convection Coefficient Adjustment Ratio,SHGC,Solar Transmittance at Normal Incidence,Visible Transmittance at Normal Incidence",
+  "rows": [
+   " WindowConstruction,BRIDGWATER_GLAZING,2,1,VerySmooth,1.400,1.400,1.000,0.441,0.357,0.702"
+  ]
+ },
+ "areas_m2": {
+  "N": 508.032,
+  "E": 4.589,
+  "S": 122.304,
+  "W": 4.589
+ },
+ "window_glazing_layer_eio": [
+  " WindowMaterial:Glazing,BRIDGWATER_GLAZING_PANE,SpectralAverage,,4.58837E-002,0.35579,0.45481,0.45481,0.70000,0.13631,0.14946,0.00000,0.84000,0.84000,8.51890E-002,1.00000,No"
+ ],
+ "slabs_no_mass": {
+  "slab_r_m2k_per_w": 0.5281944024749983,
+  "heating_mwh": 95.382,
+  "cooling_mwh": 20.294,
+  "heating_monthly_mwh": [
+   20.003,
+   14.612,
+   12.677,
+   4.402,
+   1.221,
+   0.108,
+   0.0,
+   0.137,
+   1.846,
+   6.932,
+   14.676,
+   18.769
+  ],
+  "cooling_monthly_mwh": [
+   0.0,
+   0.0,
+   0.111,
+   0.51,
+   1.92,
+   5.548,
+   8.936,
+   2.604,
+   0.648,
+   0.019,
+   0.0,
+   0.0
+  ],
+  "severe": 0,
+  "fatal": 0
+ }
+}

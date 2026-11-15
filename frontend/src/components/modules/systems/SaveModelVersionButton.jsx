@@ -16,18 +16,18 @@ import { WeatherContext } from '../../../context/WeatherContext.jsx'
 import { useAuth } from '../../../auth/AuthGate.tsx'
 import { fromBuildingConfig } from '../../../thermal/schema/fromBuildingConfig'
 import {
-  ensureBuilding, ensureProject, INSTANT_ENGINE_VERSION, INSTANT_SOURCE, instantSummary, recordRun, saveModelVersion,
+  ensureLocalBuilding, INSTANT_ENGINE_VERSION, INSTANT_SOURCE, instantSummary, recordRun, saveModelVersion,
 } from '../../../thermal/store/versions'
 
 export default function SaveModelVersionButton({ result, libraryConstructions }) {
   const auth = useAuth()
-  const { params, constructions, comfortBand } = useContext(ProjectContext)
+  const { params, constructions, comfortBand, currentProjectId } = useContext(ProjectContext)
   // The weather the Systems page's result was computed from (Brief 102a: its own bytes are pinned, never its name).
   const { weatherData } = useContext(WeatherContext)
   const [state, setState] = useState({ busy: false, done: null, error: null })
   if (!auth) return null
 
-  const ready = !!(result && params && libraryConstructions && weatherData)
+  const ready = !!(result && params && libraryConstructions && weatherData && currentProjectId)
   const save = async () => {
     setState({ busy: true, done: null, error: null })
     try {
@@ -36,8 +36,9 @@ export default function SaveModelVersionButton({ result, libraryConstructions })
       }
       const sb = auth.supabase
       const name = (params.name ?? '').trim() || 'Untitled building'
-      const projectId = await ensureProject(sb, auth.org.id, name)
-      const buildingId = await ensureBuilding(sb, projectId, name)
+      // Brief 103 P1 (QA M4): matched by the local project's id, so a rename keeps the history and two projects
+      // with the same name stay apart.
+      const buildingId = await ensureLocalBuilding(sb, auth.org.id, currentProjectId, name)
       const { document } = await fromBuildingConfig({
         building_config: params,
         construction_choices: constructions ?? {},

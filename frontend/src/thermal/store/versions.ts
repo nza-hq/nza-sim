@@ -32,24 +32,17 @@ function fail(what: string, err: { code?: string; message?: string }): never {
   throw Object.assign(new Error(`${what}: ${err.message ?? 'failed'}`), { code: err.code })
 }
 
-/** The organisation's project with this name, created if it does not exist. */
-export async function ensureProject(sb: SupabaseClient, orgId: string, name: string): Promise<string> {
-  const { data, error } = await sb.from('projects').select('id').eq('org_id', orgId).eq('name', name).order('created_at').limit(1)
-  if (error) fail('reading projects', error)
-  if (data && data.length) return data[0].id
-  const { data: id, error: e2 } = await sb.rpc('create_project', { p_org: orgId, p_name: name })
-  if (e2) fail('creating the project', e2)
-  return id as string
-}
-
-/** The project's building with this name, created if it does not exist. */
-export async function ensureBuilding(sb: SupabaseClient, projectId: string, name: string): Promise<string> {
-  const { data, error } = await sb.from('buildings').select('id').eq('project_id', projectId).eq('name', name).order('created_at').limit(1)
-  if (error) fail('reading buildings', error)
-  if (data && data.length) return data[0].id
-  const { data: id, error: e2 } = await sb.rpc('create_building', { p_project: projectId, p_name: name })
-  if (e2) fail('creating the building', e2)
-  return id as string
+/**
+ * The building for a local project, found by the local project's id (its uuid in the local SQLite store), never by
+ * its name (Brief 103 P1, QA M4). One database call, race-safe (unique (org_id, local_ref) and (project_id, local_ref)).
+ * The project and building take the local name and follow a rename. A project saved before 0005 with the same name
+ * and no local id is adopted once, so its history continues.
+ */
+export async function ensureLocalBuilding(sb: SupabaseClient, orgId: string, localRef: string, name: string): Promise<string> {
+  if (!localRef || typeof localRef !== 'string') throw new Error('no local project id: open a saved project first')
+  const { data, error } = await sb.rpc('ensure_local_building', { p_org: orgId, p_local_ref: localRef, p_name: name })
+  if (error) fail('finding the building for this project', error)
+  return data as string
 }
 
 export interface SavedVersion {
@@ -94,29 +87,45 @@ export async function recordRun(sb: SupabaseClient, versionId: string, results: 
   return data as string
 }
 
-const kwh = (mwh: unknown) => (typeof mwh === 'number' && Number.isFinite(mwh) ? Math.round(mwh * 1000 * 1000) / 1000 : 0)
+/** MWh → kWh to the Wh. A figure the engine must give and did not, or gave as a non-number, fails loudly (QA M7). */
+function kwh(mwh: unknown, path: string): number {
+  if (typeof mwh !== 'number' || !Number.isFinite(mwh)) throw new Error(`the engine result has no number at ${path} (got ${String(mwh)})`)
+  return Math.round(mwh * 1000 * 1000) / 1000
+}
 
 /**
  * The instant engine's annual figures, copied (MWh → kWh, nothing recomputed). The EUI comes only from
- * readModelledEui. End uses are the engine's own per-service fuel figures; whatever the engine counts in its total
- * but does not itemise at the top level (auxiliary loads today) is its own line, so the lines always sum to the
- * total (rule 9).
+ * readModelledEui. End uses are the engine's own per-service fuel figures, plus auxiliary from the engine's own
+ * figure (heat_balance.annual.gains.internal.auxiliary.electricity_kwh, QA M7). District heat counts as heating.
+ * Anything the engine totals but no line names stays visible as `not_itemised`, so the lines always sum to the
+ * total (rule 9); on today's engine it is zero to rounding.
  */
 export function instantSummary(result: any): RunSummary {
   const eui = readModelledEui(result)
   if (eui == null) throw new Error('the engine returned no EUI (consumption.total.kwh_per_m2_yr)')
-  const c = result.consumption
-  const byFuel: Record<string, number> = { electricity: kwh(c.total?.electricity_mwh), gas: kwh(c.total?.gas_mwh) }
-  if (kwh(c.total?.district_heat_mwh)) byFuel.district_heat = kwh(c.total.district_heat_mwh)
-  const fans = (c.ventilation ?? []).reduce((s: number, v: any) => s + (v?.fan_electricity_mwh ?? 0), 0)
-  const byEndUse: Record<string, number> = {
-    heating: kwh((c.space_heating?.electricity_mwh ?? 0) + (c.space_heating?.gas_mwh ?? 0)),
-    cooling: kwh(c.space_cooling?.electricity_mwh ?? 0),
-    dhw: kwh((c.dhw?.electricity_mwh ?? 0) + (c.dhw?.gas_mwh ?? 0)),
-    ventilation_fans: kwh(fans),
-    lighting: kwh(c.lighting?.electricity_mwh),
-    equipment: kwh(c.small_power?.electricity_mwh),
+  const c = result?.consumption
+  if (!c) throw new Error('the engine result has no consumption block')
+  const district = kwh(c.total?.district_heat_mwh, 'consumption.total.district_heat_mwh')
+  const byFuel: Record<string, number> = {
+    electricity: kwh(c.total?.electricity_mwh, 'consumption.total.electricity_mwh'),
+    gas: kwh(c.total?.gas_mwh, 'consumption.total.gas_mwh'),
   }
+  if (district) byFuel.district_heat = district
+  if (!Array.isArray(c.ventilation)) throw new Error('the engine result has no number at consumption.ventilation (got not a list)')
+  const fans = c.ventilation.reduce((s: number, v: any, i: number) => s + kwh(v?.fan_electricity_mwh, `consumption.ventilation[${i}].fan_electricity_mwh`), 0)
+  const auxKwh = result?.heat_balance?.annual?.gains?.internal?.auxiliary?.electricity_kwh
+  const auxiliary = kwh(typeof auxKwh === 'number' ? auxKwh / 1000 : auxKwh, 'heat_balance.annual.gains.internal.auxiliary.electricity_kwh')
+  const byEndUse: Record<string, number> = {
+    heating: kwh(c.space_heating?.electricity_mwh, 'consumption.space_heating.electricity_mwh')
+      + kwh(c.space_heating?.gas_mwh, 'consumption.space_heating.gas_mwh') + district,
+    cooling: kwh(c.space_cooling?.electricity_mwh, 'consumption.space_cooling.electricity_mwh'),
+    dhw: kwh(c.dhw?.electricity_mwh, 'consumption.dhw.electricity_mwh') + kwh(c.dhw?.gas_mwh, 'consumption.dhw.gas_mwh'),
+    ventilation_fans: Math.round(fans * 1000) / 1000,
+    lighting: kwh(c.lighting?.electricity_mwh, 'consumption.lighting.electricity_mwh'),
+    equipment: kwh(c.small_power?.electricity_mwh, 'consumption.small_power.electricity_mwh'),
+    auxiliary,
+  }
+  for (const k of Object.keys(byEndUse)) byEndUse[k] = Math.round(byEndUse[k] * 1000) / 1000
   const total = Object.values(byFuel).reduce((a, b) => a + b, 0)
   const listed = Object.values(byEndUse).reduce((a, b) => a + b, 0)
   byEndUse.not_itemised = Math.round((total - listed) * 1000) / 1000

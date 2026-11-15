@@ -1,13 +1,13 @@
 import { REPO, fx, EPW, EPW_SHA, reset, user, org, check, summary, psql } from './common.mjs'
 import { fromBuildingConfig } from '../../frontend/src/thermal/schema/fromBuildingConfig.ts'
-import { ensureBuilding, ensureProject, saveModelVersion, recordRun, INSTANT_ENGINE_VERSION, INSTANT_SOURCE } from '../../frontend/src/thermal/store/versions.ts'
+import { ensureLocalBuilding, saveModelVersion, recordRun, INSTANT_ENGINE_VERSION, INSTANT_SOURCE } from '../../frontend/src/thermal/store/versions.ts'
 
 reset()
 const summaryA = { eui_kwh_m2: 132.6, annual_by_end_use: { heating: 1 }, annual_by_fuel: { electricity: 1 } }
 const summaryB = { eui_kwh_m2: 999, annual_by_end_use: { heating: 2 }, annual_by_fuel: { electricity: 2 } }
 async function setup(email, name) {
   const u = await user(email); const o = await org(u, name)
-  const b = await ensureBuilding(u.sb, await ensureProject(u.sb, o, 'Anchor'), 'Anchor')
+  const b = await ensureLocalBuilding(u.sb, o, 'test:anchor', 'Anchor')
   const doc = (await fromBuildingConfig({ building_config: fx.building_config, construction_choices: fx.construction_choices,
     comfort_band: fx.comfort_band, library_constructions: fx.library_constructions, building_id: b,
     weather: { file_name: EPW, file_hash: EPW_SHA } })).document

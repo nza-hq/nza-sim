@@ -1,0 +1,12 @@
+EPW GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw
+rows: backend 8760, engine 8760
+temperature          -> dry_bulb             identical
+direct_normal        -> direct_normal        identical
+diffuse_horizontal   -> diffuse_horizontal   identical
+wind_speed           -> wind_speed           identical
+month                -> month                identical
+day                  -> day                  identical
+hour                 -> hour                 identical
+latitude/longitude: identical (51.0064, -2.6428)
+sha256: backend c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2, engine c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2: identical
+PASS: value for value

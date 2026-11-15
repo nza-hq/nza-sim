@@ -8,7 +8,7 @@
  * shape: Part 5 stores its result as a `summary` only, with `engine_version 'instant-1'`.
  */
 import { z } from 'zod'
-import { SERVICES } from './model'
+import { SCHEMA_VERSION, SERVICES } from './model'
 
 const finite = z.number().finite()
 const hourly = z.array(finite).refine((a) => a.length === 8760 || a.length === 8784, {
@@ -57,7 +57,7 @@ export const BreakdownLine = z
 
 export const Results = z
   .object({
-    schema_version: z.literal('2.0'),
+    schema_version: z.literal(SCHEMA_VERSION),
     meta: z
       .object({
         model_hash: sha,

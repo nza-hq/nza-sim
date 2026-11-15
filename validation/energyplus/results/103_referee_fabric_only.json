@@ -1,0 +1,1398 @@
+{
+ "brief": "103 Part 5",
+ "fixture": "validation/fixtures/report_baseline_v1.yaml",
+ "fixture_sha256": "c0b0bc875979dad810232db1505a027a0e767a65faea2b4a8877732b6019d88c",
+ "weather": "GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw",
+ "weather_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "ground_temperature_c": 11.2582,
+ "document_constants": {
+  "wall_solar_absorptance": 0.6,
+  "roof_solar_absorptance": 0.7,
+  "outside_emissivity": 0.9,
+  "frame_fraction": 0.2,
+  "internal_heat_capacity_j_per_k_m2": 250000.0
+ },
+ "iso14683_psi": {
+  "wall_to_roof": 0.08,
+  "wall_to_intermediate_floor": 0.08,
+  "wall_to_ground_floor": 0.16,
+  "external_corner": 0.05,
+  "window_perimeter": 0.05,
+  "door_perimeter": 0.1
+ },
+ "timesteps_per_hour": 4,
+ "variants": {
+  "r0": {
+   "what": "the referee",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.44
+     }
+    },
+    "outside_layers": {
+     "bridgwater_ext_wall": {
+      "layer": "Brdg_Wall_Insul",
+      "solar_absorptance": 0.6,
+      "thermal_absorptance": 0.9
+     },
+     "bridgwater_roof": {
+      "layer": "Brdg_Roof_Waterproof",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": {
+      "roof": 35.1072,
+      "wall": 242.973,
+      "ground_floor": 0
+     },
+     "constructions": {
+      "bridgwater_ext_wall": {
+       "u_iso6946_before": 0.14,
+       "u_iso6946_after": 0.28284,
+       "insulation_layer": "Brdg_Wall_Insul",
+       "r_after": 3.15156
+      },
+      "bridgwater_roof": {
+       "u_iso6946_before": 0.15,
+       "u_iso6946_after": 0.19163,
+       "insulation_layer": "Brdg_Roof_Insul",
+       "r_after": 4.92053
+      }
+     }
+    }
+   },
+   "heating_mwh": 90.458,
+   "cooling_mwh": 13.655,
+   "heating_monthly_mwh": [
+    19.837,
+    14.608,
+    12.848,
+    3.547,
+    0.269,
+    0.0,
+    0.0,
+    0.0,
+    0.259,
+    6.102,
+    14.157,
+    18.832
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.026,
+    3.444,
+    8.439,
+    1.725,
+    0.022,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 90.458,
+   "supply_air_total_cooling_mwh": 14.439,
+   "inside_face_conduction_net_mwh": {
+    "wall": -42.121,
+    "roof": -13.811,
+    "ground_floor": -10.282,
+    "interior_slabs": 0.156
+   },
+   "infiltration_mwh": {
+    "loss": 30.81,
+    "gain": 0.104
+   },
+   "permanent_vents_mwh": {
+    "loss": 18.784,
+    "gain": 0.064
+   },
+   "window_transmitted_solar_mwh": 103.382,
+   "window_heat_mwh": {
+    "loss": 58.001,
+    "gain": 96.332
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 21.967,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "bridging applied per element = Engine 1 H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K (roof 35.11, walls 242.97, ground floor 0)"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  },
+  "urban_wind": {
+   "what": "r0 with the assembler's Urban terrain wind and temperature height scaling",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.44
+     }
+    },
+    "outside_layers": {
+     "bridgwater_ext_wall": {
+      "layer": "Brdg_Wall_Insul",
+      "solar_absorptance": 0.6,
+      "thermal_absorptance": 0.9
+     },
+     "bridgwater_roof": {
+      "layer": "Brdg_Roof_Waterproof",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": {
+      "roof": 35.1072,
+      "wall": 242.973,
+      "ground_floor": 0
+     },
+     "constructions": {
+      "bridgwater_ext_wall": {
+       "u_iso6946_before": 0.14,
+       "u_iso6946_after": 0.28284,
+       "insulation_layer": "Brdg_Wall_Insul",
+       "r_after": 3.15156
+      },
+      "bridgwater_roof": {
+       "u_iso6946_before": 0.15,
+       "u_iso6946_after": 0.19163,
+       "insulation_layer": "Brdg_Roof_Insul",
+       "r_after": 4.92053
+      }
+     }
+    }
+   },
+   "heating_mwh": 85.443,
+   "cooling_mwh": 15.283,
+   "heating_monthly_mwh": [
+    19.091,
+    13.986,
+    11.937,
+    2.955,
+    0.113,
+    0.0,
+    0.0,
+    0.0,
+    0.159,
+    5.586,
+    13.555,
+    18.059
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.097,
+    4.196,
+    8.898,
+    2.047,
+    0.045,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 85.443,
+   "supply_air_total_cooling_mwh": 16.038,
+   "inside_face_conduction_net_mwh": {
+    "wall": -41.25,
+    "roof": -13.741,
+    "ground_floor": -10.359,
+    "interior_slabs": 0.135
+   },
+   "infiltration_mwh": {
+    "loss": 31.065,
+    "gain": 0.102
+   },
+   "permanent_vents_mwh": {
+    "loss": 12.455,
+    "gain": 0.041
+   },
+   "window_transmitted_solar_mwh": 103.382,
+   "window_heat_mwh": {
+    "loss": 58.253,
+    "gain": 96.335
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 22.014,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "bridging applied per element = Engine 1 H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K (roof 35.11, walls 242.97, ground floor 0)"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  },
+  "ground_18": {
+   "what": "r0 with EnergyPlus's default 18 C ground",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.44
+     }
+    },
+    "outside_layers": {
+     "bridgwater_ext_wall": {
+      "layer": "Brdg_Wall_Insul",
+      "solar_absorptance": 0.6,
+      "thermal_absorptance": 0.9
+     },
+     "bridgwater_roof": {
+      "layer": "Brdg_Roof_Waterproof",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": {
+      "roof": 35.1072,
+      "wall": 242.973,
+      "ground_floor": 0
+     },
+     "constructions": {
+      "bridgwater_ext_wall": {
+       "u_iso6946_before": 0.14,
+       "u_iso6946_after": 0.28284,
+       "insulation_layer": "Brdg_Wall_Insul",
+       "r_after": 3.15156
+      },
+      "bridgwater_roof": {
+       "u_iso6946_before": 0.15,
+       "u_iso6946_after": 0.19163,
+       "insulation_layer": "Brdg_Roof_Insul",
+       "r_after": 4.92053
+      }
+     }
+    }
+   },
+   "heating_mwh": 86.771,
+   "cooling_mwh": 15.137,
+   "heating_monthly_mwh": [
+    19.319,
+    14.151,
+    12.37,
+    3.159,
+    0.155,
+    0.0,
+    0.0,
+    0.0,
+    0.144,
+    5.5,
+    13.652,
+    18.32
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.062,
+    4.026,
+    8.934,
+    2.059,
+    0.056,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 86.771,
+   "supply_air_total_cooling_mwh": 15.969,
+   "inside_face_conduction_net_mwh": {
+    "wall": -42.458,
+    "roof": -13.82,
+    "ground_floor": -3.985,
+    "interior_slabs": 0.159
+   },
+   "infiltration_mwh": {
+    "loss": 30.936,
+    "gain": 0.104
+   },
+   "permanent_vents_mwh": {
+    "loss": 18.862,
+    "gain": 0.064
+   },
+   "window_transmitted_solar_mwh": 103.382,
+   "window_heat_mwh": {
+    "loss": 58.327,
+    "gain": 96.075
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 22.012,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "bridging applied per element = Engine 1 H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K (roof 35.11, walls 242.97, ground floor 0)"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  },
+  "no_frame": {
+   "what": "r0 with SHGC = g on the full opening (no frame)",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.55
+     }
+    },
+    "outside_layers": {
+     "bridgwater_ext_wall": {
+      "layer": "Brdg_Wall_Insul",
+      "solar_absorptance": 0.6,
+      "thermal_absorptance": 0.9
+     },
+     "bridgwater_roof": {
+      "layer": "Brdg_Roof_Waterproof",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": {
+      "roof": 35.1072,
+      "wall": 242.973,
+      "ground_floor": 0
+     },
+     "constructions": {
+      "bridgwater_ext_wall": {
+       "u_iso6946_before": 0.14,
+       "u_iso6946_after": 0.28284,
+       "insulation_layer": "Brdg_Wall_Insul",
+       "r_after": 3.15156
+      },
+      "bridgwater_roof": {
+       "u_iso6946_before": 0.15,
+       "u_iso6946_after": 0.19163,
+       "insulation_layer": "Brdg_Roof_Insul",
+       "r_after": 4.92053
+      }
+     }
+    }
+   },
+   "heating_mwh": 79.47,
+   "cooling_mwh": 28.145,
+   "heating_monthly_mwh": [
+    18.778,
+    13.305,
+    10.908,
+    1.669,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.004,
+    3.841,
+    12.976,
+    17.99
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.058,
+    8.245,
+    12.72,
+    4.446,
+    0.676,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 79.47,
+   "supply_air_total_cooling_mwh": 29.214,
+   "inside_face_conduction_net_mwh": {
+    "wall": -43.943,
+    "roof": -14.413,
+    "ground_floor": -10.763,
+    "interior_slabs": 0.169
+   },
+   "infiltration_mwh": {
+    "loss": 31.477,
+    "gain": 0.104
+   },
+   "permanent_vents_mwh": {
+    "loss": 19.215,
+    "gain": 0.064
+   },
+   "window_transmitted_solar_mwh": 138.43,
+   "window_heat_mwh": {
+    "loss": 58.287,
+    "gain": 126.076
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 22.203,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "bridging applied per element = Engine 1 H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K (roof 35.11, walls 242.97, ground floor 0)"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  },
+  "uniform_bridging": {
+   "what": "r0 with the assembler's uniform bridging dU over wall, roof and ground floor",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.44
+     }
+    },
+    "outside_layers": {
+     "bridgwater_ext_wall": {
+      "layer": "Brdg_Wall_Insul",
+      "solar_absorptance": 0.6,
+      "thermal_absorptance": 0.9
+     },
+     "bridgwater_roof": {
+      "layer": "Brdg_Roof_Waterproof",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": "uniform (assembler)"
+    }
+   },
+   "heating_mwh": 89.781,
+   "cooling_mwh": 13.103,
+   "heating_monthly_mwh": [
+    19.582,
+    14.439,
+    12.687,
+    3.565,
+    0.324,
+    0.0,
+    0.0,
+    0.0,
+    0.338,
+    6.195,
+    14.037,
+    18.612
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.04,
+    3.313,
+    8.077,
+    1.647,
+    0.025,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 89.781,
+   "supply_air_total_cooling_mwh": 13.855,
+   "inside_face_conduction_net_mwh": {
+    "wall": -33.032,
+    "roof": -16.701,
+    "ground_floor": -16.622,
+    "interior_slabs": 0.156
+   },
+   "infiltration_mwh": {
+    "loss": 30.759,
+    "gain": 0.104
+   },
+   "permanent_vents_mwh": {
+    "loss": 18.752,
+    "gain": 0.064
+   },
+   "window_transmitted_solar_mwh": 103.382,
+   "window_heat_mwh": {
+    "loss": 57.912,
+    "gain": 96.43
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 21.949,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  },
+  "mass_250": {
+   "what": "r0 plus 250 kJ/m2K x floor area on each zone's air node (ZoneCapacitanceMultiplier)",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.44
+     }
+    },
+    "outside_layers": {
+     "bridgwater_ext_wall": {
+      "layer": "Brdg_Wall_Insul",
+      "solar_absorptance": 0.6,
+      "thermal_absorptance": 0.9
+     },
+     "bridgwater_roof": {
+      "layer": "Brdg_Roof_Waterproof",
+      "solar_absorptance": 0.7,
+      "thermal_absorptance": 0.9
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": {
+      "roof": 35.1072,
+      "wall": 242.973,
+      "ground_floor": 0
+     },
+     "constructions": {
+      "bridgwater_ext_wall": {
+       "u_iso6946_before": 0.14,
+       "u_iso6946_after": 0.28284,
+       "insulation_layer": "Brdg_Wall_Insul",
+       "r_after": 3.15156
+      },
+      "bridgwater_roof": {
+       "u_iso6946_before": 0.15,
+       "u_iso6946_after": 0.19163,
+       "insulation_layer": "Brdg_Roof_Insul",
+       "r_after": 4.92053
+      }
+     }
+    },
+    "capacitance_multiplier": 65.5597
+   },
+   "heating_mwh": 89.645,
+   "cooling_mwh": 12.847,
+   "heating_monthly_mwh": [
+    19.842,
+    14.608,
+    12.805,
+    3.345,
+    0.209,
+    0.0,
+    0.0,
+    0.0,
+    0.072,
+    5.775,
+    14.157,
+    18.832
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.878,
+    8.409,
+    1.559,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 89.645,
+   "supply_air_total_cooling_mwh": 13.612,
+   "inside_face_conduction_net_mwh": {
+    "wall": -42.12,
+    "roof": -13.812,
+    "ground_floor": -10.283,
+    "interior_slabs": 0.152
+   },
+   "infiltration_mwh": {
+    "loss": 30.81,
+    "gain": 0.109
+   },
+   "permanent_vents_mwh": {
+    "loss": 18.75,
+    "gain": 0.068
+   },
+   "window_transmitted_solar_mwh": 103.382,
+   "window_heat_mwh": {
+    "loss": 58.12,
+    "gain": 96.437
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 21.965,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "bridging applied per element = Engine 1 H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K (roof 35.11, walls 242.97, ground floor 0)"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  },
+  "library_absorptance": {
+   "what": "r0 with the library layers' solar absorptance (0.7) instead of the document's",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.44
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": {
+      "roof": 35.1072,
+      "wall": 242.973,
+      "ground_floor": 0
+     },
+     "constructions": {
+      "bridgwater_ext_wall": {
+       "u_iso6946_before": 0.14,
+       "u_iso6946_after": 0.28284,
+       "insulation_layer": "Brdg_Wall_Insul",
+       "r_after": 3.15156
+      },
+      "bridgwater_roof": {
+       "u_iso6946_before": 0.15,
+       "u_iso6946_after": 0.19163,
+       "insulation_layer": "Brdg_Roof_Insul",
+       "r_after": 4.92053
+      }
+     }
+    }
+   },
+   "heating_mwh": 89.849,
+   "cooling_mwh": 14.128,
+   "heating_monthly_mwh": [
+    19.775,
+    14.528,
+    12.743,
+    3.413,
+    0.228,
+    0.0,
+    0.0,
+    0.0,
+    0.231,
+    6.013,
+    14.128,
+    18.79
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.039,
+    3.637,
+    8.637,
+    1.789,
+    0.026,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 89.849,
+   "supply_air_total_cooling_mwh": 14.923,
+   "inside_face_conduction_net_mwh": {
+    "wall": -40.818,
+    "roof": -13.835,
+    "ground_floor": -10.3,
+    "interior_slabs": 0.154
+   },
+   "infiltration_mwh": {
+    "loss": 30.84,
+    "gain": 0.104
+   },
+   "permanent_vents_mwh": {
+    "loss": 18.803,
+    "gain": 0.064
+   },
+   "window_transmitted_solar_mwh": 103.382,
+   "window_heat_mwh": {
+    "loss": 58.066,
+    "gain": 96.271
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 21.978,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "bridging applied per element = Engine 1 H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K (roof 35.11, walls 242.97, ground floor 0)"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  },
+  "bi_repro": {
+   "what": "Run Bi's inputs: Urban wind, 18 C ground, no frame, uniform bridging, library absorptance",
+   "inputs": {
+    "infiltration_ach": [
+     0.06924819969828935
+    ],
+    "glazing": {
+     "bridgwater_glazing_pane": {
+      "u": 1.4,
+      "g": 0.55,
+      "shgc_used": 0.55
+     }
+    },
+    "areas_m2": {
+     "wall": 1700.966,
+     "roof": 843.192,
+     "floor": 843.192,
+     "glazing": 639.514
+    },
+    "bridging": {
+     "multiplier": 3.0,
+     "junctions_m": {
+      "wall_to_roof": 146.28,
+      "wall_to_intermediate_floor": 585.12,
+      "wall_to_ground_floor": 146.28,
+      "external_corner": 64.0,
+      "window_perimeter": 151.5319,
+      "door_perimeter": 0.0
+     },
+     "h_w_per_k": {
+      "wall_to_roof": 35.1072,
+      "wall_to_intermediate_floor": 140.4288,
+      "wall_to_ground_floor": 70.2144,
+      "external_corner": 9.6,
+      "window_perimeter": 22.7298,
+      "door_perimeter": 0.0
+     },
+     "total_w_per_k": 278.0802,
+     "allocation": "uniform (assembler)"
+    }
+   },
+   "heating_mwh": 68.694,
+   "cooling_mwh": 33.808,
+   "heating_monthly_mwh": [
+    16.895,
+    11.722,
+    9.023,
+    0.978,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.001,
+    2.537,
+    11.403,
+    16.136
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.034,
+    3.662,
+    9.692,
+    13.783,
+    5.432,
+    1.205,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "supply_air_total_heating_mwh": 68.694,
+   "supply_air_total_cooling_mwh": 34.843,
+   "inside_face_conduction_net_mwh": {
+    "wall": -32.923,
+    "roof": -17.363,
+    "ground_floor": -7.436,
+    "interior_slabs": 0.153
+   },
+   "infiltration_mwh": {
+    "loss": 31.865,
+    "gain": 0.102
+   },
+   "permanent_vents_mwh": {
+    "loss": 12.788,
+    "gain": 0.041
+   },
+   "window_transmitted_solar_mwh": 138.43,
+   "window_heat_mwh": {
+    "loss": 58.948,
+    "gain": 125.783
+   },
+   "internal_gains_mwh": 0.0,
+   "zone_mean_air_c": 22.297,
+   "severe": 0,
+   "fatal": 0,
+   "warnings": 5,
+   "checks": [
+    {
+     "check": "no system objects other than IdealLoads",
+     "ok": true,
+     "detail": "none"
+    },
+    {
+     "check": "IdealLoads in every zone",
+     "ok": true,
+     "detail": "5 of 5"
+    },
+    {
+     "check": "no People / Lights / ElectricEquipment / operable openings",
+     "ok": true,
+     "detail": "deleted"
+    },
+    {
+     "check": "ZoneVentilation = the permanent louvres only",
+     "ok": true,
+     "detail": "5 objects, design flow [0.0089833] m3/s per (m/s)"
+    },
+    {
+     "check": "thermostat = flat comfort band",
+     "ok": true,
+     "detail": "21.0 / 24.0 C"
+    },
+    {
+     "check": "infiltration = q50 / 20 on an always-1 schedule",
+     "ok": true,
+     "detail": "[0.06924819969828935] ach"
+    },
+    {
+     "check": "Engine 1 junctions = the assembler's _nza_thermal_bridging_H_TB (within 0.1 W/K)",
+     "ok": true,
+     "detail": "278.080 vs 278.080 W/K"
+    },
+    {
+     "check": "internal gains = 0",
+     "ok": true,
+     "detail": "0.0 MWh"
+    },
+    {
+     "check": "0 severe, 0 fatal",
+     "ok": true,
+     "detail": "0 severe, 0 fatal, 5 warnings"
+    }
+   ]
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.15 00:43"
+}

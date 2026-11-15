@@ -5,3 +5,4 @@ export { canonicalJSON, CanonicalJSONError, sha256Hex, sha256HexBytes } from './
 export { modelHash, libraryHash, weatherHash } from './hash'
 export { fromBuildingConfig, ConversionError } from './fromBuildingConfig'
 export type { ConverterInput, Conversion, TraceEntry } from './fromBuildingConfig'
+export { upgradeDocument, TODAY } from './upgrade'

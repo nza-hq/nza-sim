@@ -1,0 +1,185 @@
+{
+ "brief": "103 Part 6",
+ "fixtures": [
+  "validation/fixtures/bridgewater_anchor_v2.yaml",
+  "validation/fixtures/report_baseline_v1.yaml"
+ ],
+ "same_envelope": true,
+ "weather_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "options": {
+  "control": "air",
+  "hc_convective_fraction": 1,
+  "warmup_days": 25,
+  "solar": {
+   "albedo": 0.2,
+   "sun_day": "actual",
+   "solar_time": "apparent"
+  },
+  "other_gains": null,
+  "surface_physics": {
+   "outside_convection": "fixed",
+   "inside_convection": "by_tilt",
+   "beam_on_floor": true
+  }
+ },
+ "t_ground_c": 11.258207792429824,
+ "gate_a": [
+  {
+   "path": "external walls (sol-air)",
+   "s1_w_per_k": 238.13522338710345,
+   "e1_w_per_k": 238.13529600000004,
+   "s1_heat_kwh": 17855.4,
+   "e1_heat_kwh": 17855.404846938483,
+   "s1_cool_kwh": 836.5,
+   "e1_cool_kwh": 836.4942044892912
+  },
+  {
+   "path": "roof (sol-air)",
+   "s1_w_per_k": 126.4793213337944,
+   "e1_w_per_k": 126.47879999999999,
+   "s1_heat_kwh": 8949.9,
+   "e1_heat_kwh": 8949.86310950061,
+   "s1_cool_kwh": 1340.8,
+   "e1_cool_kwh": 1340.7943129627836
+  },
+  {
+   "path": "ground floor (T_ground)",
+   "s1_w_per_k": 109.61458045919137,
+   "e1_w_per_k": 109.61496000000001,
+   "s1_heat_kwh": 9354.3,
+   "e1_heat_kwh": 9354.332389291383,
+   "s1_cool_kwh": 0,
+   "e1_cool_kwh": 0
+  },
+  {
+   "path": "glazing (T_out)",
+   "s1_w_per_k": 895.3193814201744,
+   "e1_w_per_k": 895.3190399999999,
+   "s1_heat_kwh": 77291.4,
+   "e1_heat_kwh": 77291.3705257768,
+   "s1_cool_kwh": 307.4,
+   "e1_cool_kwh": 307.363073564121
+  },
+  {
+   "path": "fabric leakage (q50 / 20)",
+   "s1_w_per_k": 308.29635303130124,
+   "e1_w_per_k": 308.29670783999995,
+   "s1_heat_kwh": 26614.7,
+   "e1_heat_kwh": 26614.73063003173,
+   "s1_cool_kwh": 105.8,
+   "e1_cool_kwh": 105.83827603108078
+  },
+  {
+   "path": "permanent vents (W/K per m/s of wind)",
+   "s1_w_per_k": 53.36107028346382,
+   "e1_w_per_k": 53.361000000000004,
+   "s1_heat_kwh": 16246,
+   "e1_heat_kwh": 16245.978601906838,
+   "s1_cool_kwh": 65.1,
+   "e1_cool_kwh": 65.13831531888206
+  },
+  {
+   "path": "thermal bridging (T_out)",
+   "s1_w_per_k": 278.08,
+   "e1_w_per_k": 278.0801856061382,
+   "s1_heat_kwh": 24006.2,
+   "e1_heat_kwh": 24006.189638903263,
+   "s1_cool_kwh": 95.5,
+   "e1_cool_kwh": 95.46494235751302,
+   "note": "State 1's own loss ÷ degree-hours gives 278.080 W/K"
+  }
+ ],
+ "transmitted_solar_kwh": {
+  "state1": 147785.4,
+  "engine1_as_run": 134573.0812722891,
+  "engine1_today_sun": 133006.86048262112,
+  "f_w": 0.9
+ },
+ "gate_b": {
+  "referee": {
+   "heating_mwh": 90.458,
+   "cooling_mwh": 13.655,
+   "heating_monthly_mwh": [
+    19.837,
+    14.608,
+    12.848,
+    3.547,
+    0.269,
+    0,
+    0,
+    0,
+    0.259,
+    6.102,
+    14.157,
+    18.832
+   ],
+   "cooling_monthly_mwh": [
+    0,
+    0,
+    0,
+    0,
+    0.026,
+    3.444,
+    8.439,
+    1.725,
+    0.022,
+    0,
+    0,
+    0
+   ]
+  },
+  "engine1": {
+   "heating_mwh": 89.97543995818255,
+   "cooling_mwh": 15.320232476832745,
+   "heating_monthly_mwh": [
+    19.924702910980958,
+    14.661320176830166,
+    12.374452237603093,
+    3.035161196151,
+    0.12387842843589278,
+    0,
+    0,
+    0,
+    0.505797692199748,
+    6.451311863835872,
+    14.226801546090057,
+    18.67201390605578
+   ],
+   "cooling_monthly_mwh": [
+    0,
+    0,
+    0,
+    0,
+    0.3480807140442976,
+    4.33672801376438,
+    8.194623943983025,
+    2.440799805041013,
+    0,
+    0,
+    0,
+    0
+   ],
+   "closure_max_wh": 4.449248081073165e-9
+  },
+  "state1_information": {
+   "heating_demand_mwh": 129.2,
+   "cooling_demand_mwh": 98.6,
+   "underheating_hours": 4511,
+   "overheating_hours": 3479,
+   "comfort_hours": 770
+  }
+ },
+ "engine1_breakdown_mwh": {
+  "conduction_walls": -399.41389344573145,
+  "conduction_roof": -309.9598936807402,
+  "conduction_ground": -11.589499068733735,
+  "conduction_glazing": 33.97366389773086,
+  "opaque_solar_absorbed": 1353.9376391418118,
+  "sky_longwave": -803.2192331328255,
+  "bridging": -26.19178868897103,
+  "infiltration": -29.03781946077831,
+  "permanent_vents": -17.828856113038636,
+  "solar_transmitted": 134.5730812722891,
+  "storage": 0.10139179760789559
+ }
+}

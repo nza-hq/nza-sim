@@ -1,0 +1,39 @@
+PASS  first save creates the project and building  — 04de783f-dc00-4adb-b1c8-46ecae082715
+PASS  the same local id finds the same building
+PASS  two local projects with the same name stay apart
+PASS  ...in two projects
+PASS  a rename keeps the building (and so its versions)
+PASS  ...and the names follow the rename
+PASS  an empty local id is refused  — a local project id (1 to 120 characters) is required
+PASS  the client refuses a missing local id before calling
+PASS  an unnamed project is "Untitled building"
+PASS  a pre-0005 project of the same name is adopted, so its history continues  — 9151f0aa-1ce4-4ffd-919e-d0ab0f2195d5 vs 9151f0aa-1ce4-4ffd-919e-d0ab0f2195d5
+PASS  ...and now carries the local id
+PASS  a second local project with that name does not steal it
+PASS  a viewer is refused  — only an editor or admin can save a model version
+PASS  another organisation is refused  — only an editor or admin can save a model version
+PASS  the same local id in another organisation is its own building
+PASS  six concurrent first saves return one building  — 12c5e227-57d6-474c-92a9-fda244456d46
+PASS  ...and leave one project and one building
+PASS  a new library version is written
+PASS  the same body again is a no-op returning the same id
+PASS  a different body for the same version is refused (23505)  — construction "wall_x" version 1 already exists with a different body; library versions never change, save it as version 2
+PASS  ...and the message says to save a new version  — construction "wall_x" version 1 already exists with a different body; library versions never change, save it as version 2
+PASS  the stored body is unchanged
+PASS  an outsider gets null from org_of_building  — {"data":null,"error":null}
+PASS  ...and from org_of_project  — {"data":null,"error":null}
+PASS  a member still gets the organisation  — {"data":"65e4f9a5-5f35-4261-a0be-752a7ccbd5e4","error":null}
+PASS  admin_count is no longer callable by a signed-in user  — permission denied for function admin_count
+PASS  RLS reads still work for a member (buildings)  — {"data":[{"id":"04de783f-dc00-4adb-b1c8-46ecae082715"}],"error":null}
+PASS  ...and for a viewer (projects)  — {"data":[{"id":"e42a1eea-5157-4ba6-98e1-3aa68cf7daa7"}],"error":null}
+PASS  an outsider still reads nothing  — {"data":[],"error":null}
+PASS  remove_member still works (admin_count runs inside it)
+PASS  ...and still guards the last admin  — an organisation must keep at least one admin
+PASS  an editor cannot revoke  — no such invitation, or only an admin of its organisation can revoke it
+PASS  another organisation cannot revoke  — no such invitation, or only an admin of its organisation can revoke it
+PASS  the admin revokes it
+PASS  a revoked invitation can no longer be accepted  — this invitation is not valid
+PASS  an accepted invitation cannot be revoked  — this invitation has already been accepted; remove the member instead
+PASS  0005 records itself
+
+37 passed, 0 failed

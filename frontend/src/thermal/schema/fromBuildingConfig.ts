@@ -17,6 +17,7 @@
  */
 import { canonicalJSON, sha256Hex } from './canonical'
 import { FACADES, ModelDocument, SCHEMA_VERSION } from './model'
+import { TODAY } from './upgrade'
 import type { LibraryRef } from './model'
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
@@ -228,6 +229,12 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
         const o: Obj = { kind, ...main }
         if (facadeOpen.cd !== undefined) o.cd = src.take(`${op}.cd`, `surfaces[${wallIdx}].openings[${i}].cd`)
         if (facadeOpen.flow_mode !== undefined) o.flow_mode = src.take(`${op}.flow_mode`, `surfaces[${wallIdx}].openings[${i}].flow_mode`)
+        // Schema 2.1: a permanent vent states its cd and flow mode. Where the project leaves them out, write what today's
+        // engine resolves to (building-wide value, else resolveCd 0.25 / resolveFlowMode 'single_sided').
+        if (kind === 'permanent_vent') {
+          o.cd ??= openingDefaults.cd ?? TODAY.vent_cd
+          o.flow_mode ??= openingDefaults.flow_mode ?? TODAY.vent_flow_mode
+        }
         openings.push(o)
       }
       if (facadeOpen.louvre_area_m2 !== undefined) {
@@ -244,11 +251,13 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
       id: `wall_${f}`, kind: 'wall', zone_a: ZONE_ID, zone_b: 'outside', facade: f,
       area_m2: gross * (1 - wwr), azimuth_deg: azimuth, tilt_deg: 90,
       construction_ref: wallRef, g_value: null, openings,
+      solar_absorptance: TODAY.wall_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: null,
     })
     const glazing: Obj = {
       id: `glazing_${f}`, kind: 'glazing', zone_a: ZONE_ID, zone_b: 'outside', facade: f,
       area_m2: gross * wwr, azimuth_deg: azimuth, tilt_deg: 90,
       construction_ref: glazingRef, g_value: null, wwr, openings: [],
+      solar_absorptance: null, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: TODAY.frame_fraction,
     }
     const wc = src.take(`${B}.window_count.${f}`, `surfaces[${glzIdx}].window_count`)
     if (wc !== undefined) glazing.window_count = wc
@@ -264,12 +273,14 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     id: 'roof', kind: 'roof', zone_a: ZONE_ID, zone_b: 'outside', facade: null,
     area_m2: length * width, azimuth_deg: null, tilt_deg: 0,
     construction_ref: await constructionRef('roof', `surfaces[${roofIdx}]`), g_value: null, openings: [],
+    solar_absorptance: TODAY.roof_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: null,
   })
   const groundIdx = surfaces.length
   surfaces.push({
     id: 'ground', kind: 'ground', zone_a: ZONE_ID, zone_b: 'ground', facade: null,
     area_m2: length * width, azimuth_deg: null, tilt_deg: 180,
     construction_ref: await constructionRef('ground_floor', `surfaces[${groundIdx}]`), g_value: null, openings: [],
+    solar_absorptance: null, thermal_emissivity: null, frame_fraction: null,
   })
 
   // ── Profiles ───────────────────────────────────────────────────────────────────────────────
@@ -446,6 +457,7 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     ventilation,
     infiltration_q50: src.take(`${B}.fabric.air_permeability_q50`, 'zones[0].infiltration_q50') ?? null,
     infiltration_ach: src.take(`${B}.infiltration_ach`, 'zones[0].infiltration_ach') ?? null,
+    internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2,
     surfaces: surfaces.map((s) => s.id as string),
   }
   const location = src.get(`${B}.location`)
@@ -458,12 +470,15 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
       lon: isObj(location) && location.longitude !== undefined ? src.take(`${B}.location.longitude`, 'building.site.lon') : null,
       name: isObj(location) && location.name !== undefined ? src.take(`${B}.location.name`, 'building.site.name') : null,
       exposure: src.take(`${B}.openings.site_exposure`, 'building.site.exposure') ?? null,
+      ground: { method: 'annual_mean_outdoor' as const },
     },
     orientation_deg: orientation,
     reported_floor_area_m2: src.take(`${B}.reported_gia`, 'building.reported_floor_area_m2') ?? null,
     thermal_bridging: {
       mode: src.take(`${B}.thermal_bridges.mode`, 'building.thermal_bridging.mode') ?? null,
-      multiplier: src.take(`${B}.thermal_bridges.multiplier`, 'building.thermal_bridging.multiplier') ?? null,
+      // Today's auto mode reads a missing multiplier as 1 (thermalBridges.js 182); the document states it.
+      multiplier: src.take(`${B}.thermal_bridges.multiplier`, 'building.thermal_bridging.multiplier')
+        ?? (src.get(`${B}.thermal_bridges.mode`) === 'iso14683_auto' ? TODAY.bridging_multiplier : null),
       alpha_pct: src.take(`${B}.fabric.thermal_bridging_alpha_pct`, 'building.thermal_bridging.alpha_pct') ?? null,
     },
     thermal_mass: {
