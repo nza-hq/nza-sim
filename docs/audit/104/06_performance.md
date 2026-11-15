@@ -14,7 +14,23 @@
 | 50 rooms, ten per floor over five floors (Engine 2) | 50 | 265 | 1485 | 1859.8 ms | 1318.0 ms | 2 s in a worker | **pass** |
 
 - **The five-storey case misses on this machine.** Across the session's repeated worker runs its median ranged from 167 to 219 ms (the fastest single run was 141 ms).
-- **Escalation, per decision 6.** A miss is an escalation. The next step is the same script on IT15 in Edge, which is the machine the tool is used on. Its numbers are to be added here at the close (Part 7).
+- **Escalation, per decision 6.** A miss is an escalation. To resolve it, the same script was run on IT15 in Edge, the machine the tool is used on (below).
+
+## On IT15 (15 Nov 2026, 19:35)
+
+- **Machine:** Intel Core Ultra 9 285H, 16 CPUs, mains power, Windows Balanced plan, Node 24.18, Edge 157.
+- **Code:** a separate worktree at ab1794f, with the anchor EPW copied in and no database.
+- **Runs:** three consecutive runs of `scripts/104_perf.mts` with `PW_EXECUTABLE` set to Edge. Each exited cleanly with no errors.
+
+| Case | Worker median, runs 1 / 2 / 3 | Node median, runs 1 / 2 / 3 | Budget | Verdict |
+|---|---|---|---|---|
+| One zone | 17.9 / 17.8 / 19.9 ms | 17.9 / 17.5 / 16.3 ms | 100 ms | **pass** |
+| Five storeys | 85.2 / 81.6 / 98.1 ms | 73.2 / 75.0 / 77.6 ms | 150 ms | **pass** |
+| 50 rooms | 581 / 576 / 608 ms | 607 / 606 / 608 ms | 2 s | **pass** |
+
+- **Every budget is met on IT15, with room to spare:** the five-storey case at under two-thirds of its budget, and the 50-room case at under a third.
+- **The totals are the same as the container's.** The one-zone and five-storey cooling totals differ between Node and Edge in the last binary digit, as noted above. The 50-room totals are bit-identical there.
+- **Decision 6 is met on the target machine.** The container miss is the slower cloud machine.
 
 ## Totals, Node against the browser
 
