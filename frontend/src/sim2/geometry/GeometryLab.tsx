@@ -1,230 +1,178 @@
 /**
- * Sim2 geometry prototype (route /sim2/geometry): draw a footprint, cut it into zones, click a wall and put N equal
- * windows on it; the page writes the Simulate v2 model document and checks it against the schema as you go.
+ * Sim2 geometry prototype (route /sim2/geometry). Dressed and driven like decodED's room editor (inside/RoomEditor.tsx):
+ * a plan on paper with a grid, a floating box on the left, a card on the right for the thing in hand, the tool bar
+ * along the bottom with one line above it saying what the tool does, and a note at the pointer when something can't be
+ * done (never refused in silence).
  *
- * Drawing is decodED's (ported/drawCore.ts, ported/zones.ts): tap corners; from the third corner a side lands square
- * to the first side when it is close to square, otherwise it stays where you put it, so diagonals are as easy as right
- * angles; Shift = any angle, no snapping; tap the first corner (or Enter) to finish; Backspace takes back a corner; a
- * tap that would cross a side is refused and says so at the pointer. While drawing, type a length and press Enter to
- * place the next corner that far along the pointer's direction.
+ *   - Rectangle / Triangle: press and drag. Corners land on a 0.5 m grid, square to the grid (Shift: 0.1 m). The first
+ *     shape is the building; the next ones join it (an L, a T, a wing).
+ *   - Shape: tap corners (decodED's drawing core: near-square sides snap square, diagonals stay put; Shift: any angle),
+ *     each tap on the 0.5 m grid; tap the first corner to finish.
+ *   - Cut out: drag a box over the building to take that piece away.
+ *   - Select: drag the building to move it; drag a corner; the + between corners adds one; double-click a corner to take
+ *     it away; the round orange handle turns the building (snaps to 15°, Shift: free). Click a wall for its windows,
+ *     click inside for its zone.
+ *   - Split: tap two points on the walls to split a zone in two (decodED's zone cut).
  *
- * Nothing is saved and nothing in today's tool reads this page.
+ * Nothing is saved, and nothing in today's tool reads this page.
  */
-import { type PointerEvent as RPointerEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { CLICK_SLOP_PX, CLOSE_PX, SNAP_PX, type Square, createDrawCore, rectFrom, snapToTargets, squareTo } from './ported/drawCore'
-import { type Hit, ccw, cutZones, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
+import { type PointerEvent as RPointerEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import './lab.css'
+import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
+import { type Hit, ccw, cutZones, labelAt, nearestEdge, zoneAt, zoneTint } from './ported/zones'
 import { type Plan, type WindowSet, type XY, allWindows, along, compass16, dist, emptyPlan, layoutSet, wallRuns, zoneArea } from './plan'
+import { addShape, boxRing, centreOf, cutShape, moveBy, setRing, snapXY, triRing, turnBy } from './outline'
 import { buildDocument } from './toDocument'
 
-type Tool = 'draw' | 'rect' | 'cut' | 'select'
+type Tool = 'select' | 'rect' | 'tri' | 'shape' | 'cut' | 'split'
 type Sel = { kind: 'wall'; index: number } | { kind: 'zone'; id: string } | null
-type View = { cx: number; cy: number; s: number }
+type View = { cx: number; cy: number; k: number }
+type Drag =
+  | { kind: 'pan'; x: number; y: number; v: View; moved: boolean }
+  | { kind: 'box'; a: XY; b: XY }
+  | { kind: 'move'; start: XY; base: Plan; d: XY; moved: boolean }
+  | { kind: 'corner'; i: number; base: Plan; ring: XY[] }
+  | { kind: 'turn'; start: XY; c: XY; base: Plan; rad: number }
 
-const NAVY = '#2B2A4C'
-const MAGENTA = '#E84393'
-const TEAL = '#00AEEF'
-const GLASS = '#4FC3F7'
-const f1 = (n: number) => (Math.round(n * 10) / 10).toFixed(1)
-const f2 = (n: number) => (Math.round(n * 100) / 100).toFixed(2)
+const TOOLS: Array<{ key: Tool; name: string; glyph: string; line: string }> = [
+  { key: 'select', name: 'Select', glyph: '➚', line: 'Drag the building to move it, a corner to reshape, the orange dot to turn. Click a wall for windows.' },
+  { key: 'rect', name: 'Rectangle', glyph: '▭', line: 'Press and drag a box. It snaps to the 0.5 m grid. Another box joins the building.' },
+  { key: 'tri', name: 'Triangle', glyph: '◺', line: 'Press and drag. The square corner is where you start.' },
+  { key: 'shape', name: 'Shape', glyph: '⬠', line: 'Tap each corner. Tap the first corner to finish. Shift: any angle.' },
+  { key: 'cut', name: 'Cut out', glyph: '⊟', line: 'Drag a box over the building to take that piece away.' },
+  { key: 'split', name: 'Split', glyph: '✂', line: 'Tap a point on one wall, then on another, to split a zone in two.' },
+]
+const LEFT = 328
+const GRID = 0.5
+const FINE = 0.1
+const GRAB = 9
+const TURN_PX = 34
+const EXAMPLE: XY[] = [[0, 0], [30, 0], [30, 10], [20, 10], [20, 24], [10, 24], [10, 10], [0, 10]]
 
-const EXAMPLE: XY[] = [[0, 0], [24, 0], [24, 8], [16, 16], [8, 16], [8, 8], [0, 8]]
-
-const HINT: Record<Tool, string> = {
-  draw: 'Tap corners. Diagonals stay where you put them; near-square sides snap square. Shift: any angle. Type a length + Enter for an exact side. Tap the first corner or press Enter to finish.',
-  rect: 'Tap the two ends of one side (any angle), then tap how deep it goes.',
-  cut: 'Tap a point on a wall, then another, to cut a zone in two. "Square off a wall" cuts at 90° from the first tap.',
-  select: 'Click a wall to add windows. Click inside a zone to rename it. Drag to pan, wheel to zoom.',
-}
+const f1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const f2 = (n: number) => (Math.round(n * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export default function GeometryLab() {
-  // ─── plan + history ──────────────────────────────────────────────────────────
+  // ─── the plan, with Undo ───────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>(emptyPlan)
-  const past = useRef<Plan[]>([])
-  const future = useRef<Plan[]>([])
-  const [, bump] = useState(0)
-  const commit = useCallback((next: Plan) => {
-    setPlan((cur) => {
-      past.current.push(cur)
-      future.current = []
-      return next
-    })
-  }, [])
+  const [past, setPast] = useState<Plan[]>([])
+  const [future, setFuture] = useState<Plan[]>([])
+  const commit = (next: Plan) => {
+    setPast((p) => [...p.slice(-100), plan])
+    setFuture([])
+    setPlan(next)
+  }
   const undo = () => {
-    const p = past.current.pop()
-    if (!p) return
-    future.current.push(plan)
-    setPlan(p)
-    bump((n) => n + 1)
+    const prev = past[past.length - 1]
+    if (!prev) return
+    setFuture((f) => [...f, plan])
+    setPast((p) => p.slice(0, -1))
+    setPlan(prev)
+    setSel(null)
   }
   const redo = () => {
-    const n = future.current.pop()
-    if (!n) return
-    past.current.push(plan)
-    setPlan(n)
-    bump((x) => x + 1)
+    const next = future[future.length - 1]
+    if (!next) return
+    setPast((p) => [...p, plan])
+    setFuture((f) => f.slice(0, -1))
+    setPlan(next)
+    setSel(null)
   }
 
-  const [tool, setTool] = useState<Tool>('draw')
-  const [square, setSquare] = useState<Square>('soft')
-  const [cutWay, setCutWay] = useState<'free' | 'square'>('free')
+  const [tool, setTool] = useState<Tool>('rect')
   const [sel, setSel] = useState<Sel>(null)
-  const [view, setView] = useState<View>({ cx: 12, cy: 8, s: 22 })
-  const [size, setSize] = useState({ w: 900, h: 640 })
+  const [drag, setDrag] = useState<Drag | null>(null)
   const [pointer, setPointer] = useState<XY | null>(null)
   const [shift, setShift] = useState(false)
-  const [typed, setTyped] = useState('')
-  const [note, setNote] = useState<{ text: string; at: XY } | null>(null)
-  const [rectPts, setRectPts] = useState<XY[]>([])
+  const [say, setSay] = useState<{ x: number; y: number; text: string; bad?: boolean } | null>(null)
   const [cutFrom, setCutFrom] = useState<Hit | null>(null)
   const [showJson, setShowJson] = useState(false)
-
-  // ─── the drawing core (decodED's) ───────────────────────────────────────────
-  const core = useMemo(() => createDrawCore({ kind: 'area', square, strictRing: true }), [square])
+  const [size, setSize] = useState<[number, number]>([1400, 900])
+  const [view, setView] = useState<View>({ cx: 15, cy: 10, k: 22 })
+  const host = useRef<HTMLDivElement>(null)
+  const core = useMemo(() => createDrawCore({ kind: 'area', square: 'soft', strictRing: true }), [])
   const cs = useSyncExternalStore(core.subscribe, core.state)
 
-  // ─── view ────────────────────────────────────────────────────────────────────
-  const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const el = box.current
+    const el = host.current
     if (!el) return
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }))
+    const ro = new ResizeObserver(() => setSize([el.clientWidth || 1400, el.clientHeight || 900]))
     ro.observe(el)
-    setSize({ w: el.clientWidth, h: el.clientHeight })
+    setSize([el.clientWidth || 1400, el.clientHeight || 900])
     return () => ro.disconnect()
   }, [])
-  const toPx = (p: XY): [number, number] => [size.w / 2 + (p[0] - view.cx) * view.s, size.h / 2 - (p[1] - view.cy) * view.s]
-  const toM = (x: number, y: number): XY => [(x - size.w / 2) / view.s + view.cx, -(y - size.h / 2) / view.s + view.cy]
-  const mPerPx = 1 / view.s
+  useEffect(() => {
+    if (!say) return
+    const t = setTimeout(() => setSay(null), say.bad ? 2600 : 1800)
+    return () => clearTimeout(t)
+  }, [say])
+
+  const narrow = size[0] < 760
+  const mid: [number, number] = narrow ? [size[0] / 2, size[1] * 0.3] : [LEFT + (size[0] - LEFT) / 2, size[1] / 2 - 30]
+  const toPx = (p: XY): [number, number] => [mid[0] + (p[0] - view.cx) * view.k, mid[1] - (p[1] - view.cy) * view.k]
+  const toM = (x: number, y: number): XY => [(x - mid[0]) / view.k + view.cx, -(y - mid[1]) / view.k + view.cy]
+  const mPerPx = 1 / view.k
+  const step = shift ? FINE : GRID
+  const tell = (at: XY, text: string, bad = false) => {
+    const [x, y] = toPx(at)
+    setSay({ x: x + 14, y: y - 34, text, bad })
+  }
+
+  const fitTo = (ring: readonly XY[]) => {
+    const xs = ring.map((p) => p[0])
+    const ys = ring.map((p) => p[1])
+    const w = Math.max(...xs) - Math.min(...xs) || 1
+    const h = Math.max(...ys) - Math.min(...ys) || 1
+    const room = narrow ? [size[0] - 60, size[1] * 0.45] : [size[0] - LEFT - 380, size[1] - 260]
+    setView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, k: Math.max(4, Math.min(60, room[0] / w, room[1] / h)) })
+  }
 
   const runs = useMemo(() => wallRuns(plan.footprint), [plan.footprint])
   const built = useMemo(() => buildDocument(plan), [plan])
   const placed = useMemo(() => allWindows(plan).windows, [plan])
   const rings = plan.zones.map((z) => z.ring)
+  // What is on screen while a drag is live (the plan itself changes only when the pointer comes up: one Undo step).
+  const shown: Plan = drag?.kind === 'move' ? moveBy(drag.base, drag.d) : drag?.kind === 'turn' ? turnBy(drag.base, drag.rad, drag.c) : drag?.kind === 'corner' ? { ...drag.base, footprint: drag.ring, zones: [{ ...(drag.base.zones[0] ?? { id: 'z1', name: 'Zone 1' }), ring: drag.ring }] } : plan
+  const shownRuns = drag ? wallRuns(shown.footprint) : runs
 
-  const flash = (text: string, at: XY) => {
-    setNote({ text, at })
-    window.setTimeout(() => setNote((n) => (n && n.text === text ? null : n)), 2600)
+  const apply = (r: ReturnType<typeof addShape>, at: XY) => {
+    if ('why' in r) return tell(at, r.why, true)
+    const first = !plan.footprint
+    commit(r.plan)
+    if (r.said) tell(at, r.said)
+    if (first && r.plan.footprint) setSel(null)
   }
 
-  // ─── where the next corner would land (the core's own rules, without placing it) ───
-  const preview = useMemo((): { at: XY; snap: string; closing: boolean } | null => {
-    if (!pointer) return null
-    if (tool === 'draw') {
-      const c = cs.corners
-      const n = c.length
-      if (n && dist(c[0] as XY, pointer) <= CLOSE_PX * mPerPx && n >= 3) return { at: c[0] as XY, snap: 'close', closing: true }
-      if (shift) return { at: pointer, snap: 'free', closing: false }
-      const t = snapToTargets(pointer, { corners: c.slice(1, -1) as XY[] }, SNAP_PX * mPerPx)
-      if (t) return { at: t.at, snap: t.snap, closing: false }
-      if (n >= 2) {
-        const sq = squareTo(c, pointer, square)
-        if (sq && dist(sq, c[n - 1] as XY) >= mPerPx * 0.5) return { at: sq, snap: 'square', closing: false }
-      }
-      return { at: pointer, snap: 'free', closing: false }
-    }
-    return { at: pointer, snap: 'free', closing: false }
-  }, [pointer, tool, cs.corners, shift, square, mPerPx])
-
-  /** The typed length, applied along the preview's direction. */
-  const typedAt = (): XY | null => {
-    const len = Number(typed)
-    const c = cs.corners
-    if (!typed || !(len > 0) || !c.length || !preview) return null
-    const last = c[c.length - 1] as XY
-    const d = dist(last, preview.at)
-    if (d < 1e-9) return null
-    return [last[0] + ((preview.at[0] - last[0]) / d) * len, last[1] + ((preview.at[1] - last[1]) / d) * len]
+  // ─── hit tests (screen pixels) ─────────────────────────────────────────────
+  const fp = shown.footprint
+  const turnHandle = (): { at: [number, number]; c: XY } | null => {
+    if (!fp) return null
+    const pts = fp.map(toPx)
+    const top = Math.min(...pts.map((p) => p[1]))
+    const cx = (Math.min(...pts.map((p) => p[0])) + Math.max(...pts.map((p) => p[0]))) / 2
+    return { at: [cx, top - TURN_PX], c: centreOf(fp) }
   }
-
-  // ─── actions ─────────────────────────────────────────────────────────────────
-  const setFootprint = (shape: XY[]) => {
-    const fp = ccw(shape)
-    // Fit the new footprint in view (leaving room for the hint above and the toolbar below).
-    const xs = fp.map((p) => p[0])
-    const ys = fp.map((p) => p[1])
-    const w = Math.max(...xs) - Math.min(...xs) || 1
-    const h = Math.max(...ys) - Math.min(...ys) || 1
-    const fit = Math.min((size.w - 80) / w, (size.h - 180) / h)
-    setView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, s: Math.max(3, Math.min(view.s, fit)) })
-    commit({ ...emptyPlan(), storey_height_m: plan.storey_height_m, footprint: fp, zones: [{ id: 'z1', name: 'Zone 1', ring: fp }], zone_next: 2 })
-    core.reset()
-    setRectPts([])
-    setTool('select')
-    setSel(null)
-    setTyped('')
+  const cornerAt = (x: number, y: number) => (fp ? fp.findIndex((p) => Math.hypot(toPx(p)[0] - x, toPx(p)[1] - y) <= GRAB) : -1)
+  const plusAt = (x: number, y: number) => {
+    if (!fp) return -1
+    return fp.findIndex((a, i) => {
+      const b = fp[(i + 1) % fp.length]!
+      const [ax, ay] = toPx(a)
+      const [bx, by] = toPx(b)
+      if (Math.hypot(bx - ax, by - ay) < 40 || plan.windows.some((w) => w.wall === i)) return false
+      return Math.hypot((ax + bx) / 2 - x, (ay + by) / 2 - y) <= GRAB
+    })
   }
-
-  const drawTap = (at: XY, free: boolean) => {
-    if (plan.footprint) return flash('There is already a footprint. Clear all to draw a new one.', at)
-    const o = core.tap(at, { mPerPx, shift: free })
-    if (o.kind === 'refused') flash(o.message, o.at)
-    else if (o.kind === 'finished') setFootprint(o.shape)
-    setTyped('')
-  }
-
-  const finishDraw = () => {
-    const o = core.finish(mPerPx)
-    if (o.kind === 'refused') flash(o.message, o.at)
-    else if (o.kind === 'finished') setFootprint(o.shape)
-  }
-
-  const cutHit = (p: XY) => nearestEdge(rings, p, SNAP_PX * 1.5 * mPerPx, SNAP_PX * mPerPx)
-
-  const doCut = (a: XY, b: XY) => {
-    const r = cutZones(rings, a, b)
-    if ('why' in r) return flash(r.why, b)
-    const old = plan.zones[r.at]!
-    const parts = [r.zones[r.at]!, r.zones[r.at + 1]!].sort((x, y) => Math.abs(zoneArea({ ...old, ring: y })) - Math.abs(zoneArea({ ...old, ring: x })))
-    const n = plan.zone_next
-    const zones = [...plan.zones]
-    zones.splice(r.at, 1, { ...old, ring: parts[0]! }, { id: `z${n}`, name: `Zone ${n}`, ring: parts[1]! })
-    commit({ ...plan, zones, zone_next: n + 1 })
-    setCutFrom(null)
-  }
-
-  const click = (at: XY, e: { shiftKey: boolean }) => {
-    if (tool === 'draw') return drawTap(at, e.shiftKey)
-    if (tool === 'rect') {
-      if (plan.footprint) return flash('There is already a footprint. Clear all to draw a new one.', at)
-      const pts = [...rectPts, at]
-      if (pts.length < 3) return setRectPts(pts)
-      const r = rectFrom(pts[0]!, pts[1]!, pts[2]!)
-      if (!r) {
-        setRectPts([])
-        return flash('Tap further from the first side', at)
-      }
-      return setFootprint(r)
-    }
-    if (tool === 'cut') {
-      if (!plan.zones.length) return flash('Draw a footprint first', at)
-      const h = cutHit(at)
-      if (!h) return flash('Tap on a wall or a zone line', at)
-      if (!cutFrom) {
-        if (cutWay === 'square') {
-          const end = squareCut(rings, h, null)
-          if (!end) return flash('No straight line across from there', at)
-          return doCut(h.p, end)
-        }
-        return setCutFrom(h)
-      }
-      return doCut(cutFrom.p, h.p)
-    }
-    // select
-    const wall = nearestWall(at)
-    if (wall != null) return setSel({ kind: 'wall', index: wall })
-    const zi = zoneAt(rings, at)
-    setSel(zi >= 0 ? { kind: 'zone', id: plan.zones[zi]!.id } : null)
-  }
-
-  const nearestWall = (p: XY): number | null => {
+  const wallAt = (x: number, y: number): number | null => {
     let best: number | null = null
-    let bd = 10 * mPerPx
-    for (const r of runs) {
-      const dx = r.b[0] - r.a[0]
-      const dy = r.b[1] - r.a[1]
-      const L2 = dx * dx + dy * dy || 1
-      const t = Math.max(0, Math.min(1, ((p[0] - r.a[0]) * dx + (p[1] - r.a[1]) * dy) / L2))
-      const d = dist(p, [r.a[0] + dx * t, r.a[1] + dy * t])
+    let bd = 7
+    for (const r of shownRuns) {
+      const [ax, ay] = toPx(r.a)
+      const [bx, by] = toPx(r.b)
+      const dx = bx - ax
+      const dy = by - ay
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)))
+      const d = Math.hypot(x - (ax + dx * t), y - (ay + dy * t))
       if (d < bd) {
         bd = d
         best = r.index
@@ -232,461 +180,553 @@ export default function GeometryLab() {
     }
     return best
   }
+  const insideAt = (p: XY) => (fp ? zoneAt([fp], p) === 0 : false)
 
-  // ─── pointer ─────────────────────────────────────────────────────────────────
-  const down = useRef<{ x: number; y: number; view: View; pan: boolean } | null>(null)
+  // ─── pointer ───────────────────────────────────────────────────────────────
   const local = (e: RPointerEvent) => {
-    const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect()
-    return { x: e.clientX - r.left, y: e.clientY - r.top }
+    const r = (e.currentTarget as Element).getBoundingClientRect()
+    return [e.clientX - r.left, e.clientY - r.top] as [number, number]
   }
   const onDown = (e: RPointerEvent<SVGSVGElement>) => {
-    const { x, y } = local(e)
+    if (e.button === 2) return
+    const [x, y] = local(e)
+    const m = toM(x, y)
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    down.current = { x, y, view, pan: tool === 'select' || e.button === 1 }
+    setShift(e.shiftKey)
+    if (e.button === 1) return setDrag({ kind: 'pan', x, y, v: view, moved: false })
+    if (tool === 'rect' || tool === 'tri' || tool === 'cut') {
+      const a = snapXY(m, e.shiftKey ? FINE : GRID)
+      return setDrag({ kind: 'box', a, b: a })
+    }
+    if (tool === 'select' && plan.footprint) {
+      const th = turnHandle()
+      if (th && Math.hypot(th.at[0] - x, th.at[1] - y) <= GRAB + 3) return setDrag({ kind: 'turn', start: m, c: th.c, base: plan, rad: 0 })
+      const ci = cornerAt(x, y)
+      if (ci >= 0) return setDrag({ kind: 'corner', i: ci, base: plan, ring: plan.footprint.map((p) => [p[0], p[1]] as XY) })
+      const pi = plusAt(x, y)
+      if (pi >= 0) {
+        const ring = plan.footprint.map((p) => [p[0], p[1]] as XY)
+        ring.splice(pi + 1, 0, snapXY(m, e.shiftKey ? FINE : GRID))
+        return setDrag({ kind: 'corner', i: pi + 1, base: plan, ring })
+      }
+      if (wallAt(x, y) == null && insideAt(m)) return setDrag({ kind: 'move', start: m, base: plan, d: [0, 0], moved: false })
+    }
+    setDrag({ kind: 'pan', x, y, v: view, moved: false })
   }
   const onMove = (e: RPointerEvent<SVGSVGElement>) => {
-    const { x, y } = local(e)
+    const [x, y] = local(e)
+    const m = toM(x, y)
     setShift(e.shiftKey)
-    setPointer(toM(x, y))
-    const d = down.current
-    if (d && d.pan && Math.hypot(x - d.x, y - d.y) > CLICK_SLOP_PX) {
-      setView({ ...d.view, cx: d.view.cx - (x - d.x) / d.view.s, cy: d.view.cy + (y - d.y) / d.view.s })
+    setPointer(m)
+    if (!drag) return
+    const st = e.shiftKey ? FINE : GRID
+    if (drag.kind === 'pan') {
+      if (!drag.moved && Math.hypot(x - drag.x, y - drag.y) < 4) return
+      setView({ ...drag.v, cx: drag.v.cx - (x - drag.x) / drag.v.k, cy: drag.v.cy + (y - drag.y) / drag.v.k })
+      setDrag({ ...drag, moved: true })
+    } else if (drag.kind === 'box') setDrag({ ...drag, b: snapXY(m, st) })
+    else if (drag.kind === 'move') {
+      const d = snapXY([m[0] - drag.start[0], m[1] - drag.start[1]], st)
+      setDrag({ ...drag, d, moved: drag.moved || Math.hypot(d[0], d[1]) > 0 })
+    } else if (drag.kind === 'corner') {
+      const ring = drag.ring.map((p, i) => (i === drag.i ? snapXY(m, st) : p))
+      setDrag({ ...drag, ring })
+    } else if (drag.kind === 'turn') {
+      let rad = Math.atan2(m[1] - drag.c[1], m[0] - drag.c[0]) - Math.atan2(drag.start[1] - drag.c[1], drag.start[0] - drag.c[0])
+      if (!e.shiftKey) rad = Math.round(rad / (Math.PI / 12)) * (Math.PI / 12)
+      setDrag({ ...drag, rad })
     }
   }
   const onUp = (e: RPointerEvent<SVGSVGElement>) => {
-    const { x, y } = local(e)
-    const d = down.current
-    down.current = null
-    if (!d || Math.hypot(x - d.x, y - d.y) > CLICK_SLOP_PX) return
-    const at = toM(x, y)
-    click(tool === 'draw' && preview ? at : at, e)
+    const [x, y] = local(e)
+    const m = toM(x, y)
+    const d = drag
+    setDrag(null)
+    if (!d) return
+    if (d.kind === 'box') {
+      const ring = tool === 'tri' ? triRing(d.a, d.b) : boxRing(d.a, d.b)
+      if (!ring) return tell(m, tool === 'cut' ? 'Drag a box over the building.' : 'Press and drag to draw.', !(d.a[0] === d.b[0] && d.a[1] === d.b[1]))
+      const r = tool === 'cut' ? cutShape(plan, ring) : addShape(plan, ring)
+      if (!plan.footprint && !('why' in r) && r.plan.footprint) {
+        commit(r.plan)
+        return
+      }
+      return apply(r, d.b)
+    }
+    if (d.kind === 'move') {
+      if (d.moved) return commit(moveBy(d.base, d.d))
+      return click(m, x, y)
+    }
+    if (d.kind === 'turn') {
+      if (Math.abs(d.rad) > 1e-9) commit(turnBy(d.base, d.rad, d.c))
+      return
+    }
+    if (d.kind === 'corner') {
+      const r = setRing(d.base, d.ring)
+      if ('why' in r) return tell(m, r.why, true)
+      if (r.plan.footprint && d.base.footprint && r.plan.footprint.length === d.base.footprint.length && r.plan.footprint.every((p, i) => dist(p, d.base.footprint![i]!) < 1e-9)) return
+      return apply(r, m)
+    }
+    if (d.kind === 'pan' && !d.moved) click(m, x, y, e.shiftKey)
+  }
+  const onDouble = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (tool !== 'select' || !plan.footprint) return
+    const r = (e.currentTarget as Element).getBoundingClientRect()
+    const i = cornerAt(e.clientX - r.left, e.clientY - r.top)
+    if (i < 0) return
+    const res = setRing(plan, plan.footprint.filter((_, j) => j !== i))
+    apply(res, plan.footprint[i]!)
   }
   const onWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect()
+    const r = (e.currentTarget as Element).getBoundingClientRect()
     const x = e.clientX - r.left
     const y = e.clientY - r.top
     const before = toM(x, y)
-    const s = Math.max(3, Math.min(200, view.s * Math.exp(-e.deltaY * 0.0015)))
-    setView({ s, cx: before[0] - (x - size.w / 2) / s, cy: before[1] + (y - size.h / 2) / s })
+    const k = Math.max(3, Math.min(200, view.k * Math.exp(-e.deltaY * 0.0015)))
+    setView({ k, cx: before[0] - (x - mid[0]) / k, cy: before[1] + (y - mid[1]) / k })
   }
 
-  // ─── keys ────────────────────────────────────────────────────────────────────
+  const click = (m: XY, x: number, y: number, sh = false) => {
+    if (tool === 'shape') {
+      const at = sh ? m : snapXY(m, GRID)
+      const o = core.tap(at, { mPerPx, shift: sh })
+      if (o.kind === 'refused') return tell(o.at, o.message, true)
+      if (o.kind === 'finished') {
+        core.reset()
+        const r = addShape(plan, ccw(o.shape))
+        if (!plan.footprint && !('why' in r)) return commit(r.plan)
+        return apply(r, at)
+      }
+      return
+    }
+    if (tool === 'split') {
+      if (!plan.zones.length) return tell(m, 'Draw the building first.', true)
+      const h = nearestEdge(rings, m, SNAP_PX * 1.5 * mPerPx, SNAP_PX * mPerPx)
+      if (!h) return tell(m, 'Tap on a wall.', true)
+      if (!cutFrom) return setCutFrom(h)
+      const r = cutZones(rings, cutFrom.p, h.p)
+      if ('why' in r) return tell(h.p, r.why, true)
+      const old = plan.zones[r.at]!
+      const [big, small] = [r.zones[r.at]!, r.zones[r.at + 1]!].sort((p, q) => zoneArea({ ...old, ring: q }) - zoneArea({ ...old, ring: p }))
+      const n = plan.zone_next
+      const zones = [...plan.zones]
+      zones.splice(r.at, 1, { ...old, ring: big! }, { id: `z${n}`, name: `Zone ${n}`, ring: small! })
+      commit({ ...plan, zones, zone_next: n + 1 })
+      setCutFrom(null)
+      return
+    }
+    if (tool === 'select') {
+      const w = wallAt(x, y)
+      if (w != null) return setSel({ kind: 'wall', index: w })
+      const zi = zoneAt(rings, m)
+      return setSel(zi >= 0 ? { kind: 'zone', id: plan.zones[zi]!.id } : null)
+    }
+  }
+
+  // ─── keys ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest?.('input, textarea, select')) return
       setShift(e.shiftKey)
+      if ((e.target as HTMLElement)?.closest?.('input, textarea, select')) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault()
-        if (tool === 'draw' && cs.corners.length) core.undo()
-        else e.shiftKey ? redo() : undo()
-        return
+        if (tool === 'shape' && cs.corners.length) return void core.undo()
+        return e.shiftKey ? redo() : undo()
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') return void (e.preventDefault(), redo())
-      if (tool === 'draw' && /^[0-9.]$/.test(e.key) && cs.corners.length) return setTyped((t) => (t + e.key).slice(0, 7))
-      if (e.key === 'Backspace' && typed) return setTyped((t) => t.slice(0, -1))
-      if (e.key === 'Enter' && tool === 'draw') {
-        const t = typedAt()
-        if (t) return drawTap(t, true)
-        return finishDraw()
+      if (e.key === 'Enter' && tool === 'shape') {
+        const o = core.finish(mPerPx)
+        if (o.kind === 'refused') return tell(o.at, o.message, true)
+        if (o.kind === 'finished') {
+          core.reset()
+          const r = addShape(plan, ccw(o.shape))
+          return !plan.footprint && !('why' in r) ? commit(r.plan) : apply(r, o.shape[0]!)
+        }
       }
-      if (e.key === 'Backspace' && tool === 'draw') return void core.back()
+      if (e.key === 'Backspace' && tool === 'shape') return void core.back()
       if (e.key === 'Escape') {
         core.clear()
-        setRectPts([])
         setCutFrom(null)
-        setTyped('')
+        setDrag(null)
         setSel(null)
       }
+      const t = TOOLS.find((x) => x.name[0]!.toLowerCase() === e.key.toLowerCase() && !e.ctrlKey && !e.metaKey)
+      if (t && e.key.length === 1) pick(t.key)
     }
-    const onUpKey = (e: KeyboardEvent) => setShift(e.shiftKey)
+    const onKeyUp = (e: KeyboardEvent) => setShift(e.shiftKey)
     window.addEventListener('keydown', onKey)
-    window.addEventListener('keyup', onUpKey)
+    window.addEventListener('keyup', onKeyUp)
     return () => {
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('keyup', onUpKey)
+      window.removeEventListener('keyup', onKeyUp)
     }
   })
 
-  // ─── window form ─────────────────────────────────────────────────────────────
+  const pick = (t: Tool) => {
+    setTool(t)
+    setCutFrom(null)
+    core.reset()
+    if (t !== 'select') setSel(null)
+  }
+
+  // ─── the wall card's form ──────────────────────────────────────────────────
   const selWall = sel?.kind === 'wall' ? runs[sel.index] : undefined
   const selSet = selWall ? plan.windows.find((w) => w.wall === selWall.index) : undefined
   const [form, setForm] = useState({ count: '3', area: '1', height: '1.2', sill: '0.9' })
   useEffect(() => {
-    if (selSet) setForm({ count: String(selSet.count), area: f2(selSet.width_m * selSet.height_m), height: f2(selSet.height_m), sill: f2(selSet.sill_m) })
-  }, [selSet?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (selSet) setForm({ count: String(selSet.count), area: String(Math.round(selSet.width_m * selSet.height_m * 100) / 100), height: String(selSet.height_m), sill: String(selSet.sill_m) })
+  }, [selSet?.id, sel]) // eslint-disable-line react-hooks/exhaustive-deps
   const draft: WindowSet | null = selWall
-    ? { id: selSet?.id ?? `w${selWall.index + 1}`, wall: selWall.index, count: Number(form.count), height_m: Number(form.height), width_m: Number(form.area) / Number(form.height), sill_m: Number(form.sill) }
+    ? { id: selSet?.id ?? `w${Date.now().toString(36)}`, wall: selWall.index, count: Number(form.count), height_m: Number(form.height), width_m: Number(form.area) / Number(form.height), sill_m: Number(form.sill) }
     : null
-  const draftLayout = selWall && draft ? layoutSet(selWall, draft, plan.storey_height_m) : null
-  const applyWindows = () => {
-    if (!draft || !draftLayout || 'why' in draftLayout) return
-    commit({ ...plan, windows: [...plan.windows.filter((w) => w.wall !== draft.wall), draft] })
-  }
-  const removeWindows = () => selWall && commit({ ...plan, windows: plan.windows.filter((w) => w.wall !== selWall.index) })
-
+  const lay = selWall && draft ? layoutSet(selWall, draft, plan.storey_height_m) : null
   const selZone = sel?.kind === 'zone' ? plan.zones.find((z) => z.id === sel.id) : undefined
 
-  // ─── paint ───────────────────────────────────────────────────────────────────
-  const pts = (r: readonly XY[]) => r.map((p) => toPx(p).join(',')).join(' ')
-  const grid = useMemo(() => {
-    const lines: JSX.Element[] = []
-    const step = view.s >= 14 ? 1 : 5
+  // ─── paint ─────────────────────────────────────────────────────────────────
+  const P = (r: readonly XY[]) => r.map((p) => toPx(p).map((n) => n.toFixed(1)).join(',')).join(' ')
+  const grid = (() => {
+    const out: JSX.Element[] = []
+    const g = view.k >= 16 ? 1 : 5
     const [x0, y1] = toM(0, 0)
-    const [x1, y0] = toM(size.w, size.h)
-    for (let x = Math.floor(x0 / step) * step; x <= x1; x += step) {
-      const [px] = toPx([x, 0])
-      lines.push(<line key={`x${x}`} x1={px} x2={px} y1={0} y2={size.h} stroke={x % 5 === 0 ? '#D9DCE1' : '#EEF0F2'} />)
+    const [x1, y0] = toM(size[0], size[1])
+    for (let x = Math.floor(x0 / g) * g; x <= x1; x += g) {
+      const px = toPx([x, 0])[0]
+      out.push(<line key={`x${x}`} className={`gl-gridline${Math.round(x) % 5 === 0 ? ' five' : ''}`} x1={px} x2={px} y1={0} y2={size[1]} />)
     }
-    for (let y = Math.floor(y0 / step) * step; y <= y1; y += step) {
-      const [, py] = toPx([0, y])
-      lines.push(<line key={`y${y}`} y1={py} y2={py} x1={0} x2={size.w} stroke={y % 5 === 0 ? '#D9DCE1' : '#EEF0F2'} />)
+    for (let y = Math.floor(y0 / g) * g; y <= y1; y += g) {
+      const py = toPx([0, y])[1]
+      out.push(<line key={`y${y}`} className={`gl-gridline${Math.round(y) % 5 === 0 ? ' five' : ''}`} y1={py} y2={py} x1={0} x2={size[0]} />)
     }
-    return lines
-  }, [view, size]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const hoverWall = tool === 'select' && pointer ? nearestWall(pointer) : null
-  const label = (a: XY, b: XY, text: string, key: string, out = 14, color = NAVY) => {
+    return out
+  })()
+  const lenLabel = (a: XY, b: XY, key: string, live = false) => {
     const [ax, ay] = toPx(a)
     const [bx, by] = toPx(b)
-    const L = Math.hypot(bx - ax, by - ay) || 1
-    // outside of an anticlockwise ring is to the right in metres = to the left on screen (y flipped)
-    const nx = (by - ay) / L
-    const ny = -(bx - ax) / L
+    const L = Math.hypot(bx - ax, by - ay)
+    if (L < 26) return null
+    // outside of an anticlockwise ring is on the right in metres: on screen (y down) that is (-dy, dx) / L... flipped
+    const nx = -(by - ay) / L
+    const ny = (bx - ax) / L
     return (
-      <text key={key} x={(ax + bx) / 2 - nx * out} y={(ay + by) / 2 - ny * out + 4} textAnchor="middle" fontSize={11} fill={color} style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: 3 }}>
-        {text}
+      <text key={key} className={`gl-len${live ? ' live' : ''}`} x={(ax + bx) / 2 + nx * 15} y={(ay + by) / 2 + ny * 15 + 4} textAnchor="middle">
+        {f1(dist(a, b))} m
       </text>
     )
   }
-
-  const typedPt = tool === 'draw' ? typedAt() : null
-  const ghost = typedPt ?? preview?.at ?? null
+  const hoverWall = tool === 'select' && !drag && pointer ? wallAt(...toPx(pointer)) : null
+  const th = tool === 'select' && fp ? turnHandle() : null
+  const boxGhost = drag?.kind === 'box' ? (tool === 'tri' ? triRing(drag.a, drag.b) : boxRing(drag.a, drag.b)) : null
+  const shapeGhost = tool === 'shape' && pointer && cs.corners.length ? (shift ? pointer : snapXY(pointer, GRID)) : null
+  const closing = tool === 'shape' && shapeGhost && cs.corners.length >= 3 && Math.hypot(toPx(cs.corners[0] as XY)[0] - toPx(shapeGhost)[0], toPx(cs.corners[0] as XY)[1] - toPx(shapeGhost)[1]) <= CLOSE_PX
+  const splitHit = tool === 'split' && pointer ? nearestEdge(rings, pointer, SNAP_PX * 1.5 * mPerPx, SNAP_PX * mPerPx) : null
+  const scaleM = [1, 2, 5, 10, 20, 50].find((s) => s * view.k >= 60) ?? 50
+  const cursor = drag?.kind === 'pan' && drag.moved ? 'grabbing' : drag?.kind === 'move' || drag?.kind === 'turn' ? 'grabbing' : tool === 'select' ? (hoverWall != null ? 'pointer' : pointer && insideAt(pointer) ? 'move' : 'default') : 'crosshair'
+  const tipLine = tool === 'split' && cutFrom ? 'Now tap the other end. Esc to cancel.' : drag?.kind === 'turn' ? `Turned ${Math.round((drag.rad * 180) / Math.PI)}°${shift ? '' : ' (15° steps; Shift: free)'}` : TOOLS.find((t) => t.key === tool)!.line
 
   return (
-    <div className="flex h-screen w-full flex-col bg-off-white text-navy md:flex-row" style={{ fontFamily: 'Stolzl, -apple-system, Segoe UI, Roboto, sans-serif' }}>
-      {/* ─── canvas ─── */}
-      <div className="relative min-h-0 flex-1 overflow-hidden" ref={box}>
-        <svg
-          width={size.w}
-          height={size.h}
-          className="block select-none bg-white"
-          style={{ cursor: tool === 'select' ? (hoverWall != null ? 'pointer' : 'grab') : 'crosshair', touchAction: 'none' }}
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerLeave={() => setPointer(null)}
-          onWheel={onWheel}
-        >
-          {grid}
-          {/* zones */}
-          {plan.zones.map((z, i) => {
-            const t = zoneTint(i)
-            const on = sel?.kind === 'zone' && sel.id === z.id
-            const [lx, ly] = toPx(labelAt(z.ring))
-            return (
-              <g key={z.id}>
-                <polygon points={pts(z.ring)} fill={t.fill} stroke={on ? MAGENTA : t.line} strokeWidth={on ? 2.5 : 1} strokeDasharray={on ? undefined : '5 3'} />
-                <text x={lx} y={ly} textAnchor="middle" fontSize={12} fontWeight={600} fill={NAVY}>{z.name}</text>
-                <text x={lx} y={ly + 14} textAnchor="middle" fontSize={10} fill="#4B5563">{f1(zoneArea(z))} m²</text>
-              </g>
-            )
-          })}
-          {/* footprint walls */}
-          {runs.map((r) => {
-            const on = sel?.kind === 'wall' && sel.index === r.index
-            const hv = hoverWall === r.index
-            const [ax, ay] = toPx(r.a)
-            const [bx, by] = toPx(r.b)
-            return <line key={`w${r.index}`} x1={ax} y1={ay} x2={bx} y2={by} stroke={on ? MAGENTA : hv ? TEAL : NAVY} strokeWidth={on || hv ? 6 : 3} strokeLinecap="round" />
-          })}
-          {runs.map((r) => label(r.a, r.b, `${f1(r.length_m)} m`, `l${r.index}`, 16, '#4B5563'))}
-          {/* windows */}
-          {placed.map((w, i) => {
+    <div className="gl-root" ref={host}>
+      <svg className="gl-svg" width={size[0]} height={size[1]} style={{ cursor }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setPointer(null)} onDoubleClick={onDouble} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()}>
+        {grid}
+        {shown.footprint && <polygon className="gl-floor" points={P(shown.footprint)} />}
+        {shown.zones.map((z, i) => {
+          const on = sel?.kind === 'zone' && sel.id === z.id
+          return <polygon key={z.id} className={`gl-zone${on ? ' on' : ''}`} points={P(z.ring)} fill={zoneTint(i).fill} />
+        })}
+        {shown.zones.length > 1 &&
+          shown.zones.map((z) =>
+            z.ring.map((a, i) => {
+              const b = z.ring[(i + 1) % z.ring.length]!
+              const onShell = shownRuns.some((r) => {
+                const m: XY = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+                const dx = r.b[0] - r.a[0]
+                const dy = r.b[1] - r.a[1]
+                return Math.abs((m[0] - r.a[0]) * dy - (m[1] - r.a[1]) * dx) / (r.length_m || 1) < 0.05 && Math.min(r.a[0], r.b[0]) - 0.05 <= m[0] && m[0] <= Math.max(r.a[0], r.b[0]) + 0.05 && Math.min(r.a[1], r.b[1]) - 0.05 <= m[1] && m[1] <= Math.max(r.a[1], r.b[1]) + 0.05
+              })
+              if (onShell) return null
+              const [ax, ay] = toPx(a)
+              const [bx, by] = toPx(b)
+              return <line key={`${z.id}-${i}`} className="gl-zoneline" x1={ax} y1={ay} x2={bx} y2={by} />
+            }),
+          )}
+        {shown.footprint && <polygon className={`gl-shell${drag && drag.kind !== 'pan' && drag.kind !== 'box' ? ' chosen' : ''}`} points={P(shown.footprint)} />}
+        {hoverWall != null && sel?.kind !== 'wall' && (() => {
+          const r = runs[hoverWall]!
+          return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />
+        })()}
+        {selWall && !drag && <line className="gl-wall-on" x1={toPx(selWall.a)[0]} y1={toPx(selWall.a)[1]} x2={toPx(selWall.b)[0]} y2={toPx(selWall.b)[1]} />}
+        {!drag &&
+          placed.map((w, i) => {
             const r = runs[w.wall]
             if (!r) return null
             const [ax, ay] = toPx(along(r, w.offset_m))
             const [bx, by] = toPx(along(r, w.offset_m + w.width_m))
             return (
-              <g key={`g${i}`}>
-                <line x1={ax} y1={ay} x2={bx} y2={by} stroke={NAVY} strokeWidth={8} strokeLinecap="butt" />
-                <line x1={ax} y1={ay} x2={bx} y2={by} stroke={GLASS} strokeWidth={5} strokeLinecap="butt" />
+              <g key={`w${i}`}>
+                <line className="gl-win" x1={ax} y1={ay} x2={bx} y2={by} />
+                <line className="gl-win-glass" x1={ax} y1={ay} x2={bx} y2={by} />
               </g>
             )
           })}
-          {/* drawing in progress */}
-          {tool === 'draw' && cs.corners.length > 0 && (
-            <g>
-              <polyline points={pts(cs.corners)} fill="none" stroke={MAGENTA} strokeWidth={2.5} />
-              {cs.corners.slice(1).map((c, i) => label(cs.corners[i] as XY, c as XY, `${f1(dist(cs.corners[i] as XY, c as XY))} m`, `dl${i}`))}
-              {ghost && (
-                <>
-                  <line x1={toPx(cs.corners[cs.corners.length - 1] as XY)[0]} y1={toPx(cs.corners[cs.corners.length - 1] as XY)[1]} x2={toPx(ghost)[0]} y2={toPx(ghost)[1]} stroke={MAGENTA} strokeWidth={2} strokeDasharray="6 4" />
-                  {label(cs.corners[cs.corners.length - 1] as XY, ghost, typed ? `${typed} m ↵` : `${f1(dist(cs.corners[cs.corners.length - 1] as XY, ghost))} m${preview?.snap === 'square' ? ' ⟂' : ''}`, 'gl', 14, MAGENTA)}
-                </>
-              )}
-              {cs.refused?.sides.map((i) => {
-                const a = cs.corners[i] as XY
-                const b = cs.corners[(i + 1) % cs.corners.length] as XY
-                return <line key={`bad${i}`} x1={toPx(a)[0]} y1={toPx(a)[1]} x2={toPx(b)[0]} y2={toPx(b)[1]} stroke="#DC2626" strokeWidth={4} />
-              })}
-              {cs.corners.map((c, i) => (
-                <circle key={`c${i}`} cx={toPx(c as XY)[0]} cy={toPx(c as XY)[1]} r={i === 0 ? (preview?.closing ? 9 : 7) : 4.5} fill={i === 0 ? (preview?.closing ? MAGENTA : 'white') : MAGENTA} stroke={MAGENTA} strokeWidth={2} />
-              ))}
+        {shownRuns.map((r) => lenLabel(r.a, r.b, `l${r.index}`, drag?.kind === 'corner'))}
+        {shown.zones.map((z, i) => {
+          const on = sel?.kind === 'zone' && sel.id === z.id
+          const [lx, ly] = toPx(labelAt(z.ring))
+          return (
+            <g key={`zl${z.id}`}>
+              <text className={`gl-zname${on ? ' on' : ''}`} x={lx} y={ly}>{z.name}</text>
+              <text className={`gl-zarea${on ? ' on' : ''}`} x={lx} y={ly + 15}>{f1(zoneArea(z))} m²</text>
             </g>
-          )}
-          {tool === 'rect' && rectPts.length > 0 && pointer && (() => {
-            const r = rectPts.length === 2 ? rectFrom(rectPts[0]!, rectPts[1]!, pointer) : null
-            return (
-              <g>
-                {r ? <polygon points={pts(r)} fill="rgba(232,67,147,0.08)" stroke={MAGENTA} strokeWidth={2} strokeDasharray="6 4" /> : <line x1={toPx(rectPts[0]!)[0]} y1={toPx(rectPts[0]!)[1]} x2={toPx(pointer)[0]} y2={toPx(pointer)[1]} stroke={MAGENTA} strokeWidth={2} strokeDasharray="6 4" />}
-                {!r && label(rectPts[0]!, pointer, `${f1(dist(rectPts[0]!, pointer))} m`, 'rl', 14, MAGENTA)}
-                {r && label(r[1]!, r[2]!, `${f1(dist(r[1]!, r[2]!))} m`, 'rd', 14, MAGENTA)}
-                {rectPts.map((p, i) => <circle key={i} cx={toPx(p)[0]} cy={toPx(p)[1]} r={4.5} fill={MAGENTA} />)}
-              </g>
-            )
-          })()}
-          {tool === 'cut' && pointer && (() => {
-            const h = cutHit(pointer)
-            const sq = !cutFrom && cutWay === 'square' && h ? squareCut(rings, h, null) : null
-            return (
-              <g>
-                {cutFrom && <line x1={toPx(cutFrom.p)[0]} y1={toPx(cutFrom.p)[1]} x2={toPx(h?.p ?? pointer)[0]} y2={toPx(h?.p ?? pointer)[1]} stroke={MAGENTA} strokeWidth={2} strokeDasharray="6 4" />}
-                {sq && h && <line x1={toPx(h.p)[0]} y1={toPx(h.p)[1]} x2={toPx(sq)[0]} y2={toPx(sq)[1]} stroke={MAGENTA} strokeWidth={2} strokeDasharray="6 4" />}
-                {cutFrom && <circle cx={toPx(cutFrom.p)[0]} cy={toPx(cutFrom.p)[1]} r={5} fill={MAGENTA} />}
-                {h && <circle cx={toPx(h.p)[0]} cy={toPx(h.p)[1]} r={h.corner ? 7 : 5} fill="white" stroke={MAGENTA} strokeWidth={2} />}
-              </g>
-            )
-          })()}
-          {/* pointer note (a refusal says why, where it happened) */}
-          {note && (
-            <g>
-              <rect x={toPx(note.at)[0] + 10} y={toPx(note.at)[1] - 30} width={note.text.length * 6.4 + 16} height={22} rx={4} fill="#DC2626" />
-              <text x={toPx(note.at)[0] + 18} y={toPx(note.at)[1] - 15} fontSize={11.5} fill="white">{note.text}</text>
-            </g>
-          )}
-          {/* north + scale */}
-          <g transform={`translate(${size.w - 36},40)`}>
-            <polygon points="0,-18 7,6 0,1 -7,6" fill={NAVY} />
-            <text y={22} textAnchor="middle" fontSize={11} fontWeight={600} fill={NAVY}>N</text>
+          )
+        })}
+
+        {/* select: corners, + between them, the turn handle */}
+        {tool === 'select' && fp && !(drag && (drag.kind === 'move' || drag.kind === 'turn')) && (
+          <g>
+            {fp.map((a, i) => {
+              const b = fp[(i + 1) % fp.length]!
+              const [ax, ay] = toPx(a)
+              const [bx, by] = toPx(b)
+              if (Math.hypot(bx - ax, by - ay) < 40 || drag || plan.windows.some((w) => w.wall === i)) return null
+              const mx = (ax + bx) / 2
+              const my = (ay + by) / 2
+              return (
+                <g key={`p${i}`}>
+                  <circle className="gl-plus" cx={mx} cy={my} r={7} />
+                  <path className="gl-plus-glyph" d={`M${mx - 3.5} ${my}h7M${mx} ${my - 3.5}v7`} />
+                </g>
+              )
+            })}
+            {fp.map((p, i) => <circle key={`c${i}`} className="gl-handle" cx={toPx(p)[0]} cy={toPx(p)[1]} r={6} />)}
           </g>
-          <g transform={`translate(16,${size.h - 20})`}>
-            <line x1={0} x2={5 * view.s} y1={0} y2={0} stroke={NAVY} strokeWidth={2} />
-            <line x1={0} x2={0} y1={-4} y2={4} stroke={NAVY} strokeWidth={2} />
-            <line x1={5 * view.s} x2={5 * view.s} y1={-4} y2={4} stroke={NAVY} strokeWidth={2} />
-            <text x={5 * view.s + 6} y={4} fontSize={11} fill={NAVY}>5 m</text>
+        )}
+        {th && !(drag && drag.kind === 'corner') && (
+          <g>
+            <line className="gl-stalk" x1={th.at[0]} y1={th.at[1] + 10} x2={th.at[0]} y2={th.at[1] + TURN_PX} />
+            <circle className="gl-turn" cx={th.at[0]} cy={th.at[1]} r={10} />
+            <path className="gl-turn-glyph" d={`M${th.at[0] + 4.5} ${th.at[1] - 2} A5 5 0 1 0 ${th.at[0] + 4} ${th.at[1] + 3.2}`} />
+            <path className="gl-turn-glyph" d={`M${th.at[0] + 4.8} ${th.at[1] - 5.5} L${th.at[0] + 4.6} ${th.at[1] - 1.8} L${th.at[0] + 1.2} ${th.at[1] - 2.4}`} />
           </g>
-        </svg>
+        )}
 
-        {/* toolbar */}
-        <div className="absolute bottom-4 left-1/2 flex w-max max-w-[calc(100%-24px)] -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-lg bg-white p-1 shadow-lg" style={{ border: '1px solid #E6E6E6' }}>
-          {(['draw', 'rect', 'cut', 'select'] as Tool[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => {
-                setTool(t)
-                setRectPts([])
-                setCutFrom(null)
-                setTyped('')
-              }}
-              className="rounded-md px-3 py-1.5 text-[12px] font-medium"
-              style={{ background: tool === t ? NAVY : 'transparent', color: tool === t ? 'white' : NAVY }}
-            >
-              {{ draw: 'Shape', rect: 'Rectangle', cut: 'Split / cut', select: 'Select' }[t]}
-            </button>
-          ))}
-          <span className="mx-1 h-5 w-px bg-light-grey" />
-          <button type="button" className="rounded-md px-3 py-1.5 text-[12px]" onClick={() => (tool === 'draw' && cs.corners.length ? core.undo() : undo())}>Undo</button>
-          <button type="button" className="rounded-md px-3 py-1.5 text-[12px]" onClick={() => (tool === 'draw' && cs.canRedo ? core.redo() : redo())}>Redo</button>
-          {tool === 'draw' && cs.corners.length >= 3 && (
-            <button type="button" className="rounded-md px-3 py-1.5 text-[12px] font-medium text-white" style={{ background: MAGENTA }} onClick={finishDraw}>Finish shape</button>
-          )}
+        {/* drawing ghosts */}
+        {boxGhost && (
+          <g>
+            <polygon className={`gl-ghost${tool === 'cut' ? ' cut' : ''}`} points={P(boxGhost)} />
+            {boxGhost.map((a, i) => (i < 2 ? lenLabel(a, boxGhost[(i + 1) % boxGhost.length]!, `bg${i}`, true) : null))}
+          </g>
+        )}
+        {tool === 'shape' && cs.corners.length > 0 && (
+          <g>
+            <polyline className="gl-draw-line" points={P(cs.corners as XY[])} />
+            {(cs.corners as XY[]).slice(1).map((c, i) => lenLabel(cs.corners[i] as XY, c, `dl${i}`))}
+            {shapeGhost && (
+              <>
+                <line className="gl-ghost-line" x1={toPx(cs.corners[cs.corners.length - 1] as XY)[0]} y1={toPx(cs.corners[cs.corners.length - 1] as XY)[1]} x2={toPx(shapeGhost)[0]} y2={toPx(shapeGhost)[1]} />
+                {lenLabel(cs.corners[cs.corners.length - 1] as XY, shapeGhost, 'gl', true)}
+              </>
+            )}
+            {cs.refused?.sides.map((i) => {
+              const a = cs.corners[i] as XY
+              const b = cs.corners[(i + 1) % cs.corners.length] as XY
+              return <line key={`bad${i}`} className="gl-bad-line" x1={toPx(a)[0]} y1={toPx(a)[1]} x2={toPx(b)[0]} y2={toPx(b)[1]} />
+            })}
+            {(cs.corners as XY[]).map((c, i) => <circle key={`sc${i}`} className={`gl-corner${i === 0 ? ' first' : ''}`} cx={toPx(c)[0]} cy={toPx(c)[1]} r={i === 0 ? (closing ? 9 : 7) : 4.5} />)}
+          </g>
+        )}
+        {tool === 'split' && (
+          <g>
+            {cutFrom && <line className="gl-ghost-line" x1={toPx(cutFrom.p)[0]} y1={toPx(cutFrom.p)[1]} x2={toPx(splitHit?.p ?? pointer ?? cutFrom.p)[0]} y2={toPx(splitHit?.p ?? pointer ?? cutFrom.p)[1]} />}
+            {cutFrom && <circle className="gl-corner first" cx={toPx(cutFrom.p)[0]} cy={toPx(cutFrom.p)[1]} r={5} />}
+            {splitHit && <circle className="gl-corner" cx={toPx(splitHit.p)[0]} cy={toPx(splitHit.p)[1]} r={splitHit.corner ? 7 : 5} />}
+          </g>
+        )}
+        {(tool === 'rect' || tool === 'tri' || tool === 'cut') && pointer && !drag && (() => {
+          const s = snapXY(pointer, step)
+          return <circle className="gl-corner" cx={toPx(s)[0]} cy={toPx(s)[1]} r={4} />
+        })()}
+      </svg>
+
+      {say && <div className={`gl-pill${say.bad ? ' bad' : ''}`} style={{ left: say.x, top: say.y }}>{say.text}</div>}
+
+      {/* ─── left: the building ─── */}
+      <aside className="gl-panel gl-left">
+        <div className="gl-head">
+          <h2>Building geometry</h2>
+          <p>Simulate v2 prototype. Nothing here is saved.</p>
         </div>
-        <div className="pointer-events-none absolute left-3 right-14 top-3 max-w-[460px] rounded-md bg-white/95 px-3 py-2 text-[12px] leading-snug shadow" style={{ border: '1px solid #E6E6E6' }}>
-          {HINT[tool]}
-          {tool === 'cut' && cutFrom && <div className="mt-1 font-medium" style={{ color: MAGENTA }}>Now tap the other end. Esc to cancel.</div>}
-        </div>
-      </div>
-
-      {/* ─── side panel ─── */}
-      <aside className="flex max-h-[45vh] w-full shrink-0 flex-col overflow-y-auto bg-white p-4 text-[12px] md:max-h-none md:w-[380px]" style={{ borderLeft: '1px solid #E6E6E6', borderTop: '1px solid #E6E6E6' }}>
-        <div className="text-[16px] font-semibold">Geometry and zoning</div>
-        <div className="mb-3 text-[11px] text-mid-grey">Simulate v2 prototype. Nothing here is saved, and today's tool is unchanged.</div>
-
-        <Section title="Building">
-          <Row label="Storey height">
-            <NumIn value={String(plan.storey_height_m)} onCommit={(v) => v > 0 && commit({ ...plan, storey_height_m: v })} unit="m" />
-          </Row>
-          {tool === 'draw' && (
-            <Row label="Square corners">
-              <select className="rounded border px-1 py-0.5" style={{ borderColor: '#E6E6E6' }} value={square} onChange={(e) => setSquare(e.target.value as Square)}>
-                <option value="soft">When nearly square</option>
-                <option value="strict">Always</option>
-                <option value="off">Never</option>
-              </select>
-            </Row>
-          )}
-          {tool === 'cut' && (
-            <Row label="Cut">
-              <select className="rounded border px-1 py-0.5" style={{ borderColor: '#E6E6E6' }} value={cutWay} onChange={(e) => setCutWay(e.target.value as 'free' | 'square')}>
-                <option value="free">Free line (two taps)</option>
-                <option value="square">Square off a wall (one tap)</option>
-              </select>
-            </Row>
-          )}
-          <div className="mt-2 flex gap-2">
-            {!plan.footprint && (
-              <button type="button" className="rounded border px-2 py-1" style={{ borderColor: '#E6E6E6' }} onClick={() => setFootprint(EXAMPLE)}>
+        <div className="gl-body">
+          {!plan.footprint && (
+            <div className="gl-sec">
+              <p className="gl-say">Press and drag a rectangle to start. Add more rectangles or triangles to make an L or a T, or tap corners with Shape.</p>
+              <button type="button" className="gl-btn quiet" onClick={() => { const r = addShape(plan, EXAMPLE); if (!('why' in r)) { commit(r.plan); fitTo(EXAMPLE); pick('select') } }}>
                 Start from an example
               </button>
-            )}
-            {plan.footprint && (
-              <button type="button" className="rounded border px-2 py-1" style={{ borderColor: '#E6E6E6' }} onClick={() => { commit({ ...emptyPlan(), storey_height_m: plan.storey_height_m }); core.reset(); setSel(null); setTool('draw') }}>
-                Clear all
-              </button>
-            )}
-          </div>
-        </Section>
-
-        {selWall && (
-          <Section title={`Wall ${selWall.index + 1}`} accent>
-            <div className="mb-2 text-dark-grey">
-              {f2(selWall.length_m)} m long, faces {compass16(selWall.azimuth_deg)} ({Math.round(selWall.azimuth_deg)}°), {f1(selWall.length_m * plan.storey_height_m)} m² gross
             </div>
-            <Row label="Number of windows"><NumIn value={form.count} onCommit={(v) => setForm({ ...form, count: String(v) })} live={(s) => setForm({ ...form, count: s })} /></Row>
-            <Row label="Area of each"><NumIn value={form.area} onCommit={(v) => setForm({ ...form, area: String(v) })} live={(s) => setForm({ ...form, area: s })} unit="m²" /></Row>
-            <Row label="Height"><NumIn value={form.height} onCommit={(v) => setForm({ ...form, height: String(v) })} live={(s) => setForm({ ...form, height: s })} unit="m" /></Row>
-            <Row label="Sill height"><NumIn value={form.sill} onCommit={(v) => setForm({ ...form, sill: String(v) })} live={(s) => setForm({ ...form, sill: s })} unit="m" /></Row>
-            <Row label="Spacing"><span>Equal</span></Row>
-            {draft && draftLayout && !('why' in draftLayout) && (
-              <div className="mt-1 text-dark-grey">
-                Each {f2(draft.width_m)} × {f2(draft.height_m)} m, gaps of {f2(draftLayout.gap_m)} m. Glazing {f2(draft.count * draft.width_m * draft.height_m)} m² ({Math.round((100 * draft.count * draft.width_m * draft.height_m) / (selWall.length_m * plan.storey_height_m))}% of this wall).
+          )}
+          {plan.footprint && (
+            <>
+              <div className="gl-sec">
+                <h3>Building <small>{f1(zoneArea({ id: '', name: '', ring: plan.footprint }))} m² · {runs.length} walls</small></h3>
+                <div className="gl-row">
+                  <span>Storey height</span>
+                  <Num value={plan.storey_height_m} unit="m" onCommit={(v) => v > 0 && commit({ ...plan, storey_height_m: v })} />
+                </div>
+                <div className="gl-btns">
+                  <button type="button" className="gl-btn quiet" onClick={() => fitTo(plan.footprint!)}>Fit to screen</button>
+                  <button type="button" className="gl-btn quiet" onClick={() => { commit({ ...emptyPlan(), storey_height_m: plan.storey_height_m }); setSel(null); pick('rect') }}>Clear all</button>
+                </div>
               </div>
-            )}
-            {draftLayout && 'why' in draftLayout && <div className="mt-1 font-medium" style={{ color: '#DC2626' }}>{draftLayout.why}</div>}
-            {selWall && draftLayout && !('why' in draftLayout) && <Elevation length={selWall.length_m} height={plan.storey_height_m} windows={draftLayout.windows} />}
-            <div className="mt-2 flex gap-2">
-              <button type="button" disabled={!draftLayout || 'why' in draftLayout} onClick={applyWindows} className="rounded px-3 py-1.5 font-medium text-white disabled:opacity-40" style={{ background: MAGENTA }}>
-                {selSet ? 'Update windows' : 'Add windows'}
-              </button>
-              {selSet && <button type="button" onClick={removeWindows} className="rounded border px-3 py-1.5" style={{ borderColor: '#E6E6E6' }}>Remove</button>}
-            </div>
-          </Section>
-        )}
-
-        {selZone && (
-          <Section title="Zone" accent>
-            <Row label="Name">
-              <input className="w-40 rounded border px-1 py-0.5" style={{ borderColor: '#E6E6E6' }} defaultValue={selZone.name} key={selZone.id}
-                onBlur={(e) => e.target.value.trim() && e.target.value !== selZone.name && commit({ ...plan, zones: plan.zones.map((z) => (z.id === selZone.id ? { ...z, name: e.target.value.trim() } : z)) })} />
-            </Row>
-            <Row label="Floor area"><span>{f1(zoneArea(selZone))} m²</span></Row>
-            <div className="mt-1 text-[11px] text-mid-grey">Next: assign use, systems and profiles here (and to several zones at once).</div>
-          </Section>
-        )}
-
-        <Section title="Model document">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="rounded px-2 py-0.5 text-[11px] font-semibold text-white" style={{ background: !plan.zones.length ? '#6B7280' : built.ok ? '#16A34A' : '#DC2626' }}>
-              {!plan.zones.length ? 'Nothing drawn yet' : built.ok ? `Valid (schema ${(built.doc as { schema_version: string }).schema_version})` : 'Not valid'}
-            </span>
-          </div>
-          {plan.zones.length > 0 && (
-            <table className="w-full text-[11.5px]">
-              <tbody>
-                <TRow k="Zones" v={`${built.totals.zones} · ${f1(built.totals.floor_m2)} m² floor`} />
-                <TRow k="External walls" v={`${built.totals.walls} · ${f1(built.totals.wall_net_m2)} m² net`} />
-                <TRow k="Glazing" v={`${built.totals.windows} windows · ${f2(built.totals.glazing_m2)} m²`} />
-                <TRow k="Partitions" v={String(built.totals.partitions)} />
-              </tbody>
-            </table>
+              <div className="gl-sec">
+                <h3>Zones <small>{plan.zones.length}</small></h3>
+                <div className="gl-zones">
+                  {plan.zones.map((z, i) => (
+                    <div key={z.id} className="gl-zonerow" aria-selected={sel?.kind === 'zone' && sel.id === z.id} onClick={() => setSel({ kind: 'zone', id: z.id })}>
+                      <span className="gl-sw" style={{ background: zoneTint(i).fill, borderColor: zoneTint(i).line }} />
+                      <input defaultValue={z.name} key={`${z.id}-${z.name}`} onClick={(e) => e.stopPropagation()} onBlur={(e) => e.target.value.trim() && e.target.value !== z.name && commit({ ...plan, zones: plan.zones.map((q) => (q.id === z.id ? { ...q, name: e.target.value.trim() } : q)) })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+                      <small>{f1(zoneArea(z))} m²</small>
+                    </div>
+                  ))}
+                </div>
+                <p className="gl-hint">Split (✂) cuts a zone in two along a line between two walls.</p>
+              </div>
+              <div className="gl-sec">
+                <h3>Model document</h3>
+                <span className={`gl-chip ${built.ok ? 'ok' : 'no'}`}>{built.ok ? `✓ Valid · schema ${(built.doc as { schema_version: string }).schema_version}` : 'Not valid'}</span>
+                <table className="gl-facts">
+                  <tbody>
+                    <tr><td>Floor area</td><td className="n">{f1(built.totals.floor_m2)} m²</td></tr>
+                    <tr><td>External wall (net)</td><td className="n">{f1(built.totals.wall_net_m2)} m²</td></tr>
+                    <tr><td>Windows</td><td className="n">{built.totals.windows} · {f2(built.totals.glazing_m2)} m²</td></tr>
+                    <tr><td>Partitions</td><td className="n">{built.totals.partitions}</td></tr>
+                  </tbody>
+                </table>
+                {built.notes.map((n, i) => <p key={i} className="gl-warn">{n}</p>)}
+                {built.issues.map((x, i) => <p key={i} className="gl-err">{x.path}: {x.message}</p>)}
+                <button type="button" className="gl-btn quiet" onClick={() => setShowJson((s) => !s)}>{showJson ? 'Hide' : 'Show'} the JSON</button>
+                {showJson && <pre className="gl-json">{JSON.stringify(built.doc, null, 1)}</pre>}
+                <p className="gl-hint">Constructions, profiles, systems and weather stay unassigned for now.</p>
+              </div>
+            </>
           )}
-          {built.notes.map((n, i) => <div key={i} className="mt-1 text-[11px]" style={{ color: '#B45309' }}>{n}</div>)}
-          {plan.zones.length > 0 && built.issues.map((x, i) => <div key={i} className="mt-1 text-[11px]" style={{ color: '#DC2626' }}>{x.path}: {x.message}</div>)}
-          {plan.zones.length > 0 && (
-            <div className="mt-2 flex gap-2">
-              <button type="button" className="rounded border px-2 py-1" style={{ borderColor: '#E6E6E6' }} onClick={() => setShowJson((s) => !s)}>{showJson ? 'Hide' : 'Show'} JSON</button>
-              <button type="button" className="rounded border px-2 py-1" style={{ borderColor: '#E6E6E6' }} onClick={() => download(built.doc, plan)}>Download</button>
-            </div>
-          )}
-          {showJson && <pre className="mt-2 max-h-[360px] overflow-auto rounded bg-off-white p-2 text-[10px] leading-tight">{JSON.stringify(built.doc, null, 1)}</pre>}
-          <div className="mt-2 text-[10.5px] leading-snug text-mid-grey">
-            Constructions, profiles, systems and weather are left unassigned on purpose. Window positions travel with the plan (the schema has no place for them yet).
-          </div>
-        </Section>
+        </div>
       </aside>
+
+      {/* ─── right: the thing in hand ─── */}
+      {selWall && (
+        <aside className="gl-panel gl-right">
+          <div className="gl-card-head">
+            <div>
+              <b>Wall {selWall.index + 1}</b>
+              <small>{f2(selWall.length_m)} m · faces {compass16(selWall.azimuth_deg)} ({Math.round(selWall.azimuth_deg)}°)</small>
+            </div>
+            <button type="button" className="gl-x" aria-label="Close" onClick={() => setSel(null)}>×</button>
+          </div>
+          <div className="gl-body">
+            <div className="gl-sec">
+              <h3>Windows <small>spaced equally</small></h3>
+              <div className="gl-row"><span>How many</span><Num value={form.count} onChange={(s) => setForm({ ...form, count: s })} /></div>
+              <div className="gl-row"><span>Area of each</span><Num value={form.area} unit="m²" onChange={(s) => setForm({ ...form, area: s })} /></div>
+              <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" onChange={(s) => setForm({ ...form, height: s })} /></div>
+              <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" onChange={(s) => setForm({ ...form, sill: s })} /></div>
+              {lay && 'why' in lay && <p className="gl-err">{lay.why}</p>}
+              {draft && lay && !('why' in lay) && (
+                <>
+                  <p className="gl-hint">
+                    Each {f2(draft.width_m)} m wide, {f2(lay.gap_m)} m apart. {f2(draft.count * draft.width_m * draft.height_m)} m² of glass, {Math.round((100 * draft.count * draft.width_m * draft.height_m) / (selWall.length_m * plan.storey_height_m))}% of this wall.
+                  </p>
+                  <Elevation length={selWall.length_m} height={plan.storey_height_m} windows={lay.windows} />
+                </>
+              )}
+              <div className="gl-btns">
+                <button type="button" className="gl-btn orange" disabled={!lay || 'why' in lay} onClick={() => draft && lay && !('why' in lay) && commit({ ...plan, windows: [...plan.windows.filter((w) => w.wall !== draft.wall), draft] })}>
+                  {selSet ? 'Update windows' : 'Add windows'}
+                </button>
+                {selSet && <button type="button" className="gl-btn quiet" onClick={() => commit({ ...plan, windows: plan.windows.filter((w) => w.wall !== selWall.index) })}>Remove</button>}
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+      {selZone && (
+        <aside className="gl-panel gl-right">
+          <div className="gl-card-head">
+            <div>
+              <b>{selZone.name}</b>
+              <small>{f1(zoneArea(selZone))} m² · ground floor</small>
+            </div>
+            <button type="button" className="gl-x" aria-label="Close" onClick={() => setSel(null)}>×</button>
+          </div>
+          <div className="gl-body">
+            <div className="gl-sec">
+              <p className="gl-hint">Next in the prototype: rooms inside this zone (decodED's room editor), then choose several rooms or zones and assign a use, a heating or cooling system and an occupancy profile in one go.</p>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* ─── bottom: tools ─── */}
+      <p className="gl-tip">{tipLine}</p>
+      <div className="gl-bar" role="toolbar" aria-label="Drawing tools">
+        {TOOLS.map((t) => (
+          <button key={t.key} type="button" className="gl-tool" aria-pressed={tool === t.key} title={`${t.name} (${t.name[0]})`} onClick={() => pick(t.key)} disabled={(t.key === 'split' || t.key === 'cut' || t.key === 'select') && !plan.footprint}>
+            <span>{t.glyph}</span>
+            {t.name}
+          </button>
+        ))}
+        <span className="gl-sep" />
+        <button type="button" className="gl-tool" onClick={undo} disabled={!past.length}><span>↶</span>Undo</button>
+        <button type="button" className="gl-tool" onClick={redo} disabled={!future.length}><span>↷</span>Redo</button>
+      </div>
+      <div className="gl-compass">
+        <svg width="34" height="40" viewBox="-17 -20 34 40" aria-label="North is up">
+          <circle r="15" fill="#fff" stroke="#DCE2DF" />
+          <path d="M0 -11 L5 2 L0 -1 L-5 2 Z" fill="#235546" />
+          <path d="M0 11 L5 2 L0 -1 L-5 2 Z" fill="#C3CBC7" />
+          <text y="-22" textAnchor="middle" style={{ font: '700 11px var(--gl-detail)', fill: '#235546' }}>N</text>
+        </svg>
+        <div className="gl-scale" style={{ width: scaleM * view.k }}>
+          <i />
+          {scaleM} m
+        </div>
+      </div>
     </div>
   )
 }
 
-function download(doc: unknown, plan: Plan) {
-  const blob = new Blob([JSON.stringify({ document: doc, layout: plan }, null, 2)], { type: 'application/json' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = 'sim2-geometry.json'
-  a.click()
-  URL.revokeObjectURL(a.href)
-}
-
-function Section({ title, children, accent }: { title: string; children: React.ReactNode; accent?: boolean }) {
+function Num({ value, unit, onCommit, onChange }: { value: number | string; unit?: string; onCommit?: (v: number) => void; onChange?: (s: string) => void }) {
+  const [s, setS] = useState(String(value))
+  useEffect(() => setS(String(value)), [value])
   return (
-    <div className="mb-3 rounded-md p-3" style={{ border: `1px solid ${accent ? MAGENTA : '#E6E6E6'}` }}>
-      <div className="mb-2 text-[13px] font-semibold">{title}</div>
-      {children}
-    </div>
-  )
-}
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-1.5 flex items-center justify-between gap-2">
-      <span className="text-dark-grey">{label}</span>
-      {children}
-    </div>
-  )
-}
-function TRow({ k, v }: { k: string; v: string }) {
-  return (
-    <tr>
-      <td className="py-0.5 text-dark-grey">{k}</td>
-      <td className="py-0.5 text-right font-medium">{v}</td>
-    </tr>
-  )
-}
-function NumIn({ value, onCommit, live, unit }: { value: string; onCommit: (v: number) => void; live?: (s: string) => void; unit?: string }) {
-  const [s, setS] = useState(value)
-  useEffect(() => setS(value), [value])
-  return (
-    <span className="flex items-center gap-1">
+    <span className="gl-num">
       <input
-        className="w-20 rounded border px-1 py-0.5 text-right"
-        style={{ borderColor: '#E6E6E6' }}
         inputMode="decimal"
         value={s}
         onChange={(e) => {
           setS(e.target.value)
-          live?.(e.target.value)
+          onChange?.(e.target.value)
         }}
-        onBlur={() => Number.isFinite(Number(s)) && onCommit(Number(s))}
+        onBlur={() => onCommit && Number.isFinite(Number(s)) && onCommit(Number(s))}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       />
-      {unit && <span className="w-5 text-mid-grey">{unit}</span>}
+      {unit && <small>{unit}</small>}
     </span>
   )
 }
 
-/** The wall seen from outside: its length × storey height, the windows on it, the gaps between them. */
+/** The wall seen from outside: length × storey height, its windows, equally spaced. */
 function Elevation({ length, height, windows }: { length: number; height: number; windows: Array<{ offset_m: number; width_m: number; height_m: number; sill_m: number }> }) {
-  const W = 320
-  const s = Math.min(W / length, 90 / height)
+  const W = 258
+  const s = Math.min(W / length, 80 / height)
   const w = length * s
   const h = height * s
+  const x0 = (W - w) / 2
   return (
-    <svg viewBox={`0 0 ${W} ${h + 22}`} className="mt-2 block w-full">
-      <rect x={(W - w) / 2} y={2} width={w} height={h} fill="#EFE9E6" stroke="#A1887F" />
+    <svg className="gl-elev" viewBox={`0 0 ${W} ${h + 20}`}>
+      <rect x={x0} y={2} width={w} height={h} fill="#F2EEE9" stroke="#B7AEA5" />
       {windows.map((x, i) => (
-        <rect key={i} x={(W - w) / 2 + x.offset_m * s} y={2 + h - (x.sill_m + x.height_m) * s} width={x.width_m * s} height={x.height_m * s} fill={GLASS} stroke={NAVY} strokeWidth={1} />
+        <rect key={i} x={x0 + x.offset_m * s} y={2 + h - (x.sill_m + x.height_m) * s} width={x.width_m * s} height={x.height_m * s} fill="#BFDDEC" stroke="#1F2D27" strokeWidth={1} />
       ))}
-      <text x={W / 2} y={h + 17} textAnchor="middle" fontSize={10} fill="#4B5563">Seen from outside · {f2(length)} m × {f2(height)} m</text>
+      <text x={W / 2} y={h + 16} textAnchor="middle" style={{ font: '500 10.5px var(--gl-detail)', fill: '#5E6B65' }}>Seen from outside · {f2(length)} × {f2(height)} m</text>
     </svg>
   )
 }
