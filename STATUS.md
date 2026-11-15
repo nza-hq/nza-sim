@@ -39,6 +39,7 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - Sub-hourly steps: Engine 2's own 1 h step error is ≤0.1 % on Bridgewater and 1.0–1.3 % on BESTEST 900. EnergyPlus moves 9 % on cooling with its own step, so the like-for-like referee is EnergyPlus at 4 steps: −2.3 % / +3.2 %, every storey within 4.3 %.
   - TARP inside convection: the building vs full r2_z goes from +1.1 / +7.9 % to −1.4 / +1.6 %, the worst storey's cooling from 31 % to 17 %, and z5's slab heat from 0.77 to 2.60 MWh (EnergyPlus 3.44). It is 25× too slow at 50 zones (50 s), so it stays an option; a faster factorisation is the follow-up.
   - Roof slab gap attributed: 1.83 MWh inside convection form, 0.52 the rest of EnergyPlus's surface physics, 0.31 not attributed (step, slab discretisation and air temperatures ruled out).
+  - Cooled-room twin with gains (brief deliverable 5): per room within 4.3 % of EnergyPlus with the same coefficients; gain energy equal to four figures.
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 

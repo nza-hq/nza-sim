@@ -109,6 +109,29 @@ Heat into z5 through its floor, MWh a year:
 
 The monthly figures for each pair are in `06_per_floor.json` (`roof_slab_hourly`).
 
+## 4. The cooled-room twin with gains (brief deliverable 5)
+
+The setup:
+
+- Brief 104's cooled room is unchanged: three rooms at Denver, the outer two heated to 20 °C and the middle one cooled to 24 °C.
+- Each room gets one internal gain from `validation/energyplus/105_cooled_room_gains_spec.json`:
+  - west: 8 W/m², evening-heavy every day, 50 % radiant;
+  - middle: 25 W/m², office hours on weekdays and 10 % otherwise, 30 % radiant;
+  - east: 4 W/m², always on, 70 % radiant.
+- Engine 2 reads each gain through `gains.ts` as an equipment profile with its own schedule.
+- EnergyPlus reads it as ElectricEquipment on a Schedule:Compact (`105_cooled_room_gains.py`). Each side expands the schedule itself.
+- Test: `cooled_room_gains.test.ts`. The EnergyPlus results are committed with the sha of both spec files.
+
+| Room | Demand | Gains, Engine 2 / EnergyPlus | Engine 2 vs EnergyPlus, same coefficients | Engine 2 vs EnergyPlus's own (TARP inside) | Engine 2 with TARP vs EnergyPlus's own |
+|---|---|---|---|---|---|
+| west | heating 1.350 MWh | 0.7428 / 0.7428 | **−4.3 %** | +11.9 % | +4.2 % |
+| middle | cooling 2.821 MWh | 1.935 / 1.935 | **+3.3 %** | +1.6 % | −2.8 % |
+| east | heating 1.326 MWh | 0.841 / 0.841 | **−4.0 %** | +12.3 % | +4.6 % |
+
+- The gate (±10 % per room with the same surface coefficients) passes.
+- The gain energy agrees to four figures.
+- TARP again closes most of the difference to EnergyPlus's own convection: about 12 % falls to about 4.5 %.
+
 ## Decisions
 
 - `REFEREE_OPTIONS` is unchanged, so Brief 104's gate numbers stand.
