@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 104 — Simulate v2 Engine 2: several zones solved together, starting from the Bridgewater cooling gap — ACTIVE 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30).**
+First attributes Engine 1's +12 % Bridgewater cooling miss with one-change EnergyPlus runs, then schema 2.2 (interzone surfaces, internal mass), the coupled multi-zone solver, analytic and cooled-room gates, and Bridgewater as five zones against the five-zone referee. No change to today's engine or UI. Brief [`active/104_engine-2.md`](active/104_engine-2.md).
+
 **Brief 103 — Simulate v2 Engine 1: a pure single-zone hourly engine from the model document — CLOSED 15 Nov 2026 on `chris/103-engine-1` (PR open).**
 A pure TypeScript ISO 52016-1 envelope engine (`frontend/src/thermal/engine/`), gated against today's State 1 path by path (0.000 %) and against a like-for-like EnergyPlus referee: heating 89.98 vs 90.46 MWh (−0.5 %), cooling 15.32 vs 13.65 (+12.2 %, open for 104). BESTEST 600/900 run from committed weather, with an EnergyPlus twin; 900 is above range, escalated, not tuned. Independent review addressed. No change to today's engine or UI. Brief [`archive/103_engine-1_COMPLETED.md`](archive/103_engine-1_COMPLETED.md); evidence [`../audit/103/`](../audit/103/), final report [`../audit/103/10_final_report.md`](../audit/103/10_final_report.md).
 
