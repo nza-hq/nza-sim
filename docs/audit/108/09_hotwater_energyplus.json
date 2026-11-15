@@ -1,0 +1,115 @@
+{
+ "source": "validation/energyplus/108_hotwater_referee.py",
+ "spec_sha256": "3a3f7c4af45fb9070e45d21ad0c4defe7e78e45d29f6196cf175e538af62725f",
+ "hotwater_spec_sha256": "258180489d44bacfd983a07032546e7902cfc009355a904f8fab05d5babaa486",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "runs": {
+  "tight": {
+   "warnings": 6,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.8917267284588128,
+     "unmet_hours": 464,
+     "min_c": 15.106463493026919,
+     "peak_heating_w": 931.7027618668023,
+     "max_water_kg_s": 0.019138755980861243,
+     "water_inlet_c_range": [
+      49.94545593248832,
+      50.000000000000014
+     ],
+     "full_flow_steps": 2871,
+     "k_measured_median_w_per_k": 26.722974705637824,
+     "k_measured_range_w_per_k": [
+      26.543787530439072,
+      26.88655112360364
+     ],
+     "rating": {
+      "rated_capacity_w": 907.9520638947415,
+      "rated_average_water_c": 45.0,
+      "water_kg_s": 0.019138755980861243,
+      "k_target_w_per_k": 26.666666666666668,
+      "k_predicted_w_per_k": 26.66666666666667
+     }
+    },
+    "east": {
+     "heat_mwh": 1.8888336642329477,
+     "unmet_hours": 458,
+     "min_c": 15.10198107625547,
+     "peak_heating_w": 931.821321934768,
+     "max_water_kg_s": 0.019138755980861243,
+     "water_inlet_c_range": [
+      49.94545593248832,
+      50.000000000000014
+     ],
+     "full_flow_steps": 2863,
+     "k_measured_median_w_per_k": 26.72306960778468,
+     "k_measured_range_w_per_k": [
+      26.543557856647478,
+      26.892978905392567
+     ],
+     "rating": {
+      "rated_capacity_w": 907.9520638947415,
+      "rated_average_water_c": 45.0,
+      "water_kg_s": 0.019138755980861243,
+      "k_target_w_per_k": 26.666666666666668,
+      "k_predicted_w_per_k": 26.66666666666667
+     }
+    }
+   }
+  },
+  "mild": {
+   "warnings": 6,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.9306575087094617,
+     "unmet_hours": 27,
+     "min_c": 17.810281360100014,
+     "peak_heating_w": 1181.8701608030776,
+     "max_water_kg_s": 0.02631578947368421,
+     "water_inlet_c_range": [
+      49.999999999999986,
+      50.000000000000014
+     ],
+     "full_flow_steps": 366,
+     "k_measured_median_w_per_k": 36.722826348647864,
+     "k_measured_range_w_per_k": [
+      36.60206676316682,
+      36.923815099561345
+     ],
+     "rating": {
+      "rated_capacity_w": 1244.2666500301411,
+      "rated_average_water_c": 45.0,
+      "water_kg_s": 0.02631578947368421,
+      "k_target_w_per_k": 36.666666666666664,
+      "k_predicted_w_per_k": 36.666666666666664
+     }
+    },
+    "east": {
+     "heat_mwh": 1.9276421528340746,
+     "unmet_hours": 26,
+     "min_c": 17.807929629276515,
+     "peak_heating_w": 1181.956705994157,
+     "max_water_kg_s": 0.02631578947368421,
+     "water_inlet_c_range": [
+      49.999999999999986,
+      50.000000000000014
+     ],
+     "full_flow_steps": 367,
+     "k_measured_median_w_per_k": 36.72271464336381,
+     "k_measured_range_w_per_k": [
+      36.60309792679673,
+      36.93011382343277
+     ],
+     "rating": {
+      "rated_capacity_w": 1244.2666500301411,
+      "rated_average_water_c": 45.0,
+      "water_kg_s": 0.02631578947368421,
+      "k_target_w_per_k": 36.666666666666664,
+      "k_predicted_w_per_k": 36.666666666666664
+     }
+    }
+   }
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c"
+}

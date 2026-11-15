@@ -394,3 +394,36 @@ describe('(h) the cooled room at 50/40: rated by the room against rated at the s
     expect(() => runModel(b.doc, W, b.lib, { ...REFEREE_OPTIONS, emitter_rating: 'x' as any })).toThrow('options.emitter_rating: unknown emitter_rating "x"')
   })
 })
+
+describe('(i) against EnergyPlus: a hot-water radiator whose output follows the room (review F1)', () => {
+  it('rated by the room: heating ±10 %, hours below ±20 % or ±50 h, lowest ±1 K; and the rise over the fixed limit matches EnergyPlus\'s', async () => {
+    const { createHash } = await import('node:crypto')
+    const repo = (p: string) => new URL(`../../../../../${p}`, import.meta.url)
+    const specFile = fs.readFileSync(repo('validation/energyplus/108_hotwater_spec.json'))
+    const EP = JSON.parse(fs.readFileSync(repo('docs/audit/108/09_hotwater_energyplus.json'), 'utf8'))
+    const FX = JSON.parse(fs.readFileSync(repo('docs/audit/108/03_cooled_room_capped_energyplus.json'), 'utf8'))  // EnergyPlus at a fixed limit
+    expect(EP.hotwater_spec_sha256).toBe(createHash('sha256').update(specFile).digest('hex'))
+    expect(EP.spec_sha256).toBe(createHash('sha256').update(fs.readFileSync(repo('validation/energyplus/104_cooled_room_spec.json'))).digest('hex'))
+    const HW = JSON.parse(specFile.toString())
+    for (const [name, caps] of Object.entries<Record<string, number>>(HW.cases)) {
+      const { doc, lib } = withEmitters(null, 0, (d) => {
+        d.system_groups[0].design_flow_c = HW.flow_c; d.system_groups[0].design_return_c = HW.return_c
+        for (const z of d.zones) if (caps[z.id]) z.emitters = [{ id: `${z.id}_rad`, kind: 'radiator', count: 1, rated_output_w: caps[z.id], radiant_fraction: HW.radiant_fraction, system_group_id: 'boiler', rated_flow_c: HW.flow_c, rated_return_c: HW.return_c, rated_room_c: HW.rated_room_c, exponent_n: HW.exponent_n }]
+      })
+      const room = runModel(doc, W, lib, REFEREE_OPTIONS), fixed = runModel(doc, W, lib, FIXED)
+      for (const zid of Object.keys(caps)) {
+        const z = room.zones.find((x) => x.zone_id === zid)!, f = fixed.zones.find((x) => x.zone_id === zid)!
+        const p = EP.runs[name].zones[zid], pf = FX.runs[name].zones[zid]
+        // EnergyPlus's radiator ran with the output per kelvin it was rated for (Engine 2's, design / (flow − setpoint)).
+        expect(Math.abs(p.k_measured_median_w_per_k / (caps[zid] / (HW.flow_c - HW.rated_room_c)) - 1)).toBeLessThan(0.01)
+        expect(Math.abs(z.annual.heating_kwh / 1000 / p.heat_mwh - 1), `${name} ${zid} heating`).toBeLessThanOrEqual(0.1)
+        const du = Math.abs(z.annual.unmet_heating_hours! - p.unmet_hours)
+        expect(du <= 50 || du / p.unmet_hours <= 0.2, `${name} ${zid} hours below ${z.annual.unmet_heating_hours} vs ${p.unmet_hours}`).toBe(true)
+        expect(Math.abs(z.annual.min_control_c - p.min_c), `${name} ${zid} lowest`).toBeLessThanOrEqual(1)
+        // The re-rating's own effect: how much warmer the coldest hour gets than at a fixed limit, in each program.
+        expect(Math.abs((z.annual.min_control_c - f.annual.min_control_c) - (p.min_c - pf.min_c)), `${name} ${zid} rise`).toBeLessThanOrEqual(0.2)
+        expect(z.annual.unmet_heating_hours!).toBeLessThan(f.annual.unmet_heating_hours!)
+      }
+    }
+  })
+})
