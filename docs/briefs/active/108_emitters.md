@@ -45,8 +45,7 @@ This brief is in the Systems module, and it changes the Simulate v2 engine (Engi
 
 ## Part 1 — Schema 2.4: emitters per zone, design temperatures per heating system
 
-- **Each zone gets `emitters[]`:** `{ id, label?, kind: 'radiator' | 'underfloor' | 'fan_coil' | 'other', count, rated_output_w, rated_flow_c, rated_return_c, rated_room_c, exponent_n }`.
-  - Every field is required. Nothing is defaulted: a library of emitter types can come later.
+- **Each zone gets `emitters[]`**, as settled in Part 0 (decision 1). A wet emitter names its heating group and its rating (rated output, flow, return and room temperatures, exponent n). An electric emitter has a fixed output. Nothing is defaulted.
 - **Each heating system group gets** `design_flow_c` and `design_return_c` (nullable; required when any zone it serves has emitters).
 - **Optional per zone.** A zone without emitters is uncapped, as today: ideal loads. The panel says so ("no emitters stated: output not limited").
 - **Upgrade and converter.**

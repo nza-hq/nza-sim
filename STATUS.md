@@ -2,6 +2,17 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 108 — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
+
+Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/108/00_reconnaissance.md)):
+  - EN 442 log-mean rating; a 75/65/20 radiator at 50/40 gives 38 % of its rating.
+  - Engine 1 limits `phi`; Engine 2 gets a fourth active-set state.
+  - Today's `capacity_kw` is unused.
+  - The referee is EnergyPlus's `IdealLoadsAirSystem` with `LimitCapacity`.
+  - Each wet emitter names its heating system; electric emitters have a fixed output; the rating is taken at the heating setpoint.
+
 ## 🟡 Brief 107 — Simulate v2 Engine 4: systems by zone group — IN PROGRESS on `chris/107-systems` (stacked on 106)
 
 Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
