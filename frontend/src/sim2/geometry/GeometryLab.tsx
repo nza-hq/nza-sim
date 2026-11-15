@@ -62,6 +62,25 @@ const onWalls = (e: FabricElement): e is WallEl => e === 'wall' || e === 'glazin
 /** A wall: run `index`, at `t` m along it; `whole` = the whole wall, else the room piece at `t`. `set`: what steps 3 to 5
  * give to: rooms, and rooms' parts of outside walls. */
 type Sel = { kind: 'wall'; index: number; t: number; whole: boolean } | { kind: 'blocks'; idx: number[] } | { kind: 'rooms'; ids: string[] } | { kind: 'set'; rooms: string[]; pieces: Span[] } | null
+/** Typical starting points, shown with their value and typed over freely (q50 in m³/h·m² at 50 Pa). Guides, not data:
+ * an air test or a Part L target wins. Bands as today's NZA Sim airtightness section (≤3 best, >10 leaky). */
+const Q50_PRESETS = [
+  { v: 1, name: 'Passive House' },
+  { v: 3, name: 'Very good new build' },
+  { v: 5, name: 'Typical new build today' },
+  { v: 8, name: 'Part L limit for new buildings' },
+  { v: 12, name: '1990s building, okay' },
+  { v: 20, name: 'Older building, leaky' },
+]
+/** Junction detailing as a multiplier on ISO 14683's standard ψ values, the steps today's NZA Sim names
+ * (thermalBridgesLibrary.js: 1 typical compliance detailing, 1.5 poor, 2 very poor); 3 is what Bridgewater uses. */
+const TB_PRESETS = [
+  { v: 1, name: 'Standard, Part L quality' },
+  { v: 1.5, name: 'Poor' },
+  { v: 2, name: 'Very poor' },
+  { v: 3, name: 'Older building, unimproved' },
+]
+
 /** The kinds the Fabric step gives: an element's types, or (air, bridge) a whole-building value. */
 type FabricKind = 'wall' | 'floor' | 'roof' | 'openings' | 'air' | 'bridge' | 'partition'
 const FABRIC_KINDS: Array<Kind & { key: FabricKind }> = [
@@ -1068,9 +1087,18 @@ export default function GeometryLab() {
         <GivePanel kinds={kinds} kind={fkind} onKind={onKind} title={k.name} icon={k.icon} items={[]} active={null} onActive={() => undefined}
           body={
             <div className="ap-whole-body">
+              <p className="ap-wholenote"><Icon name="building" size={16} />The whole building. {fkind === 'air' ? 'An air test measures the whole envelope at once, so this goes on every room.' : 'Junctions are counted along every edge of the building, so this goes on every room.'}</p>
               {fkind === 'air' ? (
                 <>
+                  <div className="gl-row gl-librow"><span>Typical for</span>
+                    <select className="gl-sel" aria-label="Air leakage, typical for" value={bi.q50 == null ? '' : (Q50_PRESETS.find((x) => x.v === bi.q50)?.v.toString() ?? 'own')} onChange={(e) => e.target.value !== 'own' && setBi({ q50: e.target.value ? Number(e.target.value) : null })}>
+                      <option value="">Not set</option>
+                      {Q50_PRESETS.map((x) => <option key={x.v} value={x.v}>{x.name} ({x.v})</option>)}
+                      <option value="own" disabled>Own value (tested or target)</option>
+                    </select>
+                  </div>
                   <div className="gl-row"><span>Air leakage (q50)</span><Num value={bi.q50 ?? ''} unit="m³/h·m²" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.q50) setBi({ q50: n }) }} /></div>
+                  {bi.q50 != null && <p className="ap-sysline">= {(bi.q50 / 3.6).toFixed(2)} l/s·m², at 50 Pa, per m² of outside envelope</p>}
                   <div className="gl-row"><span>Site exposure</span>
                     <select className="gl-sel" value={bi.exposure ?? ''} onChange={(e) => setBi({ exposure: (e.target.value || null) as BuildingInputs['exposure'] })}>
                       <option value="">Not set</option>
@@ -1079,12 +1107,19 @@ export default function GeometryLab() {
                       <option value="exposed">Exposed</option>
                     </select>
                   </div>
-                  <p className="gl-hint">Air leakage at 50 Pa, from an air test or a target. It goes on every room, so there is nothing to apply. Empty stays unset.</p>
+                  <p className="gl-hint">Use the air test result if there is one, or the Part L target for a new building. The list gives typical values to start from; type over them. Empty stays unset.</p>
                 </>
               ) : (
                 <>
-                  <div className="gl-row"><span>Thermal bridging</span><Num value={bi.tb_multiplier ?? ''} unit="× ISO 14683" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.tb_multiplier) setBi({ tb_multiplier: n }) }} /></div>
-                  <p className="gl-hint">1 = ISO 14683's default junctions for every edge of the building; 2 doubles them. It goes on the whole building. Empty stays unset.</p>
+                  <div className="gl-row gl-librow"><span>Junction detailing</span>
+                    <select className="gl-sel" aria-label="Junction detailing" value={bi.tb_multiplier == null ? '' : (TB_PRESETS.find((x) => x.v === bi.tb_multiplier)?.v.toString() ?? 'own')} onChange={(e) => e.target.value !== 'own' && setBi({ tb_multiplier: e.target.value ? Number(e.target.value) : null })}>
+                      <option value="">Not set</option>
+                      {TB_PRESETS.map((x) => <option key={x.v} value={x.v}>{x.name}</option>)}
+                      <option value="own" disabled>Own value</option>
+                    </select>
+                  </div>
+                  <div className="gl-row"><span>Times the standard ψ values</span><Num value={bi.tb_multiplier ?? ''} unit="×" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.tb_multiplier) setBi({ tb_multiplier: n }) }} /></div>
+                  <p className="gl-hint">The engine finds every junction from the drawing (roof edge, ground edge, floors, corners, round windows) and gives each the ISO 14683 standard ψ value, which is about what Part L's notional building assumes. Worse detailing multiplies them all. Empty stays unset.</p>
                 </>
               )}
             </div>
