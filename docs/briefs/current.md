@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 111 — Simulate v2: "Results include" levels and the heat flow view — Parts 1–2 ACTIVE 15 Nov 2026 on `chris/111-results-levels` (stacked on 108); Parts 3–4 the editor thread's.**
+Fabric only / + Spaces / + Systems as run copies of the document with objects removed (Rule 8), each with its per-zone breakdown; Fabric only checked against EnergyPlus. Brief [`active/111_results-include.md`](active/111_results-include.md). Claims (Parts 1–2): `frontend/src/sim2/run/seam.ts`, `frontend/src/sim2/run/__tests__/`, `validation/energyplus/111_*`, `docs/audit/111/`.
+
 **Brief 108 — Simulate v2: emitters per room, capped heat output, re-rated for flow temperature — RESERVED 15 Nov 2026 on `chris/108-emitters` (stacked on 107).**
 Linzie's sizing tool (15 Nov 21:28): each zone's emitters (e.g. two 500 W radiators) cap its heating; output re-rated (EN 442) at the system's flow and return temperatures, so a boiler-to-heat-pump switch shows which rooms fall short, by how much, and what rated output they would need. Engines 1 and 2 gain a heating cap; EnergyPlus referee with capacity-limited ideal loads. Brief [`active/108_emitters.md`](active/108_emitters.md). Claims: `frontend/src/thermal/` (engine, schema), `frontend/src/sim2/run/`.
 
