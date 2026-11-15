@@ -726,7 +726,7 @@ function Elevation({ length, height, windows }: { length: number; height: number
       {windows.map((x, i) => (
         <rect key={i} x={x0 + x.offset_m * s} y={2 + h - (x.sill_m + x.height_m) * s} width={x.width_m * s} height={x.height_m * s} fill="#BFDDEC" stroke="#1F2D27" strokeWidth={1} />
       ))}
-      <text x={W / 2} y={h + 16} textAnchor="middle" style={{ font: '500 10.5px var(--gl-detail)', fill: '#5E6B65' }}>Seen from outside · {f2(length)} × {f2(height)} m</text>
+      <text x={W / 2} y={h + 16} textAnchor="middle" style={{ font: '500 11px var(--gl-detail)', fill: '#5E6B65' }}>Seen from outside · {f2(length)} × {f2(height)} m</text>
     </svg>
   )
 }

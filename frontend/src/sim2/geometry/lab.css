@@ -1,23 +1,22 @@
-/* Sim2 geometry prototype. The look is decodED's room editor (nza-decoded src/twin/app/inside/inside.css "re-*" and
- * ui/editMode.css), copied as values so the prototype reads like decodED: paper and grid, white floor, ink outline,
- * orange = chosen, green = acts, Inter for the working text, Stolzl for titles. When NZA Sim's own design-system review
- * lands shared tokens, these variables point at them instead. Scoped to .gl-root: nothing else in the app is touched. */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
-
+/* Sim2 geometry prototype. Gestures and layout are decodED's room editor (nza-decoded src/twin/app/inside/inside.css
+ * "re-*", ui/editMode.css): paper and grid, white floor, ink outline, orange = chosen, green = acts. Faces, sizes and
+ * colours come from NZA Sim's shared design system (src/design-system/tokens.css, decodED's type system): DM Sans for
+ * the UI, Inter for figures, Stolzl for titles. Only the plan's own drawing colours live here. Scoped to .gl-root. */
 .gl-root {
-  --gl-orange: #E28F2C;
-  --gl-green: #235546;
-  --gl-ink: #1F2D27;
-  --gl-soft: #5E6B65;
-  --gl-line: #E1E6E4;
-  --gl-paper: #F5F7F7;
+  --gl-orange: var(--color-select, #E28F2C);
+  --gl-green: var(--color-act, #235546);
+  --gl-ink: var(--color-ink, #2A2A2A);
+  --gl-soft: var(--color-ink-soft, #62625F);
+  --gl-line: var(--color-line, #E5E1D8);
+  --gl-paper: #F5F7F7; /* the room editor's plan paper (re-paper) */
   --gl-grid: rgba(35, 85, 70, 0.07);
   --gl-grid-5: rgba(35, 85, 70, 0.14);
   --gl-tint: #F2F5F4;
   --gl-bad: #B5322B;
   --gl-glass: #7FB8D6;
-  --gl-display: 'Stolzl', 'DM Sans', system-ui, sans-serif;
-  --gl-detail: 'Inter', system-ui, sans-serif;
+  --gl-display: var(--font-display, 'Stolzl', 'DM Sans', system-ui, sans-serif);
+  --gl-detail: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  --gl-figures: var(--font-figures, 'Inter', system-ui, sans-serif);
   position: fixed; inset: 0; overflow: hidden; background: var(--gl-paper);
   font-family: var(--gl-detail); font-size: 13px; color: var(--gl-ink);
 }
@@ -49,10 +48,10 @@
 .gl-stalk { stroke: var(--gl-orange); stroke-width: 1.5; pointer-events: none; }
 .gl-win { stroke: var(--gl-ink); stroke-width: 8; pointer-events: none; }
 .gl-win-glass { stroke: var(--gl-glass); stroke-width: 5; pointer-events: none; }
-.gl-len { font: 500 11px var(--gl-detail); fill: var(--gl-soft); paint-order: stroke; stroke: var(--gl-paper); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+.gl-len { font: 500 11px var(--gl-figures); fill: var(--gl-soft); paint-order: stroke; stroke: var(--gl-paper); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .gl-len.live { fill: var(--gl-orange); font-weight: 700; }
 .gl-zname { font: 600 12px var(--gl-detail); fill: var(--gl-ink); text-anchor: middle; pointer-events: none; }
-.gl-zarea { font: 400 11px var(--gl-detail); fill: var(--gl-soft); text-anchor: middle; pointer-events: none; }
+.gl-zarea { font: 400 11px var(--gl-figures); fill: var(--gl-soft); text-anchor: middle; pointer-events: none; }
 .gl-zname.on, .gl-zarea.on { fill: #fff; }
 
 /* panels: decodED's floating white boxes */
@@ -63,7 +62,7 @@
 .gl-left { left: 14px; bottom: 14px; width: 300px; }
 .gl-right { right: 14px; width: 290px; max-height: calc(100% - 100px); }
 .gl-head { flex: none; padding: 14px 16px 12px; border-bottom: 1px solid var(--gl-line); display: grid; gap: 4px; }
-.gl-head h2 { margin: 0; font: 600 17px/1.2 var(--gl-display); }
+.gl-head h2 { margin: 0; font: 500 18px/24px var(--gl-display); letter-spacing: -0.01em; }
 .gl-head p { margin: 0; font-size: 12px; color: var(--gl-soft); }
 .gl-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 14px; display: grid; align-content: start; gap: 0; }
 .gl-sec { padding: 12px 0; border-bottom: 1px solid var(--gl-line); display: grid; gap: 8px; }
@@ -75,17 +74,17 @@
 .gl-num { display: inline-flex; align-items: center; gap: 4px; }
 .gl-num input {
   width: 72px; padding: 5px 7px; border: 1px solid var(--gl-line); border-radius: 8px; background: #fff;
-  font: 600 13px var(--gl-detail); color: var(--gl-ink); text-align: right; font-variant-numeric: tabular-nums;
+  font: 600 13px var(--gl-figures); color: var(--gl-ink); text-align: right; font-variant-numeric: tabular-nums;
 }
 .gl-num input:focus { outline: 2px solid var(--gl-green); outline-offset: -1px; }
 .gl-num small { width: 18px; color: var(--gl-soft); font-size: 12px; }
-.gl-say { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--gl-ink); }
+.gl-say { margin: 0; font-size: 12px; line-height: 1.45; color: var(--gl-ink); }
 .gl-hint { margin: 0; font-size: 12px; line-height: 1.4; color: var(--gl-soft); }
 .gl-warn { margin: 0; font-size: 12px; line-height: 1.4; color: #9A5B10; }
 .gl-err { margin: 0; font-size: 12px; line-height: 1.4; color: var(--gl-bad); font-weight: 600; }
 .gl-btn {
   justify-self: start; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--gl-green); background: var(--gl-green); color: #fff;
-  border-radius: 9px; padding: 7px 12px; font: 600 12.5px var(--gl-detail); cursor: pointer;
+  border-radius: 9px; padding: 7px 12px; font: 600 12px var(--gl-detail); cursor: pointer;
 }
 .gl-btn:disabled { opacity: .4; cursor: default; }
 .gl-btn.quiet { background: #fff; color: var(--gl-green); border-color: var(--gl-line); }
@@ -104,17 +103,17 @@
 .gl-zonerow input:focus { outline: 2px solid var(--gl-green); outline-offset: -1px; background: #fff; }
 .gl-zonerow small { font-size: 12px; color: var(--gl-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .gl-sw { width: 16px; height: 16px; flex: none; border-radius: 5px; border: 2px solid; }
-.gl-facts { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.gl-facts { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .gl-facts td { padding: 5px 0; border-top: 1px solid var(--gl-line); }
 .gl-facts tr:first-child td { border-top: 0; }
-.gl-facts td.n { text-align: right; font-weight: 600; }
+.gl-facts td.n { text-align: right; font-weight: 600; font-family: var(--gl-figures); }
 .gl-chip { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font: 700 11px var(--gl-detail); letter-spacing: .04em; color: #fff; }
 .gl-chip.ok { background: var(--gl-green); }
 .gl-chip.no { background: var(--gl-bad); }
 .gl-chip.none { background: #9AA59F; }
-.gl-json { margin: 0; max-height: 300px; overflow: auto; padding: 8px; border-radius: 8px; background: var(--gl-tint); font: 10.5px/1.35 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+.gl-json { margin: 0; max-height: 300px; overflow: auto; padding: 8px; border-radius: 8px; background: var(--gl-tint); font: 11px/1.35 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
 .gl-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 12px 12px 4px; border-radius: 12px; background: color-mix(in srgb, var(--gl-orange) 10%, #fff); }
-.gl-card-head b { font: 700 14.5px/1.25 var(--gl-detail); }
+.gl-card-head b { font: 700 14px/1.25 var(--gl-detail); }
 .gl-card-head small { display: block; font-size: 12px; color: var(--gl-soft); }
 .gl-card-head .gl-x { margin-left: auto; border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--gl-soft); }
 .gl-elev { display: block; width: 100%; height: auto; }
@@ -137,7 +136,7 @@
 .gl-pill { position: absolute; z-index: 6; pointer-events: none; padding: 5px 10px; border-radius: 12px; background: var(--gl-ink); color: #fff; font: 600 12px var(--gl-detail); white-space: nowrap; }
 .gl-pill.bad { background: var(--gl-bad); }
 .gl-compass { position: absolute; bottom: 22px; left: 340px; display: flex; align-items: flex-end; gap: 16px; pointer-events: none; z-index: 4; }
-.gl-scale { display: grid; gap: 2px; font: 600 11px var(--gl-detail); color: var(--gl-ink); }
+.gl-scale { display: grid; gap: 2px; font: 600 11px var(--gl-figures); color: var(--gl-ink); }
 .gl-scale i { display: block; height: 6px; border: 2px solid var(--gl-ink); border-top: 0; }
 
 @media (max-width: 760px) {
