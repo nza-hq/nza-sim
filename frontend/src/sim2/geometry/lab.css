@@ -198,3 +198,15 @@
 .gl-steps small { font: 400 11px var(--gl-detail); color: var(--gl-soft); }
 .gl-step-tag { align-self: center; padding: 0 10px 0 6px; font: 700 11px var(--gl-detail); letter-spacing: .06em; text-transform: uppercase; color: var(--gl-green); white-space: nowrap; }
 .gl-tool.optional:not([aria-pressed='true']) { color: var(--gl-soft); }
+.gl-num.auto input { background: var(--gl-tint); color: var(--gl-soft); border-style: dashed; }
+.gl-auto-tag { font: 600 10px var(--gl-detail); font-style: normal; letter-spacing: .04em; text-transform: uppercase; color: var(--gl-green); background: color-mix(in srgb, var(--gl-green) 10%, #fff); border-radius: 5px; padding: 1px 5px; }
+.gl-num.stepped input { width: 56px; text-align: center; border-radius: 0; margin: 0 -1px; }
+.gl-step {
+  width: 24px; height: 29px; border: 1px solid var(--gl-line); background: #fff; color: var(--gl-green); cursor: pointer;
+  font: 700 15px/1 var(--gl-figures); padding: 0;
+}
+.gl-step:first-of-type { border-radius: 8px 0 0 8px; }
+.gl-num.stepped .gl-step:last-of-type { border-radius: 0 8px 8px 0; }
+.gl-step:hover { background: var(--gl-tint); }
+.gl-num.auto .gl-step { border-style: dashed; }
+.gl-num .gl-auto-tag { margin-right: 4px; }

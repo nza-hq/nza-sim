@@ -27,7 +27,7 @@
 import { type PointerEvent as RPointerEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
-import { type Hit, ccw, labelAt, nearestEdge, zoneAt, zoneTint } from './ported/zones'
+import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
 import { type Plan, type WindowSet, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, layoutSet, ringArea, wallRuns } from './plan'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
@@ -56,7 +56,7 @@ const TOOLS: Record<Mode, Array<{ key: Tool; name: string; glyph: string; line: 
     { key: 'corner', name: 'Add corner', glyph: '⌖', line: 'Press on a wall to add a corner there, and drag it.' },
   ],
   rooms: [
-    { key: 'divide', name: 'Wall', glyph: '╱', line: 'Tap a point on one wall, then on another. A new wall goes between them and makes two rooms.' },
+    { key: 'divide', name: 'Wall', glyph: '┃', line: 'Tap a wall: a new wall runs square across the room from there, on the 0.5 m grid. Shift: any angle (tap both ends).' },
     { key: 'room', name: 'Room', glyph: '▭', line: 'Drag a box. It becomes a room, taking the space from the rooms under it.' },
     { key: 'halve', name: 'Halve', glyph: '◫', line: 'Tap a room to halve it across its long side.' },
     { key: 'join', name: 'Join', glyph: '⧉', line: 'Tap two rooms that touch to make them one.' },
@@ -388,6 +388,31 @@ export default function GeometryLab() {
     setView({ k, cx: before[0] - (x - mid[0]) / k, cy: before[1] + (y - mid[1]) / k })
   }
 
+  /** Where a new wall starts: the nearest point on a side of the room under the pointer, on the 0.5 m grid along it
+   *  (Shift: anywhere). A corner nearby wins. */
+  const wallHit = (m: XY, free: boolean): Hit | null => {
+    const ri = zoneAt(rings, m)
+    const h = ri >= 0 ? nearestEdge([rings[ri]!], m, SNAP_PX * 4 * mPerPx, SNAP_PX * mPerPx) : nearestEdge(rings, m, SNAP_PX * 1.5 * mPerPx, SNAP_PX * mPerPx)
+    if (!h) return null
+    const hit = ri >= 0 ? { ...h, zone: ri } : h
+    if (free || hit.corner) return hit
+    const ring = rings[hit.zone]!
+    const a = ring[hit.edge]!
+    const b = ring[(hit.edge + 1) % ring.length]!
+    const L = dist(a, b) || 1
+    const g = GRID
+    let p: XY
+    if (Math.abs(b[1] - a[1]) < 1e-6) p = [Math.min(Math.max(a[0], b[0]), Math.max(Math.min(a[0], b[0]), Math.round(hit.p[0] / g) * g)), a[1]]
+    else if (Math.abs(b[0] - a[0]) < 1e-6) p = [a[0], Math.min(Math.max(a[1], b[1]), Math.max(Math.min(a[1], b[1]), Math.round(hit.p[1] / g) * g))]
+    else {
+      const t = Math.max(0, Math.min(L, Math.round(dist(a, hit.p) / g) * g))
+      p = [a[0] + ((b[0] - a[0]) * t) / L, a[1] + ((b[1] - a[1]) * t) / L]
+    }
+    return { ...hit, p }
+  }
+  /** The square wall from a hit: at 90° to the side it starts on, across to the room's far side. */
+  const squareFrom = (h: Hit, m: XY): XY | null => squareCut(rings, h, m)
+
   const click = (m: XY, x: number, y: number, sh = false) => {
     if (tool === 'shape') {
       const at = sh ? m : snapXY(m, GRID)
@@ -402,8 +427,16 @@ export default function GeometryLab() {
     if (tool === 'select') return setSel(null)
     if (tool === 'divide') {
       if (!plan.rooms.length) return tell(m, 'Draw the building first.', true)
-      const h = nearestEdge(rings, m, SNAP_PX * 1.5 * mPerPx, SNAP_PX * mPerPx)
+      const h = wallHit(m, sh || !!cutFrom)
       if (!h) return tell(m, 'Tap on a wall.', true)
+      if (!sh && !cutFrom) {
+        // Square to the wall by default: one tap.
+        const end = squareFrom(h, m)
+        if (!end) return tell(h.p, 'No square wall fits from here. Hold Shift for any angle.', true)
+        const r = divideRoom(plan, h.p, end)
+        if ('why' in r) return tell(h.p, r.why, true)
+        return commit(r.plan)
+      }
       if (!cutFrom) return setCutFrom(h)
       const r = divideRoom(plan, cutFrom.p, h.p)
       setCutFrom(null)
@@ -518,13 +551,44 @@ export default function GeometryLab() {
   // ─── the wall card's form ──────────────────────────────────────────────────
   const selWall = sel?.kind === 'wall' ? runs[sel.index] : undefined
   const selSet = selWall ? plan.windows.find((w) => w.wall === selWall.index) : undefined
-  const [form, setForm] = useState({ count: '3', area: '1', height: '1.2', sill: '0.9' })
+  // Width, height and area of each window are tied (area = width × height): the two last typed stand and the third is
+  // worked out. Once a wall has windows, every valid change shows on the plan at once (no Update button).
+  type Dim = 'width' | 'height' | 'area'
+  const editing = useRef<Sel>(null)
+  const r3s = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 1000) / 1000) : '')
+  const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', recent: ['height', 'area'] as Dim[] })
+  const autoDim: Dim = (['width', 'height', 'area'] as Dim[]).find((d) => !form.recent.includes(d))!
   useEffect(() => {
-    if (selSet) setForm({ count: String(selSet.count), area: String(Math.round(selSet.width_m * selSet.height_m * 100) / 100), height: String(selSet.height_m), sill: String(selSet.sill_m) })
+    if (selSet) setForm((f) => ({ ...f, count: String(selSet.count), width: r3s(selSet.width_m), height: r3s(selSet.height_m), area: r3s(selSet.width_m * selSet.height_m), sill: r3s(selSet.sill_m) }))
   }, [selSet?.id, sel]) // eslint-disable-line react-hooks/exhaustive-deps
-  const draft: WindowSet | null = selWall
-    ? { id: selSet?.id ?? `w${Date.now().toString(36)}`, wall: selWall.index, count: Number(form.count), height_m: Number(form.height), width_m: Number(form.area) / Number(form.height), sill_m: Number(form.sill) }
-    : null
+  const toSet = (f: typeof form): WindowSet | null =>
+    selWall ? { id: selSet?.id ?? `w${Date.now().toString(36)}`, wall: selWall.index, count: Number(f.count), height_m: Number(f.height), width_m: Number(f.width), sill_m: Number(f.sill) } : null
+  const edit = (k: 'count' | 'sill' | Dim, v: string) => {
+    let f = { ...form, [k]: v }
+    if (k === 'width' || k === 'height' || k === 'area') {
+      const recent: Dim[] = [form.recent.filter((d) => d !== k).slice(-1)[0] ?? (k === 'height' ? 'area' : 'height'), k]
+      f = { ...f, recent }
+      const auto = (['width', 'height', 'area'] as Dim[]).find((d) => !recent.includes(d))!
+      const W = Number(f.width)
+      const H = Number(f.height)
+      const A = Number(f.area)
+      if (auto === 'width' && H > 0) f.width = r3s(A / H)
+      if (auto === 'height' && W > 0) f.height = r3s(A / W)
+      if (auto === 'area') f.area = r3s(W * H)
+    }
+    setForm(f)
+    const d = toSet(f)
+    if (selSet && selWall && d && !('why' in layoutSet(selWall, d, plan.storey_height_m))) {
+      // One Undo step per wall chosen, not one per key.
+      const next = { ...plan, windows: plan.windows.map((w) => (w.id === selSet.id ? d : w)) }
+      if (editing.current === sel) setPlan(next)
+      else {
+        editing.current = sel
+        commit(next)
+      }
+    }
+  }
+  const draft = toSet(form)
   const lay = selWall && draft ? layoutSet(selWall, draft, plan.storey_height_m) : null
 
   // ─── rooms and zones ───────────────────────────────────────────────────────
@@ -581,7 +645,8 @@ export default function GeometryLab() {
   const boxGhost = drag?.kind === 'box' ? (tool === 'tri' ? triRing(drag.a, drag.b) : boxRing(drag.a, drag.b)) : null
   const shapeGhost = tool === 'shape' && pointer && cs.corners.length ? (shift ? pointer : snapXY(pointer, GRID)) : null
   const closing = tool === 'shape' && shapeGhost && cs.corners.length >= 3 && Math.hypot(toPx(cs.corners[0] as XY)[0] - toPx(shapeGhost)[0], toPx(cs.corners[0] as XY)[1] - toPx(shapeGhost)[1]) <= CLOSE_PX
-  const splitHit = tool === 'divide' && pointer ? nearestEdge(rings, pointer, SNAP_PX * 1.5 * mPerPx, SNAP_PX * mPerPx) : null
+  const splitHit = tool === 'divide' && pointer && !drag ? wallHit(pointer, shift || !!cutFrom) : null
+  const squareGhost = splitHit && !shift && !cutFrom ? squareFrom(splitHit, pointer!) : null
   const cornerGhost = tool === 'corner' && hoverWall != null && pointer ? onWall(hoverWall, pointer, step) : null
   const scaleM = [1, 2, 5, 10, 20, 50].find((s) => s * view.k >= 60) ?? 50
   const overBlock = pointer && mode === 'outline' ? blockAt(plan, pointer) >= 0 : false
@@ -693,6 +758,12 @@ export default function GeometryLab() {
           <g>
             {cutFrom && <line className="gl-ghost-line" x1={toPx(cutFrom.p)[0]} y1={toPx(cutFrom.p)[1]} x2={toPx(splitHit?.p ?? pointer ?? cutFrom.p)[0]} y2={toPx(splitHit?.p ?? pointer ?? cutFrom.p)[1]} />}
             {cutFrom && <circle className="gl-corner first" cx={toPx(cutFrom.p)[0]} cy={toPx(cutFrom.p)[1]} r={5} />}
+            {squareGhost && splitHit && (
+              <>
+                <line className="gl-ghost-line" x1={toPx(splitHit.p)[0]} y1={toPx(splitHit.p)[1]} x2={toPx(squareGhost)[0]} y2={toPx(squareGhost)[1]} />
+                {lenLabel(splitHit.p, squareGhost, 'sq', true)}
+              </>
+            )}
             {splitHit && <circle className="gl-corner" cx={toPx(splitHit.p)[0]} cy={toPx(splitHit.p)[1]} r={splitHit.corner ? 7 : 5} />}
           </g>
         )}
@@ -735,7 +806,7 @@ export default function GeometryLab() {
                 <h3>Building <small>{f1(floorArea(plan.blocks))} m² · {runs.length} walls{plan.blocks.length > 1 ? ` · ${plan.blocks.length} blocks` : ''}</small></h3>
                 <div className="gl-row">
                   <span>Storey height</span>
-                  <Num value={plan.storey_height_m} unit="m" onCommit={(v) => v > 0 && commit({ ...plan, storey_height_m: v })} />
+                  <Num value={plan.storey_height_m} unit="m" step={0.1} min={2} onCommit={(v) => v > 0 && commit({ ...plan, storey_height_m: v })} />
                 </div>
                 <div className="gl-btns">
                   <button type="button" className="gl-btn quiet" onClick={() => fitTo(plan.blocks.flat())}>Fit to screen</button>
@@ -805,23 +876,27 @@ export default function GeometryLab() {
           <div className="gl-body">
             <div className="gl-sec">
               <h3>Windows <small>spaced equally</small></h3>
-              <div className="gl-row"><span>How many</span><Num value={form.count} onChange={(s) => setForm({ ...form, count: s })} /></div>
-              <div className="gl-row"><span>Area of each</span><Num value={form.area} unit="m²" onChange={(s) => setForm({ ...form, area: s })} /></div>
-              <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" onChange={(s) => setForm({ ...form, height: s })} /></div>
-              <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" onChange={(s) => setForm({ ...form, sill: s })} /></div>
+              <div className="gl-row"><span>How many</span><Num value={form.count} step={1} min={1} onChange={(s) => edit('count', s)} /></div>
+              <div className="gl-row"><span>Area of each</span><Num value={form.area} unit="m²" step={0.1} auto={autoDim === 'area'} onChange={(s) => edit('area', s)} /></div>
+              <div className="gl-row"><span>Width</span><Num value={form.width} unit="m" step={0.1} auto={autoDim === 'width'} onChange={(s) => edit('width', s)} /></div>
+              <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" step={0.1} auto={autoDim === 'height'} onChange={(s) => edit('height', s)} /></div>
+              <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" step={0.1} onChange={(s) => edit('sill', s)} /></div>
+              <p className="gl-hint">Type any two of area, width and height; the one marked <i className="gl-auto-tag">auto</i> is worked out.{selSet ? ' Changes show straight away.' : ''}</p>
               {lay && 'why' in lay && <p className="gl-err">{lay.why}</p>}
               {draft && lay && !('why' in lay) && (
                 <>
                   <p className="gl-hint">
-                    Each {f2(draft.width_m)} m wide, {f2(lay.gap_m)} m apart. {f2(draft.count * draft.width_m * draft.height_m)} m² of glass, {Math.round((100 * draft.count * draft.width_m * draft.height_m) / (selWall.length_m * plan.storey_height_m))}% of this wall.
+                    {f2(lay.gap_m)} m apart. {f2(draft.count * draft.width_m * draft.height_m)} m² of glass, {Math.round((100 * draft.count * draft.width_m * draft.height_m) / (selWall.length_m * plan.storey_height_m))}% of this wall.
                   </p>
                   <Elevation length={selWall.length_m} height={plan.storey_height_m} windows={lay.windows} />
                 </>
               )}
               <div className="gl-btns">
-                <button type="button" className="gl-btn orange" disabled={!lay || 'why' in lay} onClick={() => draft && lay && !('why' in lay) && commit({ ...plan, windows: [...plan.windows.filter((w) => w.wall !== draft.wall), draft] })}>
-                  {selSet ? 'Update windows' : 'Add windows'}
-                </button>
+                {!selSet && (
+                  <button type="button" className="gl-btn orange" disabled={!lay || 'why' in lay} onClick={() => draft && lay && !('why' in lay) && commit({ ...plan, windows: [...plan.windows.filter((w) => w.wall !== draft.wall), draft] })}>
+                    Add windows
+                  </button>
+                )}
                 {selSet && <button type="button" className="gl-btn quiet" onClick={() => commit({ ...plan, windows: plan.windows.filter((w) => w.wall !== selWall.index) })}>Remove</button>}
               </div>
               {mode === 'outline' && <p className="gl-hint">Drag a wall to push it straight out or in.</p>}
@@ -922,11 +997,24 @@ export default function GeometryLab() {
   )
 }
 
-function Num({ value, unit, onCommit, onChange }: { value: number | string; unit?: string; onCommit?: (v: number) => void; onChange?: (s: string) => void }) {
+function Num({ value, unit, auto, step, min = 0, onCommit, onChange }: { value: number | string; unit?: string; auto?: boolean; step?: number; min?: number; onCommit?: (v: number) => void; onChange?: (s: string) => void }) {
   const [s, setS] = useState(String(value))
   useEffect(() => setS(String(value)), [value])
+  const bump = (dir: 1 | -1) => {
+    if (!step) return
+    const n = Number(s)
+    const base = Number.isFinite(n) ? n : 0
+    // Step to the next whole multiple of `step` (1.67 + 0.1 → 1.7), never below `min`.
+    const k = dir > 0 ? Math.floor(base / step + 1e-9) + 1 : Math.ceil(base / step - 1e-9) - 1
+    const v = String(Math.max(min, Math.round(k * step * 1000) / 1000))
+    setS(v)
+    onChange?.(v)
+    onCommit?.(Number(v))
+  }
   return (
-    <span className="gl-num">
+    <span className={`gl-num${auto ? ' auto' : ''}${step ? ' stepped' : ''}`}>
+      {auto && <i className="gl-auto-tag">auto</i>}
+      {step && <button type="button" className="gl-step" aria-label="Less" onClick={() => bump(-1)}>−</button>}
       <input
         inputMode="decimal"
         value={s}
@@ -935,8 +1023,15 @@ function Num({ value, unit, onCommit, onChange }: { value: number | string; unit
           onChange?.(e.target.value)
         }}
         onBlur={() => onCommit && Number.isFinite(Number(s)) && onCommit(Number(s))}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          if (step && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            e.preventDefault()
+            bump(e.key === 'ArrowUp' ? 1 : -1)
+          }
+        }}
       />
+      {step && <button type="button" className="gl-step" aria-label="More" onClick={() => bump(1)}>+</button>}
       {unit && <small>{unit}</small>}
     </span>
   )
