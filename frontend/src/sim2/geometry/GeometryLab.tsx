@@ -48,6 +48,7 @@ import Spark from './Spark'
 import type { Slots } from '../workspace/ModelWorkspace'
 import type { StepId } from '../workspace/steps'
 import type { CentreTab } from '../workspace/layout'
+import type { EditorApi } from '../workspace/ModelSave'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
 import FacadeView from './FacadeView'
@@ -185,7 +186,7 @@ const STEP_OF: Record<Mode, StepId> = { outline: 'shape', rooms: 'shape', fabric
  * Standalone (`/sim2/geometry`): one full-screen canvas with floating panels. In the Model workspace (`slots` given,
  * Brief 110): the same state and behaviour, rendered into the workspace's panes, the step coming from its rail.
  */
-export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void } = {}) {
+export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab, api, onPlan }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void; api?: React.MutableRefObject<EditorApi | null>; onPlan?: (p: Plan) => void } = {}) {
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>(emptyPlan)
@@ -280,6 +281,11 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     setView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, k: Math.max(4, Math.min(60, room[0]! / w, room[1]! / h)) })
   }
 
+  // The workspace saves and reopens through these (Brief 110 P4), and is told when the plan changes.
+  useEffect(() => {
+    if (api) api.current = { getPlan: () => plan, getDocument: () => built.doc, loadPlan: (p) => { commit(upgradePlan(p as Plan)); setSel(null); fitTo((p as Plan).blocks.flat()) } }
+  })
+  useEffect(() => { onPlan?.(plan) }, [plan])
   // For browser checks: read the plan, or load one (a fixture), from the page (window.sim2).
   useEffect(() => {
     ;(window as unknown as { sim2?: unknown }).sim2 = {

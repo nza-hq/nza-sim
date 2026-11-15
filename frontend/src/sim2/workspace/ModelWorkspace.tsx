@@ -44,7 +44,7 @@ export function StepRail({ step, onStep }: { step: StepId; onStep: (s: StepId) =
   )
 }
 
-export default function ModelWorkspace({ render }: { render?: (a: { step: StepId; slots: Slots; centre: CentreTab; setCentre: (c: CentreTab) => void }) => React.ReactNode }) {
+export default function ModelWorkspace({ render, header }: { header?: React.ReactNode; render?: (a: { step: StepId; slots: Slots; centre: CentreTab; setCentre: (c: CentreTab) => void }) => React.ReactNode }) {
   const [params, setParams] = useSearchParams()
   const q = params.get('step')
   const step: StepId = isStep(q) ? q : 'shape'
@@ -66,6 +66,7 @@ export default function ModelWorkspace({ render }: { render?: (a: { step: StepId
   return (
     <div className="mw-root flex h-[calc(100vh-3rem)] relative">
       <aside className="mw-left flex-shrink-0 bg-white border-r border-light-grey flex flex-col min-h-0" style={{ width: layout.left }}>
+        {header}
         <StepRail step={step} onStep={onStep} />
         <div className="mw-slot flex-1 min-h-0 overflow-auto" ref={setLeftEl} />
       </aside>

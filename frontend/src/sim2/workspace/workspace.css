@@ -13,3 +13,8 @@
 .mw-empty h2 { font-size: 18px; color: #1F2937; margin: 0 0 8px; font-weight: 600; }
 .mw-empty a { color: #1E5A4A; text-decoration: underline; }
 .mw-empty-over { position: absolute; inset: 0; z-index: 30; background: #F7F8F8; overflow: auto; }
+.mw-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 18px 0; font-size: 12px; color: #6B7280; }
+.mw-save-state.changed { color: #B45309; }
+.mw-save-btn { margin-left: auto; padding: 4px 12px; border-radius: 6px; border: 1px solid #1E5A4A; background: #1E5A4A; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.mw-save-btn:disabled { background: #fff; color: #9CA3AF; border-color: #E5E7EB; cursor: default; }
+.mw-save-err { flex-basis: 100%; margin: 0; color: #B5322B; }
