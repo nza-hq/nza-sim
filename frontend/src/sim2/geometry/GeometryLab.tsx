@@ -46,7 +46,7 @@ const LEFT = 328
 const GRID = 0.5
 const FINE = 0.1
 const GRAB = 9
-const TURN_PX = 34
+const TURN_PX = 46
 const EXAMPLE: XY[] = [[0, 0], [30, 0], [30, 10], [20, 10], [20, 24], [10, 24], [10, 10], [0, 10]]
 
 const f1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -408,7 +408,7 @@ export default function GeometryLab() {
     const nx = -(by - ay) / L
     const ny = (bx - ax) / L
     return (
-      <text key={key} className={`gl-len${live ? ' live' : ''}`} x={(ax + bx) / 2 + nx * 15} y={(ay + by) / 2 + ny * 15 + 4} textAnchor="middle">
+      <text key={key} className={`gl-len${live ? ' live' : ''}`} x={(ax + bx) / 2 + nx * (15 + Math.abs(nx) * 16)} y={(ay + by) / 2 + ny * 15 + 4} textAnchor="middle">
         {f1(dist(a, b))} m
       </text>
     )
