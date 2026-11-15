@@ -131,6 +131,15 @@ describe('simulate', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.missing.map((m) => m.path)).toEqual(['schema_version'])
   })
+  it('a 2.3 document runs, upgraded by adding empty emitter lists only (Brief 108)', async () => {
+    const d = await doc()
+    const now = simulate(d, { weather: WEATHER })
+    d.schema_version = '2.3'
+    for (const z of d.zones) delete z.emitters
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok || !now.ok) throw new Error(JSON.stringify(r))
+    expect(r.summary.zones).toEqual(now.summary.zones)
+  })
   it('what the engine refuses comes back named, in words', async () => {
     const d = await doc()
     const i = d.profiles.findIndex((p: any) => p.kind === 'lighting')

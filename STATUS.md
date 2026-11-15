@@ -12,6 +12,7 @@ Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md)
   - Today's `capacity_kw` is unused.
   - The referee is EnergyPlus's `IdealLoadsAirSystem` with `LimitCapacity`.
   - Each wet emitter names its heating system; electric emitters have a fixed output; the rating is taken at the heating setpoint.
+- **P1 schema 2.4** ([`01_schema.md`](docs/audit/108/01_schema.md)): `zones[].emitters[]` (six kinds, each with its count, output and radiant share; wet kinds name their heating system and EN 442 rating); `design_flow_c`/`design_return_c` on heating groups. The 2.3 → 2.4 upgrade adds empty lists and fills nothing; the seam runs 2.3 through it and still refuses 2.2. 177 tests pass.
 
 ## 🟡 Brief 107 — Simulate v2 Engine 4: systems by zone group — IN PROGRESS on `chris/107-systems` (stacked on 106)
 

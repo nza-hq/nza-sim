@@ -18,6 +18,9 @@
  * them out (instantCalc.js computeHourlyGains and its helpers), and adds each gain profile's radiant fraction, filled
  * with the split today's engine applies to internal gains. Gains stay where 2.x already keeps them, on the document's
  * profiles referred to by each zone (CLAUDE.md Rule 11: one exposure); the zone's area and rooms scale the densities.
+ *
+ * 2.3 → 2.4 (Brief 108) adds each zone's emitters, empty: nothing is stated, so heating stays unlimited, as before. It
+ * fills no value, so the run seam accepts a 2.3 document through it (unlike 2.2 and older, Brief 105 review F1).
  */
 import { ModelDocument, SCHEMA_VERSION } from './model'
 
@@ -99,12 +102,18 @@ export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1' && from !== '2.2') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
-  if (from !== '2.2') to22(doc)
-  for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
+  if (from === '2.0' || from === '2.1') to22(doc)
+  if (from !== '2.3') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
+  to24(doc)
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
+}
+
+/** 2.3 → 2.4 (Brief 108): no emitters stated, so no zone's heating is limited (as before). Nothing is filled. */
+function to24(doc: Obj): void {
+  for (const z of doc.zones as Obj[]) z.emitters ??= []
 }
 
 function to22(doc: Obj): void {

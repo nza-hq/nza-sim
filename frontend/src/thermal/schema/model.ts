@@ -260,6 +260,35 @@ export const Ventilation = z
   })
   .strict()
 
+/**
+ * Schema 2.4 (Brief 108): a terminal unit in the zone: radiators, underfloor, fan coils, VRF indoor units, electric
+ * heaters. Its output caps the heat the zone can receive. A wet emitter is rated (EN 442) and re-rated at its heating
+ * system's design flow and return; a VRF indoor unit or electric heater has a fixed output. Nothing is defaulted: the
+ * engine refuses a missing value, naming it (Rules 2 and 3).
+ */
+export const EMITTER_KINDS = ['radiator', 'underfloor', 'fan_coil', 'vrf_indoor', 'electric', 'other'] as const
+export const FIXED_OUTPUT_KINDS: readonly string[] = ['vrf_indoor', 'electric']
+export const Emitter = z
+  .object({
+    id,
+    label: z.string().optional(),
+    kind: z.enum(EMITTER_KINDS),
+    count: nonNeg.nullable(),
+    /** Output of one unit at its rating (wet) or its fixed output (VRF indoor, electric), W. */
+    rated_output_w: nonNeg.nullable(),
+    /** Share of the heat given to the room's surfaces rather than its air, 0 to 1. */
+    radiant_fraction: finite.nullable(),
+    /** The heating system group that feeds it (wet kinds); null for a fixed-output unit. */
+    system_group_id: id.nullable(),
+    rated_flow_c: finite.nullable(),
+    rated_return_c: finite.nullable(),
+    rated_room_c: finite.nullable(),
+    /** EN 442 exponent n (about 1.3 panel radiators, 1.1 underfloor, 1.0 fan coils). */
+    exponent_n: finite.nullable(),
+  })
+  .strict()
+export type Emitter = z.infer<typeof Emitter>
+
 export const Zone = z
   .object({
     id,
@@ -308,6 +337,8 @@ export const Zone = z
      */
     internal_heat_capacity_j_per_k_m2: nonNeg,
     surfaces: z.array(id).min(1, 'a zone must have at least one surface'),
+    /** Schema 2.4 (Brief 108): the zone's terminal units. Empty: heating is not limited (ideal loads). */
+    emitters: z.array(Emitter),
   })
   .strict()
 export type Zone = z.infer<typeof Zone>
@@ -335,6 +366,9 @@ export const SystemGroup = z
     capacity_kw: finite.nullable().optional(),
     /** A library system template, when the system was chosen from one. */
     template_ref: z.string().nullable().optional(),
+    /** Schema 2.4 (Brief 108): a wet heating system's design flow and return, °C, at which its emitters are rated. */
+    design_flow_c: finite.nullable().optional(),
+    design_return_c: finite.nullable().optional(),
   })
   .strict()
 export type SystemGroup = z.infer<typeof SystemGroup>
@@ -416,7 +450,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.3' as const
+export const SCHEMA_VERSION = '2.4' as const
 
 export const ModelDocument = z
   .object({
@@ -513,6 +547,25 @@ export const ModelDocument = z
     doc.system_groups.forEach((g, i) => {
       g.zones.forEach((zid, j) => {
         if (!zoneIds.has(zid)) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'zones', j], message: `system group "${g.id}" serves zone "${zid}", which does not exist` })
+      })
+    })
+    // Brief 108: emitter ids are unique; a wet emitter's system is a heating group that serves its zone; a
+    // fixed-output unit names no system.
+    const emitterIds = new Set<string>()
+    doc.zones.forEach((z0, i) => {
+      z0.emitters.forEach((e, j) => {
+        const p = ['zones', i, 'emitters', j]
+        if (emitterIds.has(e.id)) ctx.addIssue({ code: 'custom', path: [...p, 'id'], message: `emitter id "${e.id}" is used twice` })
+        emitterIds.add(e.id)
+        if (FIXED_OUTPUT_KINDS.includes(e.kind)) {
+          if (e.system_group_id != null) ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: `a ${e.kind} unit has a fixed output and names no system` })
+          return
+        }
+        if (e.system_group_id == null) return  // missing: the engine names it
+        const g = doc.system_groups.find((x) => x.id === e.system_group_id)
+        if (!g) ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: `emitter "${e.id}" names system "${e.system_group_id}", which does not exist` })
+        else if (g.service !== 'heating') ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: `emitter "${e.id}" names "${g.id}", a ${g.service} system, not heating` })
+        else if (!g.zones.includes(z0.id)) ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: `emitter "${e.id}" is in zone "${z0.id}", which its system "${g.id}" does not serve` })
       })
     })
     const profileIds = new Set(doc.profiles.map((p) => p.id))
