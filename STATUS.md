@@ -15,6 +15,15 @@ Brief [`docs/briefs/active/110_model_workspace.md`](docs/briefs/active/110_model
 - **P2 steps in:** GeometryLab renders into the workspace's panes through portals when given `slots`; standalone `/sim2/geometry` is unchanged. The rail drives the mode (Shape = Outline | Rooms) and the editor's Next buttons move the rail. Site holds exposure, with weather still on the results panel until P3. The editor stays mounted on steps 6 and 7, so nothing is lost. The two-zone fixture's document is byte-identical in `/model` and `/sim2/geometry` (11,504 characters). 92 sim2 tests pass and the build is clean.
 
  — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
+## 🟡 Brief 111 — Simulate v2: "Results include" levels (Parts 1–2 here; 3–4 the editor's) — IN PROGRESS on `chris/111-results-levels` (stacked on 108)
+
+Brief [`docs/briefs/active/111_results-include.md`](docs/briefs/active/111_results-include.md). Linzie approved the plan 15 Nov 21:53.
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/111/00_reconnaissance.md)): what each level removes.
+- **P1 levels in the seam** ([`01_levels.md`](docs/audit/111/01_levels.md)): `simulate(doc, { level, fabric_heat_c })` runs a copy with objects removed (Rule 8); systems is today's run value for value; every level's breakdowns close; the fabric temperature is required, never defaulted.
+- **P2 Fabric only against EnergyPlus** ([`02_fabric.md`](docs/audit/111/02_fabric.md)): Bridgewater five storeys at 21 °C, heating only: 90.61 vs 88.42 MWh (+2.5 %, pass ±10 %); storeys −3.0 to +6.7 %. The two-zone fixture has no referee yet: it needs a document-to-EnergyPlus writer (proposed as its own work).
+
+## 🟡 Brief 108 — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
 
 Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.
 
@@ -25,10 +34,12 @@ Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md)
   - The referee is EnergyPlus's `IdealLoadsAirSystem` with `LimitCapacity`.
   - Each wet emitter names its heating system; electric emitters have a fixed output; the rating is taken at the heating setpoint.
 - **P1 schema 2.4** ([`01_schema.md`](docs/audit/108/01_schema.md)): `zones[].emitters[]` (six kinds, each with its count, output and radiant share; wet kinds name their heating system and EN 442 rating); `design_flow_c`/`design_return_c` on heating groups. The 2.3 → 2.4 upgrade adds empty lists and fills nothing; the seam runs 2.3 through it and still refuses 2.2. 177 tests pass.
+- **P2 capped heating** ([`02_capped.md`](docs/audit/108/02_capped.md)): EN 442 rating at each system's design flow/return and the zone's setpoint; Engine 1 φ = min(need, cap); Engine 2 gains a fourth active-set state (heating at its limit) on every solver path; heating's radiant share per zone from its emitters. Unmet hours, lowest temperature and hours at cap per zone. Setbacks refused until Brief 109. Analytic, two-zone hand and value-for-value tests; 196 pass; 107 gate unchanged.
+- **P3 referee** ([`03_referee.md`](docs/audit/108/03_referee.md)): EnergyPlus ideal loads at LimitCapacity. Cooled room at 800 W and 1,100 W: heating −3.3 to −3.7 % (as uncapped), unmet hours −57 h to −6 h, lowest temperature within 0.3 K. Bridgewater top storey at 12 kW: +2.6 %, 388 vs 345 unmet hours, lowest 18.55 vs 18.63 °C. All within the gate; the cooled-room gate runs as a test.
 
-## 🟡 Brief 107 — Simulate v2 Engine 4: systems by zone group — IN PROGRESS on `chris/107-systems` (stacked on 106)
+## ✅ Brief 107 — Simulate v2 Engine 4: systems by zone group — CLOSED 15 Nov 2026 on `chris/107-systems` (stacked on 106; PR open, awaiting Linzie)
 
-Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
+Brief [`docs/briefs/archive/107_systems_COMPLETED.md`](docs/briefs/archive/107_systems_COMPLETED.md).
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/107/00_reconnaissance.md)): today's 133.2 decomposed by end use. Electricity 404.144 MWh is heating 37.657 + cooling 30.8 + hot water heat pump 41.174 + pump 1.051 + fans 40.613 + lighting 39.014 + small power 186.136 + auxiliary 27.699; gas 157.428 is the hot water boiler. Every input is in the converted document.
 - **P1 systems** ([`01_systems.md`](docs/audit/107/01_systems.md)): `engine/systems.ts`. Each group's draw from the zones' demand (proportional split, scalar efficiencies), hot water tap-mix per zone, the pump, fans by schedule, and lighting, small power and auxiliary from the gains' electricity. Today's fallbacks are refusals. Served equals demand and the end uses sum to the totals by fuel (tested by hand).
@@ -38,6 +49,8 @@ Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
   - Engine 2's demand is within −3.9 / +9.3 % of EnergyPlus; today's is −13.8 / +61 %.
 - **P3 tolerance table** ([`03_tolerances.md`](docs/audit/107/03_tolerances.md)): heating and cooling electricity −3.9 / +9.3 % (±10 %, pass), EUI 131.89 against 131.86 (pass). Hot water, fans, lighting, small power and auxiliary are shared inputs, equal by construction, and say so.
 - **P4 panel** ([`04_panel.md`](docs/audit/107/04_panel.md)): "Energy used" with EUI, fuels, end uses and each system's served and used energy; missing systems inputs named while demand still shows. Browser-checked on the editor's plan (46 kWh/m²).
+- **Independent review** ([`05_independent_review.md`](docs/audit/107/05_independent_review.md)) and **response** ([`06_review_response.md`](docs/audit/107/06_review_response.md)): no tuning, Rule 11 clean. F1 hot water now refused where a zone with use has no system; F2 served is checked against the model's demand (throws, as closure does; mutation M3 now caught); F3–F9 fixed or stated (unused inputs listed on the panel). Gate unchanged; 176 tests pass; browser-checked (`06_panel.png`).
+- **P5 close** ([`07_final_report.md`](docs/audit/107/07_final_report.md)): brief archived; design note Rev A.9. Next: Brief 108, emitters per room.
 
 ## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
 

@@ -216,7 +216,9 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           </div>
 
           <h3>Energy used <i>estimate</i></h3>
-          {s.energy.ok ? (
+          {s.energy === null ? (
+            <p className="rp-none">Energy used is shown when results include systems.</p>
+          ) : s.energy.ok ? (
             <>
               <div className="rp-totals">
                 <div>
@@ -235,6 +237,8 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
                   {s.energy.end_uses.map((l) => <tr key={`${l.end_use}|${l.fuel}`}><td>{END_USE_WORDS[l.end_use] ?? l.end_use}</td><td>{FUEL_WORDS[l.fuel] ?? l.fuel}</td><td>{mwh(l.kwh)}</td></tr>)}
                 </tbody>
               </table>
+              {s.energy.no_hot_water && <p className="rp-none">No hot water system stated: hot water is not included.</p>}
+              {s.energy.not_modelled.length > 0 && <p className="rp-none">Stated but not used yet: {s.energy.not_modelled.join('; ')}.</p>}
               {s.energy.systems.length > 0 && (
                 <table className="rp-table">
                   <thead><tr><th>System</th><th>Serves MWh</th><th>Uses MWh</th></tr></thead>
@@ -261,8 +265,10 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
               EnergyPlus on a five-storey hotel (heating within 4 %, cooling within 10 %, with the same air density;
               with EnergyPlus's default outdoor air density, −11 % and +10 %). Figures for single zones and
               rooms are not yet validated: storeys differed from EnergyPlus by up to 31 % for cooling. Energy used is
-              that demand through each system's share and efficiency, plus hot water, fans, lighting and equipment; it
-              matches today's tool given the same demand. Carbon is not included yet.
+              that demand through each system's share and efficiency, plus hot water, fans, lighting and equipment. On the
+              Bridgewater test building, given the same demand, it matches today's tool to the kWh; fans follow their
+              schedule here. Lighting and equipment controls act through the gains; a control factor only splits
+              electricity between systems sharing a zone. Carbon is not included yet.
             </p>
           )}
           <table className="rp-table">

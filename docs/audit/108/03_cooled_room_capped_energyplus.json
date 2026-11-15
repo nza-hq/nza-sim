@@ -1,0 +1,66 @@
+{
+ "source": "validation/energyplus/108_capped_referee.py",
+ "spec_sha256": "3a3f7c4af45fb9070e45d21ad0c4defe7e78e45d29f6196cf175e538af62725f",
+ "caps_sha256": "04eb39ec8470d33ef9477170519f5df3c969c4d04365c9c8584aa8bc80adc1fd",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "runs": {
+  "uncapped": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.933197794339537,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "min_c": 19.999999999999993,
+     "peak_heating_w": 1471.1651439395444
+    },
+    "east": {
+     "heat_mwh": 1.9301608327763349,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "min_c": 19.999999999999993,
+     "peak_heating_w": 1471.5077145436267
+    }
+   }
+  },
+  "tight": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.8799468724552395,
+     "unmet_hours": 517,
+     "ep_not_met_hours": 513.75,
+     "min_c": 14.022288870894588,
+     "peak_heating_w": 800.0461540745985
+    },
+    "east": {
+     "heat_mwh": 1.8770901789475731,
+     "unmet_hours": 511,
+     "ep_not_met_hours": 511.0,
+     "min_c": 14.016211430025498,
+     "peak_heating_w": 800.046154622069
+    }
+   }
+  },
+  "mild": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.930007431732871,
+     "unmet_hours": 32,
+     "ep_not_met_hours": 31.75,
+     "min_c": 17.240883317460426,
+     "peak_heating_w": 1100.0574906551622
+    },
+    "east": {
+     "heat_mwh": 1.9270007370681521,
+     "unmet_hours": 32,
+     "ep_not_met_hours": 31.25,
+     "min_c": 17.237780539486874,
+     "peak_heating_w": 1100.0577385544916
+    }
+   }
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c"
+}

@@ -55,7 +55,13 @@ export interface ZoneResults {
     peak_heating_w: number
     peak_cooling_w: number
     theta_air_c: { min: number; max: number; mean: number }
+    /** Brief 108: hours the control temperature is more than 0.5 K below the heating setpoint (null: not heated). */
+    unmet_heating_hours: number | null
+    /** Brief 108: the lowest control temperature (air or operative, as the run's control), °C. */
+    min_control_c: number
   }
+  /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
+  emitters: { cap_w: number; radiant_fraction: number; hours_at_cap: number; emitters: { id: string; kind: string; output_w: number; rated_w: number; exponent_n: number | null }[] } | null
   /** Every term of the balance, per element where it has one (Rule 9). The lines sum to the closure residual. */
   breakdown: BreakdownLine[]
   closure: { max_wh: number; sum_kwh: number }

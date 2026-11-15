@@ -98,11 +98,11 @@ const sys = (doc: ModelDocument, r: ModelResults) => {
 
 // (a) today's demand, flat
 const one = await convert()
-const fed = { zones: [{ zone_id: one.zones[0].id, hourly: { heating_w: new Float64Array(H).fill((TODAY.heating_demand * 1e6) / H), cooling_w: new Float64Array(H).fill((TODAY.cooling_demand * 1e6) / H) } }] } as unknown as ModelResults
+const fed = { zones: [{ zone_id: one.zones[0].id, hourly: { heating_w: new Float64Array(H).fill((TODAY.heating_demand * 1e6) / H), cooling_w: new Float64Array(H).fill((TODAY.cooling_demand * 1e6) / H) }, annual: { heating_kwh: TODAY.heating_demand * 1000, cooling_kwh: TODAY.cooling_demand * 1000 } }] } as unknown as ModelResults
 const A = endUses(sys(one, fed))
 const pathByPath = Object.fromEntries(Object.keys(A).filter((k) => k in TODAY).map((k) => {
   const t = (TODAY as any)[k], v = (A as any)[k]
-  return [k, { today: +t.toFixed(3), v2: +v.toFixed(3), diff_kwh: +((v - t) * (k === 'eui' ? 4216 : 1000)).toFixed(1) }]
+  return [k, k === 'eui' ? { today: +t.toFixed(3), v2: +v.toFixed(3) } : { today: +t.toFixed(3), v2: +v.toFixed(3), diff_kwh: +((v - t) * 1000).toFixed(1) }]  // today's EUI is rounded to 0.1, so no kWh difference (review F9)
 }))
 
 // (b) Engine 2's own demand, five storeys, the editor's run options

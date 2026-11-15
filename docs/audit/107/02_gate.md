@@ -28,6 +28,8 @@ Today's `calculateInstant` was run on the fixture, as `_brief93_anchor.mjs --fix
 
 Lighting, small power and auxiliary use `gains.ts` electricity, so this also confirms the electricity side of Brief 105's gains port, which had been gated on heat only.
 
+**What each row of today's side is (review F9).** Heating, cooling, hot water, fans, lighting and small power come from `consumption.brief40` (today's `computeSystemsDelivered`). Auxiliary comes from today's heat-balance gains electricity, and the hot water pump from `consumption.dhw.circulation_pump_mwh` (State 3). These are the terms today's 404.144 MWh sums. The EUI row has no kWh difference, because today's EUI is rounded to 0.1.
+
 ## (b) On Engine 2's own demand
 
 Bridgewater as five storeys, with the editor's run options (gains and ventilation from the document):

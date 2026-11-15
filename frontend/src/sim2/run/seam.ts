@@ -1,7 +1,13 @@
 /**
  * Brief 105 Part 4: the run seam. A model document in, either results or the list of what is missing, in plain words.
  *
- *   simulate(doc, { weather, constructions? }) → { ok: true, results, summary } | { ok: false, missing }
+ *   simulate(doc, { weather, constructions?, level?, fabric_heat_c? }) → { ok: true, results, summary } | { ok: false, missing }
+ *
+ * Brief 111 Part 1, "Results include": `level` runs a copy of the document with objects removed (Rule 8: removed, never
+ * muted). 'fabric': the Building module's envelope alone, every zone heated to `fabric_heat_c` (stated by the caller,
+ * never defaulted here), no cooling, no gains, no ventilation entries, no emitters, no systems. 'spaces': the spaces'
+ * own setpoints and gains and natural ventilation, without mechanical ventilation, emitters or systems. 'systems'
+ * (absent): the document as it is. See `levelDocument`.
  *
  * The document is checked against the schema; an older version is refused, not upgraded (review F1). Then the inputs a run
  * needs and the editor may not have yet are checked together, so the person sees every gap at once:
@@ -16,7 +22,7 @@
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine/model'
-import { FUELS, readSystemsEui, readSystemsTotalKwh, runSystems, type EndUse, type Fuel } from '../../thermal/engine/systems'
+import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingPeakW, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
@@ -28,6 +34,39 @@ import type { WeatherChoice } from './weather'
 export type { Missing } from './library'
 
 export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'profiles', ventilation: 'document' }
+
+/** Brief 111: what a run includes. */
+export const LEVELS = ['fabric', 'spaces', 'systems'] as const
+export type Level = (typeof LEVELS)[number]
+
+/**
+ * The run copy for a level (Brief 111 Part 1, Rule 8). Objects outside the level are removed from the copy, never
+ * zeroed or switched off; the document itself is not changed.
+ * - fabric: gain profiles and every zone's references to them, every ventilation entry (q50 infiltration and permanent
+ *   vents are on the zone and its surfaces, and stay), emitters and system groups removed; each zone heated to
+ *   `heatC` with no cooling and no setback.
+ * - spaces: mechanical ventilation entries (mvhr, mev), emitters and system groups removed; the zones' own setpoints,
+ *   gains and natural ventilation stay.
+ * - systems: the document unchanged.
+ */
+export function levelDocument(doc: ModelDocument, level: Level, heatC: number | null = null): ModelDocument {
+  if (level === 'systems') return doc
+  const d = structuredClone(doc)
+  d.system_groups = []
+  for (const z of d.zones) {
+    z.emitters = []
+    z.ventilation = level === 'fabric' ? [] : z.ventilation.filter((v) => v.kind === 'natural')
+  }
+  if (level === 'fabric') {
+    if (heatC == null || !Number.isFinite(heatC)) throw new Error('fabric level needs the heating setpoint')
+    d.profiles = d.profiles.filter((p) => p.kind === 'schedule')
+    for (const z of d.zones) {
+      z.profile_refs = { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
+      z.setpoints = { heat_c: heatC, cool_c: null, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' }
+    }
+  }
+  return ModelDocument.parse(d)
+}
 
 export interface Summary {
   engine: ModelResults['engine']
@@ -44,6 +83,9 @@ export interface Summary {
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
   /** Constructions used that are drafts awaiting review (not yet in the library), by display name. */
   drafts: string[]
+  /** Brief 111: what this run includes, and for 'fabric' the temperature every zone was heated to. */
+  level: Level
+  fabric_heat_c: number | null
   /**
    * Energy the installed systems use (Brief 107), or what they still need. Demand shows either way. The EUI here is
    * v2's own boundary (Rule 11), read once through readSystemsEui.
@@ -54,8 +96,14 @@ export interface Summary {
         by_fuel: { fuel: Fuel; kwh: number }[]
         end_uses: { end_use: EndUse; fuel: Fuel; kwh: number }[]
         systems: { id: string; label: string; service: EndUse; fuel: Fuel; efficiency: number | null; served_kwh: number; fuel_kwh: number }[]
+        /** Inputs stated but not used yet, in words (review F4). */
+        not_modelled: string[]
+        /** True when no hot water system or hot water use is stated, so hot water is not in the total (review F1). */
+        no_hot_water: boolean
       }
     | { ok: false; missing: Missing[] }
+    /** Brief 111: no systems at this level, so no energy. */
+    | null
 }
 
 export type SimulateResult =
@@ -113,7 +161,14 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
   return { missing, library: lib.library, drafts: lib.drafts }
 }
 
-export function simulate(input: unknown, deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions }): SimulateResult {
+export function simulate(
+  input: unknown,
+  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null },
+): SimulateResult {
+  const level = deps.level ?? 'systems'
+  if (!LEVELS.includes(level)) return { ok: false, missing: [{ path: 'level', what: `Unknown results level "${String(level)}".` }] }
+  const fabricC = level === 'fabric' ? deps.fabric_heat_c ?? null : null
+  if (level === 'fabric' && (fabricC == null || !Number.isFinite(fabricC))) return { ok: false, missing: [{ path: 'fabric_heat_c', what: 'Fabric only needs the temperature every room is heated to.' }] }
   let doc: ModelDocument
   try {
     const v = (input as { schema_version?: unknown })?.schema_version
@@ -130,6 +185,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
   } catch (e) {
     return { ok: false, missing: [{ path: 'schema_version', what: `The building cannot be read (${(e as Error).message}).` }] }
   }
+  doc = levelDocument(doc, level, fabricC)
   const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
   if (pre.missing.length) return { ok: false, missing: pre.missing }
   const weather = deps.weather!
@@ -154,14 +210,15 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     engine: results.engine, run_ms: results.run_ms,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
     building: {
-      floor_m2: doc.zones.reduce((s, z) => s + z.area_m2, 0),
+      floor_m2: readDocFloorM2(doc),
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
       peak_heating_w: readBuildingPeakW(results, 'heating'), peak_cooling_w: readBuildingPeakW(results, 'cooling'),
     },
     zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh, heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true) })),
     breakdown: byTerm(results.zones, false),
     drafts: pre.drafts,
-    energy: energyOf(doc, results, weather),
+    level, fabric_heat_c: fabricC,
+    energy: level === 'systems' ? energyOf(doc, results, weather) : null,
   }
   return { ok: true, results, summary }
 }
@@ -181,6 +238,9 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
     if (message.startsWith('unknown source') || message.endsWith('runs on electricity')) return { path, what: `The system ${name}: ${message}.` }
     return { path, what: `The system ${name} needs ${what[g[2]] ?? g[2].replace(/_/g, ' ')}.` }
   }
+  if (path === 'services.dhw') return { path, what: 'Hot water use is stated, but no hot water system is chosen to heat it.' }
+  const z = path.match(/^zones\[(\d+)\]\.dhw$/)
+  if (z) return { path, what: `Choose a hot water system for ${zoneName(doc, z[1])}.` }
   const d = path.match(/^services\.dhw\.(\w+)$/)
   if (d) {
     const what: Record<string, string> = {
@@ -196,7 +256,12 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
 }
 
 function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
-  const a = runSystems(doc, results, weather.weather.hours)
+  let a: ReturnType<typeof runSystems>
+  try { a = runSystems(doc, results, weather.weather.hours) } catch (e) {
+    // The served-equals-demand check (Rule 9) failing is a fault in the tool, never a number to show.
+    if (e instanceof ServedError) return { ok: false, missing: [{ path: 'systems', what: `The energy check failed (${e.message}). This is a fault in the tool; please report it.` }] }
+    throw e
+  }
   if (!a.ok) return { ok: false, missing: a.missing.map((m) => explainSystems(m.path, m.message, doc)) }
   const s = a.systems
   return {
@@ -204,5 +269,12 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
     by_fuel: FUELS.filter((f) => s.by_fuel[f] > 0).map((fuel) => ({ fuel, kwh: s.by_fuel[fuel] })),
     end_uses: s.end_uses.filter((l) => l.kwh > 0),
     systems: s.groups.map((g) => ({ id: g.id, label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system`, service: g.service, fuel: g.fuel, efficiency: g.efficiency, served_kwh: g.served_kwh, fuel_kwh: g.fuel_kwh })),
+    not_modelled: s.not_modelled.map((n) => {
+      const m = n.path.match(/^system_groups\[(\d+)\]/)
+      const v = n.path.match(/^zones\[(\d+)\]\.ventilation/)
+      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : n.path
+      return `${owner}: ${n.what}`
+    }),
+    no_hot_water: s.dhw == null,
   }
 }

@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 import { ModelDocument } from '../../schema/model'
 import { calendar } from '../gains'
 import type { ModelResults } from '../results'
-import { readEndUseKwh, readSystemsEui, readSystemsTotalKwh, runSystems, WATER_KWH_PER_L_K, type SystemsResults } from '../systems'
+import { checkServed, readEndUseKwh, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, WATER_KWH_PER_L_K, type SystemsResults } from '../systems'
 import { cooledRoomDocument } from './cooledRoom'
 import { MOS, readMos } from './denver'
 
@@ -38,7 +38,7 @@ function setup() {
 function results(doc: any): ModelResults {
   const flat = (v: number) => new Float64Array(H).fill(v)
   const demand: Record<string, [number, number]> = { west: [1000, 0], middle: [0, 800], east: [500, 0] }
-  return { zones: doc.zones.map((z: any) => ({ zone_id: z.id, hourly: { heating_w: flat(demand[z.id][0]), cooling_w: flat(demand[z.id][1]) } })) } as unknown as ModelResults
+  return { zones: doc.zones.map((z: any) => ({ zone_id: z.id, hourly: { heating_w: flat(demand[z.id][0]), cooling_w: flat(demand[z.id][1]) }, annual: { heating_kwh: (demand[z.id][0] * H) / 1000, cooling_kwh: (demand[z.id][1] * H) / 1000 } })) } as unknown as ModelResults
 }
 const ok = (doc: any) => {
   const r = runSystems(ModelDocument.parse(doc), results(doc), W.hours)
@@ -146,3 +146,91 @@ describe('systems: what is missing is named, never filled', () => {
     expect(s.ungrouped.filter((u) => u.end_use === 'lighting').length).toBe(3)
   })
 })
+
+describe('systems: review responses (Brief 107 F1–F8)', () => {
+  const missing = (d: any, r = results(d)) => {
+    const a = runSystems(ModelDocument.parse(d), r, W.hours)
+    if (a.ok) throw new Error('expected a refusal')
+    return a.missing
+  }
+  it('F1: a zone with hot water use that no hot water system serves is named, not dropped', () => {
+    const d = setup()
+    d.system_groups.find((x: any) => x.id === 'dhw_boiler').zones = ['west']
+    expect(missing(d)).toEqual(expect.arrayContaining([{ path: 'zones[1].dhw', message: 'no hot water system serves middle' }, { path: 'zones[2].dhw', message: 'no hot water system serves east' }]))
+  })
+  it('F1: hot water use stated with no hot water system is named; with neither, there is no hot water', () => {
+    const d = setup()
+    d.system_groups = d.system_groups.filter((x: any) => x.service !== 'dhw')
+    expect(missing(d)).toEqual([{ path: 'services.dhw', message: 'hot water use is stated but no hot water system serves it' }])
+    d.services.dhw.demand_basis = null
+    expect(readEndUseKwh(ok(d), 'dhw')).toBe(0)
+  })
+  it('F2: served is checked against the demand computed apart from serving, per service', () => {
+    const s = ok(setup())
+    const heat = (1500 * H) / 1000, cool = (800 * H) / 1000
+    expect(() => checkServed(s.groups, heat, cool, s.dhw!.demand_kwh)).not.toThrow()
+    // A zone dropped before serving (the review's mutation M3) leaves served short of the integrand.
+    expect(() => checkServed(s.groups, heat + 1, cool, s.dhw!.demand_kwh)).toThrow(ServedError)
+    expect(() => checkServed(s.groups, heat, cool, s.dhw!.demand_kwh * 1.001)).toThrow(ServedError)
+    // And runSystems itself throws when the model's annual demand disagrees with the hours it serves.
+    const d = setup()
+    const r: any = results(d)
+    r.zones[2].annual.heating_kwh += 10
+    expect(() => runSystems(ModelDocument.parse(d), r, W.hours)).toThrow(ServedError)
+  })
+  it('F3: groups sharing a zone\'s lighting must state their control factor; a lone group need not', () => {
+    const d = setup()
+    d.system_groups.find((x: any) => x.id === 'lights').control_factor = null
+    expect(readEndUseKwh(ok(d), 'lighting')).toBeGreaterThan(0)
+    d.system_groups.find((x: any) => x.id === 'lights').share_pct = 50
+    d.system_groups.push({ id: 'lights2', service: 'lighting', zones: ['west', 'middle', 'east'], enabled: true, share_pct: 50, source: 'electricity', efficiency_metric: null, control_factor: 1 })
+    expect(missing(d).map((m) => m.path)).toContain('system_groups[4].control_factor')
+  })
+  it('F4: inputs not modelled yet are listed, not silently dropped', () => {
+    const d = setup()
+    d.system_groups[0].capacity_kw = 0.1
+    d.system_groups[1].control_schedule_ref = 'nowhere'
+    d.zones[0].ventilation[0].defrost_penalty_kwh = 5
+    expect(ok(d).not_modelled).toEqual([
+      { path: 'system_groups[0].capacity_kw', what: 'capacity' },
+      { path: 'system_groups[1].control_schedule_ref', what: 'control schedule "nowhere" (not in this building)' },
+      { path: 'zones[0].ventilation[0].defrost_penalty_kwh', what: 'defrost penalty' },
+    ])
+  })
+  it('F6: hourly shapes: one hot hour of heating lands in that hour of electricity; hot water follows occupancy', () => {
+    const d = setup()
+    const r: any = results(d)
+    const spike = new Float64Array(H); spike[1000] = 9000
+    r.zones[0].hourly.heating_w = spike; r.zones[0].annual.heating_kwh = 9
+    const s = ok2(d, r)
+    const hp = g(s, 'hp'), boiler = g(s, 'boiler')
+    expect(hp.fuel_w[1000] - (500 * 0.6) / 3).toBeCloseTo((9000 * 0.6) / 3, 9)
+    expect(hp.fuel_w[999]).toBeCloseTo((500 * 0.6) / 3, 9)
+    expect(boiler.fuel_w[1000] - (500 * 0.4) / 0.9).toBeCloseTo((9000 * 0.4) / 0.9, 9)
+    // electricity_w hour by hour: the heat pump, chiller, fan, hot water pump and lighting at hour 1000
+    const lightW = 5 * d.zones.reduce((a: number, z: any) => a + z.area_m2, 0)
+    expect(s.electricity_w[1000]).toBeCloseTo(hp.fuel_w[1000] + 800 / 2.5 + 100 + 100 + lightW, 6)
+    // hot water following occupancy: zero in unoccupied hours, the same annual total
+    const o = setup()
+    o.profiles.push({ id: 'occ', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: Array(24).fill(0).map((_, h) => (h >= 8 && h < 18 ? 1 : 0)), saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+    for (const z of o.zones) z.profile_refs.occupancy = 'occ'
+    const flat = ok(o)
+    o.services.dhw.load_shape = 'follow_occupancy'
+    const fo = ok(o)
+    expect(g(fo, 'dhw_boiler').fuel_kwh).toBeCloseTo(g(flat, 'dhw_boiler').fuel_kwh, 6)
+    const c = calendar(W.hours)
+    let night = 0
+    for (let h = 0; h < H; h++) if (c.hourOfDay[h] < 8) night += g(fo, 'dhw_boiler').fuel_w[h]
+    expect(night).toBe(0)
+  })
+  it('F8: a building with no floor area has no EUI; it is named, not 0', () => {
+    const d = setup()
+    for (const z of d.zones) z.area_m2 = 0
+    expect(missing(d).map((m) => m.path)).toContain('zones')
+  })
+})
+const ok2 = (doc: any, r: ModelResults) => {
+  const a = runSystems(ModelDocument.parse(doc), r, W.hours)
+  if (!a.ok) throw new Error(JSON.stringify(a.missing))
+  return a.systems
+}

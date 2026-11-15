@@ -22,7 +22,7 @@
  */
 import type { ModelDocument } from '../schema/model'
 import { zoneGains, GainsError, type GainKind } from './gains'
-import type { ModelResults } from './results'
+import { readBuildingCoolingKwh, readBuildingHeatingKwh, type ModelResults } from './results'
 import type { Weather } from './types'
 import { VentilationError, zoneVentilation } from './ventilation'
 
@@ -74,15 +74,34 @@ export interface SystemsResults {
   electricity_w: Float64Array
   /** Hot water: tap-mix inputs as used, and the demand served (kWh a year, at the store). */
   dhw: { hot_fraction: number; demand_kwh: number } | null
-  /** Each served zone's demand by service, kWh a year, for the served-equals-demand invariant. */
+  /** Each served zone's demand by service, kWh a year. */
   zone_demand: { zone_id: string; service: 'heating' | 'cooling' | 'dhw'; kwh: number }[]
+  /** Inputs the document states that this engine does not use yet (review F4): shown, never silently dropped. */
+  not_modelled: { path: string; what: string }[]
+}
+
+/** Thrown when what the systems serve differs from the demand the model computed (Rule 9, review F2). */
+export class ServedError extends Error {}
+const SERVED_TOL = (kwh: number) => 1e-6 * Math.abs(kwh) + 1e-6
+
+/**
+ * Rule 9, integrand against display (review F2): what the groups serve, per service, equals the demand computed
+ * independently of serving: heating and cooling from the model's results, hot water from the tap-mix over every zone.
+ */
+export function checkServed(groups: readonly GroupResult[], heatingKwh: number, coolingKwh: number, dhwKwh: number): void {
+  for (const [service, want] of [['heating', heatingKwh], ['cooling', coolingKwh], ['dhw', dhwKwh]] as const) {
+    const got = groups.filter((g) => g.service === service).reduce((a, g) => a + g.served_kwh, 0)
+    if (Math.abs(got - want) > SERVED_TOL(want)) throw new ServedError(`systems serve ${got} kWh of ${service}; the building needs ${want} kWh`)
+  }
 }
 
 export type SystemsAnswer = { ok: true; systems: SystemsResults } | { ok: false; missing: SystemsMissing[] }
 
+/** The building's floor area, m²: the zones' summed. One place, read by the systems and the seam (review F8). */
+export const readDocFloorM2 = (doc: ModelDocument) => doc.zones.reduce((s, z) => s + z.area_m2, 0)
 export const readSystemsTotalKwh = (s: SystemsResults) => FUELS.reduce((a, f) => a + s.by_fuel[f], 0)
 /** The v2 delivered-energy EUI, kWh/m² a year (Rule 11: read only here; not the instant engine's, not EnergyPlus's). */
-export const readSystemsEui = (s: SystemsResults) => (s.floor_m2 > 0 ? readSystemsTotalKwh(s) / s.floor_m2 : 0)
+export const readSystemsEui = (s: SystemsResults) => readSystemsTotalKwh(s) / s.floor_m2  // runSystems refuses a zero floor
 export const readEndUseKwh = (s: SystemsResults, u: EndUse) => s.end_uses.filter((l) => l.end_use === u).reduce((a, l) => a + l.kwh, 0)
 
 const sum = (a: Float64Array) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return s }
@@ -94,11 +113,18 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   const zoneIdx = new Map(doc.zones.map((z, i) => [z.id, i]))
 
   // ── Groups: read and check each enabled one once ────────────────────────────────────────────────────────────
-  interface G { i: number; id: string; service: EndUse; label: string | null; share: number; cf: number; fuel: Fuel; eff: number | null; zones: number[] }
+  interface G { i: number; id: string; service: EndUse; label: string | null; share: number; cf: number | null; fuel: Fuel; eff: number | null; zones: number[] }
   const groups: G[] = []
+  const not_modelled: SystemsResults['not_modelled'] = []
+  const profileIds = new Set(doc.profiles.map((x) => x.id))
   doc.system_groups.forEach((g, i) => {
     if (!g.enabled) return
     const p = `system_groups[${i}]`
+    if (g.capacity_kw != null) not_modelled.push({ path: `${p}.capacity_kw`, what: 'capacity' })
+    if (g.control_mechanism != null) not_modelled.push({ path: `${p}.control_mechanism`, what: 'control mechanism' })
+    // Not used, so not refused when it names a schedule the building lacks (today's library schedules are not carried
+    // over); the panel lists it either way.
+    if (g.control_schedule_ref != null) not_modelled.push({ path: `${p}.control_schedule_ref`, what: profileIds.has(g.control_schedule_ref) ? 'control schedule' : `control schedule "${g.control_schedule_ref}" (not in this building)` })
     const service = g.service as EndUse
     const thin = service === 'lighting' || service === 'small_power' || service === 'auxiliary'
     if (!(g.share_pct >= 0 && g.share_pct <= 100)) miss(`${p}.share_pct`, 'must be 0 to 100')
@@ -112,8 +138,10 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       else if (!(eff > 0)) miss(`${p}.efficiency_metric`, 'must be above 0')
     }
     if (thin && fuel && fuel !== 'electricity') miss(`${p}.source`, `${service.replace('_', ' ')} runs on electricity`)
-    const cf = thin ? (g.control_factor ?? 1) : 1
-    if (thin && !(cf >= 0)) miss(`${p}.control_factor`, 'must be ≥ 0')
+    // The control factor only splits a zone's electricity between the groups sharing it (as today); with one group it
+    // has no effect, so it may be left out. Sharing groups must state it (checked below; review F3).
+    const cf = thin ? (g.control_factor ?? null) : 1
+    if (thin && cf != null && !(cf >= 0)) miss(`${p}.control_factor`, 'must be ≥ 0')
     groups.push({ i, id: g.id, service, label: g.label ?? null, share: g.share_pct, cf, fuel: fuel ?? 'electricity', eff, zones: g.zones.map((z) => zoneIdx.get(z)!) })
   })
   const covering = (service: EndUse, zi: number) => groups.filter((g) => g.service === service && g.zones.includes(zi))
@@ -155,8 +183,12 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   let dhwInfo: SystemsResults['dhw'] = null
   const dhwDemand: { zi: number; w: Float64Array; kwh: number }[] = []
   let pumpW = 0
+  let dhwNeeded = 0  // the tap-mix over every zone, independent of which zones are served (review F2)
+  const d0 = doc.services.dhw
+  // Hot water use stated with no system to serve it is named, not dropped (review F1).
+  if (dhwGroups.length === 0 && d0.demand_basis != null) miss('services.dhw', 'hot water use is stated but no hot water system serves it')
   if (dhwGroups.length > 0) {
-    const d = doc.services.dhw
+    const d = d0
     const need = (v: number | string | null, k: string) => { if (v == null) miss(`services.dhw.${k}`, 'required: a hot water system is installed'); return v }
     const store = need(d.storage_setpoint_c, 'storage_setpoint_c') as number | null
     const tap = need(d.tap_outlet_temp_c, 'tap_outlet_temp_c') as number | null
@@ -177,15 +209,21 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       const hot = (tap - cold) / (store - cold)
       let total = 0
       doc.zones.forEach((zone, zi) => {
-        if (covering('dhw', zi).length === 0) return  // hot water only where a system serves it
-        if (!sharesOk('dhw', zi, 'hot water')) return
+        // Every zone with hot water use must be served (review F1): per m², every zone with floor; per person, every
+        // zone with occupants. A zone with no occupancy uses no hot water per person, unless a system names it.
         let tapLitres: number
         if (basis === 'per_person') {
           const occ = gains[zi]?.occupancy
-          if (!occ) { miss(`zones[${zi}].profile_refs.occupancy`, `hot water per person needs ${zone.name || zone.id}'s occupancy`); return }
+          if (!occ) {
+            if (covering('dhw', zi).length > 0) miss(`zones[${zi}].profile_refs.occupancy`, `hot water per person needs ${zone.name || zone.id}'s occupancy`)
+            return
+          }
           tapLitres = occ.people * litres
         } else tapLitres = litres * zone.area_m2
         const kwh = tapLitres * hot * (store - cold) * WATER_KWH_PER_L_K * 365  // a year of days, as today
+        if (!(kwh > 0)) return
+        dhwNeeded += kwh
+        if (!sharesOk('dhw', zi, 'hot water')) return
         const w = new Float64Array(H)
         if (shape === 'follow_occupancy') {
           const occ = gains[zi]?.occupancy
@@ -223,9 +261,16 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   // the electricity still counts (it is the gains'), under no group.
   doc.zones.forEach((_, zi) => {
     for (const [service, what] of [['lighting', 'lighting'], ['small_power', 'small power'], ['auxiliary', 'auxiliary']] as const) {
-      if (covering(service, zi).length > 0) sharesOk(service, zi, what)
+      const gs = covering(service, zi)
+      if (gs.length > 0) sharesOk(service, zi, what)
+      if (gs.length > 1) for (const g of gs) if (g.cf == null) miss(`system_groups[${g.i}].control_factor`, `required: ${what} systems sharing a zone are split by share × control factor`)
     }
   })
+  doc.zones.forEach((z, zi) => z.ventilation.forEach((v, j) => {
+    if (v.enabled && v.defrost_penalty_kwh != null) not_modelled.push({ path: `zones[${zi}].ventilation[${j}].defrost_penalty_kwh`, what: 'defrost penalty' })
+  }))
+  const floor_m2 = readDocFloorM2(doc)
+  if (!(floor_m2 > 0)) miss('zones', 'the building has no floor area, so it has no EUI')
 
   if (missing.length) return { ok: false, missing }
 
@@ -249,6 +294,7 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   }
   for (const d of demand) serve(d.service, d.zi, d.w, d.kwh)
   for (const d of dhwDemand) serve('dhw', d.zi, d.w, d.kwh)
+  checkServed([...out.values()], readBuildingHeatingKwh(results), readBuildingCoolingKwh(results), dhwNeeded)
   if (dhwDemand.length && pumpW > 0) ungrouped.push({ end_use: 'dhw_circulation', zone_id: null, entry_id: null, kwh: (pumpW * H) / 1000, w: new Float64Array(H).fill(pumpW) })
 
   // Lighting, small power, auxiliary: the gains' electricity, split by share × control factor.
@@ -262,7 +308,7 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       const kwh = sum(e) / 1000
       if (!(kwh > 0)) continue
       const gs = covering(service, zi)
-      const weights = gs.map((g) => (g.share / 100) * g.cf)
+      const weights = gs.map((g) => (g.share / 100) * (g.cf ?? 1))  // null only with one group, where it cancels
       const wt = weights.reduce((a, b) => a + b, 0)
       if (wt > 0) {
         gs.forEach((g, k) => {
@@ -300,8 +346,7 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   return {
     ok: true,
     systems: {
-      groups: groupsOut, ungrouped, end_uses, by_fuel, electricity_w, dhw: dhwInfo, zone_demand,
-      floor_m2: doc.zones.reduce((s, z) => s + z.area_m2, 0),
+      groups: groupsOut, ungrouped, end_uses, by_fuel, electricity_w, dhw: dhwInfo, zone_demand, floor_m2, not_modelled,
     },
   }
 }
