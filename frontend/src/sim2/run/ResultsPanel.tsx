@@ -35,9 +35,13 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'done'; summary: Summary; ms: number }
 
-export default function ResultsPanel({ doc }: { doc: unknown }) {
+/**
+ * `right`: px from the editor's right edge, so the panel can sit beside a card the editor shows there (default 16).
+ * The panel starts closed, as a tab showing the heating when there is a result.
+ */
+export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?: number }) {
   const auth = useAuth()
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
   const [weatherError, setWeatherError] = useState<string | null>(null)
@@ -48,7 +52,10 @@ export default function ResultsPanel({ doc }: { doc: unknown }) {
   latestDoc.current = doc
 
   useEffect(() => {
-    const c = new RunClient(
+    let c: RunClient
+    const failed = (why: string) => setState({ kind: 'error', message: `Results cannot run in this view (${why}).` })
+    try {
+      c = new RunClient(
       (a: RunAnswer) => {
         const r = a.result
         if (r.ok) setState({ kind: 'done', summary: r.summary, ms: a.ms })
@@ -61,7 +68,12 @@ export default function ResultsPanel({ doc }: { doc: unknown }) {
         setState({ kind: 'running' })
         c.run(latestDoc.current, 0)
       },
-    )
+      failed,
+      )
+    } catch (e) {
+      failed((e as Error).message || 'the browser blocked the background worker')
+      return
+    }
     client.current = c
     return () => c.dispose()
   }, [])
@@ -104,10 +116,10 @@ export default function ResultsPanel({ doc }: { doc: unknown }) {
   }, [s])
 
   if (!open) {
-    return <button type="button" className="rp-tab" onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : ''}</button>
+    return <button type="button" className="rp-tab" style={{ right }} onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : state.kind === 'missing' ? ` · ${state.items.length} to set` : ''}</button>
   }
   return (
-    <section className="rp" aria-label="Results">
+    <section className="rp" style={{ right }} aria-label="Results">
       <header className="rp-head">
         <h2>Heating and cooling demand</h2>
         <button type="button" className="rp-x" onClick={() => setOpen(false)} aria-label="Hide results">–</button>

@@ -11,8 +11,10 @@ export class RunClient {
   private worker: Worker
   private seq = 0
   private timer: ReturnType<typeof setTimeout> | null = null
-  constructor(private onResult: (a: RunAnswer) => void, private onWeather: (a: WeatherAnswer) => void) {
+  /** Throws when the page cannot start a worker (a page opened from a file); `onFailed` hears a worker that stops. */
+  constructor(private onResult: (a: RunAnswer) => void, private onWeather: (a: WeatherAnswer) => void, onFailed?: (message: string) => void) {
     this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+    this.worker.onerror = (ev) => { ev.preventDefault(); onFailed?.(ev.message || 'the background worker stopped') }
     this.worker.onmessage = (ev: MessageEvent<WorkerOut>) => {
       const m = ev.data
       if (m.type === 'result') { if (m.id === this.seq) this.onResult(m) } else this.onWeather(m)
