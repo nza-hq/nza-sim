@@ -7,6 +7,7 @@
 Brief [`docs/briefs/active/106_zone-breakdown.md`](docs/briefs/active/106_zone-breakdown.md). Carries Brief 105 review F3 and F6. Run seam and panel only.
 
 - **P1 pins** ([`01_pins.md`](docs/audit/106/01_pins.md)): a construction the document does not pin is refused and named, not run on whatever the library holds. The editor already pins every construction it uses (all 16 hashes match).
+- **P2 room-by-room breakdown** ([`02_zone_breakdown.md`](docs/audit/106/02_zone_breakdown.md)): each zone's row opens to its own balance, every term including heat from the other zones; the zone lines close and the interzone lines cancel across the building (tested). Browser-checked on the editor's two-zone plan.
 
 ## ✅ Brief 105 — Simulate v2: the drawn building runs — CLOSED 15 Nov 2026 on `chris/105-editor-engine` (PR open, awaiting Linzie)
 
