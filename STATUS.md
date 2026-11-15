@@ -2,7 +2,17 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🟡 Brief 108 — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
+## 🟡 Brief 110 — Simulate v2: the Model workspace inside NZA Sim — IN PROGRESS on `sim2/110-model-workspace` (stacked on `sim2/geometry-prototype`)
+
+Brief [`docs/briefs/active/110_model_workspace.md`](docs/briefs/active/110_model_workspace.md). Linzie, 15 Nov 21:53: "follow how we've built NZA Sim … just crack on."
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/110/00_reconnaissance.md)):
+  - GeometryLab renders into three slots the shell supplies; nothing about its behaviour changes.
+  - ResizeHandle is copied (not exported), the layout persists under `nza-model-layout`, and the centre tabs are Drawing and Heat flow.
+  - **Storage decision:** the Plan goes in a new `plan` column beside the document (migration 0008, dev only). The model hash is unchanged.
+  - Two asks of the building thread: an embedded ResultsPanel (P3), and Plan save and load in `versions.ts` (P4).
+
+ — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
 
 Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.
 
