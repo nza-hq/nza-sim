@@ -41,6 +41,10 @@ export interface NetworkZone {
   solar_beam_w: ArrayLike<number> | null
   other_gains: { w: ArrayLike<number>; convective_fraction: number | ArrayLike<number> } | null
   setpoints: { heat_c: number | null; cool_c: number | null }
+  /** Brief 108: the most heat the zone's emitters can give, W (null or absent: unlimited, ideal loads). */
+  heating_cap_w?: number | null
+  /** Brief 108: heating's share to the air when it differs from cooling's (the emitters'). Absent: hc_convective_fraction. */
+  heating_convective_fraction?: number | null
   /** Every node of the zone starts here before the warm-up, °C. */
   initial_c: number
 }
@@ -154,6 +158,8 @@ function check(inp: NetworkInputs) {
     const { heat_c, cool_c } = z.setpoints
     if (heat_c != null && cool_c != null && heat_c > cool_c) throw new NetworkError(`heating ${heat_c} above cooling ${cool_c}`, `${p}.setpoints`)
     if (!Number.isFinite(z.initial_c)) throw new NetworkError('required', `${p}.initial_c`)
+    if (z.heating_cap_w != null && !(z.heating_cap_w >= 0)) throw new NetworkError('must be ≥ 0', `${p}.heating_cap_w`)
+    if (z.heating_convective_fraction != null && !(z.heating_convective_fraction >= 0 && z.heating_convective_fraction <= 1)) throw new NetworkError('must be 0 to 1', `${p}.heating_convective_fraction`)
     if (z.other_gains !== null) {
       arr(z.other_gains.w, `${p}.other_gains.w`)
       const f = z.other_gains.convective_fraction
@@ -339,14 +345,21 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
 
   // Heating/cooling input vectors (convective share at the air, the rest over the zone's faces by area), and the
   // Z×Z responses at the air and star nodes to unit input at each air node (G, Gr) and to unit heating (EW, RW).
+  // Brief 108: heating and cooling each have their own split (a zone's emitters give part of their heat as radiation);
+  // EW, RW are heating's responses, EWc, RWc cooling's. Where the two splits are the same the columns are copied.
   const hcf = inp.hc_convective_fraction
-  const ehNodes: Int32Array[] = [], ehW: Float64Array[] = []
+  const hcfH = Float64Array.from(inp.zones, (z) => z.heating_convective_fraction ?? hcf)
+  const capW = Float64Array.from(inp.zones, (z) => z.heating_cap_w ?? Infinity)
+  const ehNodes: Int32Array[] = [], ehW: Float64Array[] = [], ecW: Float64Array[] = []
+  const split = (z: number, f: number) => Float64Array.from([f, ...faces[z].map((x) => ((1 - f) * x.area) / Atot[z])])
   for (let z = 0; z < Z; z++) {
     ehNodes.push(Int32Array.from([z, ...faces[z].map((f) => f.node)]))
-    ehW.push(Float64Array.from([hcf, ...faces[z].map((f) => ((1 - hcf) * f.area) / Atot[z])]))
+    ecW.push(split(z, hcf))
+    ehW.push(hcfH[z] === hcf ? ecW[z] : split(z, hcfH[z]))
   }
   const G = new Float64Array(Z * Z), Gr = new Float64Array(Z * Z), EW = new Float64Array(Z * Z), RW = new Float64Array(Z * Z)
-  const admittance = !operative && hcf === 1
+  const EWc = new Float64Array(Z * Z), RWc = new Float64Array(Z * Z)
+  const admittance = !operative && hcf === 1 && hcfH.every((f) => f === 1)
   const Y = new Float64Array(admittance ? Z * Z : 0)
   const assemble = () => {
     for (let i = 0; i < n; i++) { rows[i].clear(); for (const [j, v] of base[i]) rows[i].set(j, v) }
@@ -357,6 +370,11 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       v.fill(0); v[j] = 1
       sparseLuSolve(lu, v, x)
       for (let i = 0; i < Z; i++) { G[i * Z + j] = x[i]; Gr[i * Z + j] = x[rad[i]] }
+      v.fill(0)
+      for (let q = 0; q < ehNodes[j].length; q++) v[ehNodes[j][q]] += ecW[j][q]
+      sparseLuSolve(lu, v, x)
+      for (let i = 0; i < Z; i++) { EWc[i * Z + j] = x[i]; RWc[i * Z + j] = x[rad[i]] }
+      if (ehW[j] === ecW[j]) { for (let i = 0; i < Z; i++) { EW[i * Z + j] = EWc[i * Z + j]; RW[i * Z + j] = RWc[i * Z + j] } continue }
       v.fill(0)
       for (let q = 0; q < ehNodes[j].length; q++) v[ehNodes[j][q]] += ehW[j][q]
       sparseLuSolve(lu, v, x)
@@ -459,7 +477,12 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
 
   const bF = new Float64Array(n), z0 = new Float64Array(n), rhs = new Float64Array(n)
   const hv = new Float64Array(Z), phi = new Float64Array(Z), xa = new Float64Array(Z)
-  const mode = new Int8Array(Z)  // 0 free, 1 heating to heat_c, −1 cooling to cool_c; kept from the hour before
+  // 0 free, 1 heating to heat_c, −1 cooling to cool_c, 2 heating at its limit (Brief 108: free, with the emitters'
+  // whole output as a known input); kept from the hour before.
+  const mode = new Int8Array(Z)
+  const held = (j: number) => mode[j] === 1 || mode[j] === -1
+  const Ecol = (j: number) => (mode[j] === -1 ? EWc : EW)
+  const Rcol = (j: number) => (mode[j] === -1 ? RWc : RW)
   let maxPasses = 0, hoursOverOne = 0
   const solDiffuse = new Float64Array(Z), radBeam = new Float64Array(Z), ogRad = new Float64Array(Z)
   const stored = new Float64Array(Z), sum = new Float64Array(Z), izs = new Float64Array(Z)
@@ -482,17 +505,17 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
    */
   const solveReduced = () => {
     let m = 0
-    for (let z = 0; z < Z; z++) if (mode[z] !== 0) actIdx[m++] = z
+    for (let z = 0; z < Z; z++) if (held(z)) actIdx[m++] = z
     if (admittance) {
       let nf = 0
       for (let z = 0; z < Z; z++) {
-        if (mode[z] === 0) freeIdx[nf++] = z
+        if (!held(z)) freeIdx[nf++] = z
         else xa[z] = mode[z] === 1 ? heatC[z] : coolC[z]
       }
       if (nf) {
         for (let p = 0; p < nf; p++) {
           const i = freeIdx[p]
-          let r = wY[i]
+          let r = wY[i] + (mode[i] === 2 ? capW[i] : 0)  // all heating at the air node here: φ adds to the air's balance
           for (let a = 0; a < m; a++) { const j = actIdx[a]; r -= Y[i * Z + j] * xa[j] }
           bm[p] = r
           for (let q = 0; q <= p; q++) Kc[p * nf + q] = Y[i * Z + freeIdx[q]] + (q === p ? hv[i] : 0)
@@ -510,7 +533,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
         }
         for (let p = 0; p < nf; p++) { let v = bm[p]; for (let r = 0; r < p; r++) v -= Kc[p * nf + r] * um[r]; um[p] = v / Kc[p * nf + p] }
         for (let p = nf - 1; p >= 0; p--) { let v = um[p]; for (let r = p + 1; r < nf; r++) v -= Kc[r * nf + p] * um[r]; um[p] = v / Kc[p * nf + p] }
-        for (let p = 0; p < nf; p++) { xa[freeIdx[p]] = um[p]; phi[freeIdx[p]] = 0 }
+        for (let p = 0; p < nf; p++) { const i = freeIdx[p]; xa[i] = um[p]; phi[i] = mode[i] === 2 ? capW[i] : 0 }
       }
       for (let a = 0; a < m; a++) {
         const i = actIdx[a]
@@ -525,9 +548,11 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
         let r = z0[i]
         for (let j = 0; j < Z; j++) {
           const gij = G[i * Z + j]
-          if (mode[j] === 0) Am[i * Z + j] = (i === j ? 1 : 0) + gij * hv[j]
-          else {
-            Am[i * Z + j] = -EW[i * Z + j]
+          if (!held(j)) {
+            Am[i * Z + j] = (i === j ? 1 : 0) + gij * hv[j]
+            if (mode[j] === 2) r += EW[i * Z + j] * capW[j]  // a capped zone's known heating
+          } else {
+            Am[i * Z + j] = -Ecol(j)[i * Z + j]
             r -= ((i === j ? 1 : 0) + gij * hv[j]) * (mode[j] === 1 ? heatC[j] : coolC[j])
           }
         }
@@ -535,39 +560,44 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       }
       luSolve(luFactorInto(Am, Z, luM), bm, um)
       for (let j = 0; j < Z; j++) {
-        if (mode[j] === 0) { xa[j] = um[j]; phi[j] = 0 } else { xa[j] = mode[j] === 1 ? heatC[j] : coolC[j]; phi[j] = um[j] }
+        if (!held(j)) { xa[j] = um[j]; phi[j] = mode[j] === 2 ? capW[j] : 0 } else { xa[j] = mode[j] === 1 ? heatC[j] : coolC[j]; phi[j] = um[j] }
       }
       return
     }
     const N = Z + m
-    for (let i = 0; i < Z; i++) bm[i] = z0[i]
+    for (let i = 0; i < Z; i++) {
+      let r = z0[i]
+      for (let j = 0; j < Z; j++) if (mode[j] === 2) r += EW[i * Z + j] * capW[j]
+      bm[i] = r
+    }
     for (let a = 0; a < m; a++) {
       const zi = actIdx[a]
-      bm[Z + a] = (mode[zi] === 1 ? heatC[zi] : coolC[zi]) - 0.5 * z0[rad[zi]]
+      let r = (mode[zi] === 1 ? heatC[zi] : coolC[zi]) - 0.5 * z0[rad[zi]]
+      for (let j = 0; j < Z; j++) if (mode[j] === 2) r -= 0.5 * RW[zi * Z + j] * capW[j]
+      bm[Z + a] = r
     }
     {
       for (let i = 0; i < N * N; i++) Am[i] = 0
       for (let i = 0; i < Z; i++) {
         for (let j = 0; j < Z; j++) Am[i * N + j] = (i === j ? 1 : 0) + G[i * Z + j] * hv[j]
-        for (let a = 0; a < m; a++) Am[i * N + Z + a] = -EW[i * Z + actIdx[a]]
+        for (let a = 0; a < m; a++) Am[i * N + Z + a] = -Ecol(actIdx[a])[i * Z + actIdx[a]]
       }
       for (let a = 0; a < m; a++) {
         const zi = actIdx[a], row = (Z + a) * N
-        // 0.5·x_a,i + 0.5·(z0_r,i + Σ_j Gr_ij·(−h_v,j·x_a,j) + Σ_held RW_ij·φ_j) = setpoint
+        // 0.5·x_a,i + 0.5·(z0_r,i + Σ_j Gr_ij·(−h_v,j·x_a,j) + Σ_held RW_ij·φ_j + Σ_capped RW_ij·cap_j) = setpoint
         for (let j = 0; j < Z; j++) Am[row + j] = (zi === j ? 0.5 : 0) - 0.5 * Gr[zi * Z + j] * hv[j]
-        for (let b = 0; b < m; b++) Am[row + Z + b] = 0.5 * RW[zi * Z + actIdx[b]]
+        for (let b = 0; b < m; b++) Am[row + Z + b] = 0.5 * Rcol(actIdx[b])[zi * Z + actIdx[b]]
       }
     }
     luSolve(luFactorInto(Am, N, luM), bm, um)
-    phi.fill(0)
-    for (let j = 0; j < Z; j++) xa[j] = um[j]
+    for (let j = 0; j < Z; j++) { xa[j] = um[j]; phi[j] = mode[j] === 2 ? capW[j] : 0 }
     for (let a = 0; a < m; a++) phi[actIdx[a]] = um[Z + a]
   }
   /** The control temperature of zone i for the current xa, φ (operative needs the star node). */
   const control = (i: number) => {
     if (!operative) return xa[i]
     let r = z0[rad[i]]
-    for (let j = 0; j < Z; j++) r += -Gr[i * Z + j] * hv[j] * xa[j] + RW[i * Z + j] * phi[j]
+    for (let j = 0; j < Z; j++) r += -Gr[i * Z + j] * hv[j] * xa[j] + Rcol(j)[i * Z + j] * phi[j]
     return 0.5 * (xa[i] + r)
   }
 
@@ -621,15 +651,19 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       let changed = false
       for (let z = 0; z < Z; z++) {
         if (mode[z] === 1 && phi[z] < 0) { mode[z] = 0; changed = true }
+        else if (mode[z] === 1 && phi[z] > capW[z]) { mode[z] = 2; changed = true }  // Brief 108: needs more than its emitters give
         else if (mode[z] === -1 && phi[z] > 0) { mode[z] = 0; changed = true }
-        else if (mode[z] === 0) {
+        else if (mode[z] === 2) {
+          // At its limit, the zone floats; once it would rise above its setpoint it needs less than the limit.
+          if (control(z) > heatC[z] + 1e-9) { mode[z] = 1; changed = true }
+        } else if (mode[z] === 0) {
           const c = control(z)
           if (c < heatC[z] - 1e-9) { mode[z] = 1; changed = true }
           else if (c > coolC[z] + 1e-9) { mode[z] = -1; changed = true }
         }
       }
       if (!changed) break
-      if (passes > 2 * Z + 2) throw new NetworkError(`the heating/cooling set did not settle in hour ${h}`, 'setpoints')
+      if (passes > 3 * Z + 3) throw new NetworkError(`the heating/cooling set did not settle in hour ${h}`, 'setpoints')
     }
     if (record) { maxPasses = Math.max(maxPasses, passes); if (passes > 1) hoursOverOne++ }
 
@@ -637,7 +671,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     rhs.set(bF)
     for (let z = 0; z < Z; z++) {
       rhs[z] -= hv[z] * xa[z]
-      if (phi[z] !== 0) { const nd = ehNodes[z], w = ehW[z]; for (let q = 0; q < nd.length; q++) rhs[nd[q]] += w[q] * phi[z] }
+      if (phi[z] !== 0) { const nd = ehNodes[z], w = phi[z] > 0 ? ehW[z] : ecW[z]; for (let q = 0; q < nd.length; q++) rhs[nd[q]] += w[q] * phi[z] }
     }
     sparseLuSolve(lu, rhs, rhs)
     if (record) stored.fill(0)

@@ -1,0 +1,212 @@
+/**
+ * Brief 108 Part 2: heating limited to the zone's emitters, on Engines 1 and 2.
+ *
+ * (a) EN 442 rating by hand; (b) a cap above the peak changes nothing, value for value; (c) one zone in steady cold
+ * weather settles where its loss equals the cap, by hand, on both engines; (d) two zones, one capped: the neighbour
+ * picks up the heat it now loses through the partition, by hand; (e) the cooled room with its heated rooms capped
+ * below their peak: closure every hour, heating never above the cap, unmet hours counted; every solver path.
+ */
+import fs from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { ENGINE_CONSTANTS as K } from '../constants'
+import { innerElement, opaqueElement, type Element, type Layer } from '../elements'
+import { logMeanDeltaT, ratedOutputAt, zoneEmitters } from '../emitters'
+import { REFEREE_OPTIONS, runModel, UNMET_K, type RunOptions } from '../model'
+import { runNetwork, type NetworkElement, type NetworkInputs } from '../network'
+import { runZone, type ZoneInputs } from '../zone'
+import { ModelDocument } from '../../schema/model'
+import { cooledRoomDocument } from './cooledRoom'
+import { MOS, readMos } from './denver'
+
+const H = 24 * 20
+const flat = (v: number, n = H) => new Float64Array(n).fill(v)
+const WALL: Layer[] = [
+  { kind: 'Material:NoMass', thermal_resistance: 2 },
+  { kind: 'Material', thickness: 0.1, conductivity: 1.13, density: 2300, specific_heat: 1000 },
+]
+const wall = (id: string, area: number): Element => ({ ...opaqueElement({ id, area_m2: area, tilt_deg: 90, boundary: 'outside', layers: WALL, stated_u: null, emissivity: 0.9, path: id }), f_sky: 0 })
+const Rchain = (e: Element) => 1 / e.g_boundary + Array.from(e.g).reduce((s, g) => s + 1 / g, 0)
+const zone1 = (els: Element[], over: Partial<ZoneInputs> = {}): ZoneInputs => ({
+  elements: els, air_capacity_j_per_k: 1e6, bridging_w_per_k: 40, hours: H, theta_e: flat(0), theta_ground: 10, ventilation_w_per_k: flat(60),
+  solar_absorbed_w_per_m2: els.map(() => flat(0)), solar_transmitted_w: flat(0), other_gains: null,
+  setpoints: { heat_c: 20, cool_c: 26 }, control: 'air', hc_convective_fraction: 1, initial_c: 20, warmup_days: 60, ...over,
+})
+const last = (a: Float64Array) => a[a.length - 1]
+
+describe('(a) EN 442 rating', () => {
+  it('75/65/20 is a log-mean ΔT of 49.83 K; a 1,000 W radiator at 50/40 in a 21 °C room gives 379 W', () => {
+    expect(logMeanDeltaT(75, 65, 20)).toBeCloseTo(10 / Math.log(55 / 45), 12)
+    expect(logMeanDeltaT(75, 65, 20)).toBeCloseTo(49.83, 2)
+    const r = { flow_c: 75, return_c: 65, room_c: 20 }
+    expect(ratedOutputAt(1000, 1.3, r, { flow_c: 50, return_c: 40, room_c: 21 })).toBeCloseTo(1000 * Math.pow((10 / Math.log(29 / 19)) / (10 / Math.log(55 / 45)), 1.3), 9)
+    expect(Math.round(ratedOutputAt(1000, 1.3, r, { flow_c: 50, return_c: 40, room_c: 21 }))).toBe(379)
+    expect(ratedOutputAt(1000, 1.3, r, r)).toBeCloseTo(1000, 12)
+    expect(logMeanDeltaT(50, 50, 20)).toBe(30)
+    expect(logMeanDeltaT(40, 20, 21)).toBeNaN()  // the return below the room gives no heat
+  })
+})
+
+describe('(c) one zone in steady cold weather settles where its loss equals the cap', () => {
+  const els = [wall('a', 60), wall('b', 40)]
+  const k = els.reduce((s, e) => s + e.area_m2 / (Rchain(e) + 1 / e.h_ci), 0) + 40 + 60  // W/K, air to 0 °C outside
+  it('Engine 1: uncapped needs 20·k; capped at half, the air settles at cap / k, and every hour closes', () => {
+    const free = runZone(zone1(els))
+    expect(last(free.heating_w)).toBeCloseTo(20 * k, 6)
+    const cap = 10 * k
+    const r = runZone(zone1(els, { heating_cap_w: cap }))
+    expect(last(r.heating_w)).toBeCloseTo(cap, 9)
+    expect(Math.abs(last(r.theta_air) - cap / k)).toBeLessThan(0.01)
+    expect(Math.max(...r.heating_w)).toBeLessThanOrEqual(cap * (1 + 1e-12))
+    expect(Math.max(...r.closure_wh)).toBeLessThanOrEqual(1)
+  })
+  it('Engine 2, the same zone alone: the same steady temperature', () => {
+    const net: NetworkInputs = {
+      zones: [{ air_capacity_j_per_k: 1e6, bridging_w_per_k: 40, ventilation_w_per_k: flat(60), solar_transmitted_w: flat(0), solar_beam_w: null, other_gains: null, setpoints: { heat_c: 20, cool_c: 26 }, initial_c: 20, heating_cap_w: 10 * k }],
+      elements: els.map((element) => ({ element, zone_a: 0, zone_b: null, solar_absorbed_w_per_m2: flat(0), inside_solar_absorptance: 0.6, inside_solar_absorptance_b: null })),
+      hours: H, theta_e: flat(0), theta_ground: 10, control: 'air', hc_convective_fraction: 1, solar_convective_fraction: 0, warmup_days: 60,
+    }
+    const r = runNetwork(net)
+    expect(last(r.zones[0].heating_w)).toBeCloseTo(10 * k, 9)
+    expect(Math.abs(last(r.zones[0].theta_air) - 10)).toBeLessThan(0.01)
+    // Heating half radiant (the dense path, not the admittance form): still the cap, still closed.
+    net.zones[0].heating_convective_fraction = 0.5
+    const r2 = runNetwork(net)
+    expect(last(r2.zones[0].heating_w)).toBeCloseTo(10 * k, 9)
+    expect(Math.max(...r2.zones[0].closure_wh)).toBeLessThanOrEqual(1e-6)
+    // Operative control: the cap holds; the zone sits below its operative setpoint.
+    const r3 = runNetwork({ ...net, control: 'operative' })
+    expect(last(r3.zones[0].heating_w)).toBeCloseTo(10 * k, 9)
+    expect(last(r3.zones[0].theta_op)).toBeLessThan(20 - UNMET_K)
+    expect(Math.max(...r3.zones[0].closure_wh)).toBeLessThanOrEqual(1e-6)
+  })
+})
+
+describe('(d) two zones, one capped', () => {
+  it('zone 1 capped floats at (cap + 20·UA) / (UA + H₁); zone 0 heats its own loss plus UA·(20 − T₁)', () => {
+    const A = 15, H0 = 12, H1 = 10, HC = K.h_ci_horizontal
+    const BLOCK: Layer[] = [{ kind: 'Material', thickness: 0.1, conductivity: 0.51, density: 1400, specific_heat: 1000 }]
+    const UA = 1 / (1 / (HC * A) + 0.1 / 0.51 / A + 1 / (HC * A))
+    const part: NetworkElement = {
+      element: innerElement({ id: 'p', area_m2: A, tilt_deg: 90, layers: BLOCK, path: 'p' }), zone_a: 1, zone_b: 0,
+      solar_absorbed_w_per_m2: flat(0), inside_solar_absorptance: 0.6, inside_solar_absorptance_b: 0.6,
+    }
+    const base = (cap: number | null): NetworkInputs => ({
+      zones: [H0, H1].map((Hb, i) => ({
+        air_capacity_j_per_k: 1e4, bridging_w_per_k: Hb, ventilation_w_per_k: flat(0), solar_transmitted_w: flat(0), solar_beam_w: null,
+        other_gains: null, setpoints: { heat_c: 20, cool_c: 26 }, initial_c: 20, heating_cap_w: i === 1 ? cap : null,
+      })),
+      elements: [part], hours: H, theta_e: flat(0), theta_ground: 10, control: 'air', hc_convective_fraction: 1, solar_convective_fraction: 0, warmup_days: 60,
+    })
+    const free = runNetwork(base(null))
+    expect(last(free.zones[0].heating_w)).toBeCloseTo(20 * H0, 7)
+    expect(last(free.zones[1].heating_w)).toBeCloseTo(20 * H1, 7)
+    const cap = 100
+    const r = runNetwork(base(cap))
+    const T1 = (cap + 20 * UA) / (UA + H1)
+    expect(last(r.zones[1].theta_air)).toBeCloseTo(T1, 7)
+    expect(last(r.zones[1].heating_w)).toBeCloseTo(cap, 9)
+    expect(last(r.zones[0].heating_w)).toBeCloseTo(20 * H0 + UA * (20 - T1), 6)
+    expect(last(r.zones[0].terms.interzone_w)).toBeCloseTo(-UA * (20 - T1), 6)
+    for (const z of r.zones) expect(Math.max(...z.closure_wh)).toBeLessThanOrEqual(1e-6)
+  })
+})
+
+// ── (b) and (e): the cooled room (west and east heated, middle cooled) with emitters ────────────────────────────
+const W = readMos(fs.readFileSync(MOS))
+function withEmitters(perRoomW: number | null, radiant = 0, over: (d: any) => void = () => {}) {
+  const { doc, lib } = cooledRoomDocument()
+  const d: any = structuredClone(doc)
+  d.system_groups = [{ id: 'boiler', service: 'heating', zones: ['west', 'east'], enabled: true, share_pct: 100, source: 'gas', efficiency_metric: 0.9, design_flow_c: 75, design_return_c: 65 }]
+  if (perRoomW != null) {
+    for (const z of d.zones) if (z.setpoints.heat_c != null) {
+      // Rated at the design temperatures and this room's setpoint, so the rated output is the cap.
+      z.emitters = [{ id: `${z.id}_rad`, kind: 'radiator', count: 2, rated_output_w: perRoomW / 2, radiant_fraction: radiant, system_group_id: 'boiler', rated_flow_c: 75, rated_return_c: 65, rated_room_c: z.setpoints.heat_c, exponent_n: 1.3 }]
+    }
+  }
+  over(d)
+  return { doc: ModelDocument.parse(d), lib }
+}
+
+describe('(b) a cap above the peak changes nothing', () => {
+  it('Engine 2 (three rooms): every hourly heating and temperature value equal to the uncapped run', () => {
+    const a = withEmitters(null), base = runModel(a.doc, W, a.lib, REFEREE_OPTIONS)
+    const peak = Math.max(...base.zones.map((z) => z.annual.peak_heating_w))
+    const b = withEmitters(peak * 2), r = runModel(b.doc, W, b.lib, REFEREE_OPTIONS)
+    for (let i = 0; i < 3; i++) {
+      expect(Array.from(r.zones[i].hourly.heating_w)).toEqual(Array.from(base.zones[i].hourly.heating_w))
+      expect(Array.from(r.zones[i].hourly.theta_air_c)).toEqual(Array.from(base.zones[i].hourly.theta_air_c))
+    }
+    expect(r.zones[0].emitters!.hours_at_cap).toBe(0)
+    expect(r.zones[0].annual.unmet_heating_hours).toBe(base.zones[0].annual.unmet_heating_hours)
+  })
+  it('Engine 1 (the west room alone): the same', () => {
+    const one = (perRoom: number | null) => withEmitters(perRoom, 0, (d) => {
+      d.zones = [d.zones[0]]
+      d.surfaces = d.surfaces.filter((s: any) => s.zone_a === d.zones[0].id && (s.zone_b === 'outside' || s.zone_b === 'ground'))
+      d.zones[0].surfaces = d.zones[0].surfaces.filter((id: string) => d.surfaces.some((s: any) => s.id === id))
+      d.system_groups[0].zones = [d.zones[0].id]
+    })
+    const a = one(null), base = runModel(a.doc, W, a.lib, REFEREE_OPTIONS)
+    expect(base.engine).toBe('thermal-1')
+    const b = one(base.zones[0].annual.peak_heating_w * 2), r = runModel(b.doc, W, b.lib, REFEREE_OPTIONS)
+    expect(Array.from(r.zones[0].hourly.heating_w)).toEqual(Array.from(base.zones[0].hourly.heating_w))
+    const c = one(base.zones[0].annual.peak_heating_w * 0.5), rc = runModel(c.doc, W, c.lib, REFEREE_OPTIONS)
+    expect(Math.max(...rc.zones[0].hourly.heating_w)).toBeLessThanOrEqual(base.zones[0].annual.peak_heating_w * 0.5 * (1 + 1e-9))
+    expect(rc.zones[0].annual.unmet_heating_hours).toBeGreaterThan(0)
+  })
+})
+
+describe('(e) the heated rooms capped below their peak', () => {
+  const run = (radiant: number, options: RunOptions = REFEREE_OPTIONS) => {
+    // The uncapped run with the same radiant share (emitters far above the peak), so only the cap differs.
+    const a = withEmitters(1e9, radiant), base = runModel(a.doc, W, a.lib, options)
+    const cap = 0.6 * Math.min(base.zones[0].annual.peak_heating_w, base.zones[2].annual.peak_heating_w)
+    const b = withEmitters(cap, radiant)
+    return { base, cap, r: runModel(b.doc, W, b.lib, options) }
+  }
+  for (const [label, radiant, options] of [
+    ['air control, all convective (admittance path)', 0, REFEREE_OPTIONS],
+    ['air control, 30 % radiant (dense path)', 0.3, REFEREE_OPTIONS],
+    ['operative control, 30 % radiant', 0.3, { ...REFEREE_OPTIONS, control: 'operative' }],
+    ['four steps an hour', 0, { ...REFEREE_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }],
+  ] as const) {
+    it(`${label}: never above the cap, closes every hour, colder and with unmet hours`, () => {
+      const { base, cap, r } = run(radiant, options as RunOptions)
+      for (const zi of [0, 2]) {
+        const z = r.zones[zi]
+        expect(Math.max(...z.hourly.heating_w)).toBeLessThanOrEqual(cap * (1 + 1e-9))
+        expect(z.closure.max_wh).toBeLessThanOrEqual(1)
+        expect(z.emitters!.cap_w).toBeCloseTo(cap, 9)
+        expect(z.emitters!.hours_at_cap).toBeGreaterThan(0)
+        expect(z.annual.unmet_heating_hours!).toBeGreaterThan(base.zones[zi].annual.unmet_heating_hours!)
+        expect(z.annual.min_control_c).toBeLessThan(base.zones[zi].annual.min_control_c)
+        expect(z.annual.heating_kwh).toBeLessThan(base.zones[zi].annual.heating_kwh)
+      }
+      expect(r.zones[1].emitters).toBeNull()
+      expect(r.zones[1].annual.unmet_heating_hours).toBeNull()  // the cooled room has no heating setpoint
+    })
+  }
+})
+
+describe('what an emitter needs is named, never filled', () => {
+  const err = (over: (d: any) => void) => {
+    const { doc } = withEmitters(1000, 0, over)
+    try { zoneEmitters(doc); return null } catch (e) { return (e as Error).message }
+  }
+  it('the design temperatures, the rating, a return above the room, a setpoint to rate at', () => {
+    expect(err((d) => { d.system_groups[0].design_flow_c = null })).toBe('system_groups[0].design_flow_c: required: the flow temperature its emitters are rated at')
+    expect(err((d) => { d.zones[0].emitters[0].exponent_n = null })).toBe('zones[0].emitters[0].exponent_n: required')
+    expect(err((d) => { d.zones[0].emitters[0].count = null })).toBe('zones[0].emitters[0].count: required')
+    expect(err((d) => { d.system_groups[0].design_flow_c = 25; d.system_groups[0].design_return_c = 18 })).toMatch(/^system_groups\[0\]\.design_return_c: the return \(18 °C\) must be above/)
+    expect(err((d) => { d.system_groups[0].enabled = false })).toMatch(/switched off/)
+    expect(err((d) => { d.zones[0].emitters[0].radiant_fraction = 1.5 })).toBe('zones[0].emitters[0].radiant_fraction: must be 0 to 1')
+  })
+  it('an electric heater gives its stated output; output-weighted radiant share', () => {
+    const { doc } = withEmitters(1000, 0.2, (d) => {
+      d.zones[0].emitters.push({ id: 'h', kind: 'electric', count: 3, rated_output_w: 1000, radiant_fraction: 0.6, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null })
+    })
+    const z = zoneEmitters(doc)[0]!
+    expect(z.cap_w).toBeCloseTo(4000, 9)
+    expect(z.radiant_fraction).toBeCloseTo((1000 * 0.2 + 3000 * 0.6) / 4000, 12)
+  })
+})

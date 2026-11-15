@@ -13,6 +13,7 @@ Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md)
   - The referee is EnergyPlus's `IdealLoadsAirSystem` with `LimitCapacity`.
   - Each wet emitter names its heating system; electric emitters have a fixed output; the rating is taken at the heating setpoint.
 - **P1 schema 2.4** ([`01_schema.md`](docs/audit/108/01_schema.md)): `zones[].emitters[]` (six kinds, each with its count, output and radiant share; wet kinds name their heating system and EN 442 rating); `design_flow_c`/`design_return_c` on heating groups. The 2.3 → 2.4 upgrade adds empty lists and fills nothing; the seam runs 2.3 through it and still refuses 2.2. 177 tests pass.
+- **P2 capped heating** ([`02_capped.md`](docs/audit/108/02_capped.md)): EN 442 rating at each system's design flow/return and the zone's setpoint; Engine 1 φ = min(need, cap); Engine 2 gains a fourth active-set state (heating at its limit) on every solver path; heating's radiant share per zone from its emitters. Unmet hours, lowest temperature and hours at cap per zone. Setbacks refused until Brief 109. Analytic, two-zone hand and value-for-value tests; 196 pass; 107 gate unchanged.
 
 ## ✅ Brief 107 — Simulate v2 Engine 4: systems by zone group — CLOSED 15 Nov 2026 on `chris/107-systems` (stacked on 106; PR open, awaiting Linzie)
 
