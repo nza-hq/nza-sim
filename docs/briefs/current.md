@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 105 — Simulate v2: the drawn building runs (editor to multi-room engine, gains, ventilation, per-floor accuracy) — ACTIVE 15 Nov 2026 on `chris/105-editor-engine`.**
+Schema 2.3 (zone gains and ventilation in physical units), internal gains and ventilation on both engine paths with EnergyPlus gates, a run seam (library with layers, weather, worker) and a results panel in the v2 editor, and the per-floor accuracy work carried from 104 (sub-hourly step, TARP inside convection, roof-storey slab gap). No change to today's engine or UI. Brief [`active/105_editor-engine.md`](active/105_editor-engine.md).
+
 **Brief 104 — Simulate v2 Engine 2: several zones solved together — CLOSED 15 Nov 2026 on `chris/104-engine-2` (PR stacked on #30).**
 Engine 2 (`frontend/src/thermal/engine/network.ts`) solves zones together with interzone floors and partitions and exact per-zone ideal loads; schema 2.2; per-storey zoning. The 103 cooling miss is attributed (mainly window solar kept; Part 1b adds the window's own optics). Bridgewater as five storeys: 91.21 / 14.89 MWh, +1.1 % / +7.9 % against a referee aligned to Engine 2's per-storey bridging and infiltration (cooling +12.3 % against the unaligned referee); per-storey cooling up to ±31 % against the full referee, so per-room demand is not yet validated. Speed budgets met on IT15 (five storeys 82–98 ms, 50 rooms 0.6 s). Independent review addressed. No change to today's engine or UI. Brief [`archive/104_engine-2_COMPLETED.md`](archive/104_engine-2_COMPLETED.md); final report [`../audit/104/08_final_report.md`](../audit/104/08_final_report.md). **Next:** Brief 105 (ventilation, gains, the loft buffer), carrying the open items in the final report.
 
