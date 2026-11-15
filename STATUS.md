@@ -2,9 +2,9 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🟡 Brief 105 — Simulate v2: the drawn building runs — IN PROGRESS on `chris/105-editor-engine`
+## ✅ Brief 105 — Simulate v2: the drawn building runs — CLOSED 15 Nov 2026 on `chris/105-editor-engine` (PR open, awaiting Linzie)
 
-Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-engine.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).
+Brief [`docs/briefs/archive/105_editor-engine_COMPLETED.md`](docs/briefs/archive/105_editor-engine_COMPLETED.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/105/00_reconnaissance.md)):
   - The editor's documents run on Engine 2 once their nulls are filled.
@@ -42,6 +42,8 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - Cooled-room twin with gains (brief deliverable 5): per room within 4.3 % of EnergyPlus with the same coefficients; gain energy equal to four figures.
 - **P5 additions:** the panel starts closed as a tab; the drafted internal wall (`docs/audit/102/library_additions.json`) runs and is named in the panel ("Uses a draft construction, awaiting Chris"); editors and admins can save a weather file to their organisation (migration 0007, applied on dev: insert only, `.epw` names, no update or delete; Linzie 15 Nov 21:02).
 - **Independent review** ([`07_independent_review.md`](docs/audit/105/07_independent_review.md), response [`08_review_response.md`](docs/audit/105/08_review_response.md)): no tuning; F1, F2, F5, F7, F8 fixed; F4 stated; F3 (per-zone breakdown) and F6 (unpinned constructions) carried to the next brief; F9 a note.
+- **P7 close:** final report [`09_final_report.md`](docs/audit/105/09_final_report.md). All 156 thermal and sim2 tests pass; no file of today's engine changed; `_brief93_anchor.mjs --fixture` gives 133.2. Design note Rev A.8.
+- **Carried forward:** a per-zone breakdown on tap (F3); a pin for every construction the document uses (F6); a fast TARP factorisation; MVHR summer bypass (F9); Chris to check the drafted internal wall; saving and reloading plans.
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 
