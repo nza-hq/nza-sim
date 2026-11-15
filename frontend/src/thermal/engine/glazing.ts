@@ -81,23 +81,46 @@ export interface GlazingAngular {
 }
 
 type Curves = Record<'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'FGHI' | 'FH' | 'BDCD', number>
+// The curves' coefficients (EnergyPlus WindowManager.cc). Each curve is evaluated only when a cell asks for it
+// (Part 6): the same expressions as before, so the same values, without computing all twenty for every angle.
+const T_COEF: Record<string, number[]> = { A: [0, 3.36, -3.85, 1.49, 0.01], B: [0, 2.83, -2.42, 0.04, 0.55], C: [0, 2.45, -1.58, -0.64, 0.77], D: [0, 2.85, -2.58, 0.40, 0.35], E: [0, 1.51, 2.49, -5.87, 2.88], F: [0, 1.21, 3.14, -6.37, 3.03], G: [0, 1.09, 3.54, -6.84, 3.23], H: [0, 0.98, 3.83, -7.13, 3.33], I: [0, 0.79, 3.93, -6.86, 3.15], J: [0, 0.08, 6.02, -8.84, 3.74] }
+const R_COEF: Record<string, number[]> = { A: [1, -0.70, 2.57, -3.20, 1.33], B: [1, -1.87, 6.50, -7.86, 3.23], C: [1, -2.52, 8.40, -9.86, 3.99], D: [1, -1.85, 6.40, -7.64, 3.11], E: [1, -1.57, 5.60, -6.82, 2.80], F: [1, -3.15, 10.98, -13.14, 5.32], G: [1, -3.25, 11.32, -13.54, 5.49], H: [1, -3.39, 11.70, -13.94, 5.64], I: [1, -4.06, 13.55, -15.74, 6.27], J: [1, -4.35, 14.27, -16.32, 6.39] }
+const poly = (a: number[], c: number) => a[0] + a[1] * c + a[2] * c ** 2 + a[3] * c ** 3 + a[4] * c ** 4
+class TCurves {
+  constructor(readonly c: number) {}
+  get A() { return poly(T_COEF.A, this.c) }
+  get B() { return poly(T_COEF.B, this.c) }
+  get C() { return poly(T_COEF.C, this.c) }
+  get D() { return poly(T_COEF.D, this.c) }
+  get E() { return poly(T_COEF.E, this.c) }
+  get F() { return poly(T_COEF.F, this.c) }
+  get G() { return poly(T_COEF.G, this.c) }
+  get H() { return poly(T_COEF.H, this.c) }
+  get I() { return poly(T_COEF.I, this.c) }
+  get J() { return poly(T_COEF.J, this.c) }
+  get FGHI() { return (this.F + this.G + this.H + this.I) / 4 }
+  get FH() { return (this.F + this.H) / 2 }
+  get BDCD() { return (this.B + this.D + this.C + this.D) / 4 }
+}
+class RCurves {
+  constructor(readonly c: number, readonly t: TCurves) {}
+  get A() { return poly(R_COEF.A, this.c) - this.t.A }
+  get B() { return poly(R_COEF.B, this.c) - this.t.B }
+  get C() { return poly(R_COEF.C, this.c) - this.t.C }
+  get D() { return poly(R_COEF.D, this.c) - this.t.D }
+  get E() { return poly(R_COEF.E, this.c) - this.t.E }
+  get F() { return poly(R_COEF.F, this.c) - this.t.F }
+  get G() { return poly(R_COEF.G, this.c) - this.t.G }
+  get H() { return poly(R_COEF.H, this.c) - this.t.H }
+  get I() { return poly(R_COEF.I, this.c) - this.t.I }
+  get J() { return poly(R_COEF.J, this.c) - this.t.J }
+  get FGHI() { return (this.F + this.G + this.H + this.I) / 4 }
+  get FH() { return (this.F + this.H) / 2 }
+  get BDCD() { return (this.B + this.D + this.C + this.D) / 4 }
+}
 function curves(c: number): { T: Curves; R: Curves } {
-  const p = (a: number[]) => a[0] + a[1] * c + a[2] * c ** 2 + a[3] * c ** 3 + a[4] * c ** 4
-  const t = {
-    A: p([0, 3.36, -3.85, 1.49, 0.01]), B: p([0, 2.83, -2.42, 0.04, 0.55]), C: p([0, 2.45, -1.58, -0.64, 0.77]),
-    D: p([0, 2.85, -2.58, 0.40, 0.35]), E: p([0, 1.51, 2.49, -5.87, 2.88]), F: p([0, 1.21, 3.14, -6.37, 3.03]),
-    G: p([0, 1.09, 3.54, -6.84, 3.23]), H: p([0, 0.98, 3.83, -7.13, 3.33]), I: p([0, 0.79, 3.93, -6.86, 3.15]),
-    J: p([0, 0.08, 6.02, -8.84, 3.74]),
-  }
-  const rr = {
-    A: p([1, -0.70, 2.57, -3.20, 1.33]) - t.A, B: p([1, -1.87, 6.50, -7.86, 3.23]) - t.B,
-    C: p([1, -2.52, 8.40, -9.86, 3.99]) - t.C, D: p([1, -1.85, 6.40, -7.64, 3.11]) - t.D,
-    E: p([1, -1.57, 5.60, -6.82, 2.80]) - t.E, F: p([1, -3.15, 10.98, -13.14, 5.32]) - t.F,
-    G: p([1, -3.25, 11.32, -13.54, 5.49]) - t.G, H: p([1, -3.39, 11.70, -13.94, 5.64]) - t.H,
-    I: p([1, -4.06, 13.55, -15.74, 6.27]) - t.I, J: p([1, -4.35, 14.27, -16.32, 6.39]) - t.J,
-  }
-  const mix = (x: typeof t) => ({ ...x, FGHI: (x.F + x.G + x.H + x.I) / 4, FH: (x.F + x.H) / 2, BDCD: (x.B + x.D + x.C + x.D) / 4 })
-  return { T: mix(t), R: mix(rr) }
+  const T = new TCurves(c)
+  return { T, R: new RCurves(c, T) }
 }
 
 const two = (x: number, x0: number, x1: number, f0: number, f1: number) => f0 + ((x - x0) / (x1 - x0)) * (f1 - f0)

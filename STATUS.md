@@ -42,6 +42,11 @@ Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
     - Infiltration by each zone's own envelope area. r0 gave every storey the building's rate, which caused the end-heavy, middle-light heating.
     - Each slab as one construction from both sides. r0 used the carpet-first construction on both faces, and EnergyPlus warned. **This is in today's EnergyPlus assembler**, recorded and not changed (`nza_engine/` is out of scope).
   - **What remains.** The rest of the cooling gap is Brief 103's open surface-coefficient forms. No engine change in this part.
+- **P6 performance** ([`06_performance.md`](docs/audit/104/06_performance.md)):
+  - **Container results (worker medians).** One zone 37.6 ms against a 100 ms budget, and 50 coupled rooms 1.32 s against 2 s: both pass. Five storeys 219 ms against 150 ms: a **miss on this machine**, ranging 167–219 ms across runs. Escalated: to be re-measured on IT15 in Edge at close.
+  - **Solver changes, results unchanged.** Radiant star node per zone, sparse LU factorised once, the zone air system by Cholesky in admittance form, the active set warm-started, flat chain arrays, and build caches. Engine 1's anchor output is identical to the last digit, and Engine 2's Bridgewater figures are unchanged at the recorded precision.
+  - **API change.** Per-element terms are now annual sums (`element_terms[k].boundary_wh` and so on, `element_interzone_wh`).
+  - **Node against browser totals.** They differ in the last binary digit, about 2e-16 relative, because Chromium's `Math.cos` and similar functions round differently from Node's. This is recorded as a qualification of "identical".
 
 ## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
 

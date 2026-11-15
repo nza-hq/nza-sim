@@ -76,7 +76,10 @@ describe('runNetwork on one zone is runZone', () => {
         expect(z.heating_w[h]).toBeCloseTo(a.heating_w[h], 6)
         expect(z.cooling_w[h]).toBeCloseTo(a.cooling_w[h], 6)
         expect(z.terms.solar_lost_w[h]).toBeCloseTo(a.terms.solar_lost_w[h], 6)
-        for (let k = 0; k < b.els.length; k++) expect(n.element_terms[k].boundary_w[h]).toBeCloseTo(a.terms.boundary_w[k][h], 6)
+      }
+      for (let k = 0; k < b.els.length; k++) {
+        let s = 0; for (let h = 0; h < H; h++) s += a.terms.boundary_w[k][h]
+        expect(n.element_terms[k].boundary_wh).toBeCloseTo(s, 3)
       }
       expect(Math.max(...z.closure_wh)).toBeLessThanOrEqual(1e-6)
       expect(n.nodes).toBe(a.nodes)
@@ -116,7 +119,7 @@ describe('two zones joined by a slab', () => {
     // Somewhere the slab carries heat (different setpoints drive it).
     expect(Math.max(...r.zones[1].terms.interzone_w.map(Math.abs))).toBeGreaterThan(1)
     // Internal mass is within one zone: no interzone heat from it.
-    expect(r.element_interzone_w[r.element_interzone_w.length - 1]).not.toBeNull()
+    expect(r.element_interzone_wh[r.element_interzone_wh.length - 1]).not.toBeNull()
     expect(r.active_set.max_passes).toBeGreaterThanOrEqual(1)
   })
   it('holds each zone in its own band', () => {

@@ -145,7 +145,7 @@ describe('(d) internal mass', () => {
       expect(r.zones[0].heating_w[h]).toBeCloseTo(2 * hA * (20 - x) + air, 6)
       expect(r.zones[0].terms.storage_w[h]).toBeCloseTo(2 * Cf / 3600 * (x - prev) + air, 6)
     }
-    expect(r.element_interzone_w[0]).not.toBeNull()
+    expect(r.element_interzone_wh[0]).not.toBeNull()
     expect(Math.max(...r.zones[0].terms.interzone_w.map(Math.abs))).toBe(0)  // within one zone: no interzone line
   })
   it('at steady state it stores nothing and passes nothing through the zone; it shifts the steady result only by joining the long-wave exchange', () => {

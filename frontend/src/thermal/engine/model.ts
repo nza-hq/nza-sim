@@ -119,6 +119,17 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
     glazingAreas: [], glazingGroups: [], envelopeArea: 0, hasRoof: false, hasGround: false, sharedSlabs: 0,
   }))
   const seen = new Set<string>()
+  // Surfaces with the same orientation see the same sun, and windows with the same orientation, U and g the same
+  // optics, so each is computed once per run (per-storey documents repeat every facade on every storey). The cached
+  // values are the ones each surface computed before; nothing changes but the repetition.
+  const sunCache = new Map<string, ReturnType<typeof solarOnSurface>>()
+  const sunOn = (az: number, tilt: number) => {
+    const k = `${az}|${tilt}`
+    let v = sunCache.get(k)
+    if (!v) { v = solarOnSurface(weather, az, tilt, options.solar); sunCache.set(k, v) }
+    return v
+  }
+  const opticalCache = new Map<string, { t: Float64Array; beam: Float64Array; a: Float64Array }>()
 
   doc.zones.forEach((zone, zi) => {
     for (const id of zone.surfaces) {
@@ -153,7 +164,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
       Z.envelopeArea += s.area_m2
       const solar = () => {
         if (s.tilt_deg > 90 + 1e-9) return new Float64Array(H)  // faces down: no sun reaches it in this model
-        return solarOnSurface(weather, s.azimuth_deg ?? 0, s.tilt_deg, options.solar).total
+        return sunOn(s.azimuth_deg ?? 0, s.tilt_deg).total
       }
       if (s.kind === 'glazing') {
         if (s.zone_b !== 'outside') throw new ModelError('glazing must face outside', `${path}.zone_b`)
@@ -183,20 +194,30 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         kinds.push(s.kind); zoneA.push(za); zoneB.push(null)
         const a = new Float64Array(H)
         absorbed.push(a)
-        const sun = s.tilt_deg > 90 + 1e-9 ? null : solarOnSurface(weather, s.azimuth_deg ?? 0, s.tilt_deg, options.solar)
+        const sun = s.tilt_deg > 90 + 1e-9 ? null : sunOn(s.azimuth_deg ?? 0, s.tilt_deg)
         const w = new Float64Array(H)
         if (sun && ang) {
           // Optical: the beam at its own angle of incidence, sky and ground diffuse at the diffuse values (no F_W).
+          // Per m² of glass, once per orientation, U and g.
+          const ok = `${s.azimuth_deg ?? 0}|${s.tilt_deg}|${u}|${g}`
+          let o = opticalCache.get(ok)
+          if (!o) {
+            o = { t: new Float64Array(H), beam: new Float64Array(H), a: new Float64Array(H) }
+            for (let h = 0; h < H; h++) {
+              const dif = sun.diffuse[h] + sun.reflected[h]
+              let tb = 0, ab = 0
+              if (sun.direct[h] > 0) { const p = ang.at(sun.cos_incidence[h]); tb = sun.direct[h] * p.t; ab = sun.direct[h] * (1 - p.t - p.r) }
+              o.t[h] = tb + dif * ang.t_dif; o.beam[h] = tb; o.a[h] = ab + dif * ang.a_dif
+            }
+            opticalCache.set(ok, o)
+          }
           const share = (1 - ff) * sf
           for (let h = 0; h < H; h++) {
-            const dif = sun.diffuse[h] + sun.reflected[h]
-            let tb = 0, ab = 0
-            if (sun.direct[h] > 0) { const p = ang.at(sun.cos_incidence[h]); tb = sun.direct[h] * p.t; ab = sun.direct[h] * (1 - p.t - p.r) }
-            w[h] = (tb + dif * ang.t_dif) * share * s.area_m2
+            w[h] = o.t[h] * share * s.area_m2
             Z.solarTransmitted[h] += w[h]
-            if (sp?.beam_on_floor) Z.solarBeam[h] += tb * share * s.area_m2
+            if (sp?.beam_on_floor) Z.solarBeam[h] += o.beam[h] * share * s.area_m2
             // Absorbed in the pane, per m² of window: the glass share of the opening only (the frame takes no solar here).
-            a[h] = (ab + dif * ang.a_dif) * share
+            a[h] = o.a[h] * share
           }
         } else if (sun) {
           const f = g * fw * (1 - ff) * sf * s.area_m2
@@ -250,10 +271,10 @@ interface Solved {
   theta_air: Float64Array; theta_op: Float64Array; theta_mrt: Float64Array
   bridging_w: Float64Array; ventilation_w: Float64Array; solar_lost_w: Float64Array; other_gains_w: Float64Array; storage_w: Float64Array
   closure_wh: Float64Array
-  /** Per element of the model: its outside terms (null when not this zone's). */
-  element: (k: number) => { boundary_w: Float64Array; solar_absorbed_w: Float64Array; sky_w: Float64Array } | null
-  /** Per element: heat into this zone across it from another zone (null when it is not shared by this zone and another). */
-  interzone: (k: number) => Float64Array | null
+  /** Per element of the model: its outside terms over the run, kWh (null when not this zone's). */
+  element: (k: number) => { boundary_kwh: number; solar_absorbed_kwh: number; sky_kwh: number } | null
+  /** Per element: heat into this zone across it from another zone over the run, kWh (null when not shared by this zone and another). */
+  interzone: (k: number) => number | null
 }
 
 /**
@@ -303,6 +324,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     return { volume, inf, ventH, Hve, bridging }
   })
 
+  const kwhOf = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
   let solved: Solved[]
   let solver: ModelResults['solver']
   if (!network) {
@@ -324,7 +346,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       heating_w: run.heating_w, cooling_w: run.cooling_w, theta_air: run.theta_air, theta_op: run.theta_op, theta_mrt: run.theta_mrt,
       bridging_w: T.bridging_w, ventilation_w: T.ventilation_w, solar_lost_w: T.solar_lost_w, other_gains_w: T.other_gains_w, storage_w: T.storage_w,
       closure_wh: run.closure_wh,
-      element: (k) => ({ boundary_w: T.boundary_w[k], solar_absorbed_w: T.solar_absorbed_w[k], sky_w: T.sky_w[k] }),
+      element: (k) => ({ boundary_kwh: kwhOf(T.boundary_w[k]), solar_absorbed_kwh: kwhOf(T.solar_absorbed_w[k]), sky_kwh: kwhOf(T.sky_w[k]) }),
       interzone: () => null,
     }]
     solver = { nodes: run.nodes, active_set: null }
@@ -354,12 +376,17 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       heating_w: z.heating_w, cooling_w: z.cooling_w, theta_air: z.theta_air, theta_op: z.theta_op, theta_mrt: z.theta_mrt,
       bridging_w: z.terms.bridging_w, ventilation_w: z.terms.ventilation_w, solar_lost_w: z.terms.solar_lost_w,
       other_gains_w: z.terms.other_gains_w, storage_w: z.terms.storage_w, closure_wh: z.closure_wh,
-      element: (k) => (zoneA[k] === zi && elements[k].boundary !== 'zone' ? run.element_terms[k] : null),
+      // The network sums the hours in the same order as kwhOf, so the values are the same sums.
+      element: (k) => {
+        if (zoneA[k] !== zi || elements[k].boundary === 'zone') return null
+        const t = run.element_terms[k]
+        return { boundary_kwh: t.boundary_wh / 1000, solar_absorbed_kwh: t.solar_absorbed_wh / 1000, sky_kwh: t.sky_wh / 1000 }
+      },
       interzone: (k) => {
-        const q = run.element_interzone_w[k]
-        if (!q || zoneA[k] === zoneB[k]) return null
-        if (zoneA[k] === zi) return q
-        if (zoneB[k] === zi) return Float64Array.from(q, (v) => -v)
+        const q = run.element_interzone_wh[k]
+        if (q == null || zoneA[k] === zoneB[k]) return null
+        if (zoneA[k] === zi) return q / 1000
+        if (zoneB[k] === zi) return -q / 1000
         return null
       },
     }))
@@ -384,13 +411,13 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       if (zoneA[k] === zi || zoneB[k] === zi) mine.push(k)
       const et = run.element(k)
       if (et) {
-        lines.push({ term: 'conduction', surface_id: e.id, kwh: kwh(et.boundary_w) })
-        if (e.kind === 'opaque' && e.boundary === 'outside') lines.push({ term: 'opaque_solar_absorbed', surface_id: e.id, kwh: kwh(et.solar_absorbed_w) })
-        if (e.kind === 'window' && e.absorbed_node != null) lines.push({ term: 'glazing_solar_absorbed', surface_id: e.id, kwh: kwh(et.solar_absorbed_w) })
-        if (e.f_sky > 0) lines.push({ term: 'sky_longwave', surface_id: e.id, kwh: kwh(et.sky_w) })
+        lines.push({ term: 'conduction', surface_id: e.id, kwh: et.boundary_kwh })
+        if (e.kind === 'opaque' && e.boundary === 'outside') lines.push({ term: 'opaque_solar_absorbed', surface_id: e.id, kwh: et.solar_absorbed_kwh })
+        if (e.kind === 'window' && e.absorbed_node != null) lines.push({ term: 'glazing_solar_absorbed', surface_id: e.id, kwh: et.solar_absorbed_kwh })
+        if (e.f_sky > 0) lines.push({ term: 'sky_longwave', surface_id: e.id, kwh: et.sky_kwh })
       }
       const iz = run.interzone(k)
-      if (iz) lines.push({ term: 'interzone', surface_id: e.id, kwh: kwh(iz) })
+      if (iz != null) lines.push({ term: 'interzone', surface_id: e.id, kwh: iz })
     })
     lines.push({ term: 'bridging', surface_id: null, kwh: kwh(run.bridging_w) })
     lines.push({ term: 'infiltration', surface_id: null, kwh: infW / 1000 })

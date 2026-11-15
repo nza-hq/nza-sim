@@ -204,11 +204,11 @@
    "solver": {
     "nodes": 233,
     "active_set": {
-     "max_passes": 1,
-     "hours_over_one": 0
+     "max_passes": 2,
+     "hours_over_one": 725
     }
    },
-   "run_ms": 684
+   "run_ms": 357
   },
   "vs": {
    "r2_z": {
@@ -730,8 +730,8 @@
    "solver": {
     "nodes": 85,
     "active_set": {
-     "max_passes": 1,
-     "hours_over_one": 0
+     "max_passes": 2,
+     "hours_over_one": 218
     }
    }
   },

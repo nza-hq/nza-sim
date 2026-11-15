@@ -11,12 +11,12 @@
  * convection with that zone's air; transmitted solar, radiant gains and radiant heating are spread over the zone's
  * own faces as in Engine 1.
  *
- * The interface system (air and inside-surface nodes of every zone) is factorised once per run. Each zone's hourly
- * ventilation is a rank-one change on its air node, so all of them together are one rank-Z change, applied with the
- * Woodbury identity (an Z×Z system per hour, refactorised only when a ventilation rate changes). Heating and cooling
- * are ideal: the free-floating state and each zone's response to a unit heat input are solved, and the zones whose
- * control temperature would leave the band are held on it together. The set of such zones is iterated until it is
- * consistent; the passes are counted and recorded.
+ * The interface system (air, inside-surface and radiant star nodes of every zone) is sparse and factorised once per
+ * run (Part 6, sparse.ts). Each hour two sparse solves give the state: one without ventilation or heating, then the
+ * full one. Between them, each zone's ventilation and its heating or cooling are found from a Z-unknown system on
+ * the air temperatures (Z×Z responses precomputed once). Heating and cooling are ideal: the zones whose control
+ * temperature would leave the band are held on it together; the set starts from the hour before and is iterated
+ * until consistent; the passes are counted and recorded.
  *
  * Every hour, every zone's balance is closed: Σ terms + heating − cooling − Δstorage over the zone's own nodes. The
  * heat crossing between zones is a term of each zone (`interzone_w`). An element between two zones is split at the
@@ -25,7 +25,8 @@
  */
 import { ENGINE_CONSTANTS as K, heatFlowDirection } from './constants'
 import type { Element } from './elements'
-import { luFactor, luSolve, type LU } from './linalg'
+import { luFactor, luFactorInto, luSolve, type LU } from './linalg'
+import { sparseLuFactor, sparseLuSolve, type SparseLU } from './sparse'
 
 export interface NetworkZone {
   /** C_int: air ρ·c·V plus the zone's internal heat capacity, J/K. */
@@ -94,10 +95,14 @@ export interface NetworkZoneRun {
 export interface NetworkRun {
   hours: number
   zones: NetworkZoneRun[]
-  /** Per element, positive into the building: the outside or ground boundary, outside absorbed solar, sky. */
-  element_terms: { boundary_w: Float64Array; solar_absorbed_w: Float64Array; sky_w: Float64Array }[]
-  /** Per element between two zones: heat into zone_a from zone_b across the element's middle link, W. */
-  element_interzone_w: (Float64Array | null)[]
+  /**
+   * Per element, over the run, Wh, positive into the building: the outside or ground boundary, outside absorbed
+   * solar, sky (the hours summed in order). Annual, not hourly: per-element hourly arrays would be most of a large
+   * model's memory, and only their sums are reported; every hour's closure is checked inside the run.
+   */
+  element_terms: { boundary_wh: number; solar_absorbed_wh: number; sky_wh: number }[]
+  /** Per element between two zones: heat into zone_a from zone_b across the element's middle link over the run, Wh. */
+  element_interzone_wh: (number | null)[]
   nodes: number
   /** Most passes of the active-set iteration in any hour, and the hours that needed more than one. */
   active_set: { max_passes: number; hours_over_one: number }
@@ -203,13 +208,20 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const E = els.length
   const two = els.map((e) => e.boundary === 'zone')
   const fsc = inp.solar_convective_fraction ?? K.solar_convective_fraction
+  const operative = inp.control === 'operative'
 
-  // ── Interface nodes: zone air nodes 0..Z−1, then each element's face A, then face B of two-faced elements. ──────
+  // ── Nodes: zone air 0..Z−1, each element's face A, face B of two-faced elements, then each zone's radiant star
+  // node (Part 6). ISO 52016-1 eq. 30's exchange h_ri·A_i·A_k/A_tot between every pair of a zone's faces is exactly a
+  // star: each face coupled to one node by h_ri·A_i, that node with no capacity. Its temperature is the zone's mean
+  // radiant temperature. The star keeps the matrix sparse: a face touches its zone's air and star nodes and, on a
+  // two-faced element, the face on its other side.
   const faceA = new Int32Array(E), faceB = new Int32Array(E).fill(-1)
   let n = Z
   for (let k = 0; k < E; k++) faceA[k] = n++
   for (let k = 0; k < E; k++) if (two[k]) faceB[k] = n++
-  // Faces per zone: { node, element, area, tilt, alpha, iso (window optics), side }.
+  const nFaces = n - Z
+  const rad = new Int32Array(Z)
+  for (let z = 0; z < Z; z++) rad[z] = n++
   interface Face { node: number; k: number; area: number; tilt: number; hci: number; alpha: number | null; side: 'a' | 'b' }
   const faces: Face[][] = Array.from({ length: Z }, () => [])
   inp.elements.forEach((ne, k) => {
@@ -219,7 +231,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   })
   const Atot = faces.map((fs) => fs.reduce((s, f) => s + f.area, 0))
   const zoneOfNode = new Int32Array(n)
-  for (let z = 0; z < Z; z++) { zoneOfNode[z] = z; for (const f of faces[z]) zoneOfNode[f.node] = z }
+  for (let z = 0; z < Z; z++) { zoneOfNode[z] = z; zoneOfNode[rad[z]] = z; for (const f of faces[z]) zoneOfNode[f.node] = z }
 
   // ── Chains ───────────────────────────────────────────────────────────────────────────────────────────────────
   // A boundary element's interior is chain nodes 0..L−2 (node 0 is its outside surface, coupled to the boundary);
@@ -245,21 +257,17 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     return t
   })
 
-  // ── The interface matrix without ventilation, S0 ─────────────────────────────────────────────────────────────
-  const S = new Float64Array(n * n)
-  const add = (i: number, j: number, v: number) => { S[i * n + j] += v }
+  // ── The interface matrix without ventilation, S0, sparse ─────────────────────────────────────────────────────
+  const rows: Map<number, number>[] = Array.from({ length: n }, () => new Map())
+  const add = (i: number, j: number, v: number) => { rows[i].set(j, (rows[i].get(j) ?? 0) + v) }
+  const link = (i: number, j: number, g: number) => { add(i, i, g); add(j, j, g); add(i, j, -g); add(j, i, -g) }
   const capF = new Float64Array(n)
   for (let z = 0; z < Z; z++) {
     capF[z] = inp.zones[z].air_capacity_j_per_k
     add(z, z, inp.zones[z].bridging_w_per_k)
     for (const f of faces[z]) {
-      const hc = f.hci * f.area
-      add(z, z, hc); add(f.node, f.node, hc); add(z, f.node, -hc); add(f.node, z, -hc)
-      for (const q of faces[z]) {
-        if (q === f) continue
-        const g = (K.h_ri * f.area * q.area) / Atot[z]
-        add(f.node, f.node, g); add(f.node, q.node, -g)
-      }
+      link(z, f.node, f.hci * f.area)            // convection with the zone's air
+      link(f.node, rad[z], K.h_ri * f.area)      // long-wave through the zone's star node
     }
   }
   for (let k = 0; k < E; k++) {
@@ -267,12 +275,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     capF[faceA[k]] = e.c[L - 1] * A
     if (two[k]) capF[faceB[k]] = e.c[0] * A
     const a = faceA[k]
-    if (t.m === 0) {
-      // A two-faced element with no interior node: one conductance between its faces.
-      const g = e.g[0] * A
-      add(a, a, g); add(faceB[k], faceB[k], g); add(a, faceB[k], -g); add(faceB[k], a, -g)
-      continue
-    }
+    if (t.m === 0) { link(a, faceB[k], e.g[0] * A); continue }  // a two-faced element with no interior node
     add(a, a, t.gA + t.gA * t.wA[t.m - 1])
     if (two[k]) {
       const b = faceB[k]
@@ -281,30 +284,34 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       add(b, a, t.gB * t.wA[0])
     }
   }
-  for (let i = 0; i < n; i++) add(i, i, capF[i] / DT)
-  const lu: LU = luFactor(S, n)
+  const capDT = Float64Array.from(capF, (c) => c / DT)
+  for (let i = 0; i < n; i++) add(i, i, capDT[i])
+  // Faces first; then each zone's star and air nodes, zone by zone (adjacent zones adjacent, so a stack stays banded).
+  const order = new Int32Array(n)
+  for (let i = 0; i < nFaces; i++) order[i] = Z + i
+  for (let z = 0; z < Z; z++) { order[nFaces + 2 * z] = rad[z]; order[nFaces + 2 * z + 1] = z }
+  const lu: SparseLU = sparseLuFactor(n, rows, order)
 
-  // Columns: unit input at each zone's air (ventilation, Woodbury), heating/cooling input, and the control rows.
-  const col = (v: Float64Array) => luSolve(lu, v, new Float64Array(n))
+  // Heating/cooling input vectors (convective share at the air, the rest over the zone's faces by area), and the
+  // Z×Z responses at the air and star nodes to unit input at each air node (G, Gr) and to unit heating (EW, RW).
   const hcf = inp.hc_convective_fraction
-  const U: Float64Array[] = [], W0: Float64Array[] = [], ctl: Float64Array[] = []
+  const ehNodes: Int32Array[] = [], ehW: Float64Array[] = []
   for (let z = 0; z < Z; z++) {
-    const ea = new Float64Array(n); ea[z] = 1
-    U.push(col(ea))
-    const eh = new Float64Array(n); eh[z] = hcf
-    for (const f of faces[z]) eh[f.node] += ((1 - hcf) * f.area) / Atot[z]
-    W0.push(col(eh))
-    const c = new Float64Array(n)
-    if (inp.control === 'air') c[z] = 1
-    else { c[z] = 0.5; for (const f of faces[z]) c[f.node] += (0.5 * f.area) / Atot[z] }
-    ctl.push(c)
+    ehNodes.push(Int32Array.from([z, ...faces[z].map((f) => f.node)]))
+    ehW.push(Float64Array.from([hcf, ...faces[z].map((f) => ((1 - hcf) * f.area) / Atot[z])]))
   }
-  const dot = (a: Float64Array, b: Float64Array) => { let s = 0; for (let i = 0; i < n; i++) s += a[i] * b[i]; return s }
-  // Z×Z blocks: G = Eᵀ·U, CU = Ctlᵀ·U, CW0 = Ctlᵀ·W0, EW0 = Eᵀ·W0 (row i, column j).
-  const G = new Float64Array(Z * Z), CU = new Float64Array(Z * Z), CW0 = new Float64Array(Z * Z), EW0 = new Float64Array(Z * Z)
-  for (let i = 0; i < Z; i++) for (let j = 0; j < Z; j++) {
-    G[i * Z + j] = U[j][i]; EW0[i * Z + j] = W0[j][i]
-    CU[i * Z + j] = dot(ctl[i], U[j]); CW0[i * Z + j] = dot(ctl[i], W0[j])
+  const G = new Float64Array(Z * Z), Gr = new Float64Array(Z * Z), EW = new Float64Array(Z * Z), RW = new Float64Array(Z * Z)
+  {
+    const v = new Float64Array(n), x = new Float64Array(n)
+    for (let j = 0; j < Z; j++) {
+      v.fill(0); v[j] = 1
+      sparseLuSolve(lu, v, x)
+      for (let i = 0; i < Z; i++) { G[i * Z + j] = x[i]; Gr[i * Z + j] = x[rad[i]] }
+      v.fill(0)
+      for (let q = 0; q < ehNodes[j].length; q++) v[ehNodes[j][q]] += ehW[j][q]
+      sparseLuSolve(lu, v, x)
+      for (let i = 0; i < Z; i++) { EW[i * Z + j] = x[i]; RW[i * Z + j] = x[rad[i]] }
+    }
   }
 
   // ── Solar inside each zone (Part 1b's rule, per zone) ────────────────────────────────────────────────────────
@@ -327,208 +334,333 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       for (const f of fl) { floorShare[f.node] = f.area / aF; beamRefl[z] += (f.area / aF) * (1 - (f.alpha ?? 1)) }
     }
   }
+  // Flat per-face arrays for the hourly loops.
+  const fNode = new Int32Array(nFaces), fZone = new Int32Array(nFaces), fArea = new Float64Array(nFaces), fAlpha = new Float64Array(nFaces)
+  {
+    let q = 0
+    for (let z = 0; z < Z; z++) for (const f of faces[z]) { fNode[q] = f.node; fZone[q] = z; fArea[q] = f.area; fAlpha[q] = f.alpha ?? 1; q++ }
+  }
 
   // ── State ────────────────────────────────────────────────────────────────────────────────────────────────────
   const H = inp.hours
   const xF = new Float64Array(n)
   for (let i = 0; i < n; i++) xF[i] = inp.zones[zoneOfNode[i]].initial_c
-  const xs = chains.map((t, k) => new Float64Array(t.m).fill(inp.zones[inp.elements[k].zone_a].initial_c))
-  const bs = chains.map((t) => new Float64Array(t.m)), ys = chains.map((t) => new Float64Array(t.m))
-  // Two-faced elements start from a straight line between their zones' initial temperatures is not needed: the
-  // warm-up removes the start state. All interior nodes start at zone_a's initial temperature.
+  // All interior nodes start at zone_a's initial temperature; the warm-up removes the start state.
   const sky = els.map((e) => -e.f_sky * e.h_re * K.delta_theta_sky_k * e.area_m2)
   const gBnd = els.map((e) => e.g_boundary * e.area_m2)
   const ground = els.map((e) => e.boundary === 'ground')
+  const absAt = els.map((e, k) => (e.absorbed_node ?? 0) - chains[k].first)
+  const elZoneA = Int32Array.from(inp.elements, (ne) => ne.zone_a)
+  const elZoneB = Int32Array.from(inp.elements, (ne) => ne.zone_b ?? -1)
   // The middle link of each two-faced element (chain nodes ℓ and ℓ+1): nodes 0..ℓ are zone_b's, the rest zone_a's.
   const mid = els.map((e, k) => (two[k] ? Math.floor((e.c.length - 2) / 2) : -1))
+  // The chains' state and factors in flat arrays (Part 6): element k's interior nodes are cO[k] .. cO[k + 1] − 1.
+  const cO = new Int32Array(E + 1)
+  for (let k = 0; k < E; k++) cO[k + 1] = cO[k] + chains[k].m
+  const NC = cO[E]
+  const CX = new Float64Array(NC), CY = new Float64Array(NC), CD = new Float64Array(NC), COFF = new Float64Array(NC)
+  const CCP = new Float64Array(NC), CPIV = new Float64Array(NC), CWA = new Float64Array(NC), CWB = new Float64Array(NC)
+  const CZ = new Int32Array(NC)  // the zone whose storage each chain node counts in
+  const gAc = new Float64Array(E), gBc = new Float64Array(E)
+  for (let k = 0; k < E; k++) {
+    const t = chains[k], o = cO[k]
+    gAc[k] = t.gA; gBc[k] = t.gB
+    for (let j = 0; j < t.m; j++) {
+      CX[o + j] = inp.zones[inp.elements[k].zone_a].initial_c
+      CD[o + j] = t.cap[j] / DT
+      if (j > 0) COFF[o + j] = t.off[j - 1]
+      CCP[o + j] = t.cp[j]; CPIV[o + j] = t.piv[j]; CWA[o + j] = t.wA[j]; CWB[o + j] = t.wB ? t.wB[j] : 0
+      CZ[o + j] = two[k] && t.first + j <= mid[k] ? elZoneB[k] : elZoneA[k]
+    }
+  }
+  const heatC = Float64Array.from(inp.zones, (z) => z.setpoints.heat_c ?? NaN)
+  const coolC = Float64Array.from(inp.zones, (z) => z.setpoints.cool_c ?? NaN)
+  const ventIn = inp.zones.map((z) => z.ventilation_w_per_k), solIn = inp.zones.map((z) => z.solar_transmitted_w)
+  const beamIn = inp.zones.map((z, i) => (z.solar_beam_w && hasFloor[i] ? z.solar_beam_w : null))
+  const ogIn = inp.zones.map((z) => (z.other_gains ? z.other_gains.w : null)), ogC = Float64Array.from(inp.zones, (z) => z.other_gains?.convective_fraction ?? 0)
+  const brid = Float64Array.from(inp.zones, (z) => z.bridging_w_per_k)
+  // Hour-major copies of the per-element and per-zone hourly inputs, and hour-major outputs unpacked at the end
+  // (Part 6): each hour then reads and writes a few contiguous rows instead of one value from each of hundreds of
+  // year-long arrays. The values are the same products, computed once.
+  const absP = new Float64Array(H * E)
+  for (let k = 0; k < E; k++) { const a = inp.elements[k].solar_absorbed_w_per_m2, A = els[k].area_m2; for (let h = 0; h < H; h++) absP[h * E + k] = a[h] * A }
+  const zIn = new Float64Array(H * Z * 3)  // ventilation, transmitted solar, beam
+  for (let z = 0; z < Z; z++) {
+    const v = ventIn[z], so = solIn[z], be = beamIn[z]
+    for (let h = 0; h < H; h++) { const o = (h * Z + z) * 3; zIn[o] = v[h]; zIn[o + 1] = so[h]; zIn[o + 2] = be ? be[h] : 0 }
+  }
+  const NO = 13  // per zone and hour: air, mrt, op, heating, cooling, bridging, ventilation, solar in, solar lost, other, interzone, storage, closure
+  const zOut = new Float64Array(H * Z * NO)
+  const elB = new Float64Array(E), elS = new Float64Array(E), elK = new Float64Array(E), elI = new Float64Array(E)
 
-  const zr: NetworkZoneRun[] = inp.zones.map(() => ({
-    theta_air: new Float64Array(H), theta_mrt: new Float64Array(H), theta_op: new Float64Array(H),
-    heating_w: new Float64Array(H), cooling_w: new Float64Array(H),
-    terms: {
-      bridging_w: new Float64Array(H), ventilation_w: new Float64Array(H), solar_transmitted_w: new Float64Array(H),
-      solar_lost_w: new Float64Array(H), other_gains_w: new Float64Array(H), interzone_w: new Float64Array(H), storage_w: new Float64Array(H),
-    },
-    closure_wh: new Float64Array(H),
-  }))
-  const et = els.map(() => ({ boundary_w: new Float64Array(H), solar_absorbed_w: new Float64Array(H), sky_w: new Float64Array(H) }))
-  const ezw = els.map((_, k) => (two[k] ? new Float64Array(H) : null))
 
-  const bF = new Float64Array(n), z0 = new Float64Array(n)
-  const hv = new Float64Array(Z), hvPrev = new Float64Array(Z).fill(NaN)
-  let Mlu: LU | null = null
-  const P = new Float64Array(Z * Z)  // M⁻¹·D·EW0
-  const R = new Float64Array(Z * Z)  // control response to unit heat in each zone, with this hour's ventilation
-  const y0 = new Float64Array(Z), c0 = new Float64Array(Z), phi = new Float64Array(Z), rhsZ = new Float64Array(Z), tmpZ = new Float64Array(Z)
-  const mode = new Int8Array(Z)  // 0 free, 1 heating to heat_c, −1 cooling to cool_c
+  const bF = new Float64Array(n), z0 = new Float64Array(n), rhs = new Float64Array(n)
+  const hv = new Float64Array(Z), phi = new Float64Array(Z), xa = new Float64Array(Z)
+  const mode = new Int8Array(Z)  // 0 free, 1 heating to heat_c, −1 cooling to cool_c; kept from the hour before
   let maxPasses = 0, hoursOverOne = 0
   const solDiffuse = new Float64Array(Z), radBeam = new Float64Array(Z), ogRad = new Float64Array(Z)
+  const stored = new Float64Array(Z), sum = new Float64Array(Z)
+  const NM = operative ? 2 * Z : Z
+  const Am = new Float64Array(NM * NM), bm = new Float64Array(NM), um = new Float64Array(NM)
+  const luM: LU = { n: NM, lu: new Float64Array(NM * NM), piv: new Int32Array(NM) }
+  // Air control with all heating at the air node (EW = G): the admittance form. With Y = G⁻¹ (symmetric positive
+  // definite, as S0 is), x_a = z0 + G·(φ − H_v·x_a) is (Y + H_v)·x_a = Y·z0 + φ, so the free zones solve
+  // K_FF·x_F = w_F − Y_FH·x_H with K = Y + H_v and w = Y·z0, by Cholesky, and each held zone's φ is (K·x_a − w)_i.
+  // This replaces a dense Z×Z LU every hour by a Cholesky of the free zones only (Part 6).
+  const admittance = !operative && hcf === 1
+  const Y = new Float64Array(admittance ? Z * Z : 0), wY = new Float64Array(Z), Kc = new Float64Array(admittance ? Z * Z : 0)
+  const freeIdx = new Int32Array(Z)
+  if (admittance) {
+    const fG = luFactor(G, Z), e = new Float64Array(Z), col = new Float64Array(Z)
+    for (let j = 0; j < Z; j++) { e.fill(0); e[j] = 1; luSolve(fG, e, col); for (let i = 0; i < Z; i++) Y[i * Z + j] = col[i] }
+    for (let i = 0; i < Z; i++) for (let j = 0; j < i; j++) { const v = 0.5 * (Y[i * Z + j] + Y[j * Z + i]); Y[i * Z + j] = v; Y[j * Z + i] = v }
+  }
+  const actIdx = new Int32Array(Z)
+
+  /**
+   * The reduced hourly system: with x = S0⁻¹·(b + Σ_j e_j·q_j + Σ_j eh_j·φ_j), the air temperatures obey
+   * x_a = z0_a + G·q + EW·φ with ventilation q_j = −h_v,j·x_a,j. Air control: each zone's unknown is its air
+   * temperature (free) or its heating φ (held, air temperature known). Operative control: unknowns are every air
+   * temperature and the held zones' φ, with (x_a + x_star)/2 = setpoint for those. Z (or Z + held) dense unknowns.
+   */
+  const solveReduced = () => {
+    let m = 0
+    for (let z = 0; z < Z; z++) if (mode[z] !== 0) actIdx[m++] = z
+    if (admittance) {
+      let nf = 0
+      for (let z = 0; z < Z; z++) {
+        if (mode[z] === 0) freeIdx[nf++] = z
+        else xa[z] = mode[z] === 1 ? heatC[z] : coolC[z]
+      }
+      if (nf) {
+        for (let p = 0; p < nf; p++) {
+          const i = freeIdx[p]
+          let r = wY[i]
+          for (let a = 0; a < m; a++) { const j = actIdx[a]; r -= Y[i * Z + j] * xa[j] }
+          bm[p] = r
+          for (let q = 0; q <= p; q++) Kc[p * nf + q] = Y[i * Z + freeIdx[q]] + (q === p ? hv[i] : 0)
+        }
+        // Cholesky K_FF = L·Lᵀ in place (lower triangle), then the two triangular solves.
+        for (let p = 0; p < nf; p++) {
+          for (let q = 0; q <= p; q++) {
+            let v = Kc[p * nf + q]
+            for (let r = 0; r < q; r++) v -= Kc[p * nf + r] * Kc[q * nf + r]
+            if (q === p) {
+              if (!(v > 0)) throw new NetworkError('the zone air system is not positive definite', 'zones')
+              Kc[p * nf + p] = Math.sqrt(v)
+            } else Kc[p * nf + q] = v / Kc[q * nf + q]
+          }
+        }
+        for (let p = 0; p < nf; p++) { let v = bm[p]; for (let r = 0; r < p; r++) v -= Kc[p * nf + r] * um[r]; um[p] = v / Kc[p * nf + p] }
+        for (let p = nf - 1; p >= 0; p--) { let v = um[p]; for (let r = p + 1; r < nf; r++) v -= Kc[r * nf + p] * um[r]; um[p] = v / Kc[p * nf + p] }
+        for (let p = 0; p < nf; p++) { xa[freeIdx[p]] = um[p]; phi[freeIdx[p]] = 0 }
+      }
+      for (let a = 0; a < m; a++) {
+        const i = actIdx[a]
+        let v = hv[i] * xa[i] - wY[i]
+        for (let j = 0; j < Z; j++) v += Y[i * Z + j] * xa[j]
+        phi[i] = v
+      }
+      return
+    }
+    if (!operative) {
+      for (let i = 0; i < Z; i++) {
+        let r = z0[i]
+        for (let j = 0; j < Z; j++) {
+          const gij = G[i * Z + j]
+          if (mode[j] === 0) Am[i * Z + j] = (i === j ? 1 : 0) + gij * hv[j]
+          else {
+            Am[i * Z + j] = -EW[i * Z + j]
+            r -= ((i === j ? 1 : 0) + gij * hv[j]) * (mode[j] === 1 ? heatC[j] : coolC[j])
+          }
+        }
+        bm[i] = r
+      }
+      luSolve(luFactorInto(Am, Z, luM), bm, um)
+      for (let j = 0; j < Z; j++) {
+        if (mode[j] === 0) { xa[j] = um[j]; phi[j] = 0 } else { xa[j] = mode[j] === 1 ? heatC[j] : coolC[j]; phi[j] = um[j] }
+      }
+      return
+    }
+    const N = Z + m
+    for (let i = 0; i < Z; i++) bm[i] = z0[i]
+    for (let a = 0; a < m; a++) {
+      const zi = actIdx[a]
+      bm[Z + a] = (mode[zi] === 1 ? heatC[zi] : coolC[zi]) - 0.5 * z0[rad[zi]]
+    }
+    {
+      for (let i = 0; i < N * N; i++) Am[i] = 0
+      for (let i = 0; i < Z; i++) {
+        for (let j = 0; j < Z; j++) Am[i * N + j] = (i === j ? 1 : 0) + G[i * Z + j] * hv[j]
+        for (let a = 0; a < m; a++) Am[i * N + Z + a] = -EW[i * Z + actIdx[a]]
+      }
+      for (let a = 0; a < m; a++) {
+        const zi = actIdx[a], row = (Z + a) * N
+        // 0.5·x_a,i + 0.5·(z0_r,i + Σ_j Gr_ij·(−h_v,j·x_a,j) + Σ_held RW_ij·φ_j) = setpoint
+        for (let j = 0; j < Z; j++) Am[row + j] = (zi === j ? 0.5 : 0) - 0.5 * Gr[zi * Z + j] * hv[j]
+        for (let b = 0; b < m; b++) Am[row + Z + b] = 0.5 * RW[zi * Z + actIdx[b]]
+      }
+    }
+    luSolve(luFactorInto(Am, N, luM), bm, um)
+    phi.fill(0)
+    for (let j = 0; j < Z; j++) xa[j] = um[j]
+    for (let a = 0; a < m; a++) phi[actIdx[a]] = um[Z + a]
+  }
+  /** The control temperature of zone i for the current xa, φ (operative needs the star node). */
+  const control = (i: number) => {
+    if (!operative) return xa[i]
+    let r = z0[rad[i]]
+    for (let j = 0; j < Z; j++) r += -Gr[i * Z + j] * hv[j] * xa[j] + RW[i * Z + j] * phi[j]
+    return 0.5 * (xa[i] + r)
+  }
 
   const step = (h: number, record: boolean) => {
     const te = inp.theta_e[h]
-    for (let i = 0; i < n; i++) bF[i] = (capF[i] / DT) * xF[i]
-    let hvChanged = false
+    for (let i = 0; i < n; i++) bF[i] = capDT[i] * xF[i]
+    const zi0 = h * Z * 3
     for (let z = 0; z < Z; z++) {
-      const zn = inp.zones[z]
-      hv[z] = zn.ventilation_w_per_k[h]
-      if (hv[z] !== hvPrev[z]) hvChanged = true
-      const sol = zn.solar_transmitted_w[h]
-      const beam = zn.solar_beam_w && hasFloor[z] ? zn.solar_beam_w[h] : 0
-      const ogw = zn.other_gains ? zn.other_gains.w[h] : 0, ogc = zn.other_gains ? zn.other_gains.convective_fraction : 0
-      bF[z] += zn.bridging_w_per_k * te + fsc * sol + ogc * ogw  // ventilation's h_v·θ_e is added with the Woodbury term below
+      hv[z] = zIn[zi0 + 3 * z]
+      const sol = zIn[zi0 + 3 * z + 1]
+      const beam = zIn[zi0 + 3 * z + 2]
+      const ogw = ogIn[z] ? ogIn[z]![h] : 0, ogc = ogC[z]
+      // Ventilation's h_v·θ_e is a source; its h_v·θ_a is in the reduced system.
+      bF[z] += brid[z] * te + fsc * sol + ogc * ogw + hv[z] * te
       radBeam[z] = (1 - fsc) * beam
       solDiffuse[z] = (1 - fsc) * (sol - beam) + radBeam[z] * beamRefl[z]
       ogRad[z] = (1 - ogc) * ogw
-      bF[z] += hv[z] * te
     }
-    for (let z = 0; z < Z; z++) for (const f of faces[z]) {
-      bF[f.node] += solDiffuse[z] * difFace[f.node] + (ogRad[z] * f.area) / Atot[z] + radBeam[z] * floorShare[f.node] * (f.alpha ?? 1)
+    for (let q = 0; q < nFaces; q++) {
+      const node = fNode[q], z = fZone[q]
+      bF[node] += solDiffuse[z] * difFace[node] + (ogRad[z] * fArea[q]) / Atot[z] + radBeam[z] * floorShare[node] * fAlpha[q]
     }
     for (let k = 0; k < E; k++) {
-      const e = els[k], t = chains[k], ne = inp.elements[k]
-      if (t.m === 0) continue
-      const b = bs[k], x = xs[k], y = ys[k]
-      for (let j = 0; j < t.m; j++) b[j] = (t.cap[j] / DT) * x[j]
-      if (!two[k]) {
-        b[0] += gBnd[k] * (ground[k] ? inp.theta_ground : te) + sky[k]
-        b[(e.absorbed_node ?? 0) - t.first] += ne.solar_absorbed_w_per_m2[h] * e.area_m2 + solDiffuse[ne.zone_a] * difPane[k]
+      const o = cO[k], o1 = cO[k + 1]
+      if (o1 === o) continue
+      // solveChain with the right-hand side (stored heat, then the outside sources) formed as it goes.
+      let s0 = 0, sA = 0, jA = -1
+      if (!two[k]) { s0 = gBnd[k] * (ground[k] ? inp.theta_ground : te) + sky[k]; sA = absP[h * E + k] + solDiffuse[elZoneA[k]] * difPane[k]; jA = o + absAt[k] }
+      let bj = CD[o] * CX[o]
+      if (jA >= 0) { bj += s0; if (jA === o) bj += sA }
+      CY[o] = bj / CPIV[o]
+      for (let j = o + 1; j < o1; j++) {
+        bj = CD[j] * CX[j]
+        if (j === jA) bj += sA
+        CY[j] = (bj - COFF[j] * CY[j - 1]) / CPIV[j]
       }
-      solveChain(t, b, y)
-      bF[faceA[k]] += t.gA * y[t.m - 1]
-      if (two[k]) bF[faceB[k]] += t.gB * y[0]
+      for (let j = o1 - 2; j >= o; j--) CY[j] -= CCP[j] * CY[j + 1]
+      bF[faceA[k]] += gAc[k] * CY[o1 - 1]
+      if (two[k]) bF[faceB[k]] += gBc[k] * CY[o]
     }
-    luSolve(lu, bF, z0)
+    sparseLuSolve(lu, bF, z0)
+    if (admittance) for (let z = 0; z < Z; z++) { let w = 0; for (let j = 0; j < Z; j++) w += Y[z * Z + j] * z0[j]; wY[z] = w }
 
-    // Ventilation (rank Z): M = I + D·G; y0 = M⁻¹·D·Eᵀ·z0; P = M⁻¹·D·EW0; R = CW0 − CU·P.
-    if (hvChanged || !Mlu) {
-      const M = new Float64Array(Z * Z)
-      for (let i = 0; i < Z; i++) for (let j = 0; j < Z; j++) M[i * Z + j] = (i === j ? 1 : 0) + hv[i] * G[i * Z + j]
-      Mlu = luFactor(M, Z)
-      const colIn = new Float64Array(Z), colOut = new Float64Array(Z)
-      for (let j = 0; j < Z; j++) {
-        for (let i = 0; i < Z; i++) colIn[i] = hv[i] * EW0[i * Z + j]
-        luSolve(Mlu, colIn, colOut)
-        for (let i = 0; i < Z; i++) P[i * Z + j] = colOut[i]
-      }
-      for (let i = 0; i < Z; i++) for (let j = 0; j < Z; j++) {
-        let s = CW0[i * Z + j]
-        for (let q = 0; q < Z; q++) s -= CU[i * Z + q] * P[q * Z + j]
-        R[i * Z + j] = s
-      }
-      hvPrev.set(hv)
-    }
-    for (let i = 0; i < Z; i++) rhsZ[i] = hv[i] * z0[i]
-    luSolve(Mlu, rhsZ, y0)
-    for (let i = 0; i < Z; i++) {
-      let s = dot(ctl[i], z0)
-      for (let q = 0; q < Z; q++) s -= CU[i * Z + q] * y0[q]
-      c0[i] = s
-    }
-
-    // Ideal loads: hold every zone that would leave its band on it, all together; iterate the set to consistency.
-    mode.fill(0)
-    for (let z = 0; z < Z; z++) {
-      const { heat_c, cool_c } = inp.zones[z].setpoints
-      if (heat_c != null && c0[z] < heat_c) mode[z] = 1
-      else if (cool_c != null && c0[z] > cool_c) mode[z] = -1
-    }
+    // Ideal loads: hold every zone that would leave its band on it, all together. The set starts from the hour
+    // before and is iterated until consistent (a held zone's demand has the right sign; a free zone is in its band).
     let passes = 0
     for (;;) {
       passes++
-      phi.fill(0)
-      const act: number[] = []
-      for (let z = 0; z < Z; z++) if (mode[z] !== 0) act.push(z)
-      if (act.length) {
-        const m = act.length, A = new Float64Array(m * m), r = new Float64Array(m), s = new Float64Array(m)
-        act.forEach((zi, i) => {
-          const sp = inp.zones[zi].setpoints
-          r[i] = (mode[zi] === 1 ? sp.heat_c! : sp.cool_c!) - c0[zi]
-          act.forEach((zj, j) => { A[i * m + j] = R[zi * Z + zj] })
-        })
-        luSolve(luFactor(A, m), r, s)
-        act.forEach((zi, i) => { phi[zi] = s[i] })
-      }
+      solveReduced()
       let changed = false
       for (let z = 0; z < Z; z++) {
-        let c = c0[z]
-        for (let j = 0; j < Z; j++) c += R[z * Z + j] * phi[j]
-        const { heat_c, cool_c } = inp.zones[z].setpoints
         if (mode[z] === 1 && phi[z] < 0) { mode[z] = 0; changed = true }
         else if (mode[z] === -1 && phi[z] > 0) { mode[z] = 0; changed = true }
-        else if (mode[z] === 0 && heat_c != null && c < heat_c - 1e-9) { mode[z] = 1; changed = true }
-        else if (mode[z] === 0 && cool_c != null && c > cool_c + 1e-9) { mode[z] = -1; changed = true }
+        else if (mode[z] === 0) {
+          const c = control(z)
+          if (c < heatC[z] - 1e-9) { mode[z] = 1; changed = true }
+          else if (c > coolC[z] + 1e-9) { mode[z] = -1; changed = true }
+        }
       }
       if (!changed) break
       if (passes > 2 * Z + 2) throw new NetworkError(`the heating/cooling set did not settle in hour ${h}`, 'setpoints')
     }
     if (record) { maxPasses = Math.max(maxPasses, passes); if (passes > 1) hoursOverOne++ }
 
-    // x = z0 + W0·φ − U·(y0 + P·φ).
-    for (let i = 0; i < Z; i++) { let s = y0[i]; for (let j = 0; j < Z; j++) s += P[i * Z + j] * phi[j]; tmpZ[i] = s }
-    const stored = record ? new Float64Array(Z) : null
+    // The full state: x = S0⁻¹·(b + Σ e_j·q_j + Σ eh_j·φ_j).
+    rhs.set(bF)
+    for (let z = 0; z < Z; z++) {
+      rhs[z] -= hv[z] * xa[z]
+      if (phi[z] !== 0) { const nd = ehNodes[z], w = ehW[z]; for (let q = 0; q < nd.length; q++) rhs[nd[q]] += w[q] * phi[z] }
+    }
+    sparseLuSolve(lu, rhs, rhs)
+    if (record) stored.fill(0)
     for (let i = 0; i < n; i++) {
-      let xi = z0[i]
-      for (let j = 0; j < Z; j++) xi += W0[j][i] * phi[j] - U[j][i] * tmpZ[j]
-      if (stored) stored[zoneOfNode[i]] += (capF[i] / DT) * (xi - xF[i])
+      const xi = rhs[i]
+      if (record) stored[zoneOfNode[i]] += capDT[i] * (xi - xF[i])
       xF[i] = xi
     }
     for (let k = 0; k < E; k++) {
-      const t = chains[k], x = xs[k], y = ys[k], wB = t.wB
-      const xa = xF[faceA[k]], xb = two[k] ? xF[faceB[k]] : 0
-      const za = inp.elements[k].zone_a, zb = inp.elements[k].zone_b
-      for (let j = 0; j < t.m; j++) {
-        const xj = y[j] - t.wA[j] * xa - (wB ? wB[j] * xb : 0)
-        if (stored) {
-          const node = t.first + j
-          stored[two[k] && node <= mid[k] ? zb! : za] += (t.cap[j] / DT) * (xj - x[j])
+      const xfa = xF[faceA[k]], xfb = two[k] ? xF[faceB[k]] : 0
+      const o1 = cO[k + 1]
+      if (record) {
+        for (let j = cO[k]; j < o1; j++) {
+          const xj = CY[j] - CWA[j] * xfa - CWB[j] * xfb
+          stored[CZ[j]] += CD[j] * (xj - CX[j])
+          CX[j] = xj
         }
-        x[j] = xj
-      }
+      } else for (let j = cO[k]; j < o1; j++) CX[j] = CY[j] - CWA[j] * xfa - CWB[j] * xfb
     }
     if (!record) return
 
     // ── Terms and closure, per zone ────────────────────────────────────────────────────────────────────────────
-    const sum = new Float64Array(Z)
+    const ob = h * Z * NO
     for (let z = 0; z < Z; z++) {
-      const zn = inp.zones[z], T = zr[z].terms, ta = xF[z]
-      sum[z] += (T.bridging_w[h] = zn.bridging_w_per_k * (te - ta)) + (T.ventilation_w[h] = hv[z] * (te - ta))
-        + (T.solar_transmitted_w[h] = zn.solar_transmitted_w[h]) + (T.solar_lost_w[h] = -solDiffuse[z] * difLost[z])
-        + (T.other_gains_w[h] = zn.other_gains ? zn.other_gains.w[h] : 0) + phi[z]
-      if (phi[z] > 0) zr[z].heating_w[h] = phi[z]; else if (phi[z] < 0) zr[z].cooling_w[h] = -phi[z]
+      const o = ob + z * NO, ta = xF[z]
+      sum[z] = (zOut[o + 5] = brid[z] * (te - ta)) + (zOut[o + 6] = hv[z] * (te - ta))
+        + (zOut[o + 7] = zIn[zi0 + 3 * z + 1]) + (zOut[o + 8] = -solDiffuse[z] * difLost[z])
+        + (zOut[o + 9] = ogIn[z] ? ogIn[z]![h] : 0) + phi[z]
+      if (phi[z] > 0) zOut[o + 3] = phi[z]; else if (phi[z] < 0) zOut[o + 4] = -phi[z]
     }
     for (let k = 0; k < E; k++) {
-      const e = els[k], ne = inp.elements[k]
+      const e = els[k], za = elZoneA[k]
       if (!two[k]) {
-        const node0 = xs[k].length ? xs[k][0] : xF[faceA[k]]
+        const node0 = cO[k + 1] > cO[k] ? CX[cO[k]] : xF[faceA[k]]
         const tb = ground[k] ? inp.theta_ground : te
-        sum[ne.zone_a] += (et[k].boundary_w[h] = gBnd[k] * (tb - node0))
-        sum[ne.zone_a] += (et[k].solar_absorbed_w[h] = ne.solar_absorbed_w_per_m2[h] * e.area_m2)
-        sum[ne.zone_a] += (et[k].sky_w[h] = sky[k])
+        const qb = gBnd[k] * (tb - node0), qs = absP[h * E + k]
+        sum[za] += qb; elB[k] += qb
+        sum[za] += qs; elS[k] += qs
+        sum[za] += sky[k]; elK[k] += sky[k]
         continue
       }
       // Heat across the middle link, from the zone_b side (chain node ℓ) into the zone_a side (node ℓ+1).
-      const node = (i: number) => (i === 0 ? xF[faceB[k]] : i === e.c.length - 1 ? xF[faceA[k]] : xs[k][i - 1])
-      const l = mid[k]
-      const q = e.g[l] * e.area_m2 * (node(l) - node(l + 1))
-      ezw[k]![h] = q
-      if (ne.zone_b !== ne.zone_a) {
-        zr[ne.zone_a].terms.interzone_w[h] += q
-        zr[ne.zone_b!].terms.interzone_w[h] -= q
-      }
+      const l = mid[k], L = e.c.length
+      const tl = l === 0 ? xF[faceB[k]] : CX[cO[k] + l - 1]
+      const tr = l + 1 === L - 1 ? xF[faceA[k]] : CX[cO[k] + l]
+      const q = e.g[l] * e.area_m2 * (tl - tr)
+      elI[k] += q
+      const zb = elZoneB[k]
+      if (zb !== za) { zOut[ob + za * NO + 10] += q; zOut[ob + zb * NO + 10] -= q }
     }
     for (let z = 0; z < Z; z++) {
-      const r = zr[z], fs = faces[z]
-      sum[z] += r.terms.interzone_w[h]
-      r.terms.storage_w[h] = stored![z]
-      r.closure_wh[h] = Math.abs(sum[z] - stored![z])
-      let mrt = 0
-      for (const f of fs) mrt += (xF[f.node] * f.area) / Atot[z]
-      r.theta_air[h] = xF[z]; r.theta_mrt[h] = mrt; r.theta_op[h] = 0.5 * (xF[z] + mrt)
+      const o = ob + z * NO
+      sum[z] += zOut[o + 10]
+      zOut[o + 11] = stored[z]
+      zOut[o + 12] = Math.abs(sum[z] - stored[z])
+      const mrt = xF[rad[z]]  // the star node is the area-weighted mean of the zone's faces
+      zOut[o] = xF[z]; zOut[o + 1] = mrt; zOut[o + 2] = 0.5 * (xF[z] + mrt)
     }
   }
 
   for (let d = 0; d < inp.warmup_days; d++) for (let h = 0; h < 24; h++) step(h, false)
   for (let h = 0; h < H; h++) step(h, true)
-  const nodes = n + chains.reduce((s, t) => s + t.m, 0)
-  return { hours: H, zones: zr, element_terms: et, element_interzone_w: ezw, nodes, active_set: { max_passes: maxPasses, hours_over_one: hoursOverOne } }
+  const nodes = n - Z + chains.reduce((s, t) => s + t.m, 0)  // the star nodes are not physical nodes
+  // Unpack hour-major to one array per zone and quantity, in blocks of hours so the reads stay in cache.
+  const cols = Array.from({ length: Z * NO }, () => new Float64Array(H))
+  for (let h0 = 0; h0 < H; h0 += 64) {
+    const h1 = Math.min(H, h0 + 64)
+    for (let c = 0; c < Z * NO; c++) { const a = cols[c]; for (let h = h0; h < h1; h++) a[h] = zOut[h * Z * NO + c] }
+  }
+  const col = (z: number, f: number) => cols[z * NO + f]
+  const zr: NetworkZoneRun[] = inp.zones.map((_, z) => ({
+    theta_air: col(z, 0), theta_mrt: col(z, 1), theta_op: col(z, 2), heating_w: col(z, 3), cooling_w: col(z, 4),
+    terms: {
+      bridging_w: col(z, 5), ventilation_w: col(z, 6), solar_transmitted_w: col(z, 7), solar_lost_w: col(z, 8),
+      other_gains_w: col(z, 9), interzone_w: col(z, 10), storage_w: col(z, 11),
+    },
+    closure_wh: col(z, 12),
+  }))
+  return {
+    hours: H, zones: zr, nodes, active_set: { max_passes: maxPasses, hours_over_one: hoursOverOne },
+    element_terms: els.map((_, k) => ({ boundary_wh: elB[k], solar_absorbed_wh: elS[k], sky_wh: elK[k] })),
+    element_interzone_wh: els.map((_, k) => (two[k] ? elI[k] : null)),
+  }
 }
