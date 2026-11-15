@@ -50,19 +50,78 @@ export function crossing(plan: Plan, pieces = wallPieces(plan)): Win[] {
 }
 
 export type WindowSpec = { count: number; width_m: number; height_m: number; sill_m: number; shading_m: number }
+export type DoorSpec = { count: number; width_m: number; height_m: number }
+/** A door's usual size to start from (900 mm × 2.1 m). */
+export const DOOR = { width_m: 0.9, height_m: 2.1 }
 
 let made = 0
 const newId = () => `w${Date.now().toString(36)}${(made++).toString(36)}`
 
-/** Replace the windows on a span with `spec.count` equally spaced ones (or none, for count 0). */
-export function setWindowsIn(plan: Plan, s: Span, spec: WindowSpec | null): { plan: Plan } | { why: string } {
+/** Where the doors go among N windows + M doors: spread out, the first in the middle when there is one
+ * (4 windows and a door: window, window, door, window, window). */
+export const doorSlots = (n: number, m: number) => Array.from({ length: m }, (_, j) => Math.floor(((j + 0.5) * (n + m)) / m))
+
+/** Replace the windows and doors on a span with these, all spaced equally together (gap = (L − Σ widths) / (items + 1)).
+ * `null` or a count of 0 leaves none of that kind. */
+export function setOpeningsIn(plan: Plan, s: Span, win: WindowSpec | null, door: DoorSpec | null = null): { plan: Plan } | { why: string } {
   const keep = plan.windows.filter((w) => !inSpan(w, s))
-  if (!spec) return { plan: { ...plan, windows: keep } }
-  const l = layoutIn(s, spec, plan.storey_height_m)
-  if ('why' in l) return l
-  const added: Win[] = l.windows.map((w) => ({ id: newId(), wall: s.run, t_m: w.offset_m, width_m: w.width_m, height_m: w.height_m, sill_m: w.sill_m, shading_m: w.shading_m }))
+  const n = win && win.count > 0 ? win.count : 0
+  const m = door && door.count > 0 ? door.count : 0
+  if (!n && !m) return { plan: { ...plan, windows: keep } }
+  if (n) {
+    // The window checks (size, sill, storey height) on their own first.
+    const l = layoutIn({ ...s, t1: s.t0 + 1e9 }, win!, plan.storey_height_m)
+    if ('why' in l) return l
+  }
+  if (m) {
+    if (!Number.isInteger(m)) return { why: 'Number of doors must be a whole number' }
+    if (!(door!.width_m > 0) || !(door!.height_m > 0)) return { why: 'Door size must be more than zero' }
+    if (door!.height_m > plan.storey_height_m + 1e-9) return { why: `A ${door!.height_m} m door is taller than the storey (${plan.storey_height_m} m)` }
+  }
+  const slots = new Set(doorSlots(n, m))
+  const items = Array.from({ length: n + m }, (_, i) => slots.has(i))
+  const total = n * (win?.width_m ?? 0) + m * (door?.width_m ?? 0)
+  const L = s.t1 - s.t0
+  if (total > L + 1e-9) return { why: `These need ${Math.round(total * 100) / 100} m of wall; this stretch is ${Math.round(L * 100) / 100} m` }
+  const gap = (L - total) / (n + m + 1)
+  let t = s.t0 + gap
+  const added: Win[] = items.map((isDoor) => {
+    const w: Win = isDoor
+      ? { id: newId(), wall: s.run, t_m: t, width_m: door!.width_m, height_m: door!.height_m, sill_m: 0, shading_m: 0, door: true }
+      : { id: newId(), wall: s.run, t_m: t, width_m: win!.width_m, height_m: win!.height_m, sill_m: win!.sill_m, shading_m: win!.shading_m }
+    t += w.width_m + gap
+    return w
+  })
   return { plan: { ...plan, windows: [...keep, ...added] } }
 }
+
+/** Replace the windows (and doors) on a span with `spec.count` equally spaced windows. */
+export const setWindowsIn = (plan: Plan, s: Span, spec: WindowSpec | null) => setOpeningsIn(plan, s, spec, null)
+
+/** Change one window or door: move it (left edge `t_m`, and sill for a window), or turn it into a door or a window of
+ * the given size, about its middle. Kept on the wall and within the storey. */
+export function changeWindow(plan: Plan, id: string, to: Partial<Pick<Win, 't_m' | 'sill_m' | 'door' | 'width_m' | 'height_m'>>): Plan {
+  const runs = wallRuns(plan.blocks)
+  return {
+    ...plan,
+    windows: plan.windows.map((w) => {
+      if (w.id !== id) return w
+      const L = runs[w.wall]?.length_m ?? w.t_m + w.width_m
+      const H = plan.storey_height_m
+      const width = to.width_m ?? w.width_m
+      const height = Math.min(H, to.height_m ?? w.height_m)
+      const door = to.door ?? !!w.door
+      const t = to.t_m ?? w.t_m + (w.width_m - width) / 2
+      const sill = door ? 0 : Math.max(0, Math.min(H - height, to.sill_m ?? (w.door ? 0.9 : w.sill_m)))
+      const next: Win = { ...w, width_m: width, height_m: height, sill_m: sill, t_m: Math.max(0, Math.min(L - width, t)), shading_m: door ? 0 : w.shading_m }
+      if (door) next.door = true
+      else delete next.door
+      return next
+    }),
+  }
+}
+
+export const removeWindow = (plan: Plan, id: string): Plan => ({ ...plan, windows: plan.windows.filter((w) => w.id !== id) })
 
 /** Each room's windows on wall `run` spaced equally within that room's piece (same number and sizes). */
 export function spaceByRoom(plan: Plan, run: number): Plan {
@@ -82,19 +141,6 @@ export function spaceByRoom(plan: Plan, run: number): Plan {
     p = { ...p, windows: p.windows.map((w) => (moved.has(w.id) ? { ...w, t_m: moved.get(w.id)! } : w)) }
   }
   return p
-}
-
-/** Move one window along its wall to left edge `t` (kept on the wall). */
-export function moveWindow(plan: Plan, id: string, t: number): Plan {
-  const runs = wallRuns(plan.blocks)
-  return {
-    ...plan,
-    windows: plan.windows.map((w) => {
-      if (w.id !== id) return w
-      const L = runs[w.wall]?.length_m ?? w.t_m + w.width_m
-      return { ...w, t_m: Math.max(0, Math.min(L - w.width_m, t)) }
-    }),
-  }
 }
 
 // ─── Wall types ───────────────────────────────────────────────────────────────────────────────────

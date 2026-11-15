@@ -249,3 +249,12 @@
 .gl-typerow { cursor: default; }
 .gl-u { display: inline-flex; align-items: center; gap: 4px; font: 600 11px var(--gl-figures); color: var(--gl-soft); }
 .gl-u input { width: 46px !important; flex: none !important; text-align: right; font-family: var(--gl-figures); }
+.gl-win-door { stroke: #8A6A4A; stroke-width: 5; pointer-events: none; }
+.gl-ev-win.door { fill: #E3D3BE; stroke: #8A6A4A; }
+.gl-ev-handle { fill: #8A6A4A; pointer-events: none; }
+.gl-ev-pop { position: absolute; transform: translate(-50%, -100%); z-index: 3; display: flex; flex-direction: column; gap: 4px; padding: 9px 11px; border-radius: 11px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.14); font: 500 12px var(--gl-detail); color: var(--gl-soft); white-space: nowrap; }
+.gl-ev-pop b { font: 600 13px var(--gl-detail); color: var(--gl-ink); }
+.gl-ev-pop small { font-size: 11px; }
+.gl-ev-pop-btns { display: flex; gap: 5px; margin: 3px 0 1px; }
+.gl-ev-pop-btns button { border: 1px solid var(--gl-line); border-radius: 8px; padding: 4px 9px; background: #fff; font: 600 12px var(--gl-detail); color: var(--gl-green); cursor: pointer; }
+.gl-ev-pop-btns button:hover { border-color: var(--gl-green); }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { azimuthOf, emptyPlan, layoutIn, wallRuns, type Plan, type XY } from '../plan'
-import { crossing, setTypeOn, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
+import { DOOR, changeWindow, crossing, setOpeningsIn, setTypeOn, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
 import { cutZones } from '../ported/zones'
 import { fitRooms } from '../rooms'
 import { buildDocument } from '../toDocument'
@@ -102,6 +102,35 @@ describe('model document', () => {
     const glz = (b.doc as any).surfaces.filter((s: any) => s.kind === 'glazing' && s.azimuth_deg === 180)
     expect(glz.length).toBe(2)
     expect(glz.reduce((n: number, g: any) => n + g.window_count, 0)).toBe(windowsIn(p, south[0]!).length + 2)
+  })
+  it('four windows and a door share a wall, spaced together; the door is its own opaque surface', () => {
+    const r = setOpeningsIn(plan(box), { run: 0, t0: 0, t1: 12 }, { count: 4, width_m: 1, height_m: 1.2, sill_m: 0.9, shading_m: 0 }, { count: 1, ...DOOR })
+    if ('why' in r) throw new Error(r.why)
+    const ws = windowsIn(r.plan, { run: 0, t0: 0, t1: 12 })
+    expect(ws.map((w) => (w.door ? 'D' : 'W')).join('')).toBe('WWDWW')
+    // Equal gaps: (12 − 4 − 0.9) / 6.
+    const gap = (12 - 4.9) / 6
+    expect(ws[0]!.t_m).toBeCloseTo(gap, 9)
+    expect(ws[2]!.t_m).toBeCloseTo(3 * gap + 2, 9)
+    expect(ws[2]!.sill_m).toBe(0)
+    const b = buildDocument(r.plan)
+    expect(b.ok).toBe(true)
+    const doors = (b.doc as any).surfaces.filter((s: any) => s.construction_ref.key === 'unassigned:external_door')
+    expect(doors.length).toBe(1)
+    expect(doors[0].area_m2).toBeCloseTo(0.9 * 2.1, 6)
+    expect(b.totals.windows).toBe(4)
+    expect(b.totals.doors).toBe(1)
+    // Net wall: 40 m × 3 m − 4.8 m² glass − 1.89 m² door.
+    expect(b.totals.wall_net_m2).toBeCloseTo(120 - 4.8 - 1.89, 3)
+    // A window turned into a door keeps its middle and drops to the floor; moved up, a window stays in the storey.
+    const w0 = ws[0]!
+    const p2 = changeWindow(r.plan, w0.id, { door: true, ...DOOR })
+    const d0 = p2.windows.find((w) => w.id === w0.id)!
+    expect(d0.door).toBe(true)
+    expect(d0.sill_m).toBe(0)
+    expect(d0.t_m + d0.width_m / 2).toBeCloseTo(w0.t_m + w0.width_m / 2, 9)
+    const p3 = changeWindow(r.plan, ws[1]!.id, { sill_m: 5 })
+    expect(p3.windows.find((w) => w.id === ws[1]!.id)!.sill_m).toBeCloseTo(3 - 1.2, 9)
   })
   it('an L with a diagonal side validates', () => {
     const L: XY[] = [[0, 0], [20, 0], [20, 6], [14, 12], [0, 12]]

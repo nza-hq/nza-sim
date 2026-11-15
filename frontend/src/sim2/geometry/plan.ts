@@ -44,6 +44,8 @@ export type Win = {
   sill_m: number
   /** Shading round the window (frame of fins, overhang and sill), metres out from the wall; 0 = none. */
   shading_m: number
+  /** A door (opaque, from the floor) rather than a window. */
+  door?: boolean
   /** Only while blocks are being rebuilt: the wall's ends, to find it again. */
   at?: { a: XY; b: XY }
 }
@@ -118,7 +120,7 @@ export function facade4(az: number): 'north' | 'east' | 'south' | 'west' {
 // ─── Windows ──────────────────────────────────────────────────────────────────────────────────────
 
 /** One window, checked against its wall: `offset_m` is its left edge along the run. */
-export type PlacedWindow = { set: string; wall: number; offset_m: number; width_m: number; height_m: number; sill_m: number; shading_m: number }
+export type PlacedWindow = { set: string; wall: number; offset_m: number; width_m: number; height_m: number; sill_m: number; shading_m: number; door: boolean }
 
 /** A stretch of a run: a wall piece, or a whole wall. */
 export type Span = { run: number; t0: number; t1: number }
@@ -138,7 +140,7 @@ export function layoutIn(span: Span, s: { count: number; width_m: number; height
   const gap = (L - total) / (s.count + 1)
   const windows: PlacedWindow[] = []
   for (let i = 0; i < s.count; i++) {
-    windows.push({ set: `${id}${i + 1}`, wall: span.run, offset_m: span.t0 + gap + i * (s.width_m + gap), width_m: s.width_m, height_m: s.height_m, sill_m: s.sill_m, shading_m: s.shading_m ?? 0 })
+    windows.push({ set: `${id}${i + 1}`, wall: span.run, offset_m: span.t0 + gap + i * (s.width_m + gap), width_m: s.width_m, height_m: s.height_m, sill_m: s.sill_m, shading_m: s.shading_m ?? 0, door: false })
   }
   return { windows, gap_m: gap }
 }
@@ -153,7 +155,7 @@ export function allWindows(plan: Plan): { windows: PlacedWindow[]; problems: Arr
     if (!run) problems.push({ set: w.id, why: 'Its wall is gone' })
     else if (w.t_m < -1e-6 || w.t_m + w.width_m > run.length_m + 1e-6) problems.push({ set: w.id, why: 'It runs off the end of its wall' })
     else if (w.sill_m + w.height_m > plan.storey_height_m + 1e-9) problems.push({ set: w.id, why: 'It is taller than the storey' })
-    else windows.push({ set: w.id, wall: w.wall, offset_m: w.t_m, width_m: w.width_m, height_m: w.height_m, sill_m: w.sill_m, shading_m: w.shading_m })
+    else windows.push({ set: w.id, wall: w.wall, offset_m: w.t_m, width_m: w.width_m, height_m: w.height_m, sill_m: w.sill_m, shading_m: w.shading_m, door: !!w.door })
   }
   return { windows, problems }
 }

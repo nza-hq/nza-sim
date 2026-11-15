@@ -28,12 +28,12 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { type Plan, type Span, type WallType, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, layoutIn, ringArea, wallRuns } from './plan'
+import { type Plan, type Span, type WallType, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, wallRuns } from './plan'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
 import FacadeView from './FacadeView'
 import { buildDocument } from './toDocument'
-import { type WallPiece, type WindowSpec, crossing, moveWindow, pieceAt, piecesOfRooms, setTypeOn, setWindowsIn, spaceByRoom, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
+import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, crossing, removeWindow, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setWindowsIn, spaceByRoom, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
@@ -570,7 +570,9 @@ export default function GeometryLab() {
   const selPiece = sel?.kind === 'wall' && selWall ? pieceAt(pieces, selWall.index, Math.min(sel.t, selWall.length_m)) : undefined
   const selSpan: Span | null = sel?.kind === 'wall' && selWall ? (sel.whole || !selPiece || runPieces.length < 2 ? wholeWall(plan, selWall.index) : selPiece) : null
   const isWhole = !!selSpan && !!selWall && selSpan.t1 - selSpan.t0 >= selWall.length_m - 1e-6
-  const selWins = selSpan ? windowsIn(plan, selSpan) : []
+  const selOpen = selSpan ? windowsIn(plan, selSpan) : []
+  const selWins = selOpen.filter((w) => !w.door)
+  const selDoors = selOpen.filter((w) => w.door)
   // The elevation needs a wall; without one the plan shows.
   const shownLook = look === 'elev' && !selWall ? 'plan' : look
   const in3d = shownLook === '3d'
@@ -582,20 +584,23 @@ export default function GeometryLab() {
   const editing = useRef<Sel>(null)
   const r1s = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 10) / 10) : '')
   const r3s = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 1000) / 1000) : '')
-  const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', shade: '0', ratio: '', byRatio: false, recent: ['height', 'area'] as Dim[] })
+  const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', shade: '0', ratio: '', byRatio: false, doors: '0', doorW: String(DOOR.width_m), doorH: String(DOOR.height_m), recent: ['height', 'area'] as Dim[] })
   const autoDim: Dim = (['width', 'height', 'area'] as Dim[]).find((d) => !form.recent.includes(d))!
   const first = selWins[0]
   const sameSize = selWins.every((w) => first && Math.abs(w.width_m - first.width_m) < 1e-6 && Math.abs(w.height_m - first.height_m) < 1e-6 && Math.abs(w.sill_m - first.sill_m) < 1e-6 && Math.abs(w.shading_m - first.shading_m) < 1e-6)
   const spanKey = selSpan ? `${selSpan.run}:${selSpan.t0.toFixed(3)}:${selSpan.t1.toFixed(3)}` : ''
   useEffect(() => {
+    const d = selDoors[0]
+    if (selOpen.length) setForm((f) => ({ ...f, doors: String(selDoors.length), ...(d ? { doorW: r3s(d.width_m), doorH: r3s(d.height_m) } : {}), count: String(selWins.length) }))
     if (first) setForm((f) => ({ ...f, count: String(selWins.length), width: r3s(first.width_m), height: r3s(first.height_m), area: r3s(first.width_m * first.height_m), sill: r3s(first.sill_m), shade: r3s(first.shading_m), byRatio: false }))
-  }, [spanKey, sel]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [spanKey, sel, selWins.length, selDoors.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  const toDoor = (f: typeof form): DoorSpec => ({ count: Number(f.doors), width_m: Number(f.doorW), height_m: Number(f.doorH) })
   const toSpec = (f: typeof form): WindowSpec => ({ count: Number(f.count), height_m: Number(f.height), width_m: Number(f.width), sill_m: Number(f.sill), shading_m: Number(f.shade) })
   // Glazing ratio: glass area ÷ wall area of the chosen part (or whole wall), the same window-to-wall ratio today's tool
   // uses. Typing it sets the area of each window (ratio × wall area ÷ number), and it holds when the number changes.
   const grossM2 = selSpan ? (selSpan.t1 - selSpan.t0) * plan.storey_height_m : 0
   const ratioShown = form.byRatio ? form.ratio : grossM2 > 0 ? r1s((100 * Number(form.count) * Number(form.area)) / grossM2) : ''
-  const edit = (k: 'count' | 'sill' | 'shade' | 'ratio' | Dim, v: string) => {
+  const edit = (k: 'count' | 'sill' | 'shade' | 'ratio' | 'doors' | 'doorW' | 'doorH' | Dim, v: string) => {
     let f = { ...form, [k]: v }
     if (k === 'width' || k === 'height' || k === 'area') f.byRatio = false
     if (k === 'ratio') f = { ...f, byRatio: true }
@@ -615,8 +620,8 @@ export default function GeometryLab() {
       if (auto === 'area') f.area = r3s(W * H)
     }
     setForm(f)
-    if (!selWins.length || !selSpan) return
-    const r = setWindowsIn(plan, selSpan, toSpec(f))
+    if (!selOpen.length || !selSpan) return
+    const r = setOpeningsIn(plan, selSpan, toSpec(f), toDoor(f))
     if ('why' in r) return
     // One Undo step per wall chosen, not one per key.
     if (editing.current === sel) setPlan(r.plan)
@@ -626,7 +631,9 @@ export default function GeometryLab() {
     }
   }
   const spec = toSpec(form)
-  const lay = selSpan ? layoutIn(selSpan, spec, plan.storey_height_m) : null
+  const doorSpec = toDoor(form)
+  // A dry run of what the card says, for its message (and the Add button).
+  const lay = selSpan ? setOpeningsIn(plan, selSpan, spec, doorSpec) : null
   const chooseWall = (whole: boolean) => sel?.kind === 'wall' && setSel({ ...sel, whole })
   const choosePiece = (p: WallPiece) => setSel({ kind: 'wall', index: p.run, t: (p.t0 + p.t1) / 2, whole: false })
 
@@ -756,7 +763,10 @@ export default function GeometryLab() {
           typeName={(sp) => typeName(typeOfSpan(plan, sp))}
           typeColour={(sp) => (showTypes ? typeColour(plan, typeOfSpan(plan, sp)) : null)}
           onPick={(p) => p && choosePiece(p)}
-          onMoved={(id, t) => commit(moveWindow(plan, id, t))}
+          onChange={(id, to) => commit(changeWindow(plan, id, to))}
+          onRemove={(id) => commit(removeWindow(plan, id))}
+          doorSize={{ width_m: Number(form.doorW) || DOOR.width_m, height_m: Number(form.doorH) || DOOR.height_m }}
+          windowSize={{ width_m: Number(form.width) || 1, height_m: Number(form.height) || 1.2, sill_m: Number(form.sill) || 0.9 }}
         />
       )}
       <svg className="gl-svg" width={size[0]} height={size[1]} style={{ cursor, display: shownLook !== 'plan' ? 'none' : undefined }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setPointer(null)} onDoubleClick={onDouble} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()}>
@@ -793,7 +803,7 @@ export default function GeometryLab() {
             return (
               <g key={`w${i}`}>
                 <line className={`gl-win${crossers.has(w.set) ? ' bad' : ''}`} x1={ax} y1={ay} x2={bx} y2={by} />
-                <line className="gl-win-glass" x1={ax} y1={ay} x2={bx} y2={by} />
+                <line className={w.door ? 'gl-win-door' : 'gl-win-glass'} x1={ax} y1={ay} x2={bx} y2={by} />
               </g>
             )
           })}
@@ -979,6 +989,7 @@ export default function GeometryLab() {
                     <tr><td>Floor area</td><td className="n">{f1(built.totals.floor_m2)} m²</td></tr>
                     <tr><td>External wall (net)</td><td className="n">{f1(built.totals.wall_net_m2)} m²</td></tr>
                     <tr><td>Windows</td><td className="n">{built.totals.windows} · {f2(built.totals.glazing_m2)} m²</td></tr>
+                    {built.totals.doors > 0 && <tr><td>Doors</td><td className="n">{built.totals.doors} · {f2(built.totals.door_m2)} m²</td></tr>}
                     <tr><td>Partitions between zones</td><td className="n">{built.totals.partitions}</td></tr>
                   </tbody>
                 </table>
@@ -1032,14 +1043,21 @@ export default function GeometryLab() {
               </div>
               <div className="gl-sec">
                 <h3>Windows <small>{selWins.length ? (sameSize ? `${selWins.length} here` : `${selWins.length} here, mixed sizes`) : 'spaced equally'}</small></h3>
-                <div className="gl-row"><span>How many</span><Num value={form.count} step={1} min={1} onChange={(v) => edit('count', v)} /></div>
+                <div className="gl-row"><span>How many</span><Num value={form.count} step={1} min={0} onChange={(v) => edit('count', v)} /></div>
                 <div className="gl-row"><span>Glazing ratio</span><Num value={ratioShown} unit="%" step={1} min={0} auto={!form.byRatio} onChange={(v) => edit('ratio', v)} /></div>
                 <div className="gl-row"><span>Area of each</span><Num value={form.area} unit="m²" step={0.1} auto={autoDim === 'area'} onChange={(v) => edit('area', v)} /></div>
                 <div className="gl-row"><span>Width</span><Num value={form.width} unit="m" step={0.1} auto={autoDim === 'width'} onChange={(v) => edit('width', v)} /></div>
                 <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" step={0.1} auto={autoDim === 'height'} onChange={(v) => edit('height', v)} /></div>
                 <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" step={0.1} onChange={(v) => edit('sill', v)} /></div>
                 <div className="gl-row"><span>Shading depth</span><Num value={form.shade} unit="m" step={0.1} min={0} onChange={(v) => edit('shade', v)} /></div>
-                <p className="gl-hint">Type a glazing ratio (glass ÷ wall area) and the window size is worked out, or type any two of area, width and height; whatever is marked <i className="gl-auto-tag">auto</i> is worked out.{selWins.length ? ' A change re-spaces these windows equally.' : ''}</p>
+                <p className="gl-hint">Type a glazing ratio (glass as a % of the wall) and the window size is worked out, or type any two of area, width and height; whatever is marked <i className="gl-auto-tag">auto</i> is worked out.{selWins.length ? ' A change re-spaces these windows equally.' : ''}</p>
+              </div>
+              <div className="gl-sec">
+                <h3>Doors <small>{selDoors.length ? `${selDoors.length} here` : 'spaced with the windows'}</small></h3>
+                <div className="gl-row"><span>How many</span><Num value={form.doors} step={1} min={0} onChange={(v) => edit('doors', v)} /></div>
+                <div className="gl-row"><span>Width</span><Num value={form.doorW} unit="m" step={0.1} onChange={(v) => edit('doorW', v)} /></div>
+                <div className="gl-row"><span>Height</span><Num value={form.doorH} unit="m" step={0.1} onChange={(v) => edit('doorH', v)} /></div>
+                <p className="gl-hint">Doors and windows share the wall, spaced equally together; the first door goes in the middle. In the elevation, drag any of them, or tap one to make it a door or a window.</p>
                 {lay && 'why' in lay && <p className="gl-err">{lay.why}</p>}
                 {selWins.length > 0 && <p className="gl-hint">{f2(glass)} m² of glass, {Math.round((100 * glass) / (L * plan.storey_height_m))}% of {isWhole ? 'this wall' : 'this part'}.</p>}
                 {cross > 0 && (
@@ -1048,12 +1066,12 @@ export default function GeometryLab() {
                   </p>
                 )}
                 <div className="gl-btns">
-                  {!selWins.length && (
-                    <button type="button" className="gl-btn orange" disabled={!lay || 'why' in lay} onClick={() => { const r = setWindowsIn(plan, selSpan, spec); if (!('why' in r)) { editing.current = sel; commit(r.plan) } }}>
-                      Add windows
+                  {!selOpen.length && (
+                    <button type="button" className="gl-btn orange" disabled={!lay || 'why' in lay || (spec.count < 1 && doorSpec.count < 1)} onClick={() => { if (lay && !('why' in lay)) { editing.current = sel; commit(lay.plan) } }}>
+                      {spec.count > 0 && doorSpec.count > 0 ? 'Add windows and doors' : doorSpec.count > 0 ? 'Add doors' : 'Add windows'}
                     </button>
                   )}
-                  {selWins.length > 0 && <button type="button" className="gl-btn quiet" onClick={() => { const r = setWindowsIn(plan, selSpan, null); if (!('why' in r)) commit(r.plan) }}>Remove</button>}
+                  {selOpen.length > 0 && <button type="button" className="gl-btn quiet" onClick={() => { const r = setWindowsIn(plan, selSpan, null); if (!('why' in r)) commit(r.plan) }}>Remove all</button>}
                   {plan.windows.some((w) => w.wall === selWall.index && crossers.has(w.id)) && (
                     <button type="button" className="gl-btn quiet" onClick={() => commit(spaceByRoom(plan, selWall.index))}>Space each room's windows</button>
                   )}
@@ -1148,7 +1166,7 @@ export default function GeometryLab() {
       })()}
 
       {/* ─── bottom: tools ─── */}
-      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window along the wall (0.1 m steps; Shift: 0.01 m). Tap a room\'s part to choose it.' : tipLine}</p>
+      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m). Tap one to nudge it with the arrow keys or make it a door.' : tipLine}</p>
       {shownLook === 'plan' && <div className="gl-bar" role="toolbar" aria-label={mode === 'outline' ? 'Outline tools' : 'Room tools'}>
         <span className="gl-step-tag">{mode === 'outline' ? '1 Outline' : '2 Rooms'}</span>
         {TOOLS[mode].map((t, i) => (

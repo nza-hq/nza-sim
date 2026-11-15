@@ -37,7 +37,7 @@ export type Built = {
   issues: Array<{ path: string; message: string }>
   /** Plain-words problems from the plan itself (a window set that no longer fits, a gap between zones). */
   notes: string[]
-  totals: { zones: number; rooms: number; floor_m2: number; walls: number; wall_net_m2: number; glazing: number; glazing_m2: number; windows: number; partitions: number; systems: number }
+  totals: { zones: number; rooms: number; floor_m2: number; walls: number; wall_net_m2: number; glazing: number; glazing_m2: number; windows: number; doors: number; door_m2: number; partitions: number; systems: number }
 }
 
 export function buildDocument(plan: Plan): Built {
@@ -124,6 +124,7 @@ export function buildDocument(plan: Plan): Built {
     }
     return { shading: { overhang: { depth_m: r3(d), offset_m: 0 } } }
   }
+  const doorIds = new Set<string>()
   let windowsPlaced = 0
   const taken = new Set<number>()
   for (const w of walls) {
@@ -136,23 +137,37 @@ export function buildDocument(plan: Plan): Built {
       return true
     })
     windowsPlaced += mine.length
+    const doors = mine.filter((x) => x.door)
+    const wins = mine.filter((x) => !x.door)
     const gross = w.length_m * h
-    const glz = mine.reduce((s, x) => s + x.width_m * x.height_m, 0)
+    const glz = wins.reduce((s, x) => s + x.width_m * x.height_m, 0)
+    const doorM2 = doors.reduce((s, x) => s + x.width_m * x.height_m, 0)
     const wallId = uid(`${w.zone}_wall_${w.run + 1}`)
     add(w.zone, ext({
       id: wallId, kind: 'wall', zone_a: w.zone, zone_b: 'outside', facade: facade4(w.azimuth_deg),
-      area_m2: r3(gross - glz), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
+      area_m2: r3(gross - glz - doorM2), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
       construction_ref: constructionOf(w.type), g_value: null, openings: [],
     }, 'wall'))
-    if (mine.length) {
+    if (doors.length) {
+      // Schema 2.x has no door kind: a door is an opaque wall surface of its own, with its own construction key, so its
+      // area is never lost into the wall or the glazing (proposed as a door kind for 2.2).
+      const id = uid(`${w.zone}_door_${w.run + 1}`)
+      doorIds.add(id)
+      add(w.zone, ext({
+        id, kind: 'wall', zone_a: w.zone, zone_b: 'outside', facade: facade4(w.azimuth_deg),
+        area_m2: r3(doorM2), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
+        construction_ref: { key: 'unassigned:external_door' }, g_value: null, openings: [],
+      }, 'wall'))
+    }
+    if (wins.length) {
       add(w.zone, ext({
         id: uid(`${w.zone}_glazing_${w.run + 1}`), kind: 'glazing', zone_a: w.zone, zone_b: 'outside', facade: facade4(w.azimuth_deg),
         area_m2: r3(glz), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
         construction_ref: { key: 'unassigned:glazing' }, g_value: null,
-        wwr: r3(glz / gross), window_count: mine.length, openings: [],
+        wwr: r3(glz / gross), window_count: wins.length, openings: [],
         // Same mapping as today's tool (building.shading_overhang → overhang, offset 0); one depth per glazing surface,
         // so it is written only when every window on it has the same depth.
-        ...(shade(mine)),
+        ...(shade(wins)),
       }, 'glazing'))
     }
   }
@@ -241,11 +256,13 @@ export function buildDocument(plan: Plan): Built {
       zones: zones.length,
       rooms: plan.rooms.length,
       floor_m2: r3(zones.reduce((s, z) => s + z.area_m2, 0)),
-      walls: sum('wall').length,
-      wall_net_m2: r3(sum('wall').reduce((s, x) => s + (x.area_m2 as number), 0)),
+      walls: sum('wall').filter((x) => !doorIds.has(x.id as string)).length,
+      wall_net_m2: r3(sum('wall').filter((x) => !doorIds.has(x.id as string)).reduce((s, x) => s + (x.area_m2 as number), 0)),
+      doors: windows.filter((x) => x.door).length,
+      door_m2: r3(sum('wall').filter((x) => doorIds.has(x.id as string)).reduce((s, x) => s + (x.area_m2 as number), 0)),
       glazing: sum('glazing').length,
       glazing_m2: r3(sum('glazing').reduce((s, x) => s + (x.area_m2 as number), 0)),
-      windows: windowsPlaced,
+      windows: windows.filter((x) => !x.door).length,
       partitions: sum('partition').length,
       systems: system_groups.length,
     },

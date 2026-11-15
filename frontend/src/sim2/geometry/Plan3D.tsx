@@ -15,7 +15,7 @@ import { type Plan, type PlacedWindow, type Span, type WallRun, type XY, edgesOf
 import { labelAt, zoneTint } from './ported/zones'
 
 // Colours from BuildingViewer3D, so the two read as one tool.
-const C = { wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B' }
+const C = { wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
 const WALL_T = 0.25 // outside wall thickness, inward from the outside face
 const PART_T = 0.1
 const FD = 0.08 // reveal frame depth, out from the wall face (as today)
@@ -224,6 +224,17 @@ function Window({ w, bad }: { w: PlacedWindow; bad: boolean }) {
   const d = w.shading_m
   const s = { z0: 0, z1: d, colour: C.shading, rough: 0.85 }
   const o = FW // the shading frame sits just outside the reveal frame
+  if (w.door) {
+    // A door: a solid leaf set back in the opening, frame on the sides and head only.
+    return (
+      <>
+        <Box x0={x0} x1={x1} y0={0} y1={y1} z0={-0.1} z1={-0.05} colour={C.door} rough={0.7} />
+        <Box x0={x0 - FW} x1={x1 + FW} y0={y1} y1={y1 + FW} {...f} />
+        <Box x0={x0 - FW} x1={x0} y0={0} y1={y1} {...f} />
+        <Box x0={x1} x1={x1 + FW} y0={0} y1={y1} {...f} />
+      </>
+    )
+  }
   return (
     <>
       <mesh position={[(x0 + x1) / 2, (y0 + y1) / 2, -0.08]}>
