@@ -96,6 +96,8 @@ export type SpaceType = {
   equipment_baseload_w_per_m2?: number | null
   /** Ventilation flow, typed: l/s per m² of floor for mechanical, air changes per hour for natural. */
   vent_flow?: number | null
+  /** When the ventilation runs: 'always_on', or a library ventilation profile's key. */
+  vent_schedule?: string | null
   lighting: string | null
   equipment: string | null
   heating: string | null

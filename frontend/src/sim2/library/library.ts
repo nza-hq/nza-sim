@@ -57,7 +57,7 @@ export const systemsFor = (s: Service) =>
     : s === 'cooling' ? t.serves === 'cooling' || t.serves === 'heating_and_cooling'
     : t.serves === s || t.category === s,
   )
-export const profilesFor = (type: 'occupancy' | 'lighting' | 'equipment') => LIBRARY.profiles.filter((p) => p.schedule_type === type)
+export const profilesFor = (type: 'occupancy' | 'lighting' | 'equipment' | 'ventilation') => LIBRARY.profiles.filter((p) => p.schedule_type === type)
 
 /** The efficiency a system group carries for a service, from the template: SCOP (or η) for heating, SEER for
  * cooling, η for DHW. Null when the template gives none for that service. */

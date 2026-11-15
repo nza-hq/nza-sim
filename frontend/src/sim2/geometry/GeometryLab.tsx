@@ -1480,6 +1480,7 @@ export default function GeometryLab() {
                 {opt('Cooling', 'cooling', systemsFor('cooling'), sysLine(sp.cooling, 'cooling'))}
                 {opt('Ventilation', 'ventilation', systemsFor('ventilation'), sysLine(sp.ventilation, 'ventilation'))}
                 {sp.ventilation && (['mvhr', 'mev'].includes(system(sp.ventilation)?.type ?? '') ? typed('Air flow', 'vent_flow', 0.1, 'l/s per m²') : typed('Air changes', 'vent_flow', 0.5, 'per hour'))}
+                {sp.ventilation && opt('Runs', 'vent_schedule', [{ key: 'always_on', name: 'Always on (24/7)' }, ...profilesFor('ventilation')])}
                 {opt('Hot water', 'dhw', systemsFor('dhw'), sysLine(sp.dhw, 'dhw'))}
                 <p className="gl-hint">Each from NZA Sim's library, with its own fuel and efficiency. Rooms of this type get all of these. The library's profiles are daily shapes only; the numbers (people, W) are typed here.</p>
               </div>

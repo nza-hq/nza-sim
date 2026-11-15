@@ -230,6 +230,15 @@ export function buildDocument(plan: Plan): Built {
     if (by.size > 1 && sp) notes.push(`${z.name} has rooms of ${by.size} space types; the model gives the zone ${sp.name}'s (the most floor)`)
     if (sp && rs.some((r) => !r.space)) notes.push(`${z.name} has rooms with no space type; the zone takes ${sp.name}'s`)
   }
+  /** 'always_on' as chosen, or a library ventilation profile written as a document schedule profile. */
+  const scheduleRef = (key: string | null | undefined) => {
+    if (!key) return null
+    if (key === 'always_on') return 'always_on'
+    const pr = profile(key)
+    if (!pr?.day_types) return null
+    addProfile({ id: key, kind: 'schedule', label: pr.name, day_types: { weekday: pr.day_types.weekday, saturday: pr.day_types.saturday, sunday: pr.day_types.sunday } })
+    return key
+  }
   const ventOf = (sp: SpaceType | undefined) => {
     const t = system(sp?.ventilation)
     if (!t || !sp) return []
@@ -239,6 +248,7 @@ export function buildDocument(plan: Plan): Built {
       id: `${sp.id}_vent`, label: t.name, kind, enabled: true, share_pct: 100,
       flow_rate: sp.vent_flow ?? null, flow_rate_basis: sp.vent_flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
+      control_schedule_ref: scheduleRef(sp.vent_schedule),
     }]
   }
 
@@ -334,6 +344,7 @@ export function buildDocument(plan: Plan): Built {
       const sp = spaceOf.get(z.id)
       if (!sp) continue
       for (const k of ['heating', 'cooling', 'dhw', 'ventilation'] as const) pin('system_template', system(sp[k]))
+      if (sp.ventilation && sp.vent_schedule && sp.vent_schedule !== 'always_on') pin('profile', profile(sp.vent_schedule))
       for (const k of ['occupancy', 'lighting', 'equipment'] as const) if (k !== 'occupancy' || (sp.people_per_m2 ?? 0) > 0) pin('profile', profile(sp[k]))
     }
     return [...refs.values()].sort((a, b) => (a.kind + a.key < b.kind + b.key ? -1 : 1))
