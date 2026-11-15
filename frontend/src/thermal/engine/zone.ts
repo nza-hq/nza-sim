@@ -38,7 +38,7 @@ export interface ZoneInputs {
    * inside surfaces by area). Engine 1 maps nothing from the document here (internal gains are Brief 105); the
    * reference cases use it for BESTEST's fixed 200 W.
    */
-  other_gains: { w: ArrayLike<number>; convective_fraction: number } | null
+  other_gains: { w: ArrayLike<number>; convective_fraction: number | ArrayLike<number> } | null
   setpoints: { heat_c: number | null; cool_c: number | null }
   /** The temperature the setpoints apply to. EnergyPlus's thermostat controls air; ISO 52016-1 uses operative. */
   control: 'air' | 'operative'
@@ -133,7 +133,11 @@ function check(inp: ZoneInputs) {
     if (!inp.other_gains) throw new ZoneError('required (null for none)', 'other_gains')
     arr(inp.other_gains.w, 'other_gains.w')
     const f = inp.other_gains.convective_fraction
-    if (!(f >= 0 && f <= 1)) throw new ZoneError('must be 0 to 1', 'other_gains.convective_fraction')
+    if (typeof f === 'number') { if (!(f >= 0 && f <= 1)) throw new ZoneError('must be 0 to 1', 'other_gains.convective_fraction') }
+    else {
+      arr(f, 'other_gains.convective_fraction')
+      for (let h = 0; h < f.length; h++) if (!(f[h] >= 0 && f[h] <= 1)) throw new ZoneError(`hour ${h} must be 0 to 1`, 'other_gains.convective_fraction')
+    }
   }
   if (inp.elements.length === 0) throw new ZoneError('a zone needs at least one element', 'elements')
   if (inp.h_ce_w_per_m2k != null) {
@@ -276,6 +280,9 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   const fsc = inp.solar_convective_fraction ?? K.solar_convective_fraction
   if (!(fsc >= 0 && fsc <= 1)) throw new ZoneError('solar_convective_fraction must be in [0, 1]', 'solar_convective_fraction')
   const og = inp.other_gains
+  // Brief 105 Part 2: the convective share may vary by hour (several gains, each with its own radiant fraction).
+  const ogcN = og && typeof og.convective_fraction === 'number' ? og.convective_fraction : 0
+  const ogcH = og && typeof og.convective_fraction !== 'number' ? og.convective_fraction : null
   // Diffuse solar inside the zone (Brief 104 Part 1b): spread over the inside surfaces by area; an 'optical' window
   // absorbs part in its pane, passes part back out, and reflects the rest back into the zone, where it is spread again.
   // Summing the reflections: of diffuse D, each opaque surface takes D·s_k/den, a window D·s_k·a/den in its pane and
@@ -318,7 +325,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     const { tri, lu, uAir, wHC, ctl_uAir, ctl_wHC, gB } = st
     const te = inp.theta_e[h], hv = inp.ventilation_w_per_k[h], sol = inp.solar_transmitted_w[h]
     const beam = beamIn && floorShare ? beamIn[h] : 0
-    const ogw = og ? og.w[h] : 0, ogc = og ? og.convective_fraction : 0
+    const ogw = og ? og.w[h] : 0, ogc = ogcH ? ogcH[h] : ogcN
     for (let i = 0; i < F; i++) bF[i] = (capF[i] / DT) * xF[i]
     bF[0] += inp.bridging_w_per_k * te + hv * te + fsc * sol + ogc * ogw
     const radBeam = (1 - fsc) * beam

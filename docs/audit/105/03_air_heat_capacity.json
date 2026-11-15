@@ -1,0 +1,209 @@
+{
+ "source": "scripts/105_air_heat_capacity.mts",
+ "rows": [
+  {
+   "rho_c_j_per_m3k": 1188,
+   "gains": false,
+   "ventilation": true,
+   "heating_mwh": 342.53758319068805,
+   "cooling_mwh": 1.7749944076205102,
+   "zones": [
+    {
+     "id": "z1",
+     "heating_mwh": 77.27824234642034,
+     "cooling_mwh": 0.2150485702171643
+    },
+    {
+     "id": "z2",
+     "heating_mwh": 62.46792199672751,
+     "cooling_mwh": 0.3746391264801917
+    },
+    {
+     "id": "z3",
+     "heating_mwh": 61.97456912411119,
+     "cooling_mwh": 0.4108502705453607
+    },
+    {
+     "id": "z4",
+     "heating_mwh": 62.8253079534908,
+     "cooling_mwh": 0.40606745887590545
+    },
+    {
+     "id": "z5",
+     "heating_mwh": 77.99154176993817,
+     "cooling_mwh": 0.368388981501888
+    }
+   ]
+  },
+  {
+   "rho_c_j_per_m3k": 1188,
+   "gains": true,
+   "ventilation": true,
+   "heating_mwh": 114.5455931910392,
+   "cooling_mwh": 62.72542211895042,
+   "zones": [
+    {
+     "id": "z1",
+     "heating_mwh": 27.757543913419997,
+     "cooling_mwh": 10.143365156735427
+    },
+    {
+     "id": "z2",
+     "heating_mwh": 18.790221998688835,
+     "cooling_mwh": 14.281901128574164
+    },
+    {
+     "id": "z3",
+     "heating_mwh": 18.56912819992732,
+     "cooling_mwh": 14.567178220938503
+    },
+    {
+     "id": "z4",
+     "heating_mwh": 19.200698064990114,
+     "cooling_mwh": 14.062757929355303
+    },
+    {
+     "id": "z5",
+     "heating_mwh": 30.228001014012932,
+     "cooling_mwh": 9.670219683347021
+    }
+   ]
+  },
+  {
+   "rho_c_j_per_m3k": 1188,
+   "gains": false,
+   "ventilation": false,
+   "heating_mwh": 91.20672249659651,
+   "cooling_mwh": 14.89166454614798,
+   "zones": [
+    {
+     "id": "z1",
+     "heating_mwh": 24.940502170692024,
+     "cooling_mwh": 1.4315568412846322
+    },
+    {
+     "id": "z2",
+     "heating_mwh": 13.55138889153986,
+     "cooling_mwh": 3.685777284363762
+    },
+    {
+     "id": "z3",
+     "heating_mwh": 13.215020147928346,
+     "cooling_mwh": 4.243473169540552
+    },
+    {
+     "id": "z4",
+     "heating_mwh": 13.830321338911764,
+     "cooling_mwh": 3.7588985047521786
+    },
+    {
+     "id": "z5",
+     "heating_mwh": 25.66948994752453,
+     "cooling_mwh": 1.7719587462068558
+    }
+   ]
+  },
+  {
+   "rho_c_j_per_m3k": 1209.9278439999998,
+   "gains": false,
+   "ventilation": true,
+   "heating_mwh": 348.295557324892,
+   "cooling_mwh": 1.7574687135868274,
+   "zones": [
+    {
+     "id": "z1",
+     "heating_mwh": 78.50300889376975,
+     "cooling_mwh": 0.21262244408987702
+    },
+    {
+     "id": "z2",
+     "heating_mwh": 63.572867832015696,
+     "cooling_mwh": 0.37092638348485024
+    },
+    {
+     "id": "z3",
+     "heating_mwh": 63.07513344574039,
+     "cooling_mwh": 0.4068800318865534
+    },
+    {
+     "id": "z4",
+     "heating_mwh": 63.930375634264024,
+     "cooling_mwh": 0.4021754365492496
+    },
+    {
+     "id": "z5",
+     "heating_mwh": 79.21417151910221,
+     "cooling_mwh": 0.36486441757629695
+    }
+   ]
+  },
+  {
+   "rho_c_j_per_m3k": 1209.9278439999998,
+   "gains": true,
+   "ventilation": true,
+   "heating_mwh": 118.53690721639647,
+   "cooling_mwh": 61.14085017620064,
+   "zones": [
+    {
+     "id": "z1",
+     "heating_mwh": 28.65019650601372,
+     "cooling_mwh": 9.856569094908433
+    },
+    {
+     "id": "z2",
+     "heating_mwh": 19.515676127142534,
+     "cooling_mwh": 13.937348465738225
+    },
+    {
+     "id": "z3",
+     "heating_mwh": 19.294381667606874,
+     "cooling_mwh": 14.227480244768175
+    },
+    {
+     "id": "z4",
+     "heating_mwh": 19.926400032123098,
+     "cooling_mwh": 13.721276609646967
+    },
+    {
+     "id": "z5",
+     "heating_mwh": 31.150252883510245,
+     "cooling_mwh": 9.398175761138829
+    }
+   ]
+  },
+  {
+   "rho_c_j_per_m3k": 1209.9278439999998,
+   "gains": false,
+   "ventilation": false,
+   "heating_mwh": 91.83982220019634,
+   "cooling_mwh": 14.744038020333308,
+   "zones": [
+    {
+     "id": "z1",
+     "heating_mwh": 25.126204263520236,
+     "cooling_mwh": 1.4140199763582062
+    },
+    {
+     "id": "z2",
+     "heating_mwh": 13.638555205611,
+     "cooling_mwh": 3.650498501586612
+    },
+    {
+     "id": "z3",
+     "heating_mwh": 13.30151013668753,
+     "cooling_mwh": 4.20452132105685
+    },
+    {
+     "id": "z4",
+     "heating_mwh": 13.917490588622165,
+     "cooling_mwh": 3.723674338838408
+    },
+    {
+     "id": "z5",
+     "heating_mwh": 25.856062005755405,
+     "cooling_mwh": 1.7513238824932331
+    }
+   ]
+  }
+ ]
+}

@@ -39,7 +39,7 @@ export interface NetworkZone {
   solar_transmitted_w: ArrayLike<number>
   /** The beam part of it, landing on the zone's floor-facing faces by area; null: all spread as diffuse. */
   solar_beam_w: ArrayLike<number> | null
-  other_gains: { w: ArrayLike<number>; convective_fraction: number } | null
+  other_gains: { w: ArrayLike<number>; convective_fraction: number | ArrayLike<number> } | null
   setpoints: { heat_c: number | null; cool_c: number | null }
   /** Every node of the zone starts here before the warm-up, °C. */
   initial_c: number
@@ -137,7 +137,12 @@ function check(inp: NetworkInputs) {
     if (!Number.isFinite(z.initial_c)) throw new NetworkError('required', `${p}.initial_c`)
     if (z.other_gains !== null) {
       arr(z.other_gains.w, `${p}.other_gains.w`)
-      if (!(z.other_gains.convective_fraction >= 0 && z.other_gains.convective_fraction <= 1)) throw new NetworkError('must be 0 to 1', `${p}.other_gains.convective_fraction`)
+      const f = z.other_gains.convective_fraction
+      if (typeof f === 'number') { if (!(f >= 0 && f <= 1)) throw new NetworkError('must be 0 to 1', `${p}.other_gains.convective_fraction`) }
+      else {
+        arr(f, `${p}.other_gains.convective_fraction`)
+        for (let h = 0; h < f.length; h++) if (!(f[h] >= 0 && f[h] <= 1)) throw new NetworkError(`hour ${h} must be 0 to 1`, `${p}.other_gains.convective_fraction`)
+      }
     }
   })
   const Z = inp.zones.length
@@ -377,7 +382,10 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const coolC = Float64Array.from(inp.zones, (z) => z.setpoints.cool_c ?? NaN)
   const ventIn = inp.zones.map((z) => z.ventilation_w_per_k), solIn = inp.zones.map((z) => z.solar_transmitted_w)
   const beamIn = inp.zones.map((z, i) => (z.solar_beam_w && hasFloor[i] ? z.solar_beam_w : null))
-  const ogIn = inp.zones.map((z) => (z.other_gains ? z.other_gains.w : null)), ogC = Float64Array.from(inp.zones, (z) => z.other_gains?.convective_fraction ?? 0)
+  const ogIn = inp.zones.map((z) => (z.other_gains ? z.other_gains.w : null))
+  // Brief 105 Part 2: a zone's convective share is one number, or one per hour (several gains, each its own split).
+  const ogC = Float64Array.from(inp.zones, (z) => (typeof z.other_gains?.convective_fraction === 'number' ? z.other_gains.convective_fraction : 0))
+  const ogCh = inp.zones.map((z) => (z.other_gains && typeof z.other_gains.convective_fraction !== 'number' ? z.other_gains.convective_fraction : null))
   const brid = Float64Array.from(inp.zones, (z) => z.bridging_w_per_k)
   // Hour-major copies of the per-element and per-zone hourly inputs, and hour-major outputs unpacked at the end
   // (Part 6): each hour then reads and writes a few contiguous rows instead of one value from each of hundreds of
@@ -522,7 +530,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       hv[z] = zIn[zi0 + 3 * z]
       const sol = zIn[zi0 + 3 * z + 1]
       const beam = zIn[zi0 + 3 * z + 2]
-      const ogw = ogIn[z] ? ogIn[z]![h] : 0, ogc = ogC[z]
+      const ogw = ogIn[z] ? ogIn[z]![h] : 0, ogc = ogCh[z] ? ogCh[z]![h] : ogC[z]
       // Ventilation's h_v·θ_e is a source; its h_v·θ_a is in the reduced system.
       bF[z] += brid[z] * te + fsc * sol + ogc * ogw + hv[z] * te
       radBeam[z] = (1 - fsc) * beam

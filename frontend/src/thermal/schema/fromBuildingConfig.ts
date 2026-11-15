@@ -20,7 +20,7 @@
  */
 import { canonicalJSON, sha256Hex } from './canonical'
 import { FACADES, ModelDocument, SCHEMA_VERSION } from './model'
-import { TODAY } from './upgrade'
+import { TODAY, stateTodaysGainInputs } from './upgrade'
 import type { LibraryRef } from './model'
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
@@ -307,7 +307,9 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
   const profileRefs = { occupancy: null as string | null, lighting: [] as string[], equipment: [] as string[], auxiliary: [] as string[] }
   if (src.get(`${B}.occupancy`) != null) {
     const i = profiles.length
-    profiles.push({ id: 'occupancy', kind: 'occupancy', ...(src.tree(`${B}.occupancy`, `profiles[${i}]`) as Obj) })
+    const occ: Obj = { id: 'occupancy', kind: 'occupancy', ...(src.tree(`${B}.occupancy`, `profiles[${i}]`) as Obj) }
+    stateTodaysGainInputs(occ)
+    profiles.push(occ)
     profileRefs.occupancy = 'occupancy'
   }
   for (const kind of ['lighting', 'equipment', 'auxiliary'] as const) {
@@ -319,7 +321,9 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
       const i = profiles.length
       const body = src.tree(`${B}.gains.${kind}.profiles[${j}]`, `profiles[${i}]`) as Obj
       if (typeof body.id !== 'string') throw new ConversionError('a gains profile has no id', `${B}.gains.${kind}.profiles[${j}].id`)
-      profiles.push({ ...body, kind })
+      const gp: Obj = { ...body, kind }
+      stateTodaysGainInputs(gp)
+      profiles.push(gp)
       profileRefs[kind].push(body.id)
     })
   }
@@ -547,9 +551,10 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
  * The single-zone document split into one zone per storey (Brief 104 decision 4). Areas are divided evenly: every
  * storey of today's box is the same. Zone `z1` is the ground storey.
  *
- * Whole-building items that today's inputs do not give per storey stay on z1 and are not divided: the zone's
- * mechanical ventilation entries and its room count. Engine 2 reads neither (they are Brief 105's); the document
- * keeps them rather than dropping or inventing a split.
+ * The room count is divided evenly too (Brief 105 Part 2, schema 2.3), so per-room gains add up to the building's.
+ * Each ventilation entry is given to every storey (Brief 105 Part 3): a building flow ('constant', l/s) divided
+ * evenly, a flow per m², per person or per air change kept as it is, so each storey's flow is its share of the
+ * building's and the storeys add up to it.
  */
 function perStorey(single: Obj, g: { storeys: number; area_m2: number; interior_key: string }): Obj {
   const N = g.storeys
@@ -558,7 +563,7 @@ function perStorey(single: Obj, g: { storeys: number; area_m2: number; interior_
   const ids = Array.from({ length: N }, (_, i) => `z${i + 1}`)
   const zones: Obj[] = ids.map((id, i) => ({
     ...structuredClone(z0), id, name: `Storey ${i + 1}`, floor: i, storeys: 1, area_m2: g.area_m2,
-    ventilation: i === 0 ? structuredClone(z0.ventilation) : [], rooms: i === 0 ? z0.rooms : null, surfaces: [] as string[],
+    ventilation: (z0.ventilation as Obj[]).map((v) => ({ ...structuredClone(v), flow_rate: v.flow_rate != null && (v.flow_rate_basis ?? 'constant') === 'constant' ? v.flow_rate / N : v.flow_rate })), rooms: z0.rooms == null ? null : z0.rooms / N, surfaces: [] as string[],
   }))
   const surfaces: Obj[] = []
   const put = (s: Obj, zone: number) => { surfaces.push(s); (zones[zone].surfaces as string[]).push(s.id as string) }

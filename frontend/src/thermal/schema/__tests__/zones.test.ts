@@ -49,9 +49,12 @@ describe('per-storey zoning of the Bridgewater anchor', () => {
     expect(per.zones[2].surfaces.filter((id) => id.startsWith('ceiling_'))).toEqual(['ceiling_z2', 'ceiling_z3'])
     expect(per.library_refs.some((r) => r.key === 'interior_floor_ceiling')).toBe(true)
     expect(per.system_groups.every((g) => g.zones.length === 5)).toBe(true)
-    // Whole-building items that today's inputs do not give per storey stay on z1, undivided.
-    expect(per.zones[0].ventilation).toEqual(one.zones[0].ventilation)
-    expect(per.zones.slice(1).every((z) => z.ventilation.length === 0 && z.rooms === null)).toBe(true)
+    // Every storey gets each ventilation entry with a fifth of the building's flow (Brief 105 Part 3); rooms are
+    // divided evenly (Part 2, schema 2.3).
+    for (const z of per.zones) expect(z.ventilation).toEqual(one.zones[0].ventilation.map((v) => ({ ...v, flow_rate: v.flow_rate! / 5 })))
+    expect(one.zones[0].ventilation.map((v) => [v.flow_rate, v.flow_rate_basis])).toEqual([[1425, 'constant'], [2208, 'constant'], [210, 'constant']])
+    expect(per.zones.map((z) => z.rooms)).toEqual(per.zones.map(() => 138 / 5))
+    expect(per.zones.reduce((t, z) => t + z.rooms!, 0)).toBeCloseTo(one.zones[0].rooms!, 12)
   })
   it('is deterministic and fails loudly without the interior construction', async () => {
     const a = await modelHash((await fromBuildingConfig(input(), { zoning: 'per_storey' })).document)

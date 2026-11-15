@@ -2,6 +2,40 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 105 — Simulate v2: the drawn building runs — IN PROGRESS on `chris/105-editor-engine`
+
+Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-engine.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/105/00_reconnaissance.md)):
+  - The editor's documents run on Engine 2 once their nulls are filled.
+  - Library constructions carry layers as epJSON, so Part 4 converts them.
+  - No EPW is committed, because Climate.OneBuilding states no open licence. Weather will come from a private bucket.
+- **P1 schema 2.3** ([`01_schema.md`](docs/audit/105/01_schema.md)):
+  - Gains stay on the document's profiles (Rule 11), so there is no `zones[].gains`.
+  - `radiant_fraction` is added to each gain profile.
+  - The 2.2 upgrade and the converter write today's `computeHourlyGains` fallbacks and today's 0.3 split.
+- **P2 internal gains** ([`02_gains.md`](docs/audit/105/02_gains.md)):
+  - `engine/gains.ts` equals today's `computeHourlyGains` hour by hour (< 1e-9 W).
+  - Gains run on both solvers when `internal_gains: 'profiles'` is set, with one breakdown line per profile.
+  - With gains, Bridgewater's five storeys give cooling 228.65 MWh against EnergyPlus's 223.68 (+2.2 %), each storey within ±8 %. Neither needs heating.
+  - The brief's gate, with gains and ventilation together, comes in P3.
+  - The per-storey converter now divides rooms evenly; `rooms` may be a share.
+- **P3 ventilation** ([`03_ventilation.md`](docs/audit/105/03_ventilation.md)):
+  - `engine/ventilation.ts` is today's ρc·q·(1 − η) per entry, scheduled. It is on both solvers when `ventilation: 'document'` is set, with one breakdown line per entry.
+  - Summer bypass is refused, not ignored. Each storey gets each entry, with building flows divided evenly.
+  - **Gate** (gains and ventilation, five storeys): passes like for like at −3.9 % heating / +9.3 % cooling. It misses with EnergyPlus's default outdoor-air density (−11.4 % / +10.2 %).
+  - **The miss is attributed.** With the air heat capacity matched in a diagnostic, heating is −0.5 % and ventilation-only heating −0.04 %. The cooling remainder (+6.5 %) is Brief 104's F2.
+  - The density convention is flagged for review, not changed.
+- **P4 run seam** ([`04_seam.md`](docs/audit/105/04_seam.md)): `frontend/src/sim2/run/`.
+  - `simulate(doc, { weather })` returns results, or every missing input at once in plain words. It runs Engine 2 with gains and ventilation.
+  - The library's epJSON layers match the fixture for all 15 constructions.
+  - Weather is a local EPW (never uploaded) or the organisation's private `weather` bucket. Migration 0006 is applied on dev and allows reads only; uploads await a decision.
+  - The run happens in a worker.
+- **P5 results in the editor** ([`05_panel.md`](docs/audit/105/05_panel.md)): `ResultsPanel.tsx`, mounted by the editor with one line.
+  - Building and per-zone heating and cooling ("estimate"), the full breakdown with the outside-face terms as one expandable net line.
+  - A zone with its control stated and only a heating setpoint runs heated only ("not cooled").
+  - Browser-checked on the editor's two-zone plan: it refuses until a partition construction and the space types' gain fields are stated (asked of the editor). With them stated in a scratch copy, 9.1 MWh heating; a rerun shows in about 0.4 s.
+
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 
 Brief [`docs/briefs/archive/104_engine-2_COMPLETED.md`](docs/briefs/archive/104_engine-2_COMPLETED.md). Multi-zone, starting from the open
