@@ -580,18 +580,29 @@ export default function GeometryLab() {
   // worked out. Once there are windows, every valid change shows at once (no Update button) and re-spaces them equally.
   type Dim = 'width' | 'height' | 'area'
   const editing = useRef<Sel>(null)
+  const r1s = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 10) / 10) : '')
   const r3s = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 1000) / 1000) : '')
-  const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', shade: '0', recent: ['height', 'area'] as Dim[] })
+  const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', shade: '0', ratio: '', byRatio: false, recent: ['height', 'area'] as Dim[] })
   const autoDim: Dim = (['width', 'height', 'area'] as Dim[]).find((d) => !form.recent.includes(d))!
   const first = selWins[0]
   const sameSize = selWins.every((w) => first && Math.abs(w.width_m - first.width_m) < 1e-6 && Math.abs(w.height_m - first.height_m) < 1e-6 && Math.abs(w.sill_m - first.sill_m) < 1e-6 && Math.abs(w.shading_m - first.shading_m) < 1e-6)
   const spanKey = selSpan ? `${selSpan.run}:${selSpan.t0.toFixed(3)}:${selSpan.t1.toFixed(3)}` : ''
   useEffect(() => {
-    if (first) setForm((f) => ({ ...f, count: String(selWins.length), width: r3s(first.width_m), height: r3s(first.height_m), area: r3s(first.width_m * first.height_m), sill: r3s(first.sill_m), shade: r3s(first.shading_m) }))
+    if (first) setForm((f) => ({ ...f, count: String(selWins.length), width: r3s(first.width_m), height: r3s(first.height_m), area: r3s(first.width_m * first.height_m), sill: r3s(first.sill_m), shade: r3s(first.shading_m), byRatio: false }))
   }, [spanKey, sel]) // eslint-disable-line react-hooks/exhaustive-deps
   const toSpec = (f: typeof form): WindowSpec => ({ count: Number(f.count), height_m: Number(f.height), width_m: Number(f.width), sill_m: Number(f.sill), shading_m: Number(f.shade) })
-  const edit = (k: 'count' | 'sill' | 'shade' | Dim, v: string) => {
+  // Glazing ratio: glass area ÷ wall area of the chosen part (or whole wall), the same window-to-wall ratio today's tool
+  // uses. Typing it sets the area of each window (ratio × wall area ÷ number), and it holds when the number changes.
+  const grossM2 = selSpan ? (selSpan.t1 - selSpan.t0) * plan.storey_height_m : 0
+  const ratioShown = form.byRatio ? form.ratio : grossM2 > 0 ? r1s((100 * Number(form.count) * Number(form.area)) / grossM2) : ''
+  const edit = (k: 'count' | 'sill' | 'shade' | 'ratio' | Dim, v: string) => {
     let f = { ...form, [k]: v }
+    if (k === 'width' || k === 'height' || k === 'area') f.byRatio = false
+    if (k === 'ratio') f = { ...f, byRatio: true }
+    if ((k === 'ratio' || k === 'count') && f.byRatio && grossM2 > 0 && Number(f.count) > 0) {
+      f.area = r3s((Number(f.ratio) / 100) * grossM2 / Number(f.count))
+      k = 'area'
+    }
     if (k === 'width' || k === 'height' || k === 'area') {
       const recent: Dim[] = [form.recent.filter((d) => d !== k).slice(-1)[0] ?? (k === 'height' ? 'area' : 'height'), k]
       f = { ...f, recent }
@@ -1022,12 +1033,13 @@ export default function GeometryLab() {
               <div className="gl-sec">
                 <h3>Windows <small>{selWins.length ? (sameSize ? `${selWins.length} here` : `${selWins.length} here, mixed sizes`) : 'spaced equally'}</small></h3>
                 <div className="gl-row"><span>How many</span><Num value={form.count} step={1} min={1} onChange={(v) => edit('count', v)} /></div>
+                <div className="gl-row"><span>Glazing ratio</span><Num value={ratioShown} unit="%" step={1} min={0} auto={!form.byRatio} onChange={(v) => edit('ratio', v)} /></div>
                 <div className="gl-row"><span>Area of each</span><Num value={form.area} unit="m²" step={0.1} auto={autoDim === 'area'} onChange={(v) => edit('area', v)} /></div>
                 <div className="gl-row"><span>Width</span><Num value={form.width} unit="m" step={0.1} auto={autoDim === 'width'} onChange={(v) => edit('width', v)} /></div>
                 <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" step={0.1} auto={autoDim === 'height'} onChange={(v) => edit('height', v)} /></div>
                 <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" step={0.1} onChange={(v) => edit('sill', v)} /></div>
                 <div className="gl-row"><span>Shading depth</span><Num value={form.shade} unit="m" step={0.1} min={0} onChange={(v) => edit('shade', v)} /></div>
-                <p className="gl-hint">Type any two of area, width and height; the one marked <i className="gl-auto-tag">auto</i> is worked out.{selWins.length ? ' A change re-spaces these windows equally.' : ''}</p>
+                <p className="gl-hint">Type a glazing ratio (glass ÷ wall area) and the window size is worked out, or type any two of area, width and height; whatever is marked <i className="gl-auto-tag">auto</i> is worked out.{selWins.length ? ' A change re-spaces these windows equally.' : ''}</p>
                 {lay && 'why' in lay && <p className="gl-err">{lay.why}</p>}
                 {selWins.length > 0 && <p className="gl-hint">{f2(glass)} m² of glass, {Math.round((100 * glass) / (L * plan.storey_height_m))}% of {isWhole ? 'this wall' : 'this part'}.</p>}
                 {cross > 0 && (
