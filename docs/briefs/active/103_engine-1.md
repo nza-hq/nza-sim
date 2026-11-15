@@ -117,6 +117,9 @@ Simulate v2 store only (`frontend/src/thermal/store/`, `supabase/migrations/`, `
      - Weather: the anchor EPW (sha256 `c6571102…cf2`).
      - The bridging is re-allocated per decision 6 (Part 5). Until Part 5 re-runs it, the reference is Run Bi:
        **68.7 MWh heating / 34.8 MWh cooling**.
+     - **Part 5 result (15 Nov):** **90.46 MWh heating / 13.65 MWh cooling**, zone sensible, with the document's
+       frame, ground, absorptance and EPW wind as well as per-element bridging (`docs/audit/103/05_referee.md`).
+       This is the gate (b) reference.
    - Today's State 1 demand (129.2 / 98.6) is printed alongside **for information only**. It is not a gate, and
      nothing is tuned toward it.
 2. **Tolerance for gate (b):** annual heating and cooling within **±10 %** of the EnergyPlus referee.
