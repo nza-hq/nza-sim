@@ -8,9 +8,8 @@
  *
  * Method (as today): sun position from Cooper's declination and the hour angle at the hour's midpoint; isotropic sky
  * diffuse; ground reflection of DNI·sin(α) + DHI with a stated albedo. ASHRAE Handbook of Fundamentals 2021, Ch. 14.
- * Known simplifications carried over and stated, not hidden: solar time is taken as the EPW clock hour (no equation of
- * time or longitude correction), and the day used for the sun position is a stated option ('mid_month', today's
- * convention, or 'actual'). Perez sky and the solar-time correction are later options, never silent changes.
+ * Stated options, never silent changes: solar time is the EPW clock hour ('clock', today) or apparent solar time
+ * ('apparent', Part 4); the day used for the sun position is 'mid_month' (today) or 'actual'. Perez sky is later.
  */
 import type { SurfaceIrradiance, Weather } from './types'
 
@@ -22,6 +21,19 @@ export interface SolarOptions {
   albedo: number
   /** Which day of the month positions the sun: 'mid_month' (the 15th, today's engine) or 'actual' (the EPW day). */
   sun_day: 'mid_month' | 'actual'
+  /**
+   * 'clock': the EPW clock hour is taken as solar time (today's engine). 'apparent': the clock hour is corrected to
+   * apparent solar time by longitude and the equation of time (Duffie & Beckman 4th ed. eqs. 1.5.2–1.5.3), as
+   * ISO 52010-1 and EnergyPlus do.
+   */
+  solar_time: 'clock' | 'apparent'
+}
+
+/** Minutes of apparent solar time ahead of local standard time (Duffie & Beckman eq. 1.5.2–1.5.3). */
+export function solarTimeOffsetMin(dayOfYear: number, longitudeDeg: number, timeZoneH: number): number {
+  const B = (2 * Math.PI * (dayOfYear - 1)) / 365
+  const E = 229.2 * (0.000075 + 0.001868 * Math.cos(B) - 0.032077 * Math.sin(B) - 0.014615 * Math.cos(2 * B) - 0.04089 * Math.sin(2 * B))
+  return 4 * (longitudeDeg - 15 * timeZoneH) + E
 }
 
 export interface SunPosition {
@@ -47,6 +59,28 @@ export function sunPosition(latitudeDeg: number, dayOfYear: number, solarHour: n
   return { altitude, azimuth, above_horizon: true }
 }
 
+/** The sun's hourly position depends only on the weather's site and calendar and the options: computed once and shared by every surface. */
+const tracks = new WeakMap<Weather, Map<string, { up: Uint8Array; sinAlt: Float64Array; cosAlt: Float64Array; az: Float64Array }>>()
+function sunTrack(weather: Weather, options: SolarOptions) {
+  let byOpt = tracks.get(weather)
+  if (!byOpt) { byOpt = new Map(); tracks.set(weather, byOpt) }
+  const key = `${options.sun_day}|${options.solar_time}`
+  const hit = byOpt.get(key)
+  if (hit) return hit
+  const h = weather.hours, n = h.count
+  const { longitude, time_zone } = weather.header
+  const t = { up: new Uint8Array(n), sinAlt: new Float64Array(n), cosAlt: new Float64Array(n), az: new Float64Array(n) }
+  for (let i = 0; i < n; i++) {
+    const doy = MONTH_START_DAY[h.month[i] - 1] + (options.sun_day === 'mid_month' ? 15 : h.day[i])
+    const shift = options.solar_time === 'apparent' ? solarTimeOffsetMin(MONTH_START_DAY[h.month[i] - 1] + h.day[i], longitude, time_zone) / 60 : 0
+    const p = sunPosition(weather.header.latitude, doy, h.hour[i] - 0.5 + shift)
+    if (!p.above_horizon) continue
+    t.up[i] = 1; t.sinAlt[i] = Math.sin(p.altitude); t.cosAlt[i] = Math.cos(p.altitude); t.az[i] = p.azimuth
+  }
+  byOpt.set(key, t)
+  return t
+}
+
 function check(name: string, v: number, lo: number, hi: number) {
   if (!Number.isFinite(v) || v < lo || v > hi) throw new Error(`solarOnSurface: ${name} must be between ${lo} and ${hi} (got ${v})`)
 }
@@ -65,8 +99,10 @@ export function solarOnSurface(weather: Weather, azimuthDeg: number, tiltDeg: nu
   check('tilt', tiltDeg, 0, 180)
   check('albedo', options?.albedo, 0, 1)
   if (options.sun_day !== 'mid_month' && options.sun_day !== 'actual') throw new Error(`solarOnSurface: sun_day must be 'mid_month' or 'actual'`)
+  if (options.solar_time !== 'clock' && options.solar_time !== 'apparent') throw new Error(`solarOnSurface: solar_time must be 'clock' or 'apparent'`)
   const h = weather.hours
   const n = h.count
+  const sun = sunTrack(weather, options)
   const out: SurfaceIrradiance = { direct: new Float64Array(n), diffuse: new Float64Array(n), reflected: new Float64Array(n), total: new Float64Array(n) }
   const gs = azimuthDeg * DEG
   const beta = tiltDeg * DEG
@@ -77,11 +113,9 @@ export function solarOnSurface(weather: Weather, azimuthDeg: number, tiltDeg: nu
   for (let i = 0; i < n; i++) {
     const dn = h.direct_normal[i], dh = h.diffuse_horizontal[i]
     if (dn === 0 && dh === 0) continue
-    const day = options.sun_day === 'mid_month' ? 15 : h.day[i]
-    const sun = sunPosition(weather.header.latitude, MONTH_START_DAY[h.month[i] - 1] + day, h.hour[i] - 0.5)
-    if (!sun.above_horizon) continue
-    const sinA = Math.sin(sun.altitude), cosA = Math.cos(sun.altitude)
-    const cosT = sinA * cosB + cosA * sinB * Math.cos(sun.azimuth - gs)
+    if (!sun.up[i]) continue
+    const sinA = sun.sinAlt[i], cosA = sun.cosAlt[i]
+    const cosT = sinA * cosB + cosA * sinB * Math.cos(sun.az[i] - gs)
     const direct = cosT > 0 ? dn * cosT : 0
     const diffuse = dh * skyVf
     const reflected = (dn * sinA + dh) * options.albedo * gndVf

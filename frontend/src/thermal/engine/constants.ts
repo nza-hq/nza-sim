@@ -18,13 +18,22 @@ export const ENGINE_CONSTANTS = {
   delta_theta_sky_k: 11,
   /** Convective share of transmitted solar released to the air node (ISO 52016-1 Annex B default f_sol,c). */
   solar_convective_fraction: 0.1,
+  /**
+   * Correction from the normal-incidence g-value to the hour-average for non-normal incidence, F_W (ISO 13790:2008
+   * 11.4.2; ISO 52016-1 Annex B default). Today's engine applies none.
+   */
+  glazing_angle_factor: 0.9,
   /** ISO 6946:2017 Table 7 surface resistances, m²K/W, used only to turn a stated U into a layer resistance. */
   R_se: 0.04,
   R_si_horizontal: 0.13,
   R_si_upward: 0.10,
   R_si_downward: 0.17,
-  /** Air volumetric heat capacity, J/m³K: 1.2 kg/m³ × 1005 J/kgK, as today's engine (instantCalc.js 1048). */
-  rho_c_air: 1.2 * 1005,
+  /**
+   * Air volumetric heat capacity, J/m³K: 0.33 Wh/m³K, today's AIR_HEAT_CAPACITY (instantCalc.js 168), which today's
+   * infiltration and vent conductances use. Today's air-node capacity uses 1.2 × 1005 = 1206 (1.5 % higher); Engine 1
+   * uses one value for both, and the air's own capacity is under 2 % of the anchor zone's.
+   */
+  rho_c_air: 0.33 * 3600,
   /** Largest massive sub-layer thickness, m: thicker layers are split so each node stands for at most this much. */
   max_sublayer_m: 0.05,
 } as const

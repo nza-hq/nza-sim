@@ -22,7 +22,7 @@ function zone(elements: Element[], over: Partial<ZoneInputs> = {}): ZoneInputs {
   return {
     elements, air_capacity_j_per_k: 1e6, bridging_w_per_k: 0, hours: H,
     theta_e: flat(0), theta_ground: 10, ventilation_w_per_k: flat(0),
-    solar_absorbed_w_per_m2: elements.map(() => flat(0)), solar_transmitted_w: flat(0),
+    solar_absorbed_w_per_m2: elements.map(() => flat(0)), solar_transmitted_w: flat(0), other_gains: null,
     setpoints: { heat_c: null, cool_c: null }, control: 'air', hc_convective_fraction: 1, initial_c: 20, warmup_days: 0,
     ...over,
   }

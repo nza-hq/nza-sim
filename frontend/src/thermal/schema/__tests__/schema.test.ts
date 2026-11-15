@@ -157,7 +157,7 @@ describe('building_config → one-zone model document (Bridgewater anchor fixtur
     const north = d.surfaces.filter((s) => s.facade === 'north').reduce((a, s) => a + s.area_m2, 0)
     expect(north).toBeCloseTo(bc.length * bc.floor_height * bc.num_floors, 9)
     expect(d.surfaces.find((s) => s.id === 'wall_east')!.azimuth_deg).toBe((90 + bc.orientation) % 360)
-    expect(d.surfaces.find((s) => s.id === 'wall_north')!.openings).toEqual([{ kind: 'permanent_vent', area_m2: 1.1, cd: 0.49 }])
+    expect(d.surfaces.find((s) => s.id === 'wall_north')!.openings).toEqual([{ kind: 'permanent_vent', area_m2: 1.1, cd: 0.49, flow_mode: 'single_sided' }])  // 2.1: today's resolved flow mode, stated
     expect(d.library_refs.map((r) => r.key).sort()).toEqual(Object.values(FIXTURE.construction_choices).map(String).sort())
   })
 

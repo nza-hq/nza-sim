@@ -229,6 +229,12 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
         const o: Obj = { kind, ...main }
         if (facadeOpen.cd !== undefined) o.cd = src.take(`${op}.cd`, `surfaces[${wallIdx}].openings[${i}].cd`)
         if (facadeOpen.flow_mode !== undefined) o.flow_mode = src.take(`${op}.flow_mode`, `surfaces[${wallIdx}].openings[${i}].flow_mode`)
+        // Schema 2.1: a permanent vent states its cd and flow mode. Where the project leaves them out, write what today's
+        // engine resolves to (building-wide value, else resolveCd 0.25 / resolveFlowMode 'single_sided').
+        if (kind === 'permanent_vent') {
+          o.cd ??= openingDefaults.cd ?? TODAY.vent_cd
+          o.flow_mode ??= openingDefaults.flow_mode ?? TODAY.vent_flow_mode
+        }
         openings.push(o)
       }
       if (facadeOpen.louvre_area_m2 !== undefined) {

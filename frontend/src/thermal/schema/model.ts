@@ -406,13 +406,18 @@ export const ModelDocument = z
       if (!zoneIds.has(s.zone_a)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'zone_a'], message: `surface "${s.id}" names zone "${s.zone_a}", which does not exist` })
       }
-      const exteriorOpaque = (s.kind === 'wall' || s.kind === 'roof') && s.zone_b === 'outside'
+      const exteriorOpaque = (s.kind === 'wall' || s.kind === 'roof' || s.kind === 'floor') && s.zone_b === 'outside'
       if (exteriorOpaque && (s.solar_absorptance == null || s.thermal_emissivity == null)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" faces outside and needs solar_absorptance and thermal_emissivity` })
       }
       if (s.kind === 'glazing' && (s.frame_fraction == null || s.thermal_emissivity == null)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `glazing "${s.id}" needs frame_fraction and thermal_emissivity` })
       }
+      s.openings.forEach((o, j) => {
+        if (o.kind === 'permanent_vent' && (o.cd == null || o.flow_mode == null)) {
+          ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'openings', j], message: `permanent vent on "${s.id}" needs cd and flow_mode` })
+        }
+      })
       if (s.zone_b !== 'outside' && s.zone_b !== 'ground' && !zoneIds.has(s.zone_b)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'zone_b'], message: `surface "${s.id}" names zone "${s.zone_b}", which does not exist` })
       }

@@ -78,7 +78,7 @@ function compareWithToday(w: Weather, orientation: number) {
     temperature: w.hours.dry_bulb, direct_normal: w.hours.direct_normal, diffuse_horizontal: w.hours.diffuse_horizontal,
     month: w.hours.month, hour: w.hours.hour,
   }, w.header.latitude, orientation)
-  const opts = { albedo: 0.2, sun_day: 'mid_month' as const }
+  const opts = { albedo: 0.2, sun_day: 'mid_month' as const, solar_time: 'clock' as const }
   const mine = {
     f1: solarOnSurface(w, orientation, 90, opts).total, f2: solarOnSurface(w, orientation + 90, 90, opts).total,
     f3: solarOnSurface(w, orientation + 180, 90, opts).total, f4: solarOnSurface(w, orientation + 270, 90, opts).total,
@@ -100,7 +100,7 @@ describe('solarOnSurface', () => {
   })
   it('a horizontal surface receives DNI·sin(altitude) + DHI', async () => {
     const w = await parseEpw(bytes(makeEpw()))
-    const roof = solarOnSurface(w, 123, 0, { albedo: 0.2, sun_day: 'mid_month' })
+    const roof = solarOnSurface(w, 123, 0, { albedo: 0.2, sun_day: 'mid_month', solar_time: 'clock' })
     const i = 4000 - 4  // 16 June, 13:00-14:00
     const sun = sunPosition(51, 151 + 15, 12.5)
     expect(roof.total[i]).toBeCloseTo(w.hours.direct_normal[i] * Math.sin(sun.altitude) + w.hours.diffuse_horizontal[i], 9)
@@ -113,7 +113,7 @@ describe('solarOnSurface', () => {
   })
   it('a tilted surface splits sky and ground diffuse by its view factors', async () => {
     const w = await parseEpw(bytes(makeEpw()))
-    const s = solarOnSurface(w, 180, 30, { albedo: 0.3, sun_day: 'actual' })
+    const s = solarOnSurface(w, 180, 30, { albedo: 0.3, sun_day: 'actual', solar_time: 'clock' })
     const i = 4000
     expect(s.diffuse[i]).toBeCloseTo(w.hours.diffuse_horizontal[i] * (1 + Math.cos(Math.PI / 6)) / 2, 9)
     const sun = sunPosition(51, 151 + 16, 16.5)
@@ -121,8 +121,8 @@ describe('solarOnSurface', () => {
   })
   it('refuses a missing albedo or an unknown sun-day option instead of assuming one', async () => {
     const w = await parseEpw(bytes(makeEpw()))
-    expect(() => solarOnSurface(w, 0, 90, { albedo: undefined as unknown as number, sun_day: 'mid_month' })).toThrow('albedo')
-    expect(() => solarOnSurface(w, 0, 90, { albedo: 0.2, sun_day: 'noon' as never })).toThrow('sun_day')
+    expect(() => solarOnSurface(w, 0, 90, { albedo: undefined as unknown as number, sun_day: 'mid_month', solar_time: 'clock' })).toThrow('albedo')
+    expect(() => solarOnSurface(w, 0, 90, { albedo: 0.2, sun_day: 'noon' as never, solar_time: 'clock' })).toThrow('sun_day')
   })
 })
 
