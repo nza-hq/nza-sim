@@ -23,6 +23,7 @@
  */
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
+import { TODAY } from '../../thermal/schema/upgrade'
 import { allWindows, edgesOf, facade4, type FabricElement, type Plan, type SpaceType, ringArea, wallRuns } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, profile, system } from '../library/library'
@@ -31,6 +32,7 @@ import type { XY } from './ported/zones'
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
 const is21 = (SCHEMA_VERSION as string) !== '2.0'
+const is22 = is21 && (SCHEMA_VERSION as string) !== '2.1'
 
 export type Built = {
   doc: unknown
@@ -91,13 +93,22 @@ export function buildDocument(plan: Plan): Built {
   }
   const shares = [...pairs.values()]
 
+  // Surface optics the editor does not ask for yet: today's engine values (TODAY in thermal/schema/upgrade.ts), the
+  // same ones the converter from today's config writes. Inside absorptance is on both faces of a partition.
   const ext = (s: Record<string, unknown>, kind: 'wall' | 'roof' | 'glazing' | 'other') =>
     is21
       ? {
           ...s,
-          solar_absorptance: kind === 'wall' ? 0.6 : kind === 'roof' ? 0.7 : null,
-          thermal_emissivity: kind === 'other' ? null : 0.9,
-          frame_fraction: kind === 'glazing' ? 0.2 : null,
+          solar_absorptance: kind === 'wall' ? TODAY.wall_solar_absorptance : kind === 'roof' ? TODAY.roof_solar_absorptance : null,
+          thermal_emissivity: kind === 'other' ? null : TODAY.outside_emissivity,
+          frame_fraction: kind === 'glazing' ? TODAY.frame_fraction : null,
+          ...(is22
+            ? {
+                inside_solar_absorptance: kind === 'glazing' ? null : TODAY.inside_solar_absorptance,
+                inside_solar_absorptance_b: s.kind === 'partition' ? TODAY.inside_solar_absorptance : null,
+                faces_up: null,
+              }
+            : {}),
         }
       : s
 
@@ -272,7 +283,7 @@ export function buildDocument(plan: Plan): Built {
     ventilation: ventOf(spaceOf.get(z.id)),
     infiltration_q50: null,
     infiltration_ach: null,
-    ...(is21 ? { internal_heat_capacity_j_per_k_m2: 250000 } : {}),
+    ...(is21 ? { internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2 } : {}),
     surfaces: byZone.get(z.id) ?? [],
   }))
 
