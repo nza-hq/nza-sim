@@ -1435,6 +1435,14 @@ export default function GeometryLab() {
             {line && <small>{line}</small>}
           </div>
         )
+        // A gain the library has no number for: typed here; empty stays unset (the document says nothing).
+        type Gk = 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2'
+        const typed = (label: string, k: Gk, step: number, unit?: string) => (
+          <div className="gl-row gl-typed">
+            <span>{label}</span>
+            <Num value={sp[k] ?? ''} unit={unit} step={step} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (sp[k] ?? null)) setSpace(sp.id, { [k]: n }) }} />
+          </div>
+        )
         const sysLine = (key: string | null, s: 'heating' | 'cooling' | 'dhw' | 'ventilation') => {
           const t = system(key)
           if (!t) return undefined
@@ -1457,14 +1465,13 @@ export default function GeometryLab() {
                 <h3>Use and profiles</h3>
                 {opt('Use', 'use', USES as Array<{ key: string; name: string }>)}
                 {opt('Occupancy', 'occupancy', profilesFor('occupancy'))}
-                {sp.occupancy && (
-                  <div className="gl-row">
-                    <span>People per m²</span>
-                    <Num value={sp.people_per_m2 ?? ''} step={0.01} min={0} onCommit={(v) => { const n = v > 0 ? v : null; if (n !== (sp.people_per_m2 ?? null)) setSpace(sp.id, { people_per_m2: n }) }} />
-                  </div>
-                )}
+                {typed('People per m²', 'people_per_m2', 0.01)}
+                {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
+                {typed('Occupancy rate', 'occupancy_rate', 0.05, '0–1')}
                 {opt('Lighting', 'lighting', profilesFor('lighting'))}
+                {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
                 {opt('Equipment', 'equipment', profilesFor('equipment'))}
+                {typed('Equipment', 'equipment_w_per_m2', 0.5, 'W/m²')}
               </div>
               <div className="gl-sec">
                 <h3>Systems</h3>
@@ -1472,7 +1479,7 @@ export default function GeometryLab() {
                 {opt('Cooling', 'cooling', systemsFor('cooling'), sysLine(sp.cooling, 'cooling'))}
                 {opt('Ventilation', 'ventilation', systemsFor('ventilation'), sysLine(sp.ventilation, 'ventilation'))}
                 {opt('Hot water', 'dhw', systemsFor('dhw'), sysLine(sp.dhw, 'dhw'))}
-                <p className="gl-hint">Each from NZA Sim's library, with its own fuel and efficiency. Rooms of this type get all of these. The library's profiles are daily shapes; how many people is typed here, and lighting and equipment loads come later.</p>
+                <p className="gl-hint">Each from NZA Sim's library, with its own fuel and efficiency. Rooms of this type get all of these. The library's profiles are daily shapes only; the numbers (people, W) are typed here.</p>
               </div>
               <div className="gl-sec">
                 <div className="gl-btns">

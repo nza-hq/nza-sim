@@ -88,6 +88,11 @@ export type SpaceType = {
   occupancy: string | null
   /** People per m² of floor, typed: the library's occupancy profiles are shapes only, with no density. */
   people_per_m2?: number | null
+  /** Typed gains (W): the library has none. Null or absent: not stated, and the document says nothing. */
+  occupancy_rate?: number | null
+  sensible_w_per_person?: number | null
+  lighting_w_per_m2?: number | null
+  equipment_w_per_m2?: number | null
   lighting: string | null
   equipment: string | null
   heating: string | null

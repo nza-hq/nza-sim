@@ -33,6 +33,7 @@ import type { XY } from './ported/zones'
 const r3 = (n: number) => Math.round(n * 1000) / 1000
 const is21 = (SCHEMA_VERSION as string) !== '2.0'
 const is22 = is21 && (SCHEMA_VERSION as string) !== '2.1'
+const is23 = is22 && (SCHEMA_VERSION as string) !== '2.2'
 
 export type Built = {
   doc: unknown
@@ -250,21 +251,35 @@ export function buildDocument(plan: Plan): Built {
   const addProfile = (pr: Record<string, unknown>) => {
     if (!profiles.some((x) => x.id === pr.id)) profiles.push(pr)
   }
+  // From schema 2.3 each gain profile carries radiant_fraction; the editor does not ask for it yet, so it is null.
+  const rad = is23 ? { radiant_fraction: null } : {}
   const refsOf = (zid: string) => {
     const sp = spaceOf.get(zid)
+    if (!sp) return { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
+    // Lighting and equipment: one profile per space type, its library shape plus the W/m² typed on the space type.
     const gain = (k: 'lighting' | 'equipment') => {
-      const key = sp?.[k]
-      if (!key || !profile(key)?.day_types) return []
-      addProfile({ id: key, kind: k, label: profile(key)!.name, schedule: shapeOf(key) })
-      return [key]
+      const key = sp[k]
+      const shape = key && profile(key)?.day_types ? shapeOf(key) : null
+      const w = k === 'lighting' ? sp.lighting_w_per_m2 : sp.equipment_w_per_m2
+      if (!shape && w == null) return []
+      if (!shape) notes.push(`${sp.name}: ${k} has W/m² but no profile shape`)
+      const id = `${sp.id}_${k}`
+      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...(w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {}), ...rad })
+      return [id]
     }
     let occupancy: string | null = null
-    if (sp?.occupancy && profile(sp.occupancy)?.day_types) {
-      if (sp.people_per_m2 != null && sp.people_per_m2 > 0) {
-        occupancy = `${sp.id}_occupancy`
-        addProfile({ id: occupancy, kind: 'occupancy', label: `${profile(sp.occupancy)!.name} (${sp.name})`, schedule: shapeOf(sp.occupancy), density: { value: sp.people_per_m2, basis: 'per_m2' } })
-      } else notes.push(`${sp.name}: occupancy needs people per m² before it goes in the model`)
-    }
+    if (sp.people_per_m2 != null && sp.people_per_m2 > 0) {
+      const shape = sp.occupancy && profile(sp.occupancy)?.day_types ? shapeOf(sp.occupancy) : null
+      if (!shape) notes.push(`${sp.name}: people per m² but no occupancy profile shape`)
+      occupancy = `${sp.id}_occupancy`
+      addProfile({
+        id: occupancy, kind: 'occupancy', label: `${sp.occupancy ? profile(sp.occupancy)!.name : 'Occupancy'} (${sp.name})`,
+        ...(shape ? { schedule: shape } : {}), density: { value: sp.people_per_m2, basis: 'per_m2' },
+        ...(sp.occupancy_rate != null ? { occupancy_rate: sp.occupancy_rate } : {}),
+        ...(sp.sensible_w_per_person != null ? { sensible_w_per_person: sp.sensible_w_per_person } : {}),
+        ...rad,
+      })
+    } else if (sp.occupancy) notes.push(`${sp.name}: occupancy needs people per m² before it goes in the model`)
     return { occupancy, lighting: gain('lighting'), equipment: gain('equipment'), auxiliary: [] }
   }
 

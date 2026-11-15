@@ -162,16 +162,17 @@ describe('model document', () => {
     const z = doc.zones[0]
     expect(z.use_type).toBe('office')
     // Occupancy needs people per m² (the library profile is a shape only); without it, it waits, with a note.
-    expect(z.profile_refs).toEqual({ occupancy: null, lighting: ['office_lighting'], equipment: [], auxiliary: [] })
+    expect(z.profile_refs).toEqual({ occupancy: null, lighting: ['s1_lighting'], equipment: [], auxiliary: [] })
     expect(b.notes.some((n) => /people per m²/.test(n))).toBe(true)
-    expect(doc.profiles.map((x: any) => x.id)).toEqual(['office_lighting'])
+    expect(doc.profiles.map((x: any) => x.id)).toEqual(['s1_lighting'])
     expect(doc.profiles[0].schedule.weekday).toHaveLength(24)
     expect(doc.profiles[0].magnitude).toBeUndefined()
-    const b2 = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: 0.1 }] })
+    const b2 = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: 0.1, sensible_w_per_person: 75, occupancy_rate: 0.8, lighting_w_per_m2: 8 }] })
     expect(b2.issues).toEqual([])
     const d2 = b2.doc as any
     expect(d2.zones[0].profile_refs.occupancy).toBe('s1_occupancy')
-    expect(d2.profiles.find((x: any) => x.id === 's1_occupancy').density).toEqual({ value: 0.1, basis: 'per_m2' })
+    expect(d2.profiles.find((x: any) => x.id === 's1_occupancy')).toMatchObject({ density: { value: 0.1, basis: 'per_m2' }, sensible_w_per_person: 75, occupancy_rate: 0.8 })
+    expect(d2.profiles.find((x: any) => x.id === 's1_lighting').magnitude).toEqual({ value: 8, unit: 'w_per_m2' })
     // Every library item used is pinned with its body hash.
     expect(d2.library_refs.map((r: any) => `${r.kind}:${r.key}`)).toEqual(expect.arrayContaining(['construction:cavity_wall_standard', 'construction:triple_glazing', 'profile:office_occupancy', 'system_template:vrf_heating', 'system_template:mvhr_standard']))
     expect(d2.library_refs.every((r: any) => /^[0-9a-f]{64}$/.test(r.body_hash))).toBe(true)
