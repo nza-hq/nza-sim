@@ -3,6 +3,9 @@
 **Brief 103 — Simulate v2 Engine 1: a pure single-zone hourly engine from the model document — CLOSED 15 Nov 2026 on `chris/103-engine-1` (PR open).**
 A pure TypeScript ISO 52016-1 envelope engine (`frontend/src/thermal/engine/`), gated against today's State 1 path by path (0.000 %) and against a like-for-like EnergyPlus referee: heating 89.98 vs 90.46 MWh (−0.5 %), cooling 15.32 vs 13.65 (+12.2 %, open for 104). BESTEST 600/900 run from committed weather, with an EnergyPlus twin; 900 is above range, escalated, not tuned. Independent review addressed. No change to today's engine or UI. Brief [`archive/103_engine-1_COMPLETED.md`](archive/103_engine-1_COMPLETED.md); evidence [`../audit/103/`](../audit/103/), final report [`../audit/103/10_final_report.md`](../audit/103/10_final_report.md).
 
+**UI — adopt decodED's type system — CLOSED 15 Nov 2026 (PR to follow).**
+NZA Sim now uses decodED's faces and sizes: DM Sans for UI, Inter for figures, Stolzl for titles only. Root cause of "everything too big": the Tailwind v4 size tokens were in the wrong namespace, so ~1,600 size classes generated nothing. One shared file, `frontend/src/design-system/tokens.css`. Visual only; anchor 133.2 unchanged. Brief [`archive/ui-decoded-type-system_COMPLETED.md`](archive/ui-decoded-type-system_COMPLETED.md).
+
 **Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026; MERGED (PR #27).**
 The run key now pins the engine source (content hash, templates included) and the EPW bytes; the database stores and checks the client's canonical text, so float noise and huge numbers save; runs belong to their model version (no cross-organisation sharing); accepting an invitation never demotes. The anchor round trip checks the stored document and can be proved from the SQL editor. No engine change. Brief [`archive/102a_foundations-fixes_COMPLETED.md`](archive/102a_foundations-fixes_COMPLETED.md); evidence [`../audit/102a/`](../audit/102a/).
 

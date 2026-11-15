@@ -36,6 +36,16 @@ reference case, fixed fixture id).
 - **P6c independent review** ([`08_independent_review.md`](docs/audit/103/08_independent_review.md), response [`09_review_response.md`](docs/audit/103/09_review_response.md)): no tuning found; closure confirmed real by mutation. Fixed: `runZoneModel` refuses an unbalanced result (hourly > 1 Wh, or breakdown lines not summing to zero); library y-factors other than 1 refused (were applied to glazing only); bridging multiplier required, stated by the converter and upgrade; Denver BESTEST weather committed, anchor-EPW skip now loud (`NZA_REQUIRE_REFERENCE_DATA=1` fails it). Recorded as open for 104: the cooling-miss attribution (slabs consistent with it, BESTEST 900 one-zone residual +0.10 / +0.39 MWh same sign), inside convection (neither ISO form is TARP), unvalidated shared inputs (ground 3.7 MWh, wind 5.0 MWh). Gates unchanged: Bridgewater 89.98 / 15.32.
 - **P7 close** ([`10_final_report.md`](docs/audit/103/10_final_report.md)): brief archived, current.md updated, design note updated. **Next:** Brief 104 (multi-zone), carrying the open items in the final report (interior slabs and the cooling miss, BESTEST 900 residual, TARP-form inside convection, y-factor carriage, ground and wind inputs). **Safety:** today's engine files untouched (`git diff main...HEAD` shows none); anchor `_brief93_anchor.mjs --fixture` = 133.2; no lockfile or node_modules; nothing touched NZA Decoded.
 
+## ✅ UI — decodED type system — CLOSED 15 Nov 2026 on `ui/decoded-type-system`
+
+Brief [`docs/briefs/archive/ui-decoded-type-system_COMPLETED.md`](docs/briefs/archive/ui-decoded-type-system_COMPLETED.md) (Linzie, 15 Nov 00:38).
+Type tokens moved to `frontend/src/design-system/tokens.css` in Tailwind v4's `--text-*` namespace (the old
+`--font-size-*` names generated no utilities, so ~1,600 size classes rendered at one body size). DM Sans UI, Inter
+figures, Stolzl display; DM Sans + Inter self-hosted in `frontend/public/fonts/`. Charts Inter 10–11 px. Six module
+titles to `text-heading`. Visual only: no engine file; anchor `--fixture` 133.2, output identical; build clean; 17/17 tests.
+**Suggestions (not done):** decodED colours (Assembly palette) are available as tokens but NZA Sim's Pablo palette is
+unchanged pending Linzie's call; the many inline SVG `fontSize: 8–11` literals in charts could move to tokens.
+
 ## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 
 Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/archive/102a_foundations-fixes_COMPLETED.md). Four proven bugs
