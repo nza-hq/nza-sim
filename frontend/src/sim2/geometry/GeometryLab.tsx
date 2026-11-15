@@ -962,9 +962,11 @@ export default function GeometryLab() {
   const chosen = new Set(sel?.kind === 'rooms' ? sel.ids : joinFrom ? [joinFrom] : [])
   const chosenBlocks = new Set(drag?.kind === 'move' || drag?.kind === 'turn' ? drag.idx : selBlocks)
 
+  // A card is open on the right (wall, block, rooms or space type): the results panel sits to its left.
+  const cardOpen = !!(selWall && selSpan) || (mode === 'outline' && selBlocks.length > 0) || selRooms.length > 0 || (mode === 'spaces' && !!curSpace)
   return (
     <div className="gl-root" ref={host}>
-      <ResultsPanel doc={built.doc} />
+      <ResultsPanel doc={built.doc} right={cardOpen ? 358 : 16} />
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
