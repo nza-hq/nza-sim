@@ -70,6 +70,27 @@ export interface NetworkInputs {
   /** Absent: ENGINE_CONSTANTS.solar_convective_fraction. */
   solar_convective_fraction?: number
   warmup_days: number
+  /**
+   * Brief 105 Part 6: time steps per hour (absent: 1). The hourly inputs (solar, gains, ventilation) are held over
+   * the hour; the outdoor temperature as `theta_e_between` says. Outputs stay hourly: means of the steps (W, °C), and
+   * the hour's closure.
+   */
+  steps_per_hour?: number
+  /**
+   * Between steps of one hour: 'hold' the hour's outdoor temperature (absent), or 'linear' from the hour before's
+   * reading to this hour's, reaching it at the hour's last step (EnergyPlus's convention for weather between readings).
+   */
+  theta_e_between?: 'hold' | 'linear'
+  /**
+   * Brief 105 Part 6: each face's convection with its zone's air. Absent or 'fixed': the element's h_ci (ISO 52016-1
+   * Table 25 by tilt). 'tarp': Walton's natural-convection correlations, EnergyPlus's TARP inside algorithm, from the
+   * face's tilt and its temperature difference with the air at the step before:
+   *   heat flow unstable (a warm face looking up, a cool face looking down):  h = 9.482·|ΔT|^⅓ / (7.238 − |cos Σ|)
+   *   heat flow stable (a warm face looking down, a cool face looking up):    h = 1.810·|ΔT|^⅓ / (1.382 + |cos Σ|)
+   * (both 1.31·|ΔT|^⅓ on a vertical face), at least ENGINE_CONSTANTS.h_ci_tarp_min. The interface matrix is rebuilt
+   * every step.
+   */
+  inside_convection?: 'fixed' | 'tarp'
 }
 
 export interface NetworkZoneRun {
@@ -111,8 +132,6 @@ export interface NetworkRun {
 export class NetworkError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'NetworkError' }
 }
-
-const DT = 3600
 
 function check(inp: NetworkInputs) {
   const H = inp.hours
@@ -169,6 +188,10 @@ function check(inp: NetworkInputs) {
   for (let z = 0; z < Z; z++) {
     if (!inp.elements.some((ne) => ne.zone_a === z || ne.zone_b === z)) throw new NetworkError('a zone needs at least one face', `zones[${z}]`)
   }
+  const N = inp.steps_per_hour ?? 1
+  if (!(Number.isInteger(N) && N >= 1 && N <= 60)) throw new NetworkError('a whole number from 1 to 60', 'steps_per_hour')
+  if (inp.theta_e_between != null && inp.theta_e_between !== 'hold' && inp.theta_e_between !== 'linear') throw new NetworkError("'hold' or 'linear'", 'theta_e_between')
+  if (inp.inside_convection != null && inp.inside_convection !== 'fixed' && inp.inside_convection !== 'tarp') throw new NetworkError("'fixed' or 'tarp'", 'inside_convection')
 }
 
 /** One element's interior chain: the nodes between its interface nodes, tridiagonal, Thomas-factorised once. */
@@ -214,6 +237,9 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const two = els.map((e) => e.boundary === 'zone')
   const fsc = inp.solar_convective_fraction ?? K.solar_convective_fraction
   const operative = inp.control === 'operative'
+  const N = inp.steps_per_hour ?? 1
+  const DT = 3600 / N
+  const tarp = inp.inside_convection === 'tarp'
 
   // ── Nodes: zone air 0..Z−1, each element's face A, face B of two-faced elements, then each zone's radiant star
   // node (Part 6). ISO 52016-1 eq. 30's exchange h_ri·A_i·A_k/A_tot between every pair of a zone's faces is exactly a
@@ -262,7 +288,23 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     return t
   })
 
+  // Flat per-face arrays for the hourly loops, and each face's convection coefficient (fixed, or TARP's each step).
+  const fNode = new Int32Array(nFaces), fZone = new Int32Array(nFaces), fArea = new Float64Array(nFaces), fAlpha = new Float64Array(nFaces)
+  const fHci = new Float64Array(nFaces), fCos = new Float64Array(nFaces), fUp = new Float64Array(nFaces)
+  {
+    let q = 0
+    for (let z = 0; z < Z; z++) for (const f of faces[z]) {
+      fNode[q] = f.node; fZone[q] = z; fArea[q] = f.area; fAlpha[q] = f.alpha ?? 1; fHci[q] = f.hci
+      // The face looks into the zone, against the element's outward normal (tilt from up): it looks up when tilt > 90°.
+      const c = Math.cos((f.tilt * Math.PI) / 180)
+      fCos[q] = Math.abs(c) < 1e-12 ? 0 : Math.abs(c); fUp[q] = c < -1e-12 ? 1 : c > 1e-12 ? -1 : 0
+      q++
+    }
+  }
+
   // ── The interface matrix without ventilation, S0, sparse ─────────────────────────────────────────────────────
+  // Everything but the faces' convection is fixed for the run (`base`); convection is added by `assemble`, once, or
+  // every step for TARP.
   const rows: Map<number, number>[] = Array.from({ length: n }, () => new Map())
   const add = (i: number, j: number, v: number) => { rows[i].set(j, (rows[i].get(j) ?? 0) + v) }
   const link = (i: number, j: number, g: number) => { add(i, i, g); add(j, j, g); add(i, j, -g); add(j, i, -g) }
@@ -270,10 +312,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   for (let z = 0; z < Z; z++) {
     capF[z] = inp.zones[z].air_capacity_j_per_k
     add(z, z, inp.zones[z].bridging_w_per_k)
-    for (const f of faces[z]) {
-      link(z, f.node, f.hci * f.area)            // convection with the zone's air
-      link(f.node, rad[z], K.h_ri * f.area)      // long-wave through the zone's star node
-    }
+    for (const f of faces[z]) link(f.node, rad[z], K.h_ri * f.area)      // long-wave through the zone's star node
   }
   for (let k = 0; k < E; k++) {
     const e = els[k], t = chains[k], A = e.area_m2, L = e.c.length
@@ -291,11 +330,12 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   }
   const capDT = Float64Array.from(capF, (c) => c / DT)
   for (let i = 0; i < n; i++) add(i, i, capDT[i])
+  const base = rows.map((r) => new Map(r))
   // Faces first; then each zone's star and air nodes, zone by zone (adjacent zones adjacent, so a stack stays banded).
   const order = new Int32Array(n)
   for (let i = 0; i < nFaces; i++) order[i] = Z + i
   for (let z = 0; z < Z; z++) { order[nFaces + 2 * z] = rad[z]; order[nFaces + 2 * z + 1] = z }
-  const lu: SparseLU = sparseLuFactor(n, rows, order)
+  let lu: SparseLU
 
   // Heating/cooling input vectors (convective share at the air, the rest over the zone's faces by area), and the
   // Z×Z responses at the air and star nodes to unit input at each air node (G, Gr) and to unit heating (EW, RW).
@@ -306,7 +346,12 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     ehW.push(Float64Array.from([hcf, ...faces[z].map((f) => ((1 - hcf) * f.area) / Atot[z])]))
   }
   const G = new Float64Array(Z * Z), Gr = new Float64Array(Z * Z), EW = new Float64Array(Z * Z), RW = new Float64Array(Z * Z)
-  {
+  const admittance = !operative && hcf === 1
+  const Y = new Float64Array(admittance ? Z * Z : 0)
+  const assemble = () => {
+    for (let i = 0; i < n; i++) { rows[i].clear(); for (const [j, v] of base[i]) rows[i].set(j, v) }
+    for (let q = 0; q < nFaces; q++) link(fZone[q], fNode[q], fHci[q] * fArea[q])  // convection with the zone's air
+    lu = sparseLuFactor(n, rows, order)
     const v = new Float64Array(n), x = new Float64Array(n)
     for (let j = 0; j < Z; j++) {
       v.fill(0); v[j] = 1
@@ -317,6 +362,22 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       sparseLuSolve(lu, v, x)
       for (let i = 0; i < Z; i++) { EW[i * Z + j] = x[i]; RW[i * Z + j] = x[rad[i]] }
     }
+    if (admittance) {
+      const fG = luFactor(G, Z), e = new Float64Array(Z), col = new Float64Array(Z)
+      for (let j = 0; j < Z; j++) { e.fill(0); e[j] = 1; luSolve(fG, e, col); for (let i = 0; i < Z; i++) Y[i * Z + j] = col[i] }
+      for (let i = 0; i < Z; i++) for (let j = 0; j < i; j++) { const w = 0.5 * (Y[i * Z + j] + Y[j * Z + i]); Y[i * Z + j] = w; Y[j * Z + i] = w }
+    }
+  }
+  assemble()
+  /** TARP: each face's coefficient from its temperature difference with its zone's air at the step before. */
+  const tarpCoefficients = () => {
+    for (let q = 0; q < nFaces; q++) {
+      const dT = xF[fNode[q]] - xF[fZone[q]], a = Math.cbrt(Math.abs(dT))
+      const unstable = dT * fUp[q] > 0
+      const h = unstable ? (K.tarp_unstable_a * a) / (K.tarp_unstable_b - fCos[q]) : (K.tarp_stable_a * a) / (K.tarp_stable_b + fCos[q])
+      fHci[q] = Math.max(K.h_ci_tarp_min, h)
+    }
+    assemble()
   }
 
   // ── Solar inside each zone (Part 1b's rule, per zone) ────────────────────────────────────────────────────────
@@ -338,12 +399,6 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       hasFloor[z] = 1
       for (const f of fl) { floorShare[f.node] = f.area / aF; beamRefl[z] += (f.area / aF) * (1 - (f.alpha ?? 1)) }
     }
-  }
-  // Flat per-face arrays for the hourly loops.
-  const fNode = new Int32Array(nFaces), fZone = new Int32Array(nFaces), fArea = new Float64Array(nFaces), fAlpha = new Float64Array(nFaces)
-  {
-    let q = 0
-    for (let z = 0; z < Z; z++) for (const f of faces[z]) { fNode[q] = f.node; fZone[q] = z; fArea[q] = f.area; fAlpha[q] = f.alpha ?? 1; q++ }
   }
 
   // ── State ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -407,7 +462,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const mode = new Int8Array(Z)  // 0 free, 1 heating to heat_c, −1 cooling to cool_c; kept from the hour before
   let maxPasses = 0, hoursOverOne = 0
   const solDiffuse = new Float64Array(Z), radBeam = new Float64Array(Z), ogRad = new Float64Array(Z)
-  const stored = new Float64Array(Z), sum = new Float64Array(Z)
+  const stored = new Float64Array(Z), sum = new Float64Array(Z), izs = new Float64Array(Z)
   const NM = operative ? 2 * Z : Z
   const Am = new Float64Array(NM * NM), bm = new Float64Array(NM), um = new Float64Array(NM)
   const luM: LU = { n: NM, lu: new Float64Array(NM * NM), piv: new Int32Array(NM) }
@@ -415,14 +470,8 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   // definite, as S0 is), x_a = z0 + G·(φ − H_v·x_a) is (Y + H_v)·x_a = Y·z0 + φ, so the free zones solve
   // K_FF·x_F = w_F − Y_FH·x_H with K = Y + H_v and w = Y·z0, by Cholesky, and each held zone's φ is (K·x_a − w)_i.
   // This replaces a dense Z×Z LU every hour by a Cholesky of the free zones only (Part 6).
-  const admittance = !operative && hcf === 1
-  const Y = new Float64Array(admittance ? Z * Z : 0), wY = new Float64Array(Z), Kc = new Float64Array(admittance ? Z * Z : 0)
+  const wY = new Float64Array(Z), Kc = new Float64Array(admittance ? Z * Z : 0)
   const freeIdx = new Int32Array(Z)
-  if (admittance) {
-    const fG = luFactor(G, Z), e = new Float64Array(Z), col = new Float64Array(Z)
-    for (let j = 0; j < Z; j++) { e.fill(0); e[j] = 1; luSolve(fG, e, col); for (let i = 0; i < Z; i++) Y[i * Z + j] = col[i] }
-    for (let i = 0; i < Z; i++) for (let j = 0; j < i; j++) { const v = 0.5 * (Y[i * Z + j] + Y[j * Z + i]); Y[i * Z + j] = v; Y[j * Z + i] = v }
-  }
   const actIdx = new Int32Array(Z)
 
   /**
@@ -522,8 +571,9 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     return 0.5 * (xa[i] + r)
   }
 
-  const step = (h: number, record: boolean) => {
-    const te = inp.theta_e[h]
+  /** One step of hour h at outdoor temperature te; recorded outputs add w (1 / steps per hour) of their value. */
+  const sub = (h: number, te: number, record: boolean, w: number) => {
+    if (tarp) tarpCoefficients()
     for (let i = 0; i < n; i++) bF[i] = capDT[i] * xF[i]
     const zi0 = h * Z * 3
     for (let z = 0; z < Z; z++) {
@@ -613,10 +663,11 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     const ob = h * Z * NO
     for (let z = 0; z < Z; z++) {
       const o = ob + z * NO, ta = xF[z]
-      sum[z] = (zOut[o + 5] = brid[z] * (te - ta)) + (zOut[o + 6] = hv[z] * (te - ta))
-        + (zOut[o + 7] = zIn[zi0 + 3 * z + 1]) + (zOut[o + 8] = -solDiffuse[z] * difLost[z])
-        + (zOut[o + 9] = ogIn[z] ? ogIn[z]![h] : 0) + phi[z]
-      if (phi[z] > 0) zOut[o + 3] = phi[z]; else if (phi[z] < 0) zOut[o + 4] = -phi[z]
+      const tb = brid[z] * (te - ta), tv = hv[z] * (te - ta), ts = zIn[zi0 + 3 * z + 1], tl = -solDiffuse[z] * difLost[z], tg = ogIn[z] ? ogIn[z]![h] : 0
+      sum[z] = tb + tv + ts + tl + tg + phi[z]
+      zOut[o + 5] += w * tb; zOut[o + 6] += w * tv; zOut[o + 7] += w * ts; zOut[o + 8] += w * tl; zOut[o + 9] += w * tg
+      if (phi[z] > 0) zOut[o + 3] += w * phi[z]; else if (phi[z] < 0) zOut[o + 4] -= w * phi[z]
+      izs[z] = 0
     }
     for (let k = 0; k < E; k++) {
       const e = els[k], za = elZoneA[k]
@@ -624,9 +675,9 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
         const node0 = cO[k + 1] > cO[k] ? CX[cO[k]] : xF[faceA[k]]
         const tb = ground[k] ? inp.theta_ground : te
         const qb = gBnd[k] * (tb - node0), qs = absP[h * E + k]
-        sum[za] += qb; elB[k] += qb
-        sum[za] += qs; elS[k] += qs
-        sum[za] += sky[k]; elK[k] += sky[k]
+        sum[za] += qb; elB[k] += w * qb
+        sum[za] += qs; elS[k] += w * qs
+        sum[za] += sky[k]; elK[k] += w * sky[k]
         continue
       }
       // Heat across the middle link, from the zone_b side (chain node ℓ) into the zone_a side (node ℓ+1).
@@ -634,18 +685,30 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       const tl = l === 0 ? xF[faceB[k]] : CX[cO[k] + l - 1]
       const tr = l + 1 === L - 1 ? xF[faceA[k]] : CX[cO[k] + l]
       const q = e.g[l] * e.area_m2 * (tl - tr)
-      elI[k] += q
+      elI[k] += w * q
       const zb = elZoneB[k]
-      if (zb !== za) { zOut[ob + za * NO + 10] += q; zOut[ob + zb * NO + 10] -= q }
+      if (zb !== za) { izs[za] += q; izs[zb] -= q }
     }
     for (let z = 0; z < Z; z++) {
       const o = ob + z * NO
-      sum[z] += zOut[o + 10]
-      zOut[o + 11] = stored[z]
-      zOut[o + 12] = Math.abs(sum[z] - stored[z])
+      sum[z] += izs[z]
+      zOut[o + 10] += w * izs[z]
+      zOut[o + 11] += w * stored[z]
+      zOut[o + 12] += w * (sum[z] - stored[z])  // signed over the steps; its size is taken at the hour's end
       const mrt = xF[rad[z]]  // the star node is the area-weighted mean of the zone's faces
-      zOut[o] = xF[z]; zOut[o + 1] = mrt; zOut[o + 2] = 0.5 * (xF[z] + mrt)
+      zOut[o] += w * xF[z]; zOut[o + 1] += w * mrt; zOut[o + 2] += w * 0.5 * (xF[z] + mrt)
     }
+  }
+  const linear = inp.theta_e_between === 'linear'
+  const step = (h: number, record: boolean) => {
+    const cur = inp.theta_e[h]
+    if (N === 1) sub(h, cur, record, 1)
+    else {
+      // The reading before hour 0 is the warm-up day's last hour (the warm-up repeats the first day).
+      const prev = linear ? inp.theta_e[h > 0 ? h - 1 : Math.min(23, H - 1)] : cur
+      for (let s = 1; s <= N; s++) sub(h, prev + ((cur - prev) * s) / N, record, 1 / N)
+    }
+    if (record) { const ob = h * Z * NO; for (let z = 0; z < Z; z++) { const o = ob + z * NO + 12; zOut[o] = Math.abs(zOut[o]) } }
   }
 
   for (let d = 0; d < inp.warmup_days; d++) for (let h = 0; h < 24; h++) step(h, false)

@@ -35,6 +35,10 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - Building and per-zone heating and cooling ("estimate"), the full breakdown with the outside-face terms as one expandable net line.
   - A zone with its control stated and only a heating setpoint runs heated only ("not cooled").
   - Browser-checked on the editor's two-zone plan: it refuses until a partition construction and the space types' gain fields are stated (asked of the editor). With them stated in a scratch copy, 9.1 MWh heating; a rerun shows in about 0.4 s.
+- **P6 per-floor accuracy** ([`06_per_floor.md`](docs/audit/105/06_per_floor.md)): two engine options, neither a default.
+  - Sub-hourly steps: Engine 2's own 1 h step error is ≤0.1 % on Bridgewater and 1.0–1.3 % on BESTEST 900. EnergyPlus moves 9 % on cooling with its own step, so the like-for-like referee is EnergyPlus at 4 steps: −2.3 % / +3.2 %, every storey within 4.3 %.
+  - TARP inside convection: the building vs full r2_z goes from +1.1 / +7.9 % to −1.4 / +1.6 %, the worst storey's cooling from 31 % to 17 %, and z5's slab heat from 0.77 to 2.60 MWh (EnergyPlus 3.44). It is 25× too slow at 50 zones (50 s), so it stays an option; a faster factorisation is the follow-up.
+  - Roof slab gap attributed: 1.83 MWh inside convection form, 0.52 the rest of EnergyPlus's surface physics, 0.31 not attributed (step, slab discretisation and air temperatures ruled out).
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 

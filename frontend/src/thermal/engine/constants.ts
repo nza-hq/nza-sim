@@ -14,6 +14,16 @@ export const ENGINE_CONSTANTS = {
   h_ci_horizontal: 2.5,
   h_ci_upward: 5.0,
   h_ci_downward: 0.7,
+  /**
+   * Walton's natural-convection correlations (EnergyPlus Engineering Reference, "TARP" inside convection; Walton 1983),
+   * the 'tarp' inside convection option (Brief 105 Part 6): unstable h = 9.482·|ΔT|^⅓ / (7.238 − |cos Σ|), stable
+   * h = 1.810·|ΔT|^⅓ / (1.382 + |cos Σ|), W/m²K; and EnergyPlus's floor on any convection coefficient, 0.1 W/m²K.
+   */
+  tarp_unstable_a: 9.482,
+  tarp_unstable_b: 7.238,
+  tarp_stable_a: 1.81,
+  tarp_stable_b: 1.382,
+  h_ci_tarp_min: 0.1,
   /** ISO 6946:2017 Annex C, h_c = 4 + 4·v (v the wind speed, m/s): the wind-driven outside convection option. */
   h_ce_wind_a: 4,
   h_ce_wind_b: 4,
