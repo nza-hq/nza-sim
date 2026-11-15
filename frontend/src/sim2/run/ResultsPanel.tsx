@@ -11,7 +11,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../../auth/AuthGate'
 import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
 import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
-import type { Summary } from './seam'
+import type { Summary, WhatIf } from './seam'
+import { EmitterSizing } from './EmitterSizing'
 import './run.css'
 
 const TERMS: Record<string, string> = {
@@ -84,6 +85,10 @@ export function useRun(doc: unknown) {
   const client = useRef<RunClient | null>(null)
   const latestDoc = useRef(doc)
   latestDoc.current = doc
+  // Brief 108 P5: a second flow and return pair, run on the same rooms beside the first.
+  const [whatIf, setWhatIf] = useState<WhatIf | null>(null)
+  const latestWhatIf = useRef(whatIf)
+  latestWhatIf.current = whatIf
 
   useEffect(() => {
     let c: RunClient
@@ -100,7 +105,7 @@ export function useRun(doc: unknown) {
         if (w.ok) { setWeather({ file_name: w.file_name, station: w.station }); setWeatherError(null) }
         else { setWeather(null); setWeatherError(w.error) }
         setState({ kind: 'running' })
-        c.run(latestDoc.current, 0)
+        c.run(latestDoc.current, 0, { what_if: latestWhatIf.current })
       },
       failed,
       )
@@ -115,8 +120,8 @@ export function useRun(doc: unknown) {
   useEffect(() => {
     if (!client.current) return
     setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
-    client.current.run(doc)
-  }, [doc])
+    client.current.run(doc, 250, { what_if: whatIf })
+  }, [doc, whatIf])
 
   // The organisation's weather files, when signed in.
   useEffect(() => {
@@ -154,7 +159,7 @@ export function useRun(doc: unknown) {
     } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
-  return { auth, state, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+  return { auth, state, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
 }
 export type Run = ReturnType<typeof useRun>
 
@@ -301,6 +306,8 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
               <ul>{s.energy.missing.map((m) => <li key={m.path + m.what}>{m.what}</li>)}</ul>
             </div>
           )}
+
+          <EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} />
 
           <h3>
             By zone <i>estimate</i>
