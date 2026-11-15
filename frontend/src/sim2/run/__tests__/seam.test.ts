@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import { runModel } from '../../../thermal/engine/model'
+import { logMeanDeltaT } from '../../../thermal/engine/emitters'
 import { fromBuildingConfig } from '../../../thermal/schema/fromBuildingConfig'
 import { MOS, readMos } from '../../../thermal/engine/__tests__/denver'
 import { bodyFromLibrary, CONSTRUCTIONS } from '../library'
@@ -139,6 +140,71 @@ describe('simulate', () => {
     const r = simulate(d, { weather: WEATHER })
     if (!r.ok || !now.ok) throw new Error(JSON.stringify(r))
     expect(r.summary.zones).toEqual(now.summary.zones)
+  })
+  it('emitters: each zone\'s output against its peak, the rating that covers it, and the same rooms at 70/60 (Brief 108 P4)', async () => {
+    expect((simulate(await doc(), { weather: WEATHER }) as any).summary.emitters).toBeNull()
+    const withRads = async (rated: (zi: number) => number) => {
+      const d = await doc()
+      const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+      hp.design_flow_c = 50; hp.design_return_c = 40
+      d.zones.forEach((z: any, zi: number) => {
+        z.emitters = [{ id: `${z.id}_rads`, kind: 'radiator', count: 1, rated_output_w: rated(zi), radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 }]
+      })
+      return d
+    }
+    const r = simulate(await withRads(() => 20000), { weather: WEATHER, what_if: { design_flow_c: 70, design_return_c: 60 } })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const em = r.summary.emitters!
+    const wi = em.what_if!
+    if (!wi.ok) throw new Error(JSON.stringify(wi.missing))
+    expect(em.zones.map((z) => z.id)).toEqual(['z1', 'z2', 'z3', 'z4', 'z5'])
+    const f = (fl: number, rt: number) => Math.pow(logMeanDeltaT(fl, rt, 21) / logMeanDeltaT(75, 65, 20), 1.3)
+    em.zones.forEach((z, i) => {
+      const w = wi.zones[i]
+      expect(z.cap_w).toBeCloseTo(20000 * f(50, 40), 6)
+      expect(w.cap_w).toBeCloseTo(20000 * f(70, 60), 6)
+      expect(w.peak_w).toBe(z.peak_w)  // the unlimited run does not depend on the design temperatures
+      expect(r.results.zones[i].annual.peak_heating_w).toBeLessThanOrEqual(z.cap_w * (1 + 1e-9))  // the capped run never above the cap
+      expect(z.shortfall_w).toBeCloseTo(Math.max(0, z.peak_w - z.cap_w), 9)
+      expect(w.unmet_hours!).toBeLessThanOrEqual(z.unmet_hours!)
+      expect(z.unmet_hours).toBe(r.results.zones[i].annual.unmet_heating_hours)
+      expect(z.needed_rated_w! * f(50, 40)).toBeCloseTo(z.peak_w, 6)
+      expect(w.needed_rated_w! * f(70, 60)).toBeCloseTo(z.peak_w, 6)
+    })
+    expect(em.zones.some((z) => z.shortfall_w > 0 && z.unmet_hours! > 0)).toBe(true)
+    expect(wi.heating_kwh).toBeGreaterThan(r.summary.building.heating_kwh)
+    expect(r.summary.energy.ok && wi.energy.ok).toBe(true)
+    // The rating each zone needs at 50/40, stated: no unmet hours anywhere, and nothing short.
+    const need = em.zones.map((z) => z.needed_rated_w! * (1 + 1e-9))
+    const r2 = simulate(await withRads((zi) => need[zi]), { weather: WEATHER })
+    if (!r2.ok) throw new Error(JSON.stringify(r2.missing))
+    for (const z of r2.summary.emitters!.zones) { expect(z.unmet_hours).toBe(0); expect(z.shortfall_w).toBe(0) }
+  })
+  it('a what-if that cannot run says why, and the run itself still shows', async () => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 50; hp.design_return_c = 40
+    d.zones[0].emitters = [{ id: 'r', kind: 'radiator', count: 1, rated_output_w: 20000, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 }]
+    const r = simulate(d, { weather: WEATHER, what_if: { design_flow_c: 30, design_return_c: 20 } })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.emitters!.zones).toHaveLength(1)
+    const wi = r.summary.emitters!.what_if!
+    expect(wi.ok).toBe(false)
+    if (!wi.ok) expect(wi.missing[0].what).toBe(`The heating system "${hp.label}": the return (20 °C) must be above Storey 1's heating setpoint (21 °C), and the flow at or above the return.`)
+    const n = await doc()
+    const hn = n.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    n.zones[1].emitters = [{ id: 'r', kind: 'radiator', count: null, rated_output_w: 1000, radiant_fraction: 0.3, system_group_id: hn.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 }]
+    const rn = simulate(n, { weather: WEATHER })
+    expect(rn.ok ? [] : rn.missing.map((m) => m.what)).toEqual(['Set how many there are for the emitter "r" in "Storey 2".'])
+    n.zones[1].emitters[0].count = 1
+    const rc = simulate(n, { weather: WEATHER })
+    expect(rc.ok ? [] : rc.missing.map((m) => m.what)).toEqual([`Set the flow temperature its emitters run at for the heating system "${hn.label}".`])
+    d.zones[0].emitters = [{ id: 'e', kind: 'electric', count: 4, rated_output_w: 2000, radiant_fraction: 0.5, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    hp.design_flow_c = null; hp.design_return_c = null
+    const e = simulate(d, { weather: WEATHER, what_if: { design_flow_c: 70, design_return_c: 60 } })
+    if (!e.ok) throw new Error(JSON.stringify(e.missing))
+    expect(e.summary.emitters!.zones[0].note).toMatch(/fixed-output/)
+    expect(e.summary.emitters!.what_if).toEqual({ ok: false, flow_c: 70, return_c: 60, missing: [{ path: 'system_groups', what: expect.stringMatching(/^No heating system states flow and return/) }] })
   })
   it('what the engine refuses comes back named, in words', async () => {
     const d = await doc()

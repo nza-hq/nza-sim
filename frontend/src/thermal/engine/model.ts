@@ -48,6 +48,12 @@ export interface RunOptions {
    */
   ventilation?: 'none' | 'document'
   /**
+   * Brief 108 Part 4, the sizing run. 'none': each zone keeps its emitters' radiant share but their output is not
+   * limited, so its peak heating is what its emitters would need to give to hold the setpoint every hour. Absent or
+   * 'cap': heating is limited to the emitters' output (Part 2).
+   */
+  emitter_limit?: 'cap' | 'none'
+  /**
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
    * - outside_convection 'wind': h_ce = 4 + 4·v (ISO 6946:2017 Annex C) from the weather's hourly wind speed.
@@ -390,7 +396,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     if (e instanceof EmitterError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
     throw e
   }
-  const capOf = (zi: number) => emit[zi]?.cap_w ?? null
+  const capOf = (zi: number) => (options.emitter_limit === 'none' ? null : emit[zi]?.cap_w ?? null)
   const hcfHeatOf = (zi: number) => (emit[zi] ? 1 - emit[zi]!.radiant_fraction : null)
   const gainsIn = (zi: number) => {
     const g = gains[zi]
