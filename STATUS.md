@@ -14,9 +14,9 @@ Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md)
   - Each wet emitter names its heating system; electric emitters have a fixed output; the rating is taken at the heating setpoint.
 - **P1 schema 2.4** ([`01_schema.md`](docs/audit/108/01_schema.md)): `zones[].emitters[]` (six kinds, each with its count, output and radiant share; wet kinds name their heating system and EN 442 rating); `design_flow_c`/`design_return_c` on heating groups. The 2.3 → 2.4 upgrade adds empty lists and fills nothing; the seam runs 2.3 through it and still refuses 2.2. 177 tests pass.
 
-## 🟡 Brief 107 — Simulate v2 Engine 4: systems by zone group — IN PROGRESS on `chris/107-systems` (stacked on 106)
+## ✅ Brief 107 — Simulate v2 Engine 4: systems by zone group — CLOSED 15 Nov 2026 on `chris/107-systems` (stacked on 106; PR open, awaiting Linzie)
 
-Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
+Brief [`docs/briefs/archive/107_systems_COMPLETED.md`](docs/briefs/archive/107_systems_COMPLETED.md).
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/107/00_reconnaissance.md)): today's 133.2 decomposed by end use. Electricity 404.144 MWh is heating 37.657 + cooling 30.8 + hot water heat pump 41.174 + pump 1.051 + fans 40.613 + lighting 39.014 + small power 186.136 + auxiliary 27.699; gas 157.428 is the hot water boiler. Every input is in the converted document.
 - **P1 systems** ([`01_systems.md`](docs/audit/107/01_systems.md)): `engine/systems.ts`. Each group's draw from the zones' demand (proportional split, scalar efficiencies), hot water tap-mix per zone, the pump, fans by schedule, and lighting, small power and auxiliary from the gains' electricity. Today's fallbacks are refusals. Served equals demand and the end uses sum to the totals by fuel (tested by hand).
@@ -26,6 +26,8 @@ Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
   - Engine 2's demand is within −3.9 / +9.3 % of EnergyPlus; today's is −13.8 / +61 %.
 - **P3 tolerance table** ([`03_tolerances.md`](docs/audit/107/03_tolerances.md)): heating and cooling electricity −3.9 / +9.3 % (±10 %, pass), EUI 131.89 against 131.86 (pass). Hot water, fans, lighting, small power and auxiliary are shared inputs, equal by construction, and say so.
 - **P4 panel** ([`04_panel.md`](docs/audit/107/04_panel.md)): "Energy used" with EUI, fuels, end uses and each system's served and used energy; missing systems inputs named while demand still shows. Browser-checked on the editor's plan (46 kWh/m²).
+- **Independent review** ([`05_independent_review.md`](docs/audit/107/05_independent_review.md)) and **response** ([`06_review_response.md`](docs/audit/107/06_review_response.md)): no tuning, Rule 11 clean. F1 hot water now refused where a zone with use has no system; F2 served is checked against the model's demand (throws, as closure does; mutation M3 now caught); F3–F9 fixed or stated (unused inputs listed on the panel). Gate unchanged; 176 tests pass; browser-checked (`06_panel.png`).
+- **P5 close** ([`07_final_report.md`](docs/audit/107/07_final_report.md)): brief archived; design note Rev A.9. Next: Brief 108, emitters per room.
 
 ## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
 
