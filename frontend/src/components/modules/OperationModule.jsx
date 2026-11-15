@@ -351,7 +351,7 @@ export default function OperationModule() {
         <NavLink to="/project" className="text-xxs text-mid-grey hover:text-navy transition-colors">
           ← Overview
         </NavLink>
-        <p className="text-caption font-medium mt-0.5" style={{ color: ACCENT }}>Operation</p>
+        <p className="text-heading font-medium mt-0.5" style={{ color: ACCENT }}>Operation</p>
         <p className="text-xxs text-mid-grey">
           Operable openings — doors, windows, vents — each with its own
           control mode (always / scheduled / temperature) and physics. The

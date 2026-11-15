@@ -297,7 +297,7 @@ function InputsColumn({ library, openSection, setOpenSection, librarySchedules =
         <NavLink to="/project" className="text-xxs text-mid-grey hover:text-navy transition-colors">
           ← Overview
         </NavLink>
-        <p className="text-caption font-medium mt-0.5" style={{ color: '#00AEEF' }}>Systems</p>
+        <p className="text-heading font-medium mt-0.5" style={{ color: '#00AEEF' }}>Systems</p>
         <p className="text-xxs text-mid-grey">Assign systems to each energy demand</p>
       </div>
 

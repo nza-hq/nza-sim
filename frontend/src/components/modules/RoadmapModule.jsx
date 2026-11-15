@@ -178,7 +178,7 @@ export default function RoadmapModule() {
       <div className="flex-shrink-0 bg-white border-b border-light-grey px-6 pt-3 pb-3"
            style={{ borderTopWidth: '3px', borderTopColor: ACCENT, borderTopStyle: 'solid' }}>
         <NavLink to="/project" className="text-xxs text-mid-grey hover:text-navy">← Overview</NavLink>
-        <p className="text-caption font-medium mt-0.5" style={{ color: ACCENT }}>Retrofit Roadmap</p>
+        <p className="text-heading font-medium mt-0.5" style={{ color: ACCENT }}>Retrofit Roadmap</p>
         <p className="text-xxs text-mid-grey">
           Sequenced intervention surface against the UK grid decarbonisation
           trajectory. Each intervention's contribution is computed by leave-one-out
