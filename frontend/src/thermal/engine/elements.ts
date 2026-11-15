@@ -90,7 +90,8 @@ export interface Element {
   kind: ElementKind
   area_m2: number
   tilt_deg: number
-  boundary: 'outside' | 'ground'
+  /** 'zone': both ends are inside surfaces (between two zones, or internal mass); see `innerElement` (Brief 104). */
+  boundary: 'outside' | 'ground' | 'zone'
   /** The stated U the element carries (ISO 6946 films), W/m²K: the conductance reported as H = U·A. */
   u_w_per_m2k: number
   c: Float64Array
@@ -112,6 +113,35 @@ export interface Element {
    * all the solar that reaches it (ISO 52016-1's simplification).
    */
   interior_solar?: { transmitted: number; absorbed: number }
+  /** 'zone' elements only: node 0 is the second inside surface (zone_b's), with this convective coefficient and tilt. */
+  h_ci_b?: number
+  tilt_b_deg?: number
+}
+
+/**
+ * An element with an inside surface at both ends (Brief 104 decisions 2 and 3): a partition, floor or ceiling between
+ * two zones, or internal mass within one. Node 0 is the zone_b face (the construction's first layer), the last node
+ * the zone_a face. Masses split half to each side of every segment, as for an opaque element. No stated U: the
+ * layers are the construction (a library's published U is a whole-element figure with outside films). `u_w_per_m2k`
+ * is the ISO 6946 value with inside films on both faces, reported only.
+ */
+export function innerElement(args: { id: string; area_m2: number; tilt_deg: number; layers: Layer[]; path: string }): Element {
+  const { id, area_m2, tilt_deg, path } = args
+  if (!(area_m2 > 0)) throw new ElementError('area must be > 0', `${path}.area_m2`)
+  const segs = layerSegments(args.layers, path)
+  if (segs.length === 0) throw new ElementError('an element needs at least one layer', `${path}.layers`)
+  for (const sg of segs) if (!(sg.r > 0)) throw new ElementError('every layer needs a resistance > 0', `${path}.layers[${sg.layer}]`)
+  const tilt_b = 180 - tilt_deg
+  const film = (t: number) => { const d = heatFlowDirection(t); return d === 'upward' ? K.R_si_upward : d === 'downward' ? K.R_si_downward : K.R_si_horizontal }
+  const hci = (t: number) => { const d = heatFlowDirection(t); return d === 'upward' ? K.h_ci_upward : d === 'downward' ? K.h_ci_downward : K.h_ci_horizontal }
+  const cs = segs.map((sg) => sg.c)
+  return {
+    id, kind: 'opaque', area_m2, tilt_deg, boundary: 'zone',
+    u_w_per_m2k: 1 / (film(tilt_deg) + segs.reduce((t, sg) => t + sg.r, 0) + film(tilt_b)),
+    c: Float64Array.from({ length: segs.length + 1 }, (_, i) => ((cs[i - 1] ?? 0) + (cs[i] ?? 0)) / 2),
+    g: Float64Array.from(segs.map((sg) => 1 / sg.r)), g_boundary: 0, h_re: 0, f_sky: 0,
+    h_ci: hci(tilt_deg), h_ci_b: hci(tilt_b), tilt_b_deg: tilt_b,
+  }
 }
 
 /** Builds an opaque element from its layers, resized to the stated U when there is one. */
