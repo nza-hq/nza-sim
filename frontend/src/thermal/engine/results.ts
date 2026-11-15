@@ -14,7 +14,11 @@ export interface BreakdownLine {
     | 'glazing_solar_absorbed' | 'solar_lost_through_glazing'
     /** Heat into this zone from another through the element they share (Brief 104); the two zones' lines cancel. */
     | 'interzone'
+    /** Internal gains from the document's profiles, one line per profile the zone refers to (Brief 105 Part 2). */
+    | 'occupancy_gains' | 'lighting_gains' | 'equipment_gains' | 'auxiliary_gains'
   surface_id: string | null
+  /** The profile a gains line comes from. */
+  profile_id?: string
   kwh: number
 }
 

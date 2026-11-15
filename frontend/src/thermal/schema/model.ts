@@ -275,8 +275,11 @@ export const Zone = z
     /** Storey height. */
     height_m: finite.positive(),
     use_type: z.string().min(1),
-    /** Rooms in the zone (hotel bedrooms), for per-room occupancy. */
-    rooms: z.number().int().nonnegative().nullable(),
+    /**
+     * Rooms in the zone (hotel bedrooms), for per-room occupancy. Schema 2.3: may be a share (not a whole number) when
+     * a building's count is divided among zones, as the per-storey converter divides it.
+     */
+    rooms: nonNeg.nullable(),
     profile_refs: z
       .object({
         occupancy: id.nullable(),

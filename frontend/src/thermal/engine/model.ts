@@ -19,6 +19,7 @@ import { simpleGlazingAngular, simpleGlazingOptics } from './glazing'
 import type { Weather } from './types'
 import { runZone } from './zone'
 import type { ModelDocument } from '../schema/model'
+import { GainsError, zoneGains, type ZoneGains } from './gains'
 
 export class ModelError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'ModelError' }
@@ -30,8 +31,14 @@ export interface RunOptions {
   warmup_days: number
   /** Albedo is a run option until the document carries it (today's engine: 0.2). */
   solar: SolarOptions
-  /** Reference cases only (BESTEST's fixed gain); internal gains from profiles arrive in Brief 105. */
+  /** Reference cases only (BESTEST's fixed gain), one zone. Internal gains from the document are `internal_gains`. */
   other_gains: { w: ArrayLike<number>; convective_fraction: number } | null
+  /**
+   * Internal gains (Brief 105 Part 2). 'profiles': each zone's gains from the document profiles it refers to
+   * (gains.ts), on both solvers. Absent or 'none': no internal gains, the Building module's envelope-only state, as
+   * Briefs 103 and 104 ran.
+   */
+  internal_gains?: 'none' | 'profiles'
   /**
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
@@ -324,6 +331,22 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     return { volume, inf, ventH, Hve, bridging }
   })
 
+  // Internal gains per zone (Brief 105 Part 2).
+  let gains: (ZoneGains | null)[] = doc.zones.map(() => null)
+  if (options.internal_gains === 'profiles') {
+    if (options.other_gains) throw new ModelError('give internal gains from the document or reference-case other gains, not both', 'options.other_gains')
+    try { gains = zoneGains(doc, weather.hours) } catch (e) {
+      if (e instanceof GainsError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
+      throw e
+    }
+  } else if (options.internal_gains != null && options.internal_gains !== 'none') {
+    throw new ModelError(`unknown value ${JSON.stringify(options.internal_gains)} ('none' or 'profiles')`, 'options.internal_gains')
+  }
+  const gainsIn = (zi: number) => {
+    const g = gains[zi]
+    return g ? { w: g.total_w, convective_fraction: g.convective_fraction } : null
+  }
+
   const kwhOf = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
   let solved: Solved[]
   let solver: ModelResults['solver']
@@ -334,7 +357,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       bridging_w_per_k: a.bridging.total_w_per_k, hours: H, theta_e: weather.hours.dry_bulb, theta_ground: tg,
       ventilation_w_per_k: a.Hve, solar_absorbed_w_per_m2: absorbed, solar_transmitted_w: Z.solarTransmitted,
       inside_solar_absorptance: insideAlpha, solar_convective_fraction: options.solar_convective_fraction,
-      other_gains: options.other_gains, setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
+      other_gains: options.other_gains ?? gainsIn(0), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
       control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
       warmup_days: options.warmup_days,
       h_ce_w_per_m2k: sp?.outside_convection === 'wind' ? Float64Array.from(weather.hours.wind_speed, (v) => K.h_ce_wind_a + K.h_ce_wind_b * Math.max(0, v)) : null,
@@ -361,7 +384,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         air_capacity_j_per_k: K.rho_c_air * air[zi].volume + zone.internal_heat_capacity_j_per_k_m2 * zone.area_m2,
         bridging_w_per_k: air[zi].bridging.total_w_per_k, ventilation_w_per_k: air[zi].Hve,
         solar_transmitted_w: built.zones[zi].solarTransmitted, solar_beam_w: sp?.beam_on_floor ? built.zones[zi].solarBeam : null,
-        other_gains: null, setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
+        other_gains: gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
       })),
       elements: elements.map((element, k) => ({
@@ -425,6 +448,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     for (const t of Z.transmittedBySurface) lines.push({ term: 'solar_transmitted', surface_id: t.id, kwh: kwh(t.w) })
     if (options.glazing_solar === 'optical') lines.push({ term: 'solar_lost_through_glazing', surface_id: null, kwh: kwh(run.solar_lost_w) })
     if (options.other_gains) lines.push({ term: 'other_gains', surface_id: null, kwh: kwh(run.other_gains_w) })
+    // One line per gain profile (Rule 9): their sum is the gain the solver took (the closure checks the integrand).
+    for (const g of gains[zi]?.gains ?? []) lines.push({ term: `${g.kind}_gains`, surface_id: null, profile_id: g.profile_id, kwh: kwh(g.w) })
     lines.push({ term: 'storage', surface_id: null, kwh: -kwh(run.storage_w) })
 
     let mn = Infinity, mx = -Infinity, mean = 0, maxClosure = 0

@@ -551,9 +551,8 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
  * The single-zone document split into one zone per storey (Brief 104 decision 4). Areas are divided evenly: every
  * storey of today's box is the same. Zone `z1` is the ground storey.
  *
- * Whole-building items that today's inputs do not give per storey stay on z1 and are not divided: the zone's
- * mechanical ventilation entries and its room count. Engine 2 reads neither (they are Brief 105's); the document
- * keeps them rather than dropping or inventing a split.
+ * The room count is divided evenly too (Brief 105 Part 2, schema 2.3), so per-room gains add up to the building's.
+ * The zone's mechanical ventilation entries stay on z1 and are not divided (Brief 105 Part 3 decides their split).
  */
 function perStorey(single: Obj, g: { storeys: number; area_m2: number; interior_key: string }): Obj {
   const N = g.storeys
@@ -562,7 +561,7 @@ function perStorey(single: Obj, g: { storeys: number; area_m2: number; interior_
   const ids = Array.from({ length: N }, (_, i) => `z${i + 1}`)
   const zones: Obj[] = ids.map((id, i) => ({
     ...structuredClone(z0), id, name: `Storey ${i + 1}`, floor: i, storeys: 1, area_m2: g.area_m2,
-    ventilation: i === 0 ? structuredClone(z0.ventilation) : [], rooms: i === 0 ? z0.rooms : null, surfaces: [] as string[],
+    ventilation: i === 0 ? structuredClone(z0.ventilation) : [], rooms: z0.rooms == null ? null : z0.rooms / N, surfaces: [] as string[],
   }))
   const surfaces: Obj[] = []
   const put = (s: Obj, zone: number) => { surfaces.push(s); (zones[zone].surfaces as string[]).push(s.id as string) }

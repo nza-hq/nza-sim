@@ -2,6 +2,25 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 105 — Simulate v2: the drawn building runs — IN PROGRESS on `chris/105-editor-engine`
+
+Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-engine.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/105/00_reconnaissance.md)):
+  - The editor's documents run on Engine 2 once their nulls are filled.
+  - Library constructions carry layers as epJSON, so Part 4 converts them.
+  - No EPW is committed, because Climate.OneBuilding states no open licence. Weather will come from a private bucket.
+- **P1 schema 2.3** ([`01_schema.md`](docs/audit/105/01_schema.md)):
+  - Gains stay on the document's profiles (Rule 11), so there is no `zones[].gains`.
+  - `radiant_fraction` is added to each gain profile.
+  - The 2.2 upgrade and the converter write today's `computeHourlyGains` fallbacks and today's 0.3 split.
+- **P2 internal gains** ([`02_gains.md`](docs/audit/105/02_gains.md)):
+  - `engine/gains.ts` equals today's `computeHourlyGains` hour by hour (< 1e-9 W).
+  - Gains run on both solvers when `internal_gains: 'profiles'` is set, with one breakdown line per profile.
+  - With gains, Bridgewater's five storeys give cooling 228.65 MWh against EnergyPlus's 223.68 (+2.2 %), each storey within ±8 %. Neither needs heating.
+  - The brief's gate, with gains and ventilation together, comes in P3.
+  - The per-storey converter now divides rooms evenly; `rooms` may be a share.
+
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 
 Brief [`docs/briefs/archive/104_engine-2_COMPLETED.md`](docs/briefs/archive/104_engine-2_COMPLETED.md). Multi-zone, starting from the open
