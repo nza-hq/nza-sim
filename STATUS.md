@@ -2,6 +2,12 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — IN PROGRESS on `chris/106-zone-breakdown`
+
+Brief [`docs/briefs/active/106_zone-breakdown.md`](docs/briefs/active/106_zone-breakdown.md). Carries Brief 105 review F3 and F6. Run seam and panel only.
+
+- **P1 pins** ([`01_pins.md`](docs/audit/106/01_pins.md)): a construction the document does not pin is refused and named, not run on whatever the library holds. The editor already pins every construction it uses (all 16 hashes match).
+
 ## ✅ Brief 105 — Simulate v2: the drawn building runs — CLOSED 15 Nov 2026 on `chris/105-editor-engine` (PR open, awaiting Linzie)
 
 Brief [`docs/briefs/archive/105_editor-engine_COMPLETED.md`](docs/briefs/archive/105_editor-engine_COMPLETED.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).

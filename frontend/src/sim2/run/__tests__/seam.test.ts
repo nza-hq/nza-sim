@@ -83,6 +83,7 @@ describe('simulate', () => {
     // Two storeys joined by an internal wall of the draft construction (each storey's share of a 30 m² wall).
     d.surfaces.push({ ...structuredClone(d.surfaces.find((s: any) => s.kind === 'ceiling')), id: 'iw', kind: 'partition', tilt_deg: 90, area_m2: 30, construction_ref: { key: draft.key } })
     d.zones[0].surfaces.push('iw'); d.zones[1].surfaces.push('iw')
+    d.library_refs.push({ kind: 'construction', key: draft.key, version: null, body_hash: draft.body_hash })
     const r = simulate(d, { weather: WEATHER })
     if (!r.ok) throw new Error(JSON.stringify(r.missing))
     expect(r.summary.drafts).toEqual([draft.draft])
