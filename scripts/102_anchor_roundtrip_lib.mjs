@@ -21,7 +21,7 @@ import { fromBuildingConfig } from '../frontend/src/thermal/schema/fromBuildingC
 import { canonicalJSON, sha256Hex } from '../frontend/src/thermal/schema/canonical.ts'
 import { libraryHash, modelHash, weatherHash } from '../frontend/src/thermal/schema/hash.ts'
 import {
-  ensureBuilding, ensureProject, INSTANT_ENGINE_VERSION, INSTANT_SOURCE, instantSummary, recordRun, saveModelVersion,
+  ensureLocalBuilding, INSTANT_ENGINE_VERSION, INSTANT_SOURCE, instantSummary, recordRun, saveModelVersion,
 } from '../frontend/src/thermal/store/versions.ts'
 
 export const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -103,8 +103,18 @@ export async function runAnchorEngine() {
     { comfortBand, _skipInterventions: true, engine: 'v2.5' })
 }
 
-/** The anchor building in this organisation, or null. */
+/** The anchor's stable local id (Brief 103 P1, QA M4): buildings are found by it, never by name. */
+export const LOCAL_REF = 'fixture:bridgewater_anchor_v2'
+
+/** The anchor building in this organisation, or null (by its local id; by name only for a pre-0005 row). */
 export async function findBuilding(sb, orgId) {
+  const byRef = await sb.from('projects').select('id').eq('org_id', orgId).eq('local_ref', LOCAL_REF)
+  if (byRef.error) throw byRef.error
+  for (const p of byRef.data) {
+    const { data: b, error: e2 } = await sb.from('buildings').select('id').eq('project_id', p.id).eq('local_ref', LOCAL_REF).limit(1)
+    if (e2) throw e2
+    if (b.length) return b[0].id
+  }
   const { data: projects, error } = await sb.from('projects').select('id').eq('org_id', orgId).eq('name', NAME)
   if (error) throw error
   for (const p of projects) {
@@ -117,7 +127,7 @@ export async function findBuilding(sb, orgId) {
 
 /** Saves the fixture's version and records its run (both idempotent). */
 export async function recordAnchor(sb, orgId) {
-  const buildingId = (await findBuilding(sb, orgId)) ?? await ensureBuilding(sb, await ensureProject(sb, orgId, NAME), NAME)
+  const buildingId = await ensureLocalBuilding(sb, orgId, LOCAL_REF, NAME)
   const version = await saveModelVersion(sb, buildingId, await convert(buildingId), 'Brief 102a P5: frozen Bridgewater anchor fixture')
   const runId = await recordRun(sb, version.id, {}, instantSummary(await runAnchorEngine()), INSTANT_ENGINE_VERSION, INSTANT_SOURCE)
   return { buildingId, version, runId }

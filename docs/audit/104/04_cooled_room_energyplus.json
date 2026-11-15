@@ -1,0 +1,73 @@
+{
+ "source": "validation/energyplus/104_cooled_room.py",
+ "spec": "validation/energyplus/104_cooled_room_spec.json",
+ "spec_sha256": "3a3f7c4af45fb9070e45d21ad0c4defe7e78e45d29f6196cf175e538af62725f",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "runs": {
+  "base": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.6938508923602034,
+     "cool_mwh": 0.0,
+     "transmitted_solar_mwh": 1.8222892309056842,
+     "partition_inside_face_conduction_mwh": -0.12630388013340507,
+     "min_c": 19.999999999999993,
+     "max_c": 31.888031284987832,
+     "mean_c": 22.882687420522508
+    },
+    "middle": {
+     "heat_mwh": 0.0,
+     "cool_mwh": 1.368816129968874,
+     "transmitted_solar_mwh": 3.6445784618113684,
+     "partition_inside_face_conduction_mwh": 0.2740573807094034,
+     "min_c": 7.223003016920067,
+     "max_c": 24.000000000000007,
+     "mean_c": 20.64723251940114
+    },
+    "east": {
+     "heat_mwh": 1.6860867165460258,
+     "cool_mwh": 0.0,
+     "transmitted_solar_mwh": 1.8222892309056842,
+     "partition_inside_face_conduction_mwh": -0.1448431809554435,
+     "min_c": 19.999999999999993,
+     "max_c": 32.1423109816878,
+     "mean_c": 22.954372741814282
+    }
+   }
+  },
+  "iso_conv": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.933197794339537,
+     "cool_mwh": 0.0,
+     "transmitted_solar_mwh": 1.8222892309056842,
+     "partition_inside_face_conduction_mwh": -0.17764375055921966,
+     "min_c": 19.999999999999993,
+     "max_c": 31.061650396293317,
+     "mean_c": 22.652824567096886
+    },
+    "middle": {
+     "heat_mwh": 0.0,
+     "cool_mwh": 1.3479596695031897,
+     "transmitted_solar_mwh": 3.6445784618113684,
+     "partition_inside_face_conduction_mwh": 0.36523692052552525,
+     "min_c": 7.500007625682045,
+     "max_c": 24.000000000000007,
+     "mean_c": 20.64672845158435
+    },
+    "east": {
+     "heat_mwh": 1.9301608327763349,
+     "cool_mwh": 0.0,
+     "transmitted_solar_mwh": 1.8222892309056842,
+     "partition_inside_face_conduction_mwh": -0.18462099785696656,
+     "min_c": 19.999999999999993,
+     "max_c": 31.184657089829344,
+     "mean_c": 22.680043156133852
+    }
+   }
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c"
+}

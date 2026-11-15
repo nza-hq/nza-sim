@@ -9,6 +9,9 @@
  * surfaces (WWR), a roof and a ground floor; vents and openings on their wall; profiles carried whole and referred
  * to by id; v40 systems become system groups over the one zone, v40 ventilation becomes the zone's ventilation.
  *
+ * Brief 104 Part 2: with `{ zoning: 'per_storey' }` the same document is split into one zone per storey, joined by
+ * the interior floor construction today's EnergyPlus path uses (see `perStorey`).
+ *
  * No defaults, no invention: a field the engine needs that is missing fails with its path, and any shape this
  * converter does not know (an unknown key on a system, a v25-only service, first-class operable openings) throws
  * rather than being dropped or guessed.
@@ -17,6 +20,7 @@
  */
 import { canonicalJSON, sha256Hex } from './canonical'
 import { FACADES, ModelDocument, SCHEMA_VERSION } from './model'
+import { TODAY } from './upgrade'
 import type { LibraryRef } from './model'
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
@@ -49,7 +53,17 @@ export interface TraceEntry {
 
 export interface Conversion {
   document: ModelDocument
+  /** Input paths consumed, with their place in the single-zone document (per-storey documents are derived from it). */
   trace: TraceEntry[]
+}
+
+export interface ConverterOptions {
+  /**
+   * 'single' (default): one zone spanning every storey, as today. 'per_storey' (Brief 104 decision 4): one zone per
+   * storey, joined by the interior floor construction today's EnergyPlus path uses; walls, glazing and vents split
+   * evenly by storey; the roof on the top zone and the ground on the bottom one.
+   */
+  zoning?: 'single' | 'per_storey'
 }
 
 export class ConversionError extends Error {
@@ -145,7 +159,9 @@ const VENT_KEYS = ['id', 'label', 'enabled', 'share_pct', 'efficiency_metric', '
 const VENT_DROPPED = ['notes', 'service', 'source', 'capacity_kw']
 const V25_VENT_KEYS = ['name', 'library_id', 'enabled', 'hre_enabled', 'flow_l_s', 'sfp_w_per_l_s', 'hre', 'hours', 'schedule_ref', 'summer_bypass']
 
-export async function fromBuildingConfig(input: ConverterInput): Promise<Conversion> {
+export async function fromBuildingConfig(input: ConverterInput, options: ConverterOptions = {}): Promise<Conversion> {
+  const zoning = options.zoning ?? 'single'
+  if (zoning !== 'single' && zoning !== 'per_storey') throw new ConversionError(`unknown zoning "${String(zoning)}"`, 'options.zoning')
   const bc = input.building_config
   if (!isObj(bc)) throw new ConversionError('building_config is not an object', 'building_config')
   const src = new Source({
@@ -228,6 +244,12 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
         const o: Obj = { kind, ...main }
         if (facadeOpen.cd !== undefined) o.cd = src.take(`${op}.cd`, `surfaces[${wallIdx}].openings[${i}].cd`)
         if (facadeOpen.flow_mode !== undefined) o.flow_mode = src.take(`${op}.flow_mode`, `surfaces[${wallIdx}].openings[${i}].flow_mode`)
+        // Schema 2.1: a permanent vent states its cd and flow mode. Where the project leaves them out, write what today's
+        // engine resolves to (building-wide value, else resolveCd 0.25 / resolveFlowMode 'single_sided').
+        if (kind === 'permanent_vent') {
+          o.cd ??= openingDefaults.cd ?? TODAY.vent_cd
+          o.flow_mode ??= openingDefaults.flow_mode ?? TODAY.vent_flow_mode
+        }
         openings.push(o)
       }
       if (facadeOpen.louvre_area_m2 !== undefined) {
@@ -244,11 +266,15 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
       id: `wall_${f}`, kind: 'wall', zone_a: ZONE_ID, zone_b: 'outside', facade: f,
       area_m2: gross * (1 - wwr), azimuth_deg: azimuth, tilt_deg: 90,
       construction_ref: wallRef, g_value: null, openings,
+      solar_absorptance: TODAY.wall_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: null,
+      inside_solar_absorptance: TODAY.inside_solar_absorptance, inside_solar_absorptance_b: null, faces_up: null,
     })
     const glazing: Obj = {
       id: `glazing_${f}`, kind: 'glazing', zone_a: ZONE_ID, zone_b: 'outside', facade: f,
       area_m2: gross * wwr, azimuth_deg: azimuth, tilt_deg: 90,
       construction_ref: glazingRef, g_value: null, wwr, openings: [],
+      solar_absorptance: null, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: TODAY.frame_fraction,
+      inside_solar_absorptance: null, inside_solar_absorptance_b: null, faces_up: null,
     }
     const wc = src.take(`${B}.window_count.${f}`, `surfaces[${glzIdx}].window_count`)
     if (wc !== undefined) glazing.window_count = wc
@@ -264,12 +290,16 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     id: 'roof', kind: 'roof', zone_a: ZONE_ID, zone_b: 'outside', facade: null,
     area_m2: length * width, azimuth_deg: null, tilt_deg: 0,
     construction_ref: await constructionRef('roof', `surfaces[${roofIdx}]`), g_value: null, openings: [],
+    solar_absorptance: TODAY.roof_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: null,
+    inside_solar_absorptance: TODAY.inside_solar_absorptance, inside_solar_absorptance_b: null, faces_up: null,
   })
   const groundIdx = surfaces.length
   surfaces.push({
     id: 'ground', kind: 'ground', zone_a: ZONE_ID, zone_b: 'ground', facade: null,
     area_m2: length * width, azimuth_deg: null, tilt_deg: 180,
     construction_ref: await constructionRef('ground_floor', `surfaces[${groundIdx}]`), g_value: null, openings: [],
+    solar_absorptance: null, thermal_emissivity: null, frame_fraction: null,
+    inside_solar_absorptance: TODAY.inside_solar_absorptance, inside_solar_absorptance_b: null, faces_up: null,
   })
 
   // ── Profiles ───────────────────────────────────────────────────────────────────────────────
@@ -446,6 +476,7 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     ventilation,
     infiltration_q50: src.take(`${B}.fabric.air_permeability_q50`, 'zones[0].infiltration_q50') ?? null,
     infiltration_ach: src.take(`${B}.infiltration_ach`, 'zones[0].infiltration_ach') ?? null,
+    internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2,
     surfaces: surfaces.map((s) => s.id as string),
   }
   const location = src.get(`${B}.location`)
@@ -458,12 +489,15 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
       lon: isObj(location) && location.longitude !== undefined ? src.take(`${B}.location.longitude`, 'building.site.lon') : null,
       name: isObj(location) && location.name !== undefined ? src.take(`${B}.location.name`, 'building.site.name') : null,
       exposure: src.take(`${B}.openings.site_exposure`, 'building.site.exposure') ?? null,
+      ground: { method: 'annual_mean_outdoor' as const },
     },
     orientation_deg: orientation,
     reported_floor_area_m2: src.take(`${B}.reported_gia`, 'building.reported_floor_area_m2') ?? null,
     thermal_bridging: {
       mode: src.take(`${B}.thermal_bridges.mode`, 'building.thermal_bridging.mode') ?? null,
-      multiplier: src.take(`${B}.thermal_bridges.multiplier`, 'building.thermal_bridging.multiplier') ?? null,
+      // Today's auto mode reads a missing multiplier as 1 (thermalBridges.js 182); the document states it.
+      multiplier: src.take(`${B}.thermal_bridges.multiplier`, 'building.thermal_bridging.multiplier')
+        ?? (src.get(`${B}.thermal_bridges.mode`) === 'iso14683_auto' ? TODAY.bridging_multiplier : null),
       alpha_pct: src.take(`${B}.fabric.thermal_bridging_alpha_pct`, 'building.thermal_bridging.alpha_pct') ?? null,
     },
     thermal_mass: {
@@ -480,7 +514,7 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     ? { kind: 'epw' as const, station_id: /\.(\d{6})_/.exec(w.file_name)?.[1] ?? null, file_name: w.file_name, file_hash: w.file_hash }
     : { kind: 'legacy' as const, id: w.file_name }
 
-  const draft = {
+  let draft: Obj = {
     schema_version: SCHEMA_VERSION,
     building,
     zones: [zone],
@@ -491,10 +525,71 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     weather_ref,
     library_refs: libraryRefs,
   }
+  if (zoning === 'per_storey') {
+    const key = TODAY.interior_floor_construction
+    const item = input.library_constructions.find((c) => c?.name === key)
+    if (!item) throw new ConversionError(`per-storey zoning needs the interior floor construction "${key}" in the library`, 'library_constructions')
+    if (!libraryRefs.some((r) => r.kind === 'construction' && r.key === key)) {
+      const body = isObj(item.config_json) ? item.config_json : item
+      libraryRefs.push({ kind: 'construction', key, version: null, body_hash: await sha256Hex(canonicalJSON(body)) })
+    }
+    draft = perStorey(draft, { storeys, area_m2: length * width, interior_key: key })
+  }
   const parsed = ModelDocument.safeParse(draft)
   if (!parsed.success) {
     const first = parsed.error.issues[0]
     throw new ConversionError(`the converted document fails the schema: ${first.message}`, first.path.join('.'))
   }
   return { document: parsed.data, trace: src.trace }
+}
+
+/**
+ * The single-zone document split into one zone per storey (Brief 104 decision 4). Areas are divided evenly: every
+ * storey of today's box is the same. Zone `z1` is the ground storey.
+ *
+ * Whole-building items that today's inputs do not give per storey stay on z1 and are not divided: the zone's
+ * mechanical ventilation entries and its room count. Engine 2 reads neither (they are Brief 105's); the document
+ * keeps them rather than dropping or inventing a split.
+ */
+function perStorey(single: Obj, g: { storeys: number; area_m2: number; interior_key: string }): Obj {
+  const N = g.storeys
+  if (!Number.isInteger(N) || N < 1) throw new ConversionError(`per-storey zoning needs a whole number of storeys, found ${N}`, 'building_config.num_floors')
+  const z0 = (single.zones as Obj[])[0]
+  const ids = Array.from({ length: N }, (_, i) => `z${i + 1}`)
+  const zones: Obj[] = ids.map((id, i) => ({
+    ...structuredClone(z0), id, name: `Storey ${i + 1}`, floor: i, storeys: 1, area_m2: g.area_m2,
+    ventilation: i === 0 ? structuredClone(z0.ventilation) : [], rooms: i === 0 ? z0.rooms : null, surfaces: [] as string[],
+  }))
+  const surfaces: Obj[] = []
+  const put = (s: Obj, zone: number) => { surfaces.push(s); (zones[zone].surfaces as string[]).push(s.id as string) }
+  for (const s of single.surfaces as Obj[]) {
+    if (s.kind === 'wall' || s.kind === 'glazing') {
+      // window_count stays as it is: it counts windows across the facade on each storey (BuildingViewer3D draws that
+      // many per storey), so every storey has the same count.
+      ids.forEach((zid, i) => {
+        const c: Obj = { ...structuredClone(s), id: `${String(s.id)}_${zid}`, zone_a: zid, area_m2: (s.area_m2 as number) / N }
+        c.openings = (s.openings as Obj[]).map((o) => (o.kind === 'permanent_vent' ? { ...o, area_m2: (o.area_m2 as number) / N } : { ...o }))
+        put(c, i)
+      })
+    } else if (s.kind === 'roof') {
+      put({ ...structuredClone(s), zone_a: ids[N - 1] }, N - 1)
+    } else if (s.kind === 'ground') {
+      put({ ...structuredClone(s), zone_a: ids[0] }, 0)
+    } else {
+      throw new ConversionError(`per-storey zoning does not know where a ${String(s.kind)} goes`, `surfaces.${String(s.id)}`)
+    }
+  }
+  // The slab above each storey but the top: that storey's ceiling, the next storey's floor. Layers run from zone_b
+  // (the storey above, first layer) to zone_a, which is the library's order (carpet first).
+  for (let i = 0; i < N - 1; i++) {
+    put({
+      id: `ceiling_${ids[i]}`, kind: 'ceiling', zone_a: ids[i], zone_b: ids[i + 1], facade: null, area_m2: g.area_m2,
+      azimuth_deg: null, tilt_deg: 0, construction_ref: { key: g.interior_key }, g_value: null, openings: [],
+      solar_absorptance: null, thermal_emissivity: null, frame_fraction: null,
+      inside_solar_absorptance: TODAY.inside_solar_absorptance, inside_solar_absorptance_b: TODAY.inside_solar_absorptance, faces_up: null,
+    }, i)
+    ;(zones[i + 1].surfaces as string[]).push(`ceiling_${ids[i]}`)
+  }
+  const systemGroups = (single.system_groups as Obj[]).map((sg) => ({ ...sg, zones: [...ids] }))
+  return { ...single, zones, surfaces, system_groups: systemGroups }
 }

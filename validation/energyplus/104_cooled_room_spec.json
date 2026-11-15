@@ -1,0 +1,22 @@
+{
+ "about": "Brief 104 Part 4 (e): three rooms in a row at Denver, the outer two heated at 20 C, the middle one cooled at 24 C. Read by validation/energyplus/104_cooled_room.py (EnergyPlus) and frontend/src/thermal/engine/__tests__/multizone.test.ts (Engine 2), so both models are built from these inputs. Layers outside first (for the partition: from the west room's side; it is symmetric). Each layer is [thickness m, conductivity W/mK, specific heat J/kgK, density kg/m3]; density 0 is a no-mass layer of resistance thickness/conductivity.",
+ "depth_m": 6.0,
+ "height_m": 2.7,
+ "rooms": [
+  {"id": "west", "x0": 0.0, "x1": 4.0, "heat_c": 20.0, "cool_c": null, "window_width_m": 1.5},
+  {"id": "middle", "x0": 4.0, "x1": 8.0, "heat_c": null, "cool_c": 24.0, "window_width_m": 3.0},
+  {"id": "east", "x0": 8.0, "x1": 12.0, "heat_c": 20.0, "cool_c": null, "window_width_m": 1.5}
+ ],
+ "window": {"height_m": 2.0, "sill_m": 0.2, "u_w_per_m2k": 1.8, "shgc": 0.6},
+ "constructions": {
+  "wall": [[0.009, 0.14, 900, 530], [0.0615, 0.04, 1400, 10], [0.100, 0.51, 1000, 1400]],
+  "roof": [[0.019, 0.14, 900, 530], [0.1118, 0.04, 840, 12], [0.010, 0.16, 840, 950]],
+  "floor": [[1.007, 0.04, 0, 0], [0.080, 1.13, 1000, 1400]],
+  "partition": [[0.012, 0.16, 840, 950], [0.100, 0.51, 1000, 1400], [0.012, 0.16, 840, 950]]
+ },
+ "solar_absorptance": 0.6,
+ "inside_solar_absorptance": 0.6,
+ "thermal_emissivity": 0.9,
+ "infiltration_ach_at_site": 0.5,
+ "infiltration_ach_sea_level_air": 0.414
+}

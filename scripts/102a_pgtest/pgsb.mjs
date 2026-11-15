@@ -17,7 +17,7 @@ export function client(user) {
   return {
     rpc: async (fn, args) => {
       const a = Object.entries(args ?? {}).map(([k, v]) => `${k} => ${lit(v)}`).join(', ')
-      const r = run(`select to_json(public.${fn}(${a}))`)
+      const r = run(`select coalesce(to_json(public.${fn}(${a}))::text, 'null')`)
       if (r.error) return { data: null, error: r.error }
       return { data: JSON.parse(lines(r.out).pop()), error: null }
     },

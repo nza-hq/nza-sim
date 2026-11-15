@@ -1,11 +1,11 @@
 import { REPO, fx, EPW, EPW_SHA, reset, user, org, check, summary, psql } from './common.mjs'
 import { fromBuildingConfig } from '../../frontend/src/thermal/schema/fromBuildingConfig.ts'
 import { canonicalJSON, sha256Hex } from '../../frontend/src/thermal/schema/canonical.ts'
-import { ensureBuilding, ensureProject, saveModelVersion } from '../../frontend/src/thermal/store/versions.ts'
+import { ensureLocalBuilding, saveModelVersion } from '../../frontend/src/thermal/store/versions.ts'
 
 reset()
 const a = await user('a@example.com'); const orgA = await org(a, 'Org A')
-const bld = await ensureBuilding(a.sb, await ensureProject(a.sb, orgA, 'Anchor'), 'Anchor')
+const bld = await ensureLocalBuilding(a.sb, orgA, 'test:anchor', 'Anchor')
 const conv = async () => (await fromBuildingConfig({ building_config: fx.building_config, construction_choices: fx.construction_choices,
   comfort_band: fx.comfort_band, library_constructions: fx.library_constructions, building_id: bld,
   weather: { file_name: EPW, file_hash: EPW_SHA } })).document

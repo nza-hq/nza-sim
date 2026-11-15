@@ -2,6 +2,95 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
+
+Brief [`docs/briefs/archive/104_engine-2_COMPLETED.md`](docs/briefs/archive/104_engine-2_COMPLETED.md). Multi-zone, starting from the open
+Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/104/00_reconnaissance.md)): referee zones and slab (0.528 m²K/W, 485 kJ/m²K); the Bridgewater referee uses FullExterior (103 said FullInteriorAndExterior; beam still on the floor).
+- **P1 cooling gap attributed** ([`01_cooling_gap.md`](docs/audit/104/01_cooling_gap.md)): not the slabs. The main cause is window solar kept — Engine 1 134.6 MWh against EnergyPlus about 122.5 (EnergyPlus loses 9.4 MWh back out through the glass) — 4.39 of the 5.99 MWh between Engine 1 and EnergyPlus-with-Engine-1's-simplifications; solar convective fraction 0.65; remainder 0.95. Slabs about 1 MWh; zone count 0.27; the referee lacked the document's 250 kJ/m²K internal mass (−2.25 MWh in one zone). 103's near-match was net of these. Next: P1b, window solar from the window's optics.
+- **P1b window solar** ([`01b_window_solar.md`](docs/audit/104/01b_window_solar.md)): Engine 1 gets four published methods:
+  - the Simple Window Model's optics and angular curves (as EnergyPlus);
+  - the Perez sky (ISO 52010-1);
+  - inside solar absorptance as a document input, **schema 2.2**, with the upgrades filling today's EnergyPlus value of 0.7;
+  - window losses as a breakdown line.
+
+  `REFEREE_OPTIONS` now uses them, with no solar to the air. The referee states the document's frame (glass and frame sub-windows).
+  - **Same building, same simplifications:** Engine 1 92.90 / 10.56 against EnergyPlus 93.50 / 10.34 (−0.6 % / +2.1 %). It holds at inside absorptance 0.5 and 0.99. Transmitted solar is 110.43 against 110.44.
+  - **Against the five-zone referee r1** (89.35 / 12.88), Engine 1 is +4 % / −18 %. That is because Engine 1's building has no slabs: EnergyPlus gives 89.30 / 10.04 for the same single zone. Part 5 closes it.
+  - **BESTEST re-recorded:** 600 4.574 / 5.510, 900 2.048 / 2.424. Cooling is in range for both; heating is above, as EnergyPlus with the same ISO simplifications is.
+  - **Open:** the no-sun (+4.7) and opaque-solar (−4.6) terms that cancel; the ISO simplifications (+4 % / +5 %).
+- **P2 schema 2.2 zones:**
+  - **What the schema now holds.** `internal_mass` (zone_b = zone_a, `faces_up`, tilt 180 or 90), and surfaces between zones (`partition` / `floor` / `ceiling` with zone_b a zone). Each is listed by both of its zones, and only by them. There are no outside-face fields or openings on them. Their second face's `inside_solar_absorptance_b` is required. Layers run from zone_b's face to zone_a's.
+  - **Per-storey conversion.** `fromBuildingConfig(..., { zoning: 'per_storey' })` gives Bridgewater as five storeys joined by four `ceiling` slabs (`interior_floor_ceiling`, the construction today's EnergyPlus path uses, read from `TODAY`). Walls, glazing and vents are split evenly, with the roof on z5 and the ground on z1. Areas sum to the single-zone document's.
+  - **What stays whole-building.** The ventilation entries and room count stay on z1, undivided. Engine 2 does not read them; splitting them is Brief 105's.
+  - **Single zoning is unchanged.** Its output and hash are as before.
+- **P3 multi-zone solver** (`engine/network.ts`, `runModel`):
+  - **How it solves.** Every zone's air and inside faces form one interface system, factorised once per run. Elements between zones, and internal mass, are condensed onto both their faces. Each zone's hourly ventilation goes in as one rank-Z update (Woodbury). Heating and cooling hold every zone that would leave its band on it together, iterating that set until it is consistent; the passes are recorded.
+  - **Per-zone balance.** Each zone closes every hour (the solver refuses > 1 Wh, or breakdown lines not summing to zero). The new `interzone` line is the heat across each shared element's middle link, so the two zones' lines cancel exactly.
+  - **One builder, two solvers.** `runModel` builds elements once for both paths. A one-zone document with no internal elements still runs on Engine 1's `runZone`: the Bridgewater anchor output is identical to the last digit (checked against the previous commit), and every 103 test passes unchanged. `runZoneModel` now calls `runModel`. The network path refuses the hour-by-hour convection options and the BESTEST-only other gains.
+  - **Bridging per zone.** The roof junction goes to the zone with the roof, the ground junction to the zone with ground, and half of each shared slab's perimeter to each of its zones. The window junction is 4√A per facade over the building, shared by glazing area; per surface it would grow by √N when a facade is cut into N storeys. The zones' junctions sum to the single zone's (tested). `ModelResults` holds the zones only; building totals are read helpers (Rule 11).
+  - **First look, not a gate.** Per-storey Bridgewater on `REFEREE_OPTIONS` gives 91.21 / 14.89 MWh, against the single zone's 92.90 / 10.56 and referee r1's 89.35 / 12.88. Part 5 attributes this. It takes 713 ms, against Part 6's 150 ms budget.
+- **P4 multi-zone gates** ([`04_multizone_gates.md`](docs/audit/104/04_multizone_gates.md)):
+  - **Hand cases.** Two zones and three zones in a row match their hand solutions in steady state. Three uncoupled copies equal the one-zone solver hour by hour. Internal mass follows the hand step recursion exactly.
+  - **Cooled room against EnergyPlus.** The three Denver rooms (outer two heated at 20 °C, middle cooled at 24 °C) built from one shared spec are within ±10 % per room of EnergyPlus with the same surface coefficients: −3.7 %, +4.5 % and −3.5 %. Against EnergyPlus's own convection the heated rooms are +10 %; that is Brief 103's open convection finding, not a multi-zone effect.
+  - **Finding.** Internal mass stores nothing at steady state but raises the steady heating 2.7 %, because it joins the room's long-wave exchange. The brief expected no change. This is recorded, not tuned.
+- **P5 Bridgewater five zones** ([`05_anchor_zones.md`](docs/audit/104/05_anchor_zones.md)):
+  - **Gate passed.** Engine 2 on the per-storey document gives 91.21 / 14.89 MWh against referee r2_z's 90.18 / 13.81: +1.1 % / +7.9 %. With Engine 2's surface simplifications in EnergyPlus the result is −2.3 % / +3.2 %, with every zone within 5 %. One zone with the slabs as internal mass gives +1.1 % / +8.2 %.
+  - **Three referee findings, each measured.** None is a tuning knob: each makes the referee build the building the document states.
+    - Bridging by zone.
+    - Infiltration by each zone's own envelope area. r0 gave every storey the building's rate, which caused the end-heavy, middle-light heating.
+    - Each slab as one construction from both sides. r0 used the carpet-first construction on both faces, and EnergyPlus warned. **This is in today's EnergyPlus assembler**, recorded and not changed (`nza_engine/` is out of scope).
+  - **What remains.** The rest of the cooling gap is Brief 103's open surface-coefficient forms. No engine change in this part.
+- **P6 performance** ([`06_performance.md`](docs/audit/104/06_performance.md)):
+  - **Container results (worker medians).** One zone 37.6 ms against a 100 ms budget, and 50 coupled rooms 1.32 s against 2 s: both pass. Five storeys 219 ms against 150 ms: a **miss on this machine**, ranging 167–219 ms across runs. Escalated: to be re-measured on IT15 in Edge at close.
+  - **Solver changes, results unchanged.** Radiant star node per zone, sparse LU factorised once, the zone air system by Cholesky in admittance form, the active set warm-started, flat chain arrays, and build caches. Engine 1's anchor output is identical to the last digit, and Engine 2's Bridgewater figures are unchanged at the recorded precision.
+  - **API change.** Per-element terms are now annual sums (`element_terms[k].boundary_wh` and so on, `element_interzone_wh`).
+  - **Node against browser totals.** They differ in the last binary digit, about 2e-16 relative, because Chromium's `Math.cos` and similar functions round differently from Node's. This is recorded as a qualification of "identical".
+  - **IT15 (Edge 157, Core Ultra 9 285H) passes every budget:** one zone about 18 ms, five storeys 82–98 ms, 50 rooms 576–608 ms (worker medians, three runs). The container miss was the slower cloud machine.
+- **P7 close** ([`08_final_report.md`](docs/audit/104/08_final_report.md), review [`07_independent_review.md`](docs/audit/104/07_independent_review.md)):
+  - **Review verdicts.** No tuning; closure and cancellation hold (4/4 mutations caught); P6 unchanged to 3e-13; no file of today's engine touched.
+  - **Caveats stated plainly.**
+    - The gate passes against a referee aligned to Engine 2's per-storey bridging and infiltration. Cooling is +12.3 % against the slab-fixed-only referee and +15.6 % against r1.
+    - Per-storey cooling is up to ±31 % against the full referee (all storeys within 5 % like for like, except the roof storey's slab heat at −40 %). Per-room demand is not validated to ±10 %.
+  - **Fixed.** F4: the per-storey test now also runs on committed Denver weather. F5: the cooled-room test checks the spec hash. Decision 4's referee claim corrected in the archived brief.
+  - **Carried to Brief 105.** F2 per-storey and roof-slab gap; F3 the engine's own 1 h step error (needs a sub-hourly option); the infiltration allocation design choice; the surface-physics forms; the assembler slab bug.
+  - **Safety.** `git diff 139777c..HEAD` touches no file of today's engine; `_brief93_anchor.mjs --fixture` = 133.2; 101 thermal tests pass; `npm run build` clean; no lockfile or node_modules; nothing touched NZA Decoded.
+
+## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
+
+Brief [`docs/briefs/archive/103_engine-1_COMPLETED.md`](docs/briefs/archive/103_engine-1_COMPLETED.md), written by this project's agent at
+Linzie's request (14 Nov, in place of the architect chat). Pure single-zone ISO 52016-1 engine, envelope only; QA
+store fixes. Five decisions flagged for Chris's review (anchor gate on envelope demand, ±5 % tolerance, location,
+reference case, fixed fixture id).
+
+- **Brief** (d1d295b).
+- **P0 reconnaissance** ([`docs/audit/103/00_reconnaissance.md`](docs/audit/103/00_reconnaissance.md)). Findings:
+  - State 1 demand is a quasi-steady setpoint convention that is already known to differ from EnergyPlus (cooling +56 % on Bridgewater). The proposal re-gates the anchor on conductances and setpoint losses (±1 %) plus an EnergyPlus envelope-only referee, with State 1 demand shown for information only. Agreed (Rev B).
+  - IT15 has no Supabase CLI and no EnergyPlus. The proposed database route keeps Chris's agent pasting SQL, or moves NZA Sim (dev) into the Net Zero Advisory organisation (Chris's call).
+  - Engine 1 needs a model schema v2 (absorptance, emissivity, frame fraction, internal mass and ground as explicit fields).
+- **Rev B of the brief** (14 Nov, 23:50, Linzie "YES"). EnergyPlus is now the demand referee.
+  - The clean fabric-only EnergyPlus 25.2 run gives 68.7 MWh heating / 34.8 MWh cooling, against State 1's
+    129.2 / 98.6 (`docs/audit/103/ep_confirm_results.md`, `cooling_gap_root_cause.md`).
+  - Gates: per-path arithmetic against State 1 within 1 %, and demand against EnergyPlus within ±10 %. State 1
+    demand is shown for information only.
+  - Added: per-element thermal bridging in a referee-only EnergyPlus script (Part 5), and a performance budget
+    (one zone, one year, under 100 ms in a worker; 50-zone scaling measured).
+  - The fix for the thermal-bridging bug in today's engine landed separately as Brief 102b (PR #28): the anchor is now 133.2.
+  - NZA Sim (dev) is now in the Net Zero Advisory Supabase org; migrations go through the connector, dev only.
+- **P1 store fixes** ([`docs/audit/103/01_store_fixes.md`](docs/audit/103/01_store_fixes.md)).
+  - M4: projects are matched by the local id; M6: library versions are immutable; M7: auxiliary has its own line and a missing figure fails loudly; L2: helpers gated; L3: Retry and Sign out; L6: `revoke_invitation`.
+  - `0005` is applied to NZA Sim (dev) through the connector and read back. Tests: rig 37/37 plus 42 earlier checks, vitest 25/25, build clean.
+- **P2 engine package** ([`docs/audit/103/02_engine_package.md`](docs/audit/103/02_engine_package.md)): EPW parser equal to the backend value for value (sha c6571102…cf2); solar on any azimuth/tilt equal to today's solarCalc to Float32 on 43,800 values; schema 2.1 states today's absorptance, emissivity, frame fraction, internal heat capacity and ground method, with a 2.0 upgrade (P3 adds emissivity on glazing). 38 vitest pass; build clean.
+- **P3 one-zone balance** ([`docs/audit/103/03_zone_balance.md`](docs/audit/103/03_zone_balance.md)): ISO 52016-1 air node plus layer-based element chains, radiative exchange, sky, ideal demand solved exactly, factorised once per run. Analytic cases (a)–(d) match their hand calculations; closure ≤ 1 Wh every hour (largest 2e-8). A Bridgewater-sized year takes 49 ms in Node.
+- **P4 engine and results** ([`04_engine_results.md`](docs/audit/103/04_engine_results.md), [`04_performance.md`](docs/audit/103/04_performance.md)): `runZoneModel` from the document (infiltration, vents, bridging, shading, solar, comfort band), results with one read helper per quantity, a breakdown line per term. One zone in a browser worker: 22 ms; 50 zones 0.85 s. **BESTEST gate fails for heating (600 +4 %, 900 +34 % above range); escalated, not tuned.** Anchor first look 89.9 / 15.4 MWh against Run Bi 68.7 / 34.8, with four referee-input mismatches found for Part 5 (window frame, ground 18 °C default, bridging spread, internal mass).
+- **P5 EnergyPlus referee** ([`05_referee.md`](docs/audit/103/05_referee.md), `validation/energyplus/103_referee.py`): the same building Engine 1 reads (frame as SHGC × 0.8, ground at the EPW mean 11.26 °C, bridging per element, EPW wind at every zone, the document's absorptance), IdealLoads, gains deleted. **90.46 MWh heating / 13.65 MWh cooling** (zone sensible): the new gate (b) reference. Run Bi's inputs put back reproduce IT15's 68.7 / 34.8 exactly in the container (EnergyPlus 25.2.0 Linux). One-change sensitivities: frame −11.0 / +14.5, Urban wind −5.0 / +1.6, 18 °C ground −3.7 / +1.5, uniform bridging −0.7 / −0.6, absorptance −0.6 / +0.5, extra air-node mass −0.8 / −0.8 MWh. `nza_engine/` unchanged.
+- **P6 Bridgewater envelope** ([`06_anchor_envelope.md`](docs/audit/103/06_anchor_envelope.md), `scripts/103_anchor_envelope.mts`): **gate (a) passes**, every path's conductance and setpoint loss equal to State 1 within 0.001 % (transmitted solar −8.9 % as run, exactly F_W 0.9 plus the sun convention). **Gate (b): heating 89.91 vs 90.46 (−0.6 %, pass); cooling 15.45 vs 13.65 (+13.1 %, miss).** Diagnosed, not tuned: annual window solar into the zone agrees to about 2 %; the miss is internal mass — removing only the referee's interior slab mass moves its cooling +6.6 MWh, and Engine 1 (one zone, capacity on the air node) sits at 27 % of that. Refinement candidate: interior partitions as elements in the one-zone document (schema 2.2).
+- **P6a BESTEST in EnergyPlus** ([`07_bestest_referee.md`](docs/audit/103/07_bestest_referee.md), `validation/energyplus/103_bestest_twin.py`): from Engine 1's inputs EnergyPlus puts 600/900/600FF/900FF in range (600 4.289 / 6.016, 900 1.652 / 2.507 MWh). Engine 1's three ISO simplifications put into EnergyPlus take 600 to 4.683 (Engine 1 4.698) and explain about two thirds of the 900 heating gap.
+- **P6b surface physics** (same note): run options for the beam on floors, wind-driven outside convection (ISO 6946) and inside convection by heat-flow direction (Table 25). `REFEREE_OPTIONS` uses the beam on the floor only, because both referees do; the two convection forms stay off (not the referee's correlations; the wind form costs 170 ms). Re-recorded: BESTEST 600 4.547 / 5.628, 900 2.186 / 2.755 (900 heating still +0.37 above range, escalated); Bridgewater gate (b) 89.98 (−0.5 %) / 15.32 (+12.2 %, miss, interior slabs). Interior partitions deferred to Brief 104. Speed 35 ms Node, 25 ms worker.
+- **P6c independent review** ([`08_independent_review.md`](docs/audit/103/08_independent_review.md), response [`09_review_response.md`](docs/audit/103/09_review_response.md)): no tuning found; closure confirmed real by mutation. Fixed: `runZoneModel` refuses an unbalanced result (hourly > 1 Wh, or breakdown lines not summing to zero); library y-factors other than 1 refused (were applied to glazing only); bridging multiplier required, stated by the converter and upgrade; Denver BESTEST weather committed, anchor-EPW skip now loud (`NZA_REQUIRE_REFERENCE_DATA=1` fails it). Recorded as open for 104: the cooling-miss attribution (slabs consistent with it, BESTEST 900 one-zone residual +0.10 / +0.39 MWh same sign), inside convection (neither ISO form is TARP), unvalidated shared inputs (ground 3.7 MWh, wind 5.0 MWh). Gates unchanged: Bridgewater 89.98 / 15.32.
+- **P7 close** ([`10_final_report.md`](docs/audit/103/10_final_report.md)): brief archived, current.md updated, design note updated. **Next:** Brief 104 (multi-zone), carrying the open items in the final report (interior slabs and the cooling miss, BESTEST 900 residual, TARP-form inside convection, y-factor carriage, ground and wind inputs). **Safety:** today's engine files untouched (`git diff main...HEAD` shows none); anchor `_brief93_anchor.mjs --fixture` = 133.2; no lockfile or node_modules; nothing touched NZA Decoded.
+
 ## ✅ UI — decodED type system — CLOSED 15 Nov 2026 on `ui/decoded-type-system`
 
 Brief [`docs/briefs/archive/ui-decoded-type-system_COMPLETED.md`](docs/briefs/archive/ui-decoded-type-system_COMPLETED.md) (Linzie, 15 Nov 00:38).
@@ -7417,6 +7506,7 @@ All checklist items:
 
 ## Suggestions
 
+- **Today's EnergyPlus assembler, interzone slabs (Brief 104 P5):** both faces of each slab pair get the same carpet-first `interior_floor_ceiling` construction, so each storey's floor has plaster as its inside face, and EnergyPlus warns "does not have the same materials in the reverse order". The upper face should get the reversed construction. Measured on Bridgewater r1 → r2: +0.47 MWh heating, +0.38 MWh cooling. `nza_engine/` was out of scope for 104; for the brief that next touches the assembler.
 - Report export to PowerPoint/PDF using NZA template
 - CIBSE TM54 benchmark integration — show building type comparison on Results dashboard
 - Multi-zone building types (office, retail, hotel mix)

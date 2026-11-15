@@ -150,14 +150,30 @@ export const Shading = z
   })
   .strict()
 
-export const SurfaceKind = z.enum(['wall', 'roof', 'ground', 'partition', 'floor', 'ceiling', 'glazing'])
+export const SurfaceKind = z.enum(['wall', 'roof', 'ground', 'partition', 'floor', 'ceiling', 'glazing', 'internal_mass'])
 
+/** Kinds that may join two zones (Brief 104 decision 2). */
+export const INTERZONE_KINDS = ['partition', 'floor', 'ceiling'] as const
+const isZoneId = (b: string) => b !== 'outside' && b !== 'ground'
+
+/**
+ * A surface. Its construction's layers run from the zone_b side (first, "outside") to the zone_a side (last, "inside").
+ *
+ * Schema 2.2 (Brief 104 decisions 2 and 3):
+ * - **Interzone.** A `partition`, `floor` or `ceiling` whose zone_b is another zone is one surface with two inside
+ *   faces: its last layer faces zone_a and its first faces zone_b. It is listed by both zones, and only by them.
+ *   `kind` and `tilt_deg` are from zone_a's side. A `floor` is zone_a's floor and zone_b's ceiling (tilt 180). A
+ *   `ceiling` is zone_a's ceiling and zone_b's floor (tilt 0).
+ * - **Internal mass.** `internal_mass` has zone_b equal to zone_a, so both faces are in that zone. Its area is one
+ *   face's area. `faces_up` says whether it lies flat with its zone_a face up, taking the sun's beam like a floor
+ *   (tilt 180, its other face down), or stands upright (tilt 90).
+ */
 export const Surface = z
   .object({
     id,
     kind: SurfaceKind,
     zone_a: id,
-    /** Another zone's id, or the outside, or the ground. */
+    /** Another zone's id (interzone; zone_a itself for internal mass), or the outside, or the ground. */
     zone_b: z.union([z.literal('outside'), z.literal('ground'), id]),
     /** The compass label today's engine works by (north/east/south/west before orientation); null for roof and ground. */
     facade: Facade.nullable(),
@@ -169,12 +185,35 @@ export const Surface = z
     g_value: finite.nullable(),
     /** Glazing only: the window-to-wall ratio of its host wall (the note's "WWR per edge"). */
     wwr: finite.min(0).max(1).optional(),
-    /** Glazing only: how many windows the WWR is split into. */
+    /** Glazing only: how many windows the WWR is split into across the facade, on each storey (as the 3D viewer draws them). */
     window_count: z.number().int().nonnegative().optional(),
     /** Glazing only. */
     shading: Shading.optional(),
     /** Walls carry the vents and openings in them. */
     openings: z.array(Opening),
+    /**
+     * Schema 2.1 (Brief 103 Part 2): outside-face short-wave absorptance, 0 to 1. Required on walls and roofs facing
+     * outside; null on glazing, ground and internal surfaces. Today's engine hard-codes 0.6 (walls) and 0.7 (roofs).
+     */
+    solar_absorptance: finite.min(0).max(1).nullable(),
+    /** Schema 2.1: outside-face long-wave emissivity, 0 to 1, on outside walls, roofs and glazing (ISO 52016-1 sky exchange); null otherwise. */
+    thermal_emissivity: finite.min(0).max(1).nullable(),
+    /** Schema 2.1: glazing only, the frame's share of the opening area, 0 to <1 (today's engine: 0.20); null otherwise. */
+    frame_fraction: finite.min(0).lt(1).nullable(),
+    /**
+     * Schema 2.2 (Brief 104 Part 1b): inside-face short-wave absorptance, above 0 and at most 1, on every opaque
+     * surface; null on glazing. Solar inside a zone goes to each face in proportion to area × this value; the rest is
+     * reflected and spread again, and some leaves through the windows. Today's EnergyPlus path states none, so
+     * EnergyPlus's default 0.7 applies; today's instant engine has no inside distribution (every face takes all).
+     */
+    inside_solar_absorptance: finite.gt(0).max(1).nullable(),
+    /**
+     * Schema 2.2: the other inside face's short-wave absorptance (zone_b's face of an interzone surface, the first-layer
+     * face of internal mass); null on every other surface.
+     */
+    inside_solar_absorptance_b: finite.gt(0).max(1).nullable(),
+    /** Schema 2.2: internal mass only. True: flat, zone_a face up (takes the beam). False: upright. Null otherwise. */
+    faces_up: z.boolean().nullable(),
   })
   .strict()
 export type Surface = z.infer<typeof Surface>
@@ -255,6 +294,11 @@ export const Zone = z
     infiltration_q50: finite.nullable(),
     /** The legacy direct air-change rate the engine still reads when q50 is absent. */
     infiltration_ach: finite.nullable(),
+    /**
+     * Schema 2.1 (Brief 103 Part 2): heat capacity of the zone's internal mass (furniture, partitions, contents) per
+     * m² of floor, J/K·m². Today's engine hard-codes 250,000 (instantCalc.js internal_mass_J_per_K_per_m2).
+     */
+    internal_heat_capacity_j_per_k_m2: nonNeg,
     surfaces: z.array(id).min(1, 'a zone must have at least one surface'),
   })
   .strict()
@@ -338,6 +382,11 @@ export const Building = z
         lon: finite.min(-180).max(180).nullable(),
         name: z.string().nullable(),
         exposure: z.string().nullable(),
+        /**
+         * Schema 2.1 (Brief 103 Part 2): the ground's boundary temperature. 'annual_mean_outdoor' is today's engine
+         * (a constant equal to the EPW's annual mean dry bulb); ISO 13370 methods are later options.
+         */
+        ground: z.object({ method: z.literal('annual_mean_outdoor') }).strict(),
       })
       .strict(),
     /** The box's orientation: degrees the north facade is turned clockwise from true north. */
@@ -359,7 +408,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.0' as const
+export const SCHEMA_VERSION = '2.2' as const
 
 export const ModelDocument = z
   .object({
@@ -387,14 +436,71 @@ export const ModelDocument = z
       if (!zoneIds.has(s.zone_a)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'zone_a'], message: `surface "${s.id}" names zone "${s.zone_a}", which does not exist` })
       }
-      if (s.zone_b !== 'outside' && s.zone_b !== 'ground' && !zoneIds.has(s.zone_b)) {
+      const exteriorOpaque = (s.kind === 'wall' || s.kind === 'roof' || s.kind === 'floor') && s.zone_b === 'outside'
+      if (exteriorOpaque && (s.solar_absorptance == null || s.thermal_emissivity == null)) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" faces outside and needs solar_absorptance and thermal_emissivity` })
+      }
+      if (s.kind !== 'glazing' && s.inside_solar_absorptance == null) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'inside_solar_absorptance'], message: `opaque surface "${s.id}" needs inside_solar_absorptance` })
+      }
+      if (s.kind === 'glazing' && s.inside_solar_absorptance != null) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'inside_solar_absorptance'], message: `glazing "${s.id}" takes its inside optics from its U and g, not inside_solar_absorptance` })
+      }
+      if (s.kind === 'glazing' && (s.frame_fraction == null || s.thermal_emissivity == null)) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `glazing "${s.id}" needs frame_fraction and thermal_emissivity` })
+      }
+      s.openings.forEach((o, j) => {
+        if (o.kind === 'permanent_vent' && (o.cd == null || o.flow_mode == null)) {
+          ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'openings', j], message: `permanent vent on "${s.id}" needs cd and flow_mode` })
+        }
+      })
+      if (isZoneId(s.zone_b) && !zoneIds.has(s.zone_b)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'zone_b'], message: `surface "${s.id}" names zone "${s.zone_b}", which does not exist` })
       }
+      // Schema 2.2: interzone surfaces and internal mass.
+      const issue = (message: string, at: (string | number)[] = []) => ctx.addIssue({ code: 'custom', path: ['surfaces', i, ...at], message })
+      const internalMass = s.kind === 'internal_mass'
+      const interzone = !internalMass && isZoneId(s.zone_b)
+      if (internalMass && s.zone_b !== s.zone_a) issue(`internal mass "${s.id}" must have zone_b equal to zone_a`, ['zone_b'])
+      if (interzone) {
+        if (!(INTERZONE_KINDS as readonly string[]).includes(s.kind)) issue(`a ${s.kind} cannot join two zones ("${s.id}"): only ${INTERZONE_KINDS.join(', ')}`, ['kind'])
+        if (s.zone_b === s.zone_a) issue(`surface "${s.id}" joins zone "${s.zone_a}" to itself: use internal_mass`, ['zone_b'])
+        if (s.kind === 'floor' && s.tilt_deg !== 180) issue(`interzone floor "${s.id}" must have tilt 180 from zone_a's side`, ['tilt_deg'])
+        if (s.kind === 'ceiling' && s.tilt_deg !== 0) issue(`interzone ceiling "${s.id}" must have tilt 0 from zone_a's side`, ['tilt_deg'])
+      }
+      if (internalMass && s.faces_up == null) issue(`internal mass "${s.id}" needs faces_up`, ['faces_up'])
+      if (internalMass && s.faces_up != null && s.tilt_deg !== (s.faces_up ? 180 : 90)) issue(`internal mass "${s.id}" with faces_up ${s.faces_up} must have tilt ${s.faces_up ? 180 : 90}`, ['tilt_deg'])
+      if (!internalMass && s.faces_up != null) issue(`faces_up is for internal mass only ("${s.id}")`, ['faces_up'])
+      if (interzone || internalMass) {
+        if (s.solar_absorptance != null || s.thermal_emissivity != null || s.frame_fraction != null || s.g_value != null || s.azimuth_deg != null || s.facade != null) {
+          issue(`surface "${s.id}" has no outside face: solar_absorptance, thermal_emissivity, frame_fraction, g_value, azimuth_deg and facade must be null`)
+        }
+        if (s.openings.length) issue(`surface "${s.id}" has no outside face to carry openings`, ['openings'])
+        if (s.inside_solar_absorptance_b == null) issue(`surface "${s.id}" has two inside faces and needs inside_solar_absorptance_b`, ['inside_solar_absorptance_b'])
+      } else if (s.inside_solar_absorptance_b != null) {
+        issue(`surface "${s.id}" has one inside face: inside_solar_absorptance_b must be null`, ['inside_solar_absorptance_b'])
+      }
     })
+    // Every surface is listed by its zone_a and, when interzone, by its zone_b; by no other zone, and once.
+    const listedBy = new Map<string, string[]>()
     doc.zones.forEach((z0, i) => {
+      const seen = new Set<string>()
       z0.surfaces.forEach((sid, j) => {
         if (!surfaceIds.has(sid)) ctx.addIssue({ code: 'custom', path: ['zones', i, 'surfaces', j], message: `zone "${z0.id}" lists surface "${sid}", which does not exist` })
+        if (seen.has(sid)) ctx.addIssue({ code: 'custom', path: ['zones', i, 'surfaces', j], message: `zone "${z0.id}" lists surface "${sid}" twice` })
+        seen.add(sid)
+        listedBy.set(sid, [...(listedBy.get(sid) ?? []), z0.id])
       })
+    })
+    doc.surfaces.forEach((s, i) => {
+      const want = new Set([s.zone_a, ...(isZoneId(s.zone_b) ? [s.zone_b] : [])])
+      const got = listedBy.get(s.id) ?? []
+      for (const zid of want) {
+        if (zoneIds.has(zid) && !got.includes(zid)) ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" is not listed by its zone "${zid}"` })
+      }
+      for (const zid of got) {
+        if (!want.has(zid)) ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" is listed by zone "${zid}", which it does not face` })
+      }
     })
     doc.system_groups.forEach((g, i) => {
       g.zones.forEach((zid, j) => {
