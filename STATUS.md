@@ -26,6 +26,11 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - **Gate** (gains and ventilation, five storeys): passes like for like at −3.9 % heating / +9.3 % cooling. It misses with EnergyPlus's default outdoor-air density (−11.4 % / +10.2 %).
   - **The miss is attributed.** With the air heat capacity matched in a diagnostic, heating is −0.5 % and ventilation-only heating −0.04 %. The cooling remainder (+6.5 %) is Brief 104's F2.
   - The density convention is flagged for review, not changed.
+- **P4 run seam** ([`04_seam.md`](docs/audit/105/04_seam.md)): `frontend/src/sim2/run/`.
+  - `simulate(doc, { weather })` returns results, or every missing input at once in plain words. It runs Engine 2 with gains and ventilation.
+  - The library's epJSON layers match the fixture for all 15 constructions.
+  - Weather is a local EPW (never uploaded) or the organisation's private `weather` bucket. Migration 0006 is applied on dev and allows reads only; uploads await a decision.
+  - The run happens in a worker.
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 
