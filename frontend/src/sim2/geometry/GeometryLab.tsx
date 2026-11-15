@@ -715,18 +715,22 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // The workspace's rail chooses the railStep; the editor's own "Next" buttons move the rail with it.
   useEffect(() => {
     if (!embedded || !railStep || railStep === 'site' || STEP_OF[mode] === railStep) return
-    if (!has && railStep !== 'shape') { onStep?.('shape'); return }
+    // With nothing drawn, steps 3 to 5 stay chosen and say what they need (needsShape), instead of bouncing to Shape.
+    if (!has && railStep !== 'shape') return
     if (railStep === 'shape') toMode('outline')
     else if (railStep === 'fabric' || railStep === 'spaces' || railStep === 'systems') toMode(railStep)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [railStep])
+  }, [railStep, has])
   useEffect(() => {
-    if (embedded && railStep !== 'site' && railStep !== 'check' && railStep !== 'interventions' && STEP_OF[mode] !== railStep) onStep?.(STEP_OF[mode])
+    if (embedded && railStep !== 'site' && railStep !== 'check' && railStep !== 'interventions' && !(railStep !== 'shape' && !has) && STEP_OF[mode] !== railStep) onStep?.(STEP_OF[mode])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
   const onSite = embedded && railStep === 'site'
   /** Steps 6 and 7 are the workspace's empty states: the editor stays mounted (nothing is lost) with its right side empty. */
   const offStep = embedded && (railStep === 'check' || railStep === 'interventions')
+  /** Fabric, Spaces or Systems chosen with nothing drawn yet: the right side says so and offers the way on. */
+  const needsShape = embedded && !has && (railStep === 'fabric' || railStep === 'spaces' || railStep === 'systems')
+  const startExample = () => { const r = addShape(plan, EXAMPLE); if (!('why' in r)) { commit(r.plan); fitTo(EXAMPLE); pick('select'); setSel({ kind: 'blocks', idx: [0] }) } }
   /** Where Site puts the weather choice (the run's own picker, rendered there). */
   const [weatherEl, setWeatherEl] = useState<HTMLElement | null>(null)
 
@@ -1700,7 +1704,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           {!has && (
             <div className="gl-sec">
               <p className="gl-say">Press and drag a rectangle for the building. Add more rectangles or triangles to make an L or a T, or tap corners with Shape.</p>
-              <button type="button" className="gl-btn quiet" onClick={() => { const r = addShape(plan, EXAMPLE); if (!('why' in r)) { commit(r.plan); fitTo(EXAMPLE); pick('select'); setSel({ kind: 'blocks', idx: [0] }) } }}>
+              <button type="button" className="gl-btn quiet" onClick={startExample}>
                 Start from an example
               </button>
             </div>
@@ -1771,7 +1775,15 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </aside>, 'left')}
 
       {/* ─── right: the thing in hand ─── */}
-      {toPane(slots?.right, offStep ? null : <>{onSite && sitePanel()}{!onSite && <>
+      {toPane(slots?.right, needsShape ? (
+        <div className="gl-sec gl-needs">
+          <p className="gl-say"><strong>Nothing drawn yet.</strong> {railStep === 'fabric' ? 'Fabric is given to walls, roofs and floors' : railStep === 'spaces' ? 'Spaces are given to rooms' : 'Systems are given to rooms'}, so the building needs an outline first.</p>
+          <div className="gl-needs-btns">
+            <button type="button" className="gl-btn" onClick={startExample}>Start from an example</button>
+            <button type="button" className="gl-btn quiet" onClick={() => onStep?.('shape')}>Go to Shape and draw</button>
+          </div>
+        </div>
+      ) : offStep ? null : <>{onSite && sitePanel()}{!onSite && <>
       {selWall && selSpan && (() => {
         const L = selSpan.t1 - selSpan.t0
         const glass = selWins.reduce((t, w) => t + w.width_m * w.height_m, 0)
