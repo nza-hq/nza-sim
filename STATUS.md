@@ -11,6 +11,7 @@ Brief [`docs/briefs/active/110_model_workspace.md`](docs/briefs/active/110_model
   - ResizeHandle is copied (not exported), the layout persists under `nza-model-layout`, and the centre tabs are Drawing and Heat flow.
   - **Storage decision:** the Plan goes in a new `plan` column beside the document (migration 0008, dev only). The model hash is unchanged.
   - Two asks of the building thread: an embedded ResultsPanel (P3), and Plan save and load in `versions.ts` (P4).
+- **P1 shell:** `/model` inside AppShell, plus one sidebar entry, "Model (new)". It has a seven-step rail (the step is in the address, `?step=`), a shelf linking to today's Profiles, Library and Results pages, three panes resized with a copy of Building's handle and remembered under `nza-model-layout`, and Drawing and Heat flow tabs. Steps 6 and 7 are empty states that link to Consumption and Interventions, with no numbers. The build is clean, and every other page and entry is unchanged.
 
  — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
 

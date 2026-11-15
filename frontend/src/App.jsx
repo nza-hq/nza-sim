@@ -45,6 +45,8 @@ import ChartComponentsTestPage from './pages/ChartComponentsTestPage.jsx'
 import ConfirmDialogHost from './components/shared/ConfirmDialog.jsx'
 // Simulate v2 geometry prototype: its own route, loaded only when visited, so today's tool is unchanged.
 const GeometryLab = lazy(() => import('./sim2/geometry/GeometryLab.tsx'))
+// Brief 110: the Model workspace, the editor's steps inside the app shell; also loaded only when visited.
+const ModelPage = lazy(() => import('./sim2/workspace/ModelPage.tsx'))
 
 export default function App() {
   return (
@@ -66,6 +68,7 @@ export default function App() {
                 <Route path="/building"    element={<ErrorBoundary moduleName="Building Definition"><BuildingDefinition /></ErrorBoundary>} />
                 <Route path="/operation"   element={<ErrorBoundary moduleName="Operation"><OperationModule /></ErrorBoundary>} />
                 <Route path="/systems"   element={<ErrorBoundary moduleName="Systems"><SystemsModule /></ErrorBoundary>} />
+                <Route path="/model"     element={<ErrorBoundary moduleName="Model"><Suspense fallback={null}><ModelPage /></Suspense></ErrorBoundary>} />
                 <Route path="/gains"     element={<ErrorBoundary moduleName="Internal Gains"><InternalGainsModule /></ErrorBoundary>} />
                 <Route path="/consumption" element={<ErrorBoundary moduleName="Consumption"><ConsumptionManager /></ErrorBoundary>} />
                 <Route path="/interventions" element={<ErrorBoundary moduleName="Interventions"><InterventionsModule /></ErrorBoundary>} />
