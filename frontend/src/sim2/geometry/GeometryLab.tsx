@@ -38,10 +38,12 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
-import { LIBRARY, construction, constructionsFor, profilesFor, system, systemsFor } from '../library/library'
+import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, systemsFor } from '../library/library'
+import { BORROWS, borrow, borrowedFrom } from './borrow'
+import Spark from './Spark'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
 import FacadeView from './FacadeView'
@@ -1193,7 +1195,7 @@ export default function GeometryLab() {
       </div>
     )
     // A value the library has no number for: typed here; empty stays unset (the document says nothing).
-    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2'
+    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'people_per_room'
     const typed = (label: string, k: Gk, step: number, unit?: string, max?: number) => sp && (
       <div className="gl-row gl-typed">
         <span>{label}</span>
@@ -1215,29 +1217,52 @@ export default function GeometryLab() {
         detail={sp && (
           <>
             <input className="gl-title-in ap-tname" aria-label="Space type name" defaultValue={sp.name} key={`${sp.id}-${sp.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== sp.name && setSpace(sp.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            <div className="ap-borrow">
+              <div className="gl-row gl-librow"><span>Used for</span>
+                <select className="gl-sel" aria-label="Used for" value={sp.borrowed ?? ''} onChange={(e) => { const bw = BORROWS.find((x) => x.key === e.target.value); setSpace(sp.id, bw ? borrow(bw) : { borrowed: null }) }}>
+                  <option value="">Not chosen</option>
+                  {BORROWS.map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
+                </select>
+              </div>
+              <p>{sp.borrowed ? borrowedFrom(BORROWS.find((x) => x.key === sp.borrowed)!) + ' All can be changed below.' : "Pick one to fill this in from today's NZA Sim profiles, or fill it in yourself."}</p>
+            </div>
             {opt('Use', 'use', USES as Array<{ key: string; name: string }>)}
             <h4>People</h4>
-            {opt('Occupancy', 'occupancy', profilesFor('occupancy'))}
-            {typed('People per m²', 'people_per_m2', 0.01)}
+            {opt('Occupancy', 'occupancy', [{ key: ALWAYS, name: 'In all the time (100%)' }, ...profilesFor('occupancy')])}
+            <Spark label="Occupancy" days={sp.occupancy === ALWAYS ? { weekday: Array(24).fill(1) } : profile(sp.occupancy ?? '')?.day_types ?? null} />
+            <div className="gl-row gl-librow"><span>Count people</span>
+              <select className="gl-sel" aria-label="Count people" value={sp.people_basis ?? 'per_m2'} onChange={(e) => setSpace(sp.id, { people_basis: e.target.value as 'per_m2' | 'per_room' })}>
+                <option value="per_m2">Per m² of floor</option>
+                <option value="per_room">Per room</option>
+              </select>
+            </div>
+            {sp.people_basis === 'per_room' ? typed('People in each room', 'people_per_room', 1) : typed('People per m²', 'people_per_m2', 0.01)}
             {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
             {typed('Occupancy rate', 'occupancy_rate', 0.05, undefined, 1)}
-            <h4>Lighting and equipment</h4>
-            {opt('Lighting', 'lighting', profilesFor('lighting'))}
+            <h4>Lighting</h4>
             {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
-            {opt('Equipment', 'equipment', profilesFor('equipment'))}
-            {typed('Equipment in use', 'equipment_w_per_m2', 0.5, 'W/m²')}
-            {typed('Equipment always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
+            {opt('Follows', 'light_relationship', [...RELATIONSHIPS, { key: 'always_on', name: 'Always on' }])}
+            {(sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill') && opt('Its profile', 'lighting', profilesFor('lighting'))}
+            {sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill'
+              ? <Spark label="Lighting" days={profile(sp.lighting ?? '')?.day_types ?? null} />
+              : sp.light_relationship === 'always_on' ? <Spark label="Lighting" days={{ weekday: Array(24).fill(1) }} /> : null}
+            <h4>Equipment</h4>
+            {typed('In use', 'equipment_w_per_m2', 0.5, 'W/m²')}
+            {typed('Always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
+            {opt('Follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}
+            {sp.equip_relationship === 'independent' && opt('Its profile', 'equipment', profilesFor('equipment'))}
+            {sp.equip_relationship === 'independent' && <Spark label="Equipment" days={profile(sp.equipment ?? '')?.day_types ?? null} />}
+            <p className="gl-hint">"With occupancy" uses the occupancy profile above, so lighting and equipment rise and fall with the people.</p>
             <h4>Comfort</h4>
             {typed('Heating to', 'heat_c', 0.5, '°C', 40)}
             {typed('Cooling to', 'cool_c', 0.5, '°C', 40)}
+            <p className="gl-hint">Held every hour for now. A lower temperature outside occupied hours (setback) needs the engine first; asked.</p>
             <details className="gl-more">
               <summary>How the gains enter the room</summary>
               {typed('Radiant share', 'radiant_fraction', 0.05, undefined, 1)}
-              {opt('Lighting follows', 'light_relationship', RELATIONSHIPS)}
               {sp.light_relationship === 'proportional_with_spill' && typed('Daylight factor', 'daylight_factor', 0.05, undefined, 1)}
               {typed('Lit share of floor', 'light_area_share', 0.05)}
               {typed('Lighting heat to room', 'light_gain_fraction', 0.05, undefined, 1)}
-              {opt('Equipment follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}
               {sp.equip_relationship !== 'independent' && typed('Standby when empty', 'standby_factor', 0.05, undefined, 1)}
               {typed('Equipped share of floor', 'equip_area_share', 0.05)}
               {typed('Equipment heat to room', 'equip_gain_fraction', 0.05, undefined, 1)}

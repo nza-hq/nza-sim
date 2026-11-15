@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { allWindows, edgesOf, facade4, type FabricElement, isWet, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, isWet, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, profile, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -315,7 +315,6 @@ export function buildDocument(plan: Plan): Built {
       const shape = key && profile(key)?.day_types ? shapeOf(key) : null
       const w = k === 'lighting' ? sp.lighting_w_per_m2 : sp.equipment_w_per_m2
       if (!shape && w == null && (k === 'lighting' || sp.equipment_baseload_w_per_m2 == null)) return []
-      if (!shape) notes.push(`${sp.name}: ${k} has W/m² but no profile shape`)
       const id = `${sp.id}_${k}`
       // Today's engine reads lighting from magnitude and equipment from active + baseload.
       const base = sp.equipment_baseload_w_per_m2
@@ -326,6 +325,8 @@ export function buildDocument(plan: Plan): Built {
       // Stated detail only: a field left empty on the space type is left out, and the engine names it.
       const L = k === 'lighting'
       const rel = L ? sp.light_relationship : sp.equip_relationship
+      // Following occupancy needs no shape of its own; on its own schedule with none chosen, the engine uses occupancy's.
+      if (!shape && rel === 'independent') notes.push(`${sp.name}: ${k} runs on its own profile, but none is chosen, so it follows occupancy's`)
       const detail = Object.fromEntries(Object.entries({
         area_share: L ? sp.light_area_share : sp.equip_area_share,
         gain_fraction: L ? sp.light_gain_fraction : sp.equip_gain_fraction,
@@ -337,18 +338,22 @@ export function buildDocument(plan: Plan): Built {
       return [id]
     }
     let occupancy: string | null = null
-    if (sp.people_per_m2 != null && sp.people_per_m2 > 0) {
-      const shape = sp.occupancy && profile(sp.occupancy)?.day_types ? shapeOf(sp.occupancy) : null
-      if (!shape) notes.push(`${sp.name}: people per m² but no occupancy profile shape`)
+    const perRoom = sp.people_basis === 'per_room'
+    const dens = perRoom ? sp.people_per_room : sp.people_per_m2
+    const allTime = sp.occupancy === ALWAYS
+    if (dens != null && dens > 0) {
+      // "In all the time": present every hour, which the person chose and sees; otherwise the library's shape.
+      const shape = allTime ? { weekday: Array(24).fill(1), saturday: Array(24).fill(1), sunday: Array(24).fill(1) } : sp.occupancy && profile(sp.occupancy)?.day_types ? shapeOf(sp.occupancy) : null
+      if (!shape) notes.push(`${sp.name}: people are counted but no occupancy profile is chosen`)
       occupancy = `${sp.id}_occupancy`
       addProfile({
-        id: occupancy, kind: 'occupancy', label: `${sp.occupancy ? profile(sp.occupancy)!.name : 'Occupancy'} (${sp.name})`,
-        ...(shape ? { schedule: shape } : {}), density: { value: sp.people_per_m2, basis: 'per_m2' },
+        id: occupancy, kind: 'occupancy', label: `${allTime ? 'In all the time' : sp.occupancy ? profile(sp.occupancy)!.name : 'Occupancy'} (${sp.name})`,
+        ...(shape ? { schedule: shape } : {}), density: { value: dens, basis: perRoom ? 'per_room' : 'per_m2' },
         ...(sp.occupancy_rate != null ? { occupancy_rate: sp.occupancy_rate } : {}),
         ...(sp.sensible_w_per_person != null ? { sensible_w_per_person: sp.sensible_w_per_person } : {}),
         ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}),
       })
-    } else if (sp.occupancy) notes.push(`${sp.name}: occupancy needs people per m² before it goes in the model`)
+    } else if (sp.occupancy) notes.push(`${sp.name}: occupancy needs people per ${perRoom ? 'room' : 'm²'} before it goes in the model`)
     return { occupancy, lighting: gain('lighting'), equipment: gain('equipment'), auxiliary: [] }
   }
 
@@ -415,7 +420,7 @@ export function buildDocument(plan: Plan): Built {
       if (v && system(v.template) && v.schedule && v.schedule !== 'always_on') pin('profile', profile(v.schedule))
       const sp = spaceOf.get(z.id)
       if (!sp) continue
-      for (const k of ['occupancy', 'lighting', 'equipment'] as const) if (k !== 'occupancy' || (sp.people_per_m2 ?? 0) > 0) pin('profile', profile(sp[k]))
+      for (const k of ['occupancy', 'lighting', 'equipment'] as const) if (k !== 'occupancy' || ((sp.people_basis === 'per_room' ? sp.people_per_room : sp.people_per_m2) ?? 0) > 0) pin('profile', profile(sp[k]))
     }
     return [...refs.values()].sort((a, b) => (a.kind + a.key < b.kind + b.key ? -1 : 1))
   }

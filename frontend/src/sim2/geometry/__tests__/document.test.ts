@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { azimuthOf, emptyPlan, layoutIn, upgradePlan, wallRuns, type Plan, type PlanSystem, type XY } from '../plan'
+import { ALWAYS, azimuthOf, emptyPlan, layoutIn, upgradePlan, wallRuns, type Plan, type PlanSystem, type XY } from '../plan'
 import { DOOR, changeWindow, crossing, setOpeningsIn, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
 import { cutZones } from '../ported/zones'
 import { fitRooms } from '../rooms'
@@ -272,5 +272,26 @@ describe('emitters in rooms (schema 2.4)', () => {
       { id: `${doc.zones[0].id}_e2`, label: 'Panel heater', kind: 'electric', count: n, rated_output_w: 1000, radiant_fraction: 0.1, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null },
     ])
     expect(doc.system_groups.find((g: any) => g.id === 'heating_y1')).toMatchObject({ design_flow_c: 45, design_return_c: 40 })
+  })
+})
+
+describe('spaces borrow from today\'s profiles', () => {
+  it('"Hotel bedroom" fills profiles, lighting and equipment from today\'s templates, and comfort from the setpoint profiles', async () => {
+    const { BORROWS, borrow } = await import('../borrow')
+    const b = borrow(BORROWS.find((x) => x.key === 'hotel_bedroom')!)
+    expect(b).toMatchObject({ use: 'bedroom', occupancy: 'hotel_bedroom_occupancy', lighting: 'hotel_bedroom_lighting', equipment: 'hotel_bedroom_equipment', lighting_w_per_m2: 5, light_relationship: 'proportional_with_spill', daylight_factor: 0.6, equipment_w_per_m2: 4, equipment_baseload_w_per_m2: 1, equip_relationship: 'proportional', standby_factor: 0.1, heat_c: 21, cool_c: 24 })
+    // People are not in either source, so they are left alone.
+    expect('people_per_m2' in b).toBe(false)
+  })
+
+  it('"2 people, all the time" writes a per-room density and a flat profile', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    p = { ...p, spaces: [{ id: 's1', name: 'Bedroom', use: 'bedroom', occupancy: ALWAYS, lighting: null, equipment: null, people_basis: 'per_room', people_per_room: 2, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3 }], rooms: p.rooms.map((r) => ({ ...r, space: 's1' })) }
+    const doc = buildDocument(p).doc as any
+    const occ = doc.profiles.find((x: any) => x.kind === 'occupancy')
+    expect(occ.density).toEqual({ value: 2, basis: 'per_room' })
+    expect(occ.schedule.weekday).toEqual(Array(24).fill(1))
+    expect(doc.library_refs.some((r: any) => r.key === ALWAYS)).toBe(false)
   })
 })

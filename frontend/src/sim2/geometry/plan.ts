@@ -84,6 +84,9 @@ export type EmitterType = {
 export const isWet = (k: EmitterKind) => EMITTER_KINDS.find((x) => x.key === k)!.wet
 
 /** Uses a zone can be given: the zone types today's schedule editor offers (UnifiedScheduleEditor.jsx). */
+/** An occupancy choice that is not a library profile: people present every hour ("2 people, all the time"). */
+export const ALWAYS = 'always_on'
+
 export const USES: ReadonlyArray<{ key: string; name: string }> = [
   { key: 'bedroom', name: 'Bedroom' },
   { key: 'office', name: 'Office' },
@@ -139,6 +142,11 @@ export type SpaceType = {
   occupancy: string | null
   /** People per m² of floor, typed: the library's occupancy profiles are shapes only, with no density. */
   people_per_m2?: number | null
+  /** How people are counted: per m² of floor (people_per_m2, the default) or per room (people_per_room). */
+  people_basis?: 'per_m2' | 'per_room' | null
+  people_per_room?: number | null
+  /** The "Used for" choice the values were borrowed from (borrow.ts), shown; changing a value afterwards is fine. */
+  borrowed?: string | null
   /** Typed gains (W): the library has none. Null or absent: not stated, and the document says nothing. */
   occupancy_rate?: number | null
   sensible_w_per_person?: number | null
