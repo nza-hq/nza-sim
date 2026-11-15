@@ -8,6 +8,7 @@ Brief [`docs/briefs/active/111_results-include.md`](docs/briefs/active/111_resul
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/111/00_reconnaissance.md)): what each level removes.
 - **P1 levels in the seam** ([`01_levels.md`](docs/audit/111/01_levels.md)): `simulate(doc, { level, fabric_heat_c })` runs a copy with objects removed (Rule 8); systems is today's run value for value; every level's breakdowns close; the fabric temperature is required, never defaulted.
+- **P2 Fabric only against EnergyPlus** ([`02_fabric.md`](docs/audit/111/02_fabric.md)): Bridgewater five storeys at 21 °C, heating only: 90.61 vs 88.42 MWh (+2.5 %, pass ±10 %); storeys −3.0 to +6.7 %. The two-zone fixture has no referee yet: it needs a document-to-EnergyPlus writer (proposed as its own work).
 
 ## 🟡 Brief 108 — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
 
