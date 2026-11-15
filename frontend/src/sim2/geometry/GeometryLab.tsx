@@ -1436,7 +1436,7 @@ export default function GeometryLab() {
           </div>
         )
         // A gain the library has no number for: typed here; empty stays unset (the document says nothing).
-        type Gk = 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2'
+        type Gk = 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'vent_flow'
         const typed = (label: string, k: Gk, step: number, unit?: string) => (
           <div className="gl-row gl-typed">
             <span>{label}</span>
@@ -1471,13 +1471,15 @@ export default function GeometryLab() {
                 {opt('Lighting', 'lighting', profilesFor('lighting'))}
                 {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
                 {opt('Equipment', 'equipment', profilesFor('equipment'))}
-                {typed('Equipment', 'equipment_w_per_m2', 0.5, 'W/m²')}
+                {typed('Equipment in use', 'equipment_w_per_m2', 0.5, 'W/m²')}
+                {typed('Equipment always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
               </div>
               <div className="gl-sec">
                 <h3>Systems</h3>
                 {opt('Heating', 'heating', systemsFor('heating'), sysLine(sp.heating, 'heating'))}
                 {opt('Cooling', 'cooling', systemsFor('cooling'), sysLine(sp.cooling, 'cooling'))}
                 {opt('Ventilation', 'ventilation', systemsFor('ventilation'), sysLine(sp.ventilation, 'ventilation'))}
+                {sp.ventilation && (['mvhr', 'mev'].includes(system(sp.ventilation)?.type ?? '') ? typed('Air flow', 'vent_flow', 0.1, 'l/s per m²') : typed('Air changes', 'vent_flow', 0.5, 'per hour'))}
                 {opt('Hot water', 'dhw', systemsFor('dhw'), sysLine(sp.dhw, 'dhw'))}
                 <p className="gl-hint">Each from NZA Sim's library, with its own fuel and efficiency. Rooms of this type get all of these. The library's profiles are daily shapes only; the numbers (people, W) are typed here.</p>
               </div>

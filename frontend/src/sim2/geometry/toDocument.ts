@@ -235,7 +235,9 @@ export function buildDocument(plan: Plan): Built {
     if (!t || !sp) return []
     const kind = t.type === 'mvhr' || t.type === 'mev' ? t.type : 'natural'
     return [{
-      id: `${sp.id}_vent`, label: t.name, kind, enabled: true, share_pct: 100, flow_rate: null, flow_rate_basis: null,
+      // Flow as typed on the space type: l/s per m² of floor (mechanical) or air changes per hour (natural).
+      id: `${sp.id}_vent`, label: t.name, kind, enabled: true, share_pct: 100,
+      flow_rate: sp.vent_flow ?? null, flow_rate_basis: sp.vent_flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
     }]
   }
@@ -261,10 +263,14 @@ export function buildDocument(plan: Plan): Built {
       const key = sp[k]
       const shape = key && profile(key)?.day_types ? shapeOf(key) : null
       const w = k === 'lighting' ? sp.lighting_w_per_m2 : sp.equipment_w_per_m2
-      if (!shape && w == null) return []
+      if (!shape && w == null && (k === 'lighting' || sp.equipment_baseload_w_per_m2 == null)) return []
       if (!shape) notes.push(`${sp.name}: ${k} has W/m² but no profile shape`)
       const id = `${sp.id}_${k}`
-      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...(w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {}), ...rad })
+      // Today's engine reads lighting from magnitude and equipment from active + baseload.
+      const size = k === 'lighting'
+        ? (w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
+        : { ...(w != null ? { active: { value: w, unit: 'w_per_m2' } } : {}), ...(sp.equipment_baseload_w_per_m2 != null ? { baseload: { value: sp.equipment_baseload_w_per_m2, unit: 'w_per_m2' } } : {}) }
+      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...size, ...rad })
       return [id]
     }
     let occupancy: string | null = null
