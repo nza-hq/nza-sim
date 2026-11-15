@@ -61,7 +61,7 @@ export type Win = {
 }
 
 /** The fabric elements the Fabric step gives types to. */
-export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor'
+export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition'
 /** A fabric type: a library construction (by key) and, optionally, a U-value the user typed over it (W/m²K). Both
  * null: not set yet, and the model document says so (`unassigned:…`). */
 export type FabricType = { id: string; element: FabricElement; name: string; construction: string | null; u: number | null }
@@ -74,6 +74,7 @@ export const FABRIC_ELEMENTS: ReadonlyArray<{ key: FabricElement; name: string; 
   { key: 'door', name: 'Doors', one: 'Doors' },
   { key: 'roof', name: 'Roof', one: 'Roof' },
   { key: 'floor', name: 'Ground floor', one: 'Ground floor' },
+  { key: 'partition', name: 'Walls between zones', one: 'Wall between zones' },
 ]
 /** One type per element to start with, nothing chosen. */
 export const defaultFabric = (): FabricType[] => FABRIC_ELEMENTS.map((e) => ({ id: `f_${e.key}`, element: e.key, name: e.one, construction: null, u: null }))
@@ -101,6 +102,17 @@ export type SpaceType = {
   /** Comfort band the systems hold, °C, typed. */
   heat_c?: number | null
   cool_c?: number | null
+  /** How the gains enter the zone (schema 2.3 profile fields), visible and editable on the space type. A new space
+   * type starts from today's engine values (TODAY in thermal/schema/upgrade.ts). */
+  radiant_fraction?: number | null
+  light_area_share?: number | null
+  light_gain_fraction?: number | null
+  light_relationship?: string | null
+  daylight_factor?: number | null
+  equip_area_share?: number | null
+  equip_gain_fraction?: number | null
+  equip_relationship?: string | null
+  standby_factor?: number | null
   lighting: string | null
   equipment: string | null
   heating: string | null

@@ -73,7 +73,7 @@ export function buildDocument(plan: Plan): Built {
   // A fabric type's construction: its library key, or `unassigned:<element>` while none is chosen (a type other than
   // the element's first adds its id, so the types stay apart); a U-value the user typed rides on it as an override.
   const typeOf = new Map(plan.fabric_types.map((t) => [t.id, t]))
-  const UNSET: Record<FabricElement, string> = { wall: 'external_wall', glazing: 'glazing', door: 'external_door', roof: 'roof', floor: 'ground_floor' }
+  const UNSET: Record<FabricElement, string> = { wall: 'external_wall', glazing: 'glazing', door: 'external_door', roof: 'roof', floor: 'ground_floor', partition: 'internal_wall' }
   const constructionOf = (type: string) => {
     const t = typeOf.get(type)
     if (!t) return { key: 'unassigned:external_wall' }
@@ -194,11 +194,14 @@ export function buildDocument(plan: Plan): Built {
   }
   if (windowsPlaced < windows.length) notes.push(`${windows.length - windowsPlaced} window(s) are on no zone's wall`)
 
+  // Walls between zones: one building-wide type (a plan from before it existed has none, so it stays unassigned).
+  const pt = plan.fabric_types.find((t) => t.element === 'partition')
+  const partitionRef = pt ? constructionOf(pt.id) : { key: 'unassigned:internal_wall' }
   for (const s of shares) {
     const id = uid(`partition_${s.a}_${s.b}`)
     const surf = ext({
       id, kind: 'partition', zone_a: s.a, zone_b: s.b, facade: null, area_m2: r3(s.length_m * h),
-      azimuth_deg: null, tilt_deg: 90, construction_ref: { key: 'unassigned:partition' }, g_value: null, openings: [],
+      azimuth_deg: null, tilt_deg: 90, construction_ref: partitionRef, g_value: null, openings: [],
     }, 'other')
     surfaces.push(surf)
     byZone.set(s.a, [...(byZone.get(s.a) ?? []), id])
@@ -263,8 +266,7 @@ export function buildDocument(plan: Plan): Built {
   const addProfile = (pr: Record<string, unknown>) => {
     if (!profiles.some((x) => x.id === pr.id)) profiles.push(pr)
   }
-  // From schema 2.3 each gain profile carries radiant_fraction; the editor does not ask for it yet, so it is null.
-  const rad = is23 ? { radiant_fraction: null } : {}
+  // From schema 2.3 each gain profile carries radiant_fraction, stated on the space type (null until it is).
   const refsOf = (zid: string) => {
     const sp = spaceOf.get(zid)
     if (!sp) return { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
@@ -277,10 +279,22 @@ export function buildDocument(plan: Plan): Built {
       if (!shape) notes.push(`${sp.name}: ${k} has W/m² but no profile shape`)
       const id = `${sp.id}_${k}`
       // Today's engine reads lighting from magnitude and equipment from active + baseload.
+      const base = sp.equipment_baseload_w_per_m2
+      if (k === 'equipment' && (w != null) !== (base != null)) notes.push(`${sp.name}: equipment needs both "in use" and "always on" W/m² (0 is fine)`)
       const size = k === 'lighting'
         ? (w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
-        : { ...(w != null ? { active: { value: w, unit: 'w_per_m2' } } : {}), ...(sp.equipment_baseload_w_per_m2 != null ? { baseload: { value: sp.equipment_baseload_w_per_m2, unit: 'w_per_m2' } } : {}) }
-      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...size, ...rad })
+        : w != null && base != null ? { active: { value: w, unit: 'w_per_m2' }, baseload: { value: base, unit: 'w_per_m2' } } : {}
+      // Stated detail only: a field left empty on the space type is left out, and the engine names it.
+      const L = k === 'lighting'
+      const rel = L ? sp.light_relationship : sp.equip_relationship
+      const detail = Object.fromEntries(Object.entries({
+        area_share: L ? sp.light_area_share : sp.equip_area_share,
+        gain_fraction: L ? sp.light_gain_fraction : sp.equip_gain_fraction,
+        relationship_to_occupancy: rel,
+        ...(L && rel === 'proportional_with_spill' ? { daylight_factor: sp.daylight_factor } : {}),
+        ...(!L && rel !== 'independent' ? { standby_factor: sp.standby_factor } : {}),
+      }).filter(([, v]) => v != null))
+      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...size, ...detail, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}) })
       return [id]
     }
     let occupancy: string | null = null
@@ -293,7 +307,7 @@ export function buildDocument(plan: Plan): Built {
         ...(shape ? { schedule: shape } : {}), density: { value: sp.people_per_m2, basis: 'per_m2' },
         ...(sp.occupancy_rate != null ? { occupancy_rate: sp.occupancy_rate } : {}),
         ...(sp.sensible_w_per_person != null ? { sensible_w_per_person: sp.sensible_w_per_person } : {}),
-        ...rad,
+        ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}),
       })
     } else if (sp.occupancy) notes.push(`${sp.name}: occupancy needs people per m² before it goes in the model`)
     return { occupancy, lighting: gain('lighting'), equipment: gain('equipment'), auxiliary: [] }

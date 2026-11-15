@@ -6,7 +6,7 @@
  */
 import snap from './snapshot.json'
 
-export type Element = 'wall' | 'glazing' | 'door' | 'roof' | 'floor'
+export type Element = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition'
 export type Construction = { key: string; body_hash: string; element: string; name: string; u: number | null; g: number | null }
 export type SystemTemplate = {
   key: string

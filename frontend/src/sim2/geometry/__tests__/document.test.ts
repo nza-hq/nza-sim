@@ -167,13 +167,13 @@ describe('model document', () => {
     expect(doc.profiles.map((x: any) => x.id)).toEqual(['s1_lighting'])
     expect(doc.profiles[0].schedule.weekday).toHaveLength(24)
     expect(doc.profiles[0].magnitude).toBeUndefined()
-    const b2 = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: 0.1, sensible_w_per_person: 75, occupancy_rate: 0.8, lighting_w_per_m2: 8, equipment_w_per_m2: 10, vent_flow: 1.2, vent_schedule: 'hotel_ventilation_occupied' }] })
+    const b2 = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: 0.1, sensible_w_per_person: 75, occupancy_rate: 0.8, lighting_w_per_m2: 8, equipment_w_per_m2: 10, equipment_baseload_w_per_m2: 0, radiant_fraction: 0.3, equip_relationship: 'proportional', standby_factor: 0.1, vent_flow: 1.2, vent_schedule: 'hotel_ventilation_occupied' }] })
     expect(b2.issues).toEqual([])
     const d2 = b2.doc as any
     expect(d2.zones[0].profile_refs.occupancy).toBe('s1_occupancy')
     expect(d2.profiles.find((x: any) => x.id === 's1_occupancy')).toMatchObject({ density: { value: 0.1, basis: 'per_m2' }, sensible_w_per_person: 75, occupancy_rate: 0.8 })
     expect(d2.profiles.find((x: any) => x.id === 's1_lighting').magnitude).toEqual({ value: 8, unit: 'w_per_m2' })
-    expect(d2.profiles.find((x: any) => x.id === 's1_equipment')).toMatchObject({ active: { value: 10, unit: 'w_per_m2' } })
+    expect(d2.profiles.find((x: any) => x.id === 's1_equipment')).toMatchObject({ active: { value: 10, unit: 'w_per_m2' }, baseload: { value: 0, unit: 'w_per_m2' }, relationship_to_occupancy: 'proportional', standby_factor: 0.1, radiant_fraction: 0.3 })
     expect(d2.zones[0].ventilation[0]).toMatchObject({ kind: 'mvhr', flow_rate: 1.2, flow_rate_basis: 'per_m2', control_schedule_ref: 'hotel_ventilation_occupied' })
     expect(d2.profiles.find((x: any) => x.id === 'hotel_ventilation_occupied')).toMatchObject({ kind: 'schedule' })
     // Every library item used is pinned with its body hash.

@@ -225,6 +225,13 @@
     "name": "Ground floor",
     "construction": "ground_floor_slab",
     "u": null
+   },
+   {
+    "id": "f_partition",
+    "element": "partition",
+    "name": "Wall between zones",
+    "construction": null,
+    "u": null
    }
   ],
   "wall_spans": [],
@@ -248,7 +255,17 @@
     "vent_flow": 1,
     "vent_schedule": "always_on",
     "heat_c": 21,
-    "cool_c": 24
+    "cool_c": 24,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "equipment_baseload_w_per_m2": 0
    },
    {
     "use": "other",
@@ -261,7 +278,16 @@
     "dhw": null,
     "id": "s2",
     "name": "Store",
-    "heat_c": 16
+    "heat_c": 16,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
    }
   ],
   "building": {

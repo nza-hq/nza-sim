@@ -41,6 +41,8 @@ import { LIBRARY, construction, constructionsFor, profilesFor, system, systemsFo
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
 import FacadeView from './FacadeView'
+import ResultsPanel from '../run/ResultsPanel'
+import { TODAY } from '../../thermal/schema/upgrade'
 import { buildDocument } from './toDocument'
 import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
@@ -92,6 +94,26 @@ const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 
 const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', spaces: 'Spaces' }
 const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, spaces: 4 }
 const SPACE_COLOURS = ['#E0A84E', '#5B9BD5', '#6AA84F', '#C27BA0', '#45A5A0', '#D9734E', '#8E7CC3', '#A0A04A']
+/** How gains enter a zone, as today's engine assumes them (TODAY): a new space type starts here, all editable. */
+const todaysGains = (): Partial<SpaceType> => ({
+  occupancy_rate: TODAY.occupancy_rate,
+  sensible_w_per_person: TODAY.sensible_w_per_person,
+  equipment_baseload_w_per_m2: 0,
+  radiant_fraction: TODAY.gains_radiant_fraction,
+  light_area_share: TODAY.area_share,
+  light_gain_fraction: TODAY.gain_fraction,
+  light_relationship: TODAY.lighting_relationship,
+  daylight_factor: TODAY.daylight_factor,
+  equip_area_share: TODAY.area_share,
+  equip_gain_fraction: TODAY.gain_fraction,
+  equip_relationship: TODAY.equipment_relationship,
+  standby_factor: TODAY.standby_factor,
+})
+const RELATIONSHIPS = [
+  { key: 'proportional', name: 'With occupancy' },
+  { key: 'proportional_with_spill', name: 'With occupancy, lights left on' },
+  { key: 'independent', name: 'Own schedule only' },
+]
 const short = (name: string) => (name.length > 46 ? `${name.slice(0, 44)}…` : name)
 const exportDate = new Date(LIBRARY.exported_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 const LEFT = 328
@@ -713,7 +735,7 @@ export default function GeometryLab() {
   type Target = { spans: Span[] } | { rooms: string[] }
   /** The types a card's selection has for element `e`. */
   const typesOn = (e: FabricElement, to: Target) =>
-    onWalls(e) ? ('rooms' in to ? piecesOfRooms(plan, to.rooms) : piecesIn(to.spans)).map((p) => typeOfSpan(plan, p, e)) : 'rooms' in to ? to.rooms.map((r) => roomType(plan, r, e)) : []
+    onWalls(e) ? ('rooms' in to ? piecesOfRooms(plan, to.rooms) : piecesIn(to.spans)).map((p) => typeOfSpan(plan, p, e)) : 'rooms' in to ? to.rooms.map((r) => roomType(plan, r, e as 'roof' | 'floor')) : []
   /** Change the construction or U of what is chosen. When its type is also used elsewhere, the chosen things get a
    * type of their own (named after them) so nothing else changes; when only they use it, the type itself changes. */
   const editFor = (e: FabricElement, to: Target, q: Partial<FabricType>, label: string) => {
@@ -722,7 +744,7 @@ export default function GeometryLab() {
     if (cur) {
       const mine = onWalls(e)
         ? (() => { const ps = 'rooms' in to ? piecesOfRooms(plan, to.rooms) : piecesIn(to.spans); return pieces.filter((p) => typeOfSpan(plan, p, e) === cur.id).every((p) => ps.some((x) => samePiece(x, p))) })()
-        : 'rooms' in to && plan.rooms.filter((r) => roomType(plan, r.id, e) === cur.id).every((r) => to.rooms.includes(r.id))
+        : 'rooms' in to && plan.rooms.filter((r) => roomType(plan, r.id, e as 'roof' | 'floor') === cur.id).every((r) => to.rooms.includes(r.id))
       if (mine) return setFT(cur.id, q)
     }
     const r = newType(plan, e)
@@ -768,6 +790,7 @@ export default function GeometryLab() {
       const n = plan.windows.filter((w) => !!w.door === (t.element === 'door') && typeAt(plan, w.wall, w.t_m + w.width_m / 2, t.element as WallEl) === t.id).length
       return { n, text: `${n} ${t.element === 'door' ? (n === 1 ? 'door' : 'doors') : n === 1 ? 'window' : 'windows'}` }
     }
+    if (t.element === 'partition') return { n: 1, text: '' }
     const a = plan.rooms.filter((r) => roomType(plan, r.id, t.element as 'roof' | 'floor') === t.id).reduce((n, r) => n + ringArea(r.ring), 0)
     return { n: a, text: `${f1(a)} m²` }
   }
@@ -794,7 +817,7 @@ export default function GeometryLab() {
     while (plan.spaces.some((x) => x.id === `s${k}`)) k++
     const sp: SpaceType = from
       ? { ...from, id: `s${k}`, name: `${from.name} (copy)` }
-      : { id: `s${k}`, name: `Space type ${plan.spaces.length + 1}`, use: null, occupancy: null, lighting: null, equipment: null, heating: null, cooling: null, ventilation: null, dhw: null }
+      : { id: `s${k}`, name: `Space type ${plan.spaces.length + 1}`, use: null, occupancy: null, lighting: null, equipment: null, heating: null, cooling: null, ventilation: null, dhw: null, ...todaysGains() }
     commit({ ...plan, spaces: [...plan.spaces, sp] })
     setActiveSpace(sp.id)
     return sp.id
@@ -807,7 +830,7 @@ export default function GeometryLab() {
     if (v === '__new') {
       let k = plan.spaces.length + 1
       while (plan.spaces.some((x) => x.id === `s${k}`)) k++
-      const sp: SpaceType = { id: `s${k}`, name: `Space type ${plan.spaces.length + 1}`, use: null, occupancy: null, lighting: null, equipment: null, heating: null, cooling: null, ventilation: null, dhw: null }
+      const sp: SpaceType = { id: `s${k}`, name: `Space type ${plan.spaces.length + 1}`, use: null, occupancy: null, lighting: null, equipment: null, heating: null, cooling: null, ventilation: null, dhw: null, ...todaysGains() }
       p = { ...p, spaces: [...p.spaces, sp] }
       sid = sp.id
       setActiveSpace(sp.id)
@@ -842,6 +865,7 @@ export default function GeometryLab() {
       if (!sid) return tell(m, 'Make a space type on the left first.', true)
       return commit({ ...plan, rooms: plan.rooms.map((r) => (r.id === room.id ? { ...r, space: sid } : r)) })
     }
+    if (elem === 'partition') return tell(m, 'Walls between zones take one type for the whole building: set it on the left.', true)
     const id = activeOf(elem)
     const w = onWalls(elem) ? wallAt(x, y) : null
     if (w != null) {
@@ -871,11 +895,11 @@ export default function GeometryLab() {
   /** A room's fill: its zone (step 2), its roof or floor type (step 3), its space type (step 4). */
   const roomFill = (r: Plan['rooms'][number]) =>
     mode === 'spaces' ? (spaceColour(r.space) ?? '#FFFFFF') + '59'
-    : mode === 'fabric' ? (onWalls(elem) ? '#FFFFFF' : typeColour(plan, roomType(plan, r.id, elem)) + '40')
+    : mode === 'fabric' ? (elem === 'roof' || elem === 'floor' ? typeColour(plan, roomType(plan, r.id, elem)) + '40' : '#FFFFFF')
     : tintOf(r.zone).fill
   const roomSub = (r: Plan['rooms'][number]) =>
     mode === 'spaces' ? (plan.spaces.find((x) => x.id === r.space)?.name ?? 'No space type')
-    : mode === 'fabric' && !onWalls(elem) ? typeName(roomType(plan, r.id, elem))
+    : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
     : `${f1(ringArea(r.ring))} m²`
 
   // ─── paint ─────────────────────────────────────────────────────────────────
@@ -940,6 +964,7 @@ export default function GeometryLab() {
 
   return (
     <div className="gl-root" ref={host}>
+      <ResultsPanel doc={built.doc} />
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
@@ -1168,6 +1193,7 @@ export default function GeometryLab() {
               )}
               {mode === 'fabric' && (() => {
                 const types = plan.fabric_types.filter((t) => t.element === elem)
+                if (!types.length && elem === 'partition') return <div className="gl-sec"><button type="button" className="gl-btn quiet" onClick={() => commit(newType(plan, 'partition').plan)}>Add walls between zones</button></div>
                 const act = activeOf(elem)
                 const lib = constructionsFor(elem)
                 const bi = plan.building ?? noBuildingInputs()
@@ -1220,11 +1246,15 @@ export default function GeometryLab() {
                         )
                       })}
                     </div>
+                    {elem === 'partition' ? (
+                      <p className="gl-hint">One type for every wall between zones. The library has no internal wall construction yet, so none can be picked; a typed U alone is not enough to run.</p>
+                    ) : (<>
                     <div className="gl-btns">
                       <button type="button" className="gl-btn quiet" onClick={() => { const r = newType(plan, elem); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}>Add a type</button>
                       <button type="button" className="gl-btn quiet" onClick={() => commit(onWalls(elem) ? setTypeOn(plan, runs.map((r) => wholeWall(plan, r.index)!), act) : setTypeOnRooms(plan, plan.rooms.map((r) => r.id), act))}>Give everything {typeName(act)}</button>
                     </div>
                     <p className="gl-hint">Choose a type, then Apply: tap a room's part of a wall (Shift: the whole wall) or tap a room{onWalls(elem) ? ' for all its outside walls' : ''}. U in W/m²K; typed, it is used over the library's.{elem === 'door' ? ' The library has no door constructions yet, so a door needs a typed U.' : ''}</p>
+                    </>)}
                     <p className="gl-hint">Library: NZA Sim's, exported {exportDate}.</p>
                   </div>
                   </>
@@ -1414,7 +1444,7 @@ export default function GeometryLab() {
                 return (
                   <div className="gl-sec">
                     <h3>Fabric</h3>
-                    {fabricRows(FABRIC_ELEMENTS.map((x) => x.key), { rooms: ids }, one ? one.name : `${ids.length} rooms`)}
+                    {fabricRows(FABRIC_ELEMENTS.map((x) => x.key).filter((k) => k !== 'partition'), { rooms: ids }, one ? one.name : `${ids.length} rooms`)}
                     <p className="gl-hint">{own.length ? `${own.length} outside wall part${own.length === 1 ? '' : 's'}, ${f1(own.reduce((t, p) => t + p.length_m, 0))} m. ` : 'No outside walls: only its roof and floor. '}Type a U-value or pick a construction for {one ? 'this room' : 'these rooms'}; if other rooms share the type, {one ? 'it gets' : 'they get'} a type of {one ? 'its' : 'their'} own.</p>
                   </div>
                 )
@@ -1465,7 +1495,7 @@ export default function GeometryLab() {
           </div>
         )
         // A gain the library has no number for: typed here; empty stays unset (the document says nothing).
-        type Gk = 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'vent_flow'
+        type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'vent_flow'
         const typed = (label: string, k: Gk, step: number, unit?: string) => (
           <div className="gl-row gl-typed">
             <span>{label}</span>
@@ -1496,13 +1526,27 @@ export default function GeometryLab() {
                 {opt('Occupancy', 'occupancy', profilesFor('occupancy'))}
                 {typed('People per m²', 'people_per_m2', 0.01)}
                 {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
-                {typed('Occupancy rate', 'occupancy_rate', 0.05, '0–1')}
+                {typed('Occupancy rate', 'occupancy_rate', 0.05)}
                 {opt('Lighting', 'lighting', profilesFor('lighting'))}
                 {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
                 {opt('Equipment', 'equipment', profilesFor('equipment'))}
                 {typed('Equipment in use', 'equipment_w_per_m2', 0.5, 'W/m²')}
                 {typed('Equipment always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
               </div>
+              <details className="gl-sec gl-more">
+                <summary><h3>How the gains enter the room</h3></summary>
+                {typed('Radiant share', 'radiant_fraction', 0.05)}
+                {opt('Lighting follows', 'light_relationship', RELATIONSHIPS)}
+                {sp.light_relationship === 'proportional_with_spill' && typed('Daylight factor', 'daylight_factor', 0.05)}
+                {typed('Lit share of floor', 'light_area_share', 0.05)}
+                {typed('Lighting heat to room', 'light_gain_fraction', 0.05)}
+                {opt('Equipment follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}
+                {sp.equip_relationship !== 'independent' && typed('Standby when empty', 'standby_factor', 0.05)}
+                {typed('Equipped share of floor', 'equip_area_share', 0.05)}
+                {typed('Equipment heat to room', 'equip_gain_fraction', 0.05)}
+                <p className="gl-hint">Shares and factors run 0 to 1. A new space type starts from today's engine values; all can be changed. Empty: not stated, and the results say so.</p>
+                <div className="gl-btns"><button type="button" className="gl-btn quiet" onClick={() => setSpace(sp.id, { ...todaysGains(), equipment_baseload_w_per_m2: sp.equipment_baseload_w_per_m2 ?? 0, occupancy_rate: sp.occupancy_rate ?? TODAY.occupancy_rate, sensible_w_per_person: sp.sensible_w_per_person ?? TODAY.sensible_w_per_person })}>Fill with today's engine values</button></div>
+              </details>
               <div className="gl-sec">
                 <h3>Comfort</h3>
                 {typed('Heating to', 'heat_c', 0.5, '°C')}
