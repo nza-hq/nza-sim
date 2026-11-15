@@ -145,3 +145,54 @@ describe('the sky term and sources', () => {
     expect(() => runZone(zone([e], { ventilation_w_per_k: v }))).toThrow('hour 7 is negative')
   })
 })
+
+describe('surface physics options (Brief 103 Part 6b)', () => {
+  const box = () => [
+    wall('w1', 30), wall('w2', 30),
+    opaqueElement({ id: 'roof', area_m2: 20, tilt_deg: 0, boundary: 'outside', layers: WALL, stated_u: null, emissivity: 0.9, path: 'roof' }),
+    opaqueElement({ id: 'floor', area_m2: 20, tilt_deg: 180, boundary: 'ground', layers: WALL, stated_u: null, emissivity: null, path: 'floor' }),
+  ]
+  const sun = Float64Array.from({ length: H }, (_, h) => (h % 24 >= 8 && h % 24 < 16 ? 2000 : 0))
+  const base = (over: Partial<ZoneInputs> = {}) => zone(box(), { theta_e: Float64Array.from({ length: H }, (_, h) => 5 + 5 * Math.sin((2 * Math.PI * h) / 24)), solar_transmitted_w: sun, ...over })
+
+  it('an hourly h_ce equal to every element\'s own gives the same run; a different one changes it', () => {
+    const a = runZone(base()), b = runZone(base({ h_ce_w_per_m2k: flat(K.h_ce) }))
+    for (let h = 0; h < H; h++) expect(b.theta_air[h]).toBeCloseTo(a.theta_air[h], 9)
+    const c = runZone(base({ h_ce_w_per_m2k: Float64Array.from({ length: H }, (_, h) => 4 + 4 * (h % 7)) }))
+    closes(c)
+    expect(Math.abs(c.theta_air[H - 1] - a.theta_air[H - 1])).toBeGreaterThan(1e-3)
+  })
+  it('the ground link is not an outside film: h_ce leaves a ground-only zone unchanged', () => {
+    const g = [opaqueElement({ id: 'floor', area_m2: 20, tilt_deg: 180, boundary: 'ground', layers: WALL, stated_u: null, emissivity: null, path: 'floor' })]
+    const a = runZone(zone(g)), b = runZone(zone(g, { h_ce_w_per_m2k: flat(4) }))
+    expect(b.theta_air[H - 1]).toBe(a.theta_air[H - 1])
+  })
+  it('by_heat_flow: closes every hour and, in steady heating, equals by_tilt (heat flows from the zone)', () => {
+    const steady = { theta_e: flat(0), solar_transmitted_w: flat(0), setpoints: { heat_c: 20, cool_c: null } }
+    const a = runZone(base(steady)), b = runZone(base({ ...steady, inside_convection: 'by_heat_flow' }))
+    closes(b)
+    // Air 20 °C above cooler surfaces: ceilings take heat upward (5.0) and floors downward (0.7), as by tilt.
+    expect(b.heating_w[H - 1]).toBeCloseTo(a.heating_w[H - 1], 6)
+  })
+  it('by_heat_flow: a floor warmer than the air takes 5.0, so the same sun reaches the air faster', () => {
+    const over = { solar_beam_w: sun, setpoints: { heat_c: null, cool_c: null } }
+    const a = runZone(base(over)), b = runZone(base({ ...over, inside_convection: 'by_heat_flow' }))
+    closes(b)
+    let pa = -Infinity, pb = -Infinity
+    for (let h = H - 24; h < H; h++) { pa = Math.max(pa, a.theta_air[h]); pb = Math.max(pb, b.theta_air[h]) }
+    expect(pb).toBeGreaterThan(pa)
+  })
+  it('solar_beam_w lands on the floor: same annual gain, closes, and the floor surface runs warmer', () => {
+    const a = runZone(base()), b = runZone(base({ solar_beam_w: sun }))
+    closes(b)
+    const sum = (x: ArrayLike<number>) => Array.from(x).reduce((s, v) => s + v, 0)
+    expect(sum(b.terms.solar_transmitted_w)).toBeCloseTo(sum(a.terms.solar_transmitted_w), 6)
+    // The floor's ground term (heat leaving to the ground) grows when the beam is on it.
+    expect(-sum(b.terms.boundary_w[3])).toBeGreaterThan(-sum(a.terms.boundary_w[3]))
+  })
+  it('refuses a beam above the transmitted solar, a non-positive h_ce, and an unknown convection mode', () => {
+    expect(() => runZone(base({ solar_beam_w: flat(5000) }))).toThrow('solar_beam_w')
+    expect(() => runZone(base({ h_ce_w_per_m2k: flat(0) }))).toThrow('h_ce_w_per_m2k')
+    expect(() => runZone(base({ inside_convection: 'x' as any }))).toThrow('inside_convection')
+  })
+})

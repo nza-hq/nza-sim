@@ -53,3 +53,69 @@ beam-on-floor difference. Other candidates, not measured here:
 - the inside long-wave exchange (Engine 1: a star network by area; EnergyPlus: view factors);
 - the sky (Engine 1: a fixed 11 K; EnergyPlus: the weather file's infrared);
 - the node count in the heavy layers.
+
+# Part 6b: three surface-physics options, and which the referee comparison uses
+
+Engine 1 gains three run options (`RunOptions.surface_physics`). Each one replaces one of the simplifications
+measured above. With the option absent, Engine 1 behaves exactly as before, and every analytic test is unchanged.
+
+1. **`beam_on_floor`.** The beam part of transmitted solar lands on the floor-facing inside surfaces (tilt above
+   120°), by area. Diffuse and ground-reflected solar are still spread over every inside surface by area.
+2. **`outside_convection: 'wind'`.** h_ce = 4 + 4·v, ISO 6946:2017 Annex C, from the weather file's hourly wind.
+   Windows included; the ground link is untouched.
+3. **`inside_convection: 'by_heat_flow'`.** ISO 52016-1 Table 25 by the actual direction of heat flow, taken from
+   the previous hour. A floor warmer than the air, or a ceiling cooler than it, takes 5.0 W/m²K; otherwise 0.7. Walls
+   stay at 2.5.
+
+When the coefficients change, the solver rebuilds its factorisation for that hour. Every run still closes its
+balance to 1e-10 Wh or better. New tests in `zone.test.ts` cover each option: an hourly h_ce equal to the fixed value
+gives the same run, steady heating is unchanged by direction of heat flow, the beam keeps the annual gain, and bad
+inputs are refused.
+
+## Table 3: each option on Engine 1, MWh
+
+| Options | 600 heating | 600 cooling | 900 heating | 900 cooling | Bridgewater heating | Bridgewater cooling |
+|---|---|---|---|---|---|---|
+| None (Part 4 / 6) | 4.698 | 5.725 | 2.436 | 2.976 | 89.91 | 15.45 |
+| Beam on floor | **4.547** | **5.628** | **2.186** | **2.755** | **89.98** | **15.32** |
+| Wind-driven outside convection | 4.682 | 5.833 | 2.398 | 3.059 | 90.07 | 15.26 |
+| Inside convection by heat flow | 4.774 | 5.725 | 2.360 | 2.770 | 89.90 | 15.30 |
+| Beam and heat flow | 4.789 | 6.251 | 2.281 | 3.112 | 89.45 | 16.33 |
+| All three | 4.775 | 6.353 | 2.245 | 3.189 | 89.61 | 16.13 |
+| *EnergyPlus as specified* | *4.289* | *6.016* | *1.652* | *2.507* | *90.46* | *13.65* |
+
+## What the referee comparison uses: the beam on the floor, nothing else
+
+The choice rests on what makes Engine 1 and EnergyPlus the same model. It does not rest on which row lands nearest.
+
+- **The beam on the floor: on.** Both referees put it there: FullInteriorAndExterior in the BESTEST twin and in the
+  Bridgewater referee. Spreading it by area, including onto the window, is a modelling difference between the two.
+  It moves Case 900 toward EnergyPlus in both heating and cooling. It also moves Case 600 heating from 4.698 to
+  4.547, away from the earlier near-match. That near-match was two differences cancelling.
+- **Wind-driven outside convection: available, off.** ISO 6946's 4 + 4v averages about 20 W/m²K at Denver's wind,
+  so it hardly changes anything. EnergyPlus's DOE-2 coefficient runs lower (Table 2). Choosing between two ISO forms
+  does not make Engine 1 use EnergyPlus's correlation. It also costs speed: the hourly rebuild takes the Bridgewater
+  year from about 25 to about 170 ms, over the 100 ms target.
+- **Inside convection by heat flow: available, off.** Table 25's 5.0 for a sunlit floor is a design value, much
+  higher than TARP's natural convection for a few kelvin of difference. With the beam on the floor it releases the
+  sun to the air at once, and cooling rises on every case. On its own it helps 900, but turning it on for that
+  reason would be choosing by the number.
+
+## Results with the referee options as now set
+
+- **BESTEST 600:** 4.547 / 5.628 MWh. Cooling is in range; heating is 0.04 above (4.504).
+- **BESTEST 900:** 2.186 / 2.755 MWh. Heating is 0.37 above range (1.814); cooling is 0.04 above (2.714).
+  - Against EnergyPlus with the same simplifications (2.082 / 2.370), the residual is +0.10 heating and +0.39
+    cooling.
+  - Still open: the inside long-wave network, the fixed 11 K sky, and the node count in heavy layers. Not chased in
+    103; Brief 104's multi-zone work revisits each.
+- **Bridgewater gate (b):** heating 89.98 vs 90.46 (−0.5 %, pass); cooling 15.32 vs 13.65 (+12.2 %, miss).
+  - The diagnosis in `06_anchor_envelope.md` stands: interior slab mass that one zone does not have.
+  - The beam now lands on the ground floor only. In the building it lands on five floors.
+- **Gate (a):** unchanged at 0.000 % on every path. It reads conductances, which no option touches.
+- **Speed:** the Bridgewater year takes 35 ms median in Node and 25 ms in a browser worker. 50 independent zones take
+  0.91 s and 1.02 s. Node and worker give identical numbers.
+- **Today's tool is unchanged.** No file of today's engine changed.
+
+`bestest.test.ts` RECORDED moves from 4.698 / 5.725 and 2.436 / 2.976 to the values above, with the reason written
+next to it.

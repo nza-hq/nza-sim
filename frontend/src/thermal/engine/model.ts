@@ -29,12 +29,27 @@ export interface RunOptions {
   solar: SolarOptions
   /** Reference cases only (BESTEST's fixed gain); internal gains from profiles arrive in Brief 105. */
   other_gains: { w: ArrayLike<number>; convective_fraction: number } | null
+  /**
+   * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
+   * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
+   * - outside_convection 'wind': h_ce = 4 + 4·v (ISO 6946:2017 Annex C) from the weather's hourly wind speed.
+   * - inside_convection 'by_heat_flow': ISO 52016-1 Table 25 by the actual direction of heat flow (previous hour).
+   * - beam_on_floor: the beam part of transmitted solar lands on the floor-facing inside surfaces, by area.
+   */
+  surface_physics?: { outside_convection: 'fixed' | 'wind'; inside_convection: 'by_tilt' | 'by_heat_flow'; beam_on_floor: boolean }
 }
 
-/** The options the EnergyPlus referee comparison uses: air thermostat, ideal convective loads, apparent solar time. */
+/**
+ * The options the EnergyPlus referee comparison uses: air thermostat, ideal convective loads, apparent solar time,
+ * and the sun's beam on the floor, as EnergyPlus distributes it (FullInteriorAndExterior) in both referees. Outside
+ * and inside convection stay ISO 52016-1's fixed values: the referee's own correlations (DOE-2, TARP) are not ISO
+ * 6946's or Table 25's, so switching between ISO forms does not make the two models the same (Part 6b,
+ * docs/audit/103/07_bestest_referee.md).
+ */
 export const REFEREE_OPTIONS: RunOptions = {
   control: 'air', hc_convective_fraction: 1, warmup_days: 25,
   solar: { albedo: 0.2, sun_day: 'actual', solar_time: 'apparent' }, other_gains: null,
+  surface_physics: { outside_convection: 'fixed', inside_convection: 'by_tilt', beam_on_floor: true },
 }
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
@@ -59,6 +74,8 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
   const absorbed: Float64Array[] = []
   const transmittedBySurface: { id: string; w: Float64Array }[] = []
   const solarTransmitted = new Float64Array(H)
+  const solarBeam = new Float64Array(H)
+  const sp = options.surface_physics ?? null
   const vents: (Vent & { m3s_per_ms: number })[] = []
   const glazingInfo: ZoneResults['conductances']['glazing'] = []
   let envelopeArea = 0
@@ -87,9 +104,13 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
       const sf = facade ? shadingFactor(facade, s.shading) : 1
       elements.push(windowElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, u, emissivity: s.thermal_emissivity, path }))
       absorbed.push(new Float64Array(H))
-      const I = solar(), w = new Float64Array(H)
+      const sun = s.tilt_deg > 90 + 1e-9 ? null : solarOnSurface(weather, s.azimuth_deg ?? 0, s.tilt_deg, options.solar)
+      const w = new Float64Array(H)
       const f = g * K.glazing_angle_factor * (1 - ff) * sf * s.area_m2
-      for (let h = 0; h < H; h++) { w[h] = I[h] * f; solarTransmitted[h] += w[h] }
+      if (sun) {
+        for (let h = 0; h < H; h++) { w[h] = sun.total[h] * f; solarTransmitted[h] += w[h] }
+        if (sp?.beam_on_floor) for (let h = 0; h < H; h++) solarBeam[h] += Math.min(sun.direct[h] * f, w[h])
+      }
       transmittedBySurface.push({ id: s.id, w })
       glazingInfo.push({ surface_id: s.id, g_value: g, frame_fraction: ff, shading_factor: sf })
       continue
@@ -141,6 +162,9 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
     other_gains: options.other_gains, setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
     control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
     warmup_days: options.warmup_days,
+    h_ce_w_per_m2k: sp?.outside_convection === 'wind' ? Float64Array.from(weather.hours.wind_speed, (v) => K.h_ce_wind_a + K.h_ce_wind_b * Math.max(0, v)) : null,
+    inside_convection: sp?.inside_convection ?? 'by_tilt',
+    solar_beam_w: sp?.beam_on_floor ? solarBeam : null,
   })
 
   // Breakdown: annual kWh per term (Rule 9). Ventilation is split into infiltration and vents by their conductances.

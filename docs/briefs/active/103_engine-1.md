@@ -316,6 +316,19 @@ Commit: `103 P6: Bridgewater envelope, per-path arithmetic against State 1 and d
 - **Every miss gets a diagnosis by instrumentation,** recorded in the audit with its magnitude: hourly traces, or a
   perturbation that isolates the term. Not tuned away.
 
+### Part 6b — Surface physics, chosen with both referees in hand (added 15 Nov 2026)
+
+Files: `frontend/src/thermal/engine/{zone,model,constants}.ts`, their tests, `validation/energyplus/103_bestest_twin.py`
+(Part 6a), `docs/audit/103/07_bestest_referee.md`. Commits: `103 P6a: …` (the BESTEST twin), `103 P6b: …`.
+
+- Build BESTEST 600/900 in EnergyPlus from Engine 1's inputs, and put each ISO 52016-1 simplification into EnergyPlus
+  one at a time, so each one's effect is measured in the referee (Part 6a).
+- Add, as run options: the sun's beam onto floor-facing inside surfaces; outside convection from the wind (ISO 6946
+  Annex C); inside convection by the actual direction of heat flow (ISO 52016-1 Table 25). Defaults unchanged.
+- Choose the referee options by what makes the two models the same physics, not by which number lands nearer. Re-run
+  BESTEST, both Bridgewater gates, performance and tests; re-record what moves, with its reason.
+- Interior floors as partitions go to Brief 104, where the multi-zone document carries real slabs.
+
 ### Part 7 — Close
 
 Files: STATUS.md, `docs/briefs/current.md`, `git mv` this brief to

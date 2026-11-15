@@ -132,7 +132,8 @@ describe.skipIf(!fs.existsSync(MOS))('ASHRAE 140 / BESTEST (local weather; skipp
   // and Brief 103 escalates that (docs/audit/103/04_engine_results.md) instead of tuning toward the range (Rule 10).
   // What is asserted: the run closes every hour, and the result is the one recorded in the audit (so any change to
   // the physics shows up here and must be re-recorded with its reason).
-  const RECORDED = { 600: { heat: 4.698, cool: 5.725 }, 900: { heat: 2.436, cool: 2.976 } } as const
+  // Re-recorded in Part 6b when REFEREE_OPTIONS put the beam on the floor (was 600: 4.698 / 5.725, 900: 2.436 / 2.976).
+  const RECORDED = { 600: { heat: 4.547, cool: 5.628 }, 900: { heat: 2.186, cool: 2.755 } } as const
   for (const [name, wall, floor] of [['600', 'wall600', 'floor600'], ['900', 'wall900', 'floor900']] as const) {
     it(`Case ${name}: closes every hour; result as recorded; range verdict printed`, () => {
       const r = runZoneModel(doc(wall, floor), weather, LIB, OPTIONS)

@@ -14,6 +14,9 @@ export const ENGINE_CONSTANTS = {
   h_ci_horizontal: 2.5,
   h_ci_upward: 5.0,
   h_ci_downward: 0.7,
+  /** ISO 6946:2017 Annex C, h_c = 4 + 4·v (v the wind speed, m/s): the wind-driven outside convection option. */
+  h_ce_wind_a: 4,
+  h_ce_wind_b: 4,
   /** Mean difference between outdoor air and apparent sky temperature, K (ISO 13790:2008 11.3.5; ISO 52016-1 Annex B default). */
   delta_theta_sky_k: 11,
   /** Convective share of transmitted solar released to the air node (ISO 52016-1 Annex B default f_sol,c). */

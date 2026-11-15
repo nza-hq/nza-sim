@@ -14,7 +14,7 @@
  * state and the response to a unit heat input are both solved, and the system is linear, so the exact input that
  * puts the control temperature on the setpoint is found without iteration.
  */
-import { ENGINE_CONSTANTS as K } from './constants'
+import { ENGINE_CONSTANTS as K, heatFlowDirection } from './constants'
 import type { Element } from './elements'
 import { luFactor, luSolve } from './linalg'
 
@@ -44,6 +44,24 @@ export interface ZoneInputs {
   control: 'air' | 'operative'
   /** Share of heating/cooling delivered to the air (1 = ideal convective, as EnergyPlus IdealLoads). */
   hc_convective_fraction: number
+  /**
+   * Outside convective coefficient per hour, W/m²K, for every element facing the outside (windows included), in place
+   * of each element's fixed h_ce. Null or absent: the element's own (ISO 52016-1 Table 25, 20 W/m²K).
+   */
+  h_ce_w_per_m2k?: ArrayLike<number> | null
+  /**
+   * Inside convection on horizontal surfaces. 'by_tilt' (default): fixed by the surface's tilt as if heat flowed from
+   * the zone (ceilings 5.0, floors 0.7). 'by_heat_flow': ISO 52016-1 Table 25 by the actual direction of heat flow,
+   * taken from the previous hour (a floor warmer than the air, or a ceiling cooler than it, is heat flowing upward:
+   * 5.0; the other way: 0.7). Walls are 2.5 either way.
+   */
+  inside_convection?: 'by_tilt' | 'by_heat_flow'
+  /**
+   * The beam part of `solar_transmitted_w`, W, per hour. It lands on the zone's upward-facing inside surfaces (floors,
+   * tilt above 120°) by area, as the sun patch does; the rest of the transmitted solar is spread over every inside
+   * surface by area. Null or absent: all of it by area (ISO 52016-1's simplification).
+   */
+  solar_beam_w?: ArrayLike<number> | null
   /** Every node starts here before the warm-up, °C. */
   initial_c: number
   /** The first day is repeated this many times before the year, as EnergyPlus's warm-up does. */
@@ -108,6 +126,19 @@ function check(inp: ZoneInputs) {
     if (!(f >= 0 && f <= 1)) throw new ZoneError('must be 0 to 1', 'other_gains.convective_fraction')
   }
   if (inp.elements.length === 0) throw new ZoneError('a zone needs at least one element', 'elements')
+  if (inp.h_ce_w_per_m2k != null) {
+    arr(inp.h_ce_w_per_m2k, 'h_ce_w_per_m2k')
+    for (let i = 0; i < hours; i++) if (!(inp.h_ce_w_per_m2k[i] > 0)) throw new ZoneError(`hour ${i} must be > 0`, 'h_ce_w_per_m2k')
+  }
+  if (inp.inside_convection != null && inp.inside_convection !== 'by_tilt' && inp.inside_convection !== 'by_heat_flow') {
+    throw new ZoneError("by_tilt or by_heat_flow", 'inside_convection')
+  }
+  if (inp.solar_beam_w != null) {
+    arr(inp.solar_beam_w, 'solar_beam_w')
+    for (let i = 0; i < hours; i++) {
+      if (inp.solar_beam_w[i] < 0 || inp.solar_beam_w[i] > inp.solar_transmitted_w[i] + 1e-9) throw new ZoneError(`hour ${i} must be between 0 and the transmitted solar`, 'solar_beam_w')
+    }
+  }
 }
 
 export function runZone(inp: ZoneInputs): ZoneRun {
@@ -116,20 +147,33 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   const els = inp.elements
   const E = els.length
   const A_tot = els.reduce((s, e) => s + e.area_m2, 0)
+  const F = E + 1
+  const nI = els.map((e) => e.c.length - 1)          // interior nodes per element (chain minus inside surface)
+  const outsideFace = els.map((e) => e.boundary === 'outside')
+  const dirOf = els.map((e) => heatFlowDirection(e.tilt_deg))
 
   // ── Structure (decision 7) ───────────────────────────────────────────────────────────────────────────────────
   // The nodes split into "interface" nodes, the air (0) and each element's inside surface (1..E), and each element's
   // interior chain (outside surface and layers), which touches nothing but its own neighbours and, at its last node,
-  // its own inside surface. Each chain is a tridiagonal block, eliminated once (static condensation); what is left is
-  // an (E+1)×(E+1) system on the interface nodes, factorised once. Each hour is then a tridiagonal substitution per
-  // element plus one small dense substitution: O(nodes), and a block structure multi-zone can extend.
-  const nI = els.map((e) => e.c.length - 1)          // interior nodes per element (chain minus inside surface)
-  const tri = els.map((e, k) => {
-    const m = nI[k], A = e.area_m2
-    const diag = new Float64Array(m), off = new Float64Array(Math.max(0, m - 1)), cap = new Float64Array(m)
+  // its own inside surface. Each chain is a tridiagonal block, eliminated (static condensation); what is left is an
+  // (E+1)×(E+1) system on the interface nodes. With fixed surface coefficients this is factorised once per run. When
+  // the outside coefficient follows the wind, or the inside one the direction of heat flow, the coefficients change
+  // hour by hour and the structure is rebuilt for the hours they change: per element a tridiagonal factorisation, and
+  // one small dense factorisation (E+1)³/3, still O(nodes) per hour.
+  interface Chain { m: number; cap: Float64Array; gLink: number; w: Float64Array; off: Float64Array; cp: Float64Array; piv: Float64Array }
+  const caps = els.map((e, k) => { const c = new Float64Array(nI[k]); for (let j = 0; j < nI[k]; j++) c[j] = e.c[j] * e.area_m2; return c })
+  const solveChain = (t: Chain, b: Float64Array, y: Float64Array) => {
+    const { m, off, cp, piv } = t
+    y[0] = b[0] / piv[0]
+    for (let j = 1; j < m; j++) y[j] = (b[j] - off[j - 1] * y[j - 1]) / piv[j]
+    for (let j = m - 2; j >= 0; j--) y[j] -= cp[j] * y[j + 1]
+    return y
+  }
+  const chain = (k: number, gB_m2: number): Chain => {
+    const e = els[k], m = nI[k], A = e.area_m2, cap = caps[k]
+    const diag = new Float64Array(m), off = new Float64Array(Math.max(0, m - 1))
     for (let j = 0; j < m; j++) {
-      cap[j] = e.c[j] * A
-      diag[j] = cap[j] / DT + e.g[j] * A + (j > 0 ? e.g[j - 1] * A : e.g_boundary * A)
+      diag[j] = cap[j] / DT + e.g[j] * A + (j > 0 ? e.g[j - 1] * A : gB_m2 * A)
       if (j < m - 1) off[j] = -e.g[j] * A
     }
     // Thomas factorisation: modified super-diagonal and pivots.
@@ -139,55 +183,63 @@ export function runZone(inp: ZoneInputs): ZoneRun {
       if (!(Math.abs(piv[j]) > 0)) throw new ZoneError('an element chain is singular', `elements[${k}]`)
       cp[j] = j < m - 1 ? off[j] / piv[j] : 0
     }
-    const gLink = e.g[m - 1] * A                       // last interior node ↔ inside surface
-    const solve = (b: Float64Array, y: Float64Array) => {
-      y[0] = b[0] / piv[0]
-      for (let j = 1; j < m; j++) y[j] = (b[j] - off[j - 1] * y[j - 1]) / piv[j]
-      for (let j = m - 2; j >= 0; j--) y[j] -= cp[j] * y[j + 1]
-      return y
-    }
+    const t: Chain = { m, cap, gLink: e.g[m - 1] * A, w: new Float64Array(m), off, cp, piv }
     // w = B⁻¹·c with c = −gLink at the last interior node: the chain's response to its inside surface temperature.
-    const unit = new Float64Array(m); unit[m - 1] = -gLink
-    const w = solve(unit, new Float64Array(m))
-    return { m, cap, gLink, solve, w, b: new Float64Array(m), y: new Float64Array(m), x: new Float64Array(m) }
-  })
-
-  const F = E + 1
-  const S = new Float64Array(F * F)
-  const capF = new Float64Array(F)
-  const add = (i: number, j: number, v: number) => { S[i * F + j] += v }
-  capF[0] = inp.air_capacity_j_per_k
-  add(0, 0, inp.bridging_w_per_k)
-  for (let k = 0; k < E; k++) {
-    const e = els[k], A = e.area_m2, f = k + 1, t = tri[k]
-    capF[f] = e.c[e.c.length - 1] * A
-    const hc = e.h_ci * A
-    add(0, 0, hc); add(f, f, hc); add(0, f, -hc); add(f, 0, -hc)
-    // ISO 52016-1 eq. 30: h_ri · A_i · Σ_k (A_k / A_tot)(θ_i − θ_k).
-    for (let q = 0; q < E; q++) {
-      if (q === k) continue
-      const g = (K.h_ri * A * els[q].area_m2) / A_tot
-      add(f, f, g); add(f, q + 1, -g)
-    }
-    // The chain's link to this surface, condensed: S_ff += gLink − cᵀ·w = gLink + gLink·w_last (w_last = −gLink·(B⁻¹)_last,last).
-    add(f, f, t.gLink + t.gLink * t.w[t.m - 1])
+    const unit = new Float64Array(m); unit[m - 1] = -t.gLink
+    solveChain(t, unit, t.w)
+    return t
   }
-  for (let i = 0; i < F; i++) add(i, i, capF[i] / DT)
-  const lu = luFactor(S, F)
 
-  // Unit responses on the interface, once per run.
+  const capF = new Float64Array(F)
+  capF[0] = inp.air_capacity_j_per_k
+  for (let k = 0; k < E; k++) capF[k + 1] = els[k].c[els[k].c.length - 1] * els[k].area_m2
   const eAir = new Float64Array(F); eAir[0] = 1
-  const uAir = luSolve(lu, eAir, new Float64Array(F))
   const eHC = new Float64Array(F)
   eHC[0] = inp.hc_convective_fraction
   for (let k = 0; k < E; k++) eHC[k + 1] += ((1 - inp.hc_convective_fraction) * els[k].area_m2) / A_tot
-  const wHC = luSolve(lu, eHC, new Float64Array(F))
   const ctl = new Float64Array(F)
   if (inp.control === 'air') ctl[0] = 1
   else { ctl[0] = 0.5; for (let k = 0; k < E; k++) ctl[k + 1] += (0.5 * els[k].area_m2) / A_tot }
   const dot = (a: Float64Array, b: Float64Array) => { let s = 0; for (let i = 0; i < F; i++) s += a[i] * b[i]; return s }
-  const ctl_uAir = dot(ctl, uAir), ctl_wHC = dot(ctl, wHC)
 
+  // One factorised structure for a given set of outside (W/m²K, per element) and inside convective coefficients.
+  const build = (gB_m2: Float64Array, hci: Float64Array) => {
+    const tri = els.map((_, k) => chain(k, gB_m2[k]))
+    const S = new Float64Array(F * F)
+    const add = (i: number, j: number, v: number) => { S[i * F + j] += v }
+    add(0, 0, inp.bridging_w_per_k)
+    for (let k = 0; k < E; k++) {
+      const A = els[k].area_m2, f = k + 1, t = tri[k]
+      const hc = hci[k] * A
+      add(0, 0, hc); add(f, f, hc); add(0, f, -hc); add(f, 0, -hc)
+      // ISO 52016-1 eq. 30: h_ri · A_i · Σ_k (A_k / A_tot)(θ_i − θ_k).
+      for (let q = 0; q < E; q++) {
+        if (q === k) continue
+        const g = (K.h_ri * A * els[q].area_m2) / A_tot
+        add(f, f, g); add(f, q + 1, -g)
+      }
+      // The chain's link to this surface, condensed: S_ff += gLink − cᵀ·w = gLink + gLink·w_last (w_last = −gLink·(B⁻¹)_last,last).
+      add(f, f, t.gLink + t.gLink * t.w[t.m - 1])
+    }
+    for (let i = 0; i < F; i++) add(i, i, capF[i] / DT)
+    const lu = luFactor(S, F)
+    const uAir = luSolve(lu, eAir, new Float64Array(F))
+    const wHC = luSolve(lu, eHC, new Float64Array(F))
+    return { tri, lu, uAir, wHC, ctl_uAir: dot(ctl, uAir), ctl_wHC: dot(ctl, wHC), gB: gB_m2.map((g, k) => g * els[k].area_m2) }
+  }
+  const gBm2 = Float64Array.from(els, (e) => e.g_boundary)
+  const hci = Float64Array.from(els, (e) => e.h_ci)
+  let st = build(gBm2, hci)
+  const dynamic = inp.h_ce_w_per_m2k != null || inp.inside_convection === 'by_heat_flow'
+  // Per-element chain state (node temperatures) and scratch, kept apart from the factorisation so a rebuild keeps it.
+  const xs = els.map((_, k) => new Float64Array(nI[k]))
+  const bs = els.map((_, k) => new Float64Array(nI[k]))
+  const ys = els.map((_, k) => new Float64Array(nI[k]))
+  const floorShare = (() => {
+    const floors = els.map((_, k) => dirOf[k] === 'downward')
+    const aF = els.reduce((s, e, k) => s + (floors[k] ? e.area_m2 : 0), 0)
+    return aF > 0 ? els.map((e, k) => (floors[k] ? e.area_m2 / aF : 0)) : null
+  })()
   const H = inp.hours
   const out: ZoneRun = {
     hours: H, nodes: 1 + els.reduce((s, e) => s + e.c.length, 0),
@@ -202,29 +254,52 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   }
 
   const xF = new Float64Array(F).fill(inp.initial_c)
-  for (const t of tri) t.x.fill(inp.initial_c)
+  for (const x of xs) x.fill(inp.initial_c)
   const bF = new Float64Array(F), z = new Float64Array(F)
   const sky = els.map((e) => -e.f_sky * e.h_re * K.delta_theta_sky_k * e.area_m2)
-  const gB = els.map((e) => e.g_boundary * e.area_m2)
   const share = els.map((e) => e.area_m2 / A_tot)
+  const hceIn = inp.h_ce_w_per_m2k ?? null
+  const byFlow = inp.inside_convection === 'by_heat_flow'
+  const beamIn = inp.solar_beam_w ?? null
   const ground = els.map((e) => e.boundary === 'ground')
   const { heat_c, cool_c } = inp.setpoints
   const fsc = K.solar_convective_fraction
   const og = inp.other_gains
 
   const step = (h: number, record: boolean) => {
+    if (dynamic) {
+      let changed = false
+      for (let k = 0; k < E; k++) {
+        if (hceIn && outsideFace[k]) {
+          const g = hceIn[h] + els[k].h_re
+          if (g !== gBm2[k]) { gBm2[k] = g; changed = true }
+        }
+        if (byFlow && dirOf[k] !== 'horizontal') {
+          // Direction of heat flow at this surface from the previous hour: a floor (inside face up) warmer than the
+          // air, or a ceiling (inside face down) cooler than it, has heat flowing upward.
+          const surf = xF[k + 1], air = xF[0]
+          const up = dirOf[k] === 'downward' ? surf > air : air > surf
+          const v = up ? K.h_ci_upward : K.h_ci_downward
+          if (v !== hci[k]) { hci[k] = v; changed = true }
+        }
+      }
+      if (changed) st = build(gBm2, hci)
+    }
+    const { tri, lu, uAir, wHC, ctl_uAir, ctl_wHC, gB } = st
     const te = inp.theta_e[h], hv = inp.ventilation_w_per_k[h], sol = inp.solar_transmitted_w[h]
+    const beam = beamIn && floorShare ? beamIn[h] : 0
     const ogw = og ? og.w[h] : 0, ogc = og ? og.convective_fraction : 0
     for (let i = 0; i < F; i++) bF[i] = (capF[i] / DT) * xF[i]
     bF[0] += inp.bridging_w_per_k * te + hv * te + fsc * sol + ogc * ogw
-    const radIn = (1 - fsc) * sol + (1 - ogc) * ogw
+    const radDiffuse = (1 - fsc) * (sol - beam) + (1 - ogc) * ogw
+    const radBeam = (1 - fsc) * beam
     for (let k = 0; k < E; k++) {
-      const t = tri[k], b = t.b
-      for (let j = 0; j < t.m; j++) b[j] = (t.cap[j] / DT) * t.x[j]
+      const t = tri[k], b = bs[k], x = xs[k], y = ys[k]
+      for (let j = 0; j < t.m; j++) b[j] = (t.cap[j] / DT) * x[j]
       b[0] += gB[k] * (ground[k] ? inp.theta_ground : te) + sky[k] + inp.solar_absorbed_w_per_m2[k][h] * els[k].area_m2
-      t.solve(b, t.y)
+      solveChain(t, b, y)
       // Condensed right-hand side: b_f − cᵀ·y = b_f + gLink·y_last.
-      bF[k + 1] += radIn * share[k] + t.gLink * t.y[t.m - 1]
+      bF[k + 1] += radDiffuse * share[k] + (floorShare ? radBeam * floorShare[k] : 0) + t.gLink * y[t.m - 1]
     }
     luSolve(lu, bF, z)
     const den = 1 + hv * uAir[0]
@@ -241,11 +316,11 @@ export function runZone(inp: ZoneInputs): ZoneRun {
       xF[i] = xi
     }
     for (let k = 0; k < E; k++) {
-      const t = tri[k], xs = xF[k + 1]
+      const t = tri[k], xsurf = xF[k + 1], x = xs[k], y = ys[k]
       for (let j = 0; j < t.m; j++) {
-        const xj = t.y[j] - t.w[j] * xs
-        if (record) stored += (t.cap[j] / DT) * (xj - t.x[j])
-        t.x[j] = xj
+        const xj = y[j] - t.w[j] * xsurf
+        if (record) stored += (t.cap[j] / DT) * (xj - x[j])
+        x[j] = xj
       }
     }
     if (!record) return
@@ -256,7 +331,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     let mrt = 0
     for (let k = 0; k < E; k++) {
       const tb = ground[k] ? inp.theta_ground : te
-      sum += (T.boundary_w[k][h] = gB[k] * (tb - tri[k].x[0]))
+      sum += (T.boundary_w[k][h] = gB[k] * (tb - xs[k][0]))
       sum += (T.solar_absorbed_w[k][h] = inp.solar_absorbed_w_per_m2[k][h] * els[k].area_m2)
       sum += (T.sky_w[k][h] = sky[k])
       mrt += xF[k + 1] * share[k]

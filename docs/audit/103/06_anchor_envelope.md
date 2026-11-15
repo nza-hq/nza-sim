@@ -4,6 +4,11 @@
 0.001 %. Transmitted solar differs by −8.9 %. That difference is fully explained by two of Engine 1's stated choices,
 and taking them out leaves 0.000 %.
 
+> **Updated in Part 6b (15 Nov 2026):** `REFEREE_OPTIONS` now puts the sun's beam on the floor, as EnergyPlus does.
+> Gate (b) moves to heating 89.98 (−0.5 %) and cooling 15.32 MWh (+12.2 %): still a miss, with the same diagnosis.
+> `06_anchor_envelope.json` holds the re-run. The tables below are the Part 6 run, kept as recorded. See
+> [`07_bestest_referee.md`](07_bestest_referee.md).
+
 **Gate (b): heating passes, cooling misses.** Against the EnergyPlus referee, heating is −0.6 % and cooling is
 +13.1 % (15.45 against 13.65 MWh). Instrumentation places the cooling miss in the internal-mass representation. Engine
 1 has one zone with its internal capacity on the air node. The referee has four concrete floor slabs between five
