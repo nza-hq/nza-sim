@@ -15,10 +15,16 @@ const FIXTURE = parseYaml(readFileSync(repo('validation/fixtures/bridgewater_anc
 
 describe('epJSON layers to engine layers', () => {
   const fx = new Map((FIXTURE.library_constructions as any[]).map((c) => [c.name, c.config_json]))
-  it('the library has the fixture\'s fifteen constructions', () => {
-    expect(CONSTRUCTIONS.map((c) => c.key).sort()).toEqual([...fx.keys()].sort())
+  const exported = CONSTRUCTIONS.filter((c) => !c.draft)
+  it('the library has the fixture\'s fifteen constructions, and the drafts on top', () => {
+    expect(exported.map((c) => c.key).sort()).toEqual([...fx.keys()].sort())
+    expect(CONSTRUCTIONS.filter((c) => c.draft).map((c) => c.key)).toEqual(['interior_wall_block_plastered'])
   })
-  for (const item of CONSTRUCTIONS) {
+  it('the draft internal wall: plaster, 100 mm block, plaster, copied from library rows', () => {
+    const got = bodyFromLibrary(CONSTRUCTIONS.find((c) => c.draft)!.body, 'draft')
+    expect(got.layers!.map((l: any) => [l.thickness, l.conductivity, l.density, l.specific_heat])).toEqual([[0.013, 0.5, 1300, 1000], [0.1, 0.51, 1400, 1000], [0.013, 0.5, 1300, 1000]])
+  })
+  for (const item of exported) {
     it(`${item.key}: layers, U and g as the fixture holds them`, () => {
       const want = fx.get(item.key)
       const got = bodyFromLibrary(item.body, item.key)

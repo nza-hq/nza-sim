@@ -73,6 +73,20 @@ describe('simulate', () => {
     const both = simulate(d, { weather: WEATHER })
     expect(both.ok ? [] : both.missing.map((m) => m.what)).toEqual(['Set the heating setpoint for "Storey 1".', 'Set the cooling setpoint for "Storey 1".'])
   })
+  it('a draft construction runs and is named in the summary', async () => {
+    const d = await doc()
+    const draft = CONSTRUCTIONS.find((c) => c.draft)!
+    expect(draft.key).toBe('interior_wall_block_plastered')
+    expect(draft.body_hash).toBe('0204c0d2fdb03e86fe74164514a58eff776cfc6be7e562494b49c4628ec1cdb3')
+    const r0 = simulate(d, { weather: WEATHER })
+    expect(r0.ok && r0.summary.drafts).toEqual([])
+    // Two storeys joined by an internal wall of the draft construction (each storey's share of a 30 m² wall).
+    d.surfaces.push({ ...structuredClone(d.surfaces.find((s: any) => s.kind === 'ceiling')), id: 'iw', kind: 'partition', tilt_deg: 90, area_m2: 30, construction_ref: { key: draft.key } })
+    d.zones[0].surfaces.push('iw'); d.zones[1].surfaces.push('iw')
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.drafts).toEqual([draft.draft])
+  })
   it('what the engine refuses comes back named, in words', async () => {
     const d = await doc()
     const i = d.profiles.findIndex((p: any) => p.kind === 'lighting')

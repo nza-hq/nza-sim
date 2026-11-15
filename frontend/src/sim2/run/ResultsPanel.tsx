@@ -202,6 +202,7 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
               ])}
             </tbody>
           </table>
+          {s.drafts.length > 0 && <p className="rp-draft">Uses a draft construction, awaiting Chris: {s.drafts.join('; ')}.</p>}
           <p className="rp-foot">MWh a year; + into the building, − out. Ran in {Math.round(state.kind === 'done' ? state.ms : 0)} ms.</p>
         </div>
       )}

@@ -37,6 +37,8 @@ export interface Summary {
   zones: { id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; heated: boolean; cooled: boolean }[]
   /** The building's balance by term, kWh a year: positive is heat into the building. Heating and cooling included. */
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
+  /** Constructions used that are drafts awaiting review (not yet in the library), by display name. */
+  drafts: string[]
 }
 
 export type SimulateResult =
@@ -91,7 +93,7 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
     }
     if (z.infiltration_q50 == null && z.infiltration_ach == null) missing.push(explain(`zones[${i}].infiltration_q50`, 'required', doc))
   })
-  return { missing, library: lib.library }
+  return { missing, library: lib.library, drafts: lib.drafts }
 }
 
 export function simulate(input: unknown, deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions }): SimulateResult {
@@ -131,6 +133,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     },
     zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh, heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null })),
     breakdown: [...byTerm].map(([term, kwh]) => ({ term, kwh })),
+    drafts: pre.drafts,
   }
   return { ok: true, results, summary }
 }

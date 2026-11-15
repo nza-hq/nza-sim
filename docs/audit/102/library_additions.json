@@ -1,0 +1,59 @@
+{
+ "_note": "Library items drafted for Simulate v2 that are NOT in Chris's database yet. Each is pending review: Chris confirms, edits or replaces it, then adds it to the library and re-exports, and the item is removed from this file. Read alongside library_export.json by scripts/sim2_library_snapshot.mjs (and the run seam's constructions script). Linzie chose this route on 15 Nov 2026 (decision card: 'I draft one, Chris checks').",
+ "items": [
+  {
+   "kind": "construction",
+   "key": "interior_wall_block_plastered",
+   "body": {
+    "name": "interior_wall_block_plastered",
+    "type": "interior",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Internal wall: plaster skim, 100mm dense concrete block, plaster skim",
+    "epjson": {
+     "Material": {
+      "IntWall_PlasterA": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      },
+      "IntWall_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "IntWall_PlasterB": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "interior_wall_block_plastered": {
+       "outside_layer": "IntWall_PlasterA",
+       "layer_2": "IntWall_ConcreteBlock",
+       "layer_3": "IntWall_PlasterB"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-15, Claude (Simulate v2 editor thread), on Linzie's decision",
+    "basis": "No new numbers: the plaster layers copy IntFloor_Plaster from interior_floor_ceiling (13 mm, k 0.5, 1300 kg/m3, 1000 J/kgK) and the block copies CavWall_Std_ConcreteBlock from cavity_wall_standard (100 mm, k 0.51, 1400 kg/m3, 1000 J/kgK), both rows of Chris's library. Symmetric, so either face can be zone A.",
+    "review": "Chris: confirm, edit or replace (e.g. a stud partition), then add to the library",
+    "library_type": "construction",
+    "display_name": "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)"
+   }
+  }
+ ]
+}
