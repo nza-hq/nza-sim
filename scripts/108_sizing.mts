@@ -14,7 +14,7 @@ import { parse } from 'yaml'
 import { fromBuildingConfig } from '../frontend/src/thermal/schema/fromBuildingConfig'
 import { EN442_STANDARD, logMeanDeltaT } from '../frontend/src/thermal/engine/emitters'
 import { CONSTRUCTIONS } from '../frontend/src/sim2/run/library'
-import { simulate } from '../frontend/src/sim2/run/seam'
+import { RUN_OPTIONS, simulate } from '../frontend/src/sim2/run/seam'
 import { weatherFromBytes } from '../frontend/src/sim2/run/weather'
 
 const root = path.resolve(__dirname, '..')
@@ -39,8 +39,8 @@ async function doc(rated: (zi: number) => number) {
   })
   return d
 }
-const run = (d: any, what_if?: { design_flow_c: number; design_return_c: number }) => {
-  const r = simulate(d, { weather, what_if })
+const run = (d: any, what_if?: { design_flow_c: number; design_return_c: number }, options = RUN_OPTIONS) => {
+  const r = simulate(d, { weather, what_if, options })
   if (!r.ok) throw new Error(JSON.stringify(r.missing))
   return r.summary
 }
@@ -54,9 +54,13 @@ const s = run(await doc((zi) => rated[zi]), { design_flow_c: 70, design_return_c
 const wi = s.emitters!.what_if!
 if (!wi.ok) throw new Error(JSON.stringify(wi.missing))
 if (!s.energy.ok || !wi.energy.ok) throw new Error('energy missing')
+// Review F1: the same at 50/40 with the radiators rated with the room at its setpoint all year (LimitCapacity's form),
+// to show how much the hourly rating moves.
+const fixed = run(await doc((zi) => rated[zi]), undefined, { ...RUN_OPTIONS, emitter_rating: 'setpoint' }).emitters!.zones
 const zones = s.emitters!.zones.map((z, i) => ({
   zone: z.name, peak_w: z.peak_w, rated_now_w: z.rated_now_w,
   at_50_40: { output_w: z.cap_w, shortfall_w: z.shortfall_w, unmet_hours: z.unmet_hours, min_c: z.min_c, hours_at_cap: z.hours_at_cap, needed_rated_w: z.needed_rated_w },
+  at_50_40_rated_at_setpoint: { unmet_hours: fixed[i].unmet_hours, min_c: fixed[i].min_c },
   at_70_60: { output_w: wi.zones[i].cap_w, shortfall_w: wi.zones[i].shortfall_w, unmet_hours: wi.zones[i].unmet_hours, min_c: wi.zones[i].min_c, hours_at_cap: wi.zones[i].hours_at_cap, needed_rated_w: wi.zones[i].needed_rated_w },
 }))
 // 3. The rating needed at 50/40, stated: no unmet hours.
@@ -69,6 +73,7 @@ const out = {
   brief: '108 P4', weather: { file, sha256: weather.sha256 }, radiators: { exponent_n: N, radiant_fraction: 0.3, sized_for: '70/60 °C, room 21 °C' },
   zones,
   building: {
+    at_50_40_rated_at_setpoint: { unmet_hours: zones.reduce((a, z) => a + z.at_50_40_rated_at_setpoint.unmet_hours!, 0) },
     at_50_40: { heating_kwh: s.building.heating_kwh, unmet_hours: zones.reduce((a, z) => a + z.at_50_40.unmet_hours!, 0), energy_kwh: s.energy.total_kwh, eui_kwh_per_m2: s.energy.eui_kwh_per_m2 },
     at_70_60: { heating_kwh: wi.heating_kwh, unmet_hours: zones.reduce((a, z) => a + z.at_70_60.unmet_hours!, 0), energy_kwh: wi.energy.total_kwh, eui_kwh_per_m2: wi.energy.eui_kwh_per_m2 },
   },

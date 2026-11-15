@@ -28,24 +28,31 @@ Emitter and design-temperature gaps now come back in words, e.g. "Set how many t
 
 ## Linzie's case on Bridgewater
 
+**Updated for review F1 (Linzie, 15 Nov: "work it out each hour").** Each hour the radiators are re-rated at the
+room's temperature at the end of the hour before, with their design water flow held, so the return falls as the room
+cools. The 50/40 figures below are on that basis. In brackets are the figures with the output fixed at its value with
+the room at its setpoint, which is Part 3's form and EnergyPlus's LimitCapacity. The building goes from
+2,845 to 2,501 unmet storey-hours, and every storey's lowest temperature rises by 0.4 to 0.6 K. The stated output,
+the shortfall and the rating needed are all at the setpoint, and none of them changes.
+
 Each storey is given panel radiators (n = 1.3, 30 % radiant) sized to give exactly its peak at 70/60 °C, as for a gas
 boiler. Then the air source heat pump is run at 50/40 °C. Room 21 °C. Outputs in kW.
 
 | Storey | Peak | Rated now (75/65/20) | Output 70/60 | Unmet h 70/60 | Output 50/40 | Short 50/40 | Unmet h 50/40 | Lowest °C 50/40 | Rating needed for 50/40 |
 |---|---|---|---|---|---|---|---|---|---|
-| Storey 1 | 23.2 | 27.4 | 23.2 | 0 | 10.4 | 12.8 | 634 | 18.0 | 61.0 |
-| Storey 2 | 18.9 | 22.4 | 18.9 | 0 | 8.5 | 10.4 | 500 | 18.3 | 49.9 |
-| Storey 3 | 19.0 | 22.5 | 19.0 | 0 | 8.5 | 10.5 | 481 | 18.2 | 50.0 |
-| Storey 4 | 19.0 | 22.5 | 19.0 | 0 | 8.5 | 10.5 | 517 | 18.1 | 50.1 |
-| Storey 5 | 24.9 | 29.5 | 24.9 | 0 | 11.2 | 13.7 | 713 | 17.3 | 65.7 |
+| Storey 1 | 23.2 | 27.4 | 23.2 | 0 | 10.4 | 12.8 | 574 (634) | 18.4 (18.0) | 61.0 |
+| Storey 2 | 18.9 | 22.4 | 18.9 | 0 | 8.5 | 10.4 | 412 (500) | 18.6 (18.3) | 49.9 |
+| Storey 3 | 19.0 | 22.5 | 19.0 | 0 | 8.5 | 10.5 | 408 (481) | 18.6 (18.2) | 50.0 |
+| Storey 4 | 19.0 | 22.5 | 19.0 | 0 | 8.5 | 10.5 | 449 (517) | 18.5 (18.1) | 50.1 |
+| Storey 5 | 24.9 | 29.5 | 24.9 | 0 | 11.2 | 13.7 | 658 (713) | 17.9 (17.3) | 65.7 |
 
 At 50/40 the same radiators give 45 % of their 70/60 output, (23.8 / 43.9)^1.3. They hold 21 °C in mild weather and
-run out in the cold: 2845 unmet storey-hours, as low as 17.3 °C on the top floor. The rating
+run out in the cold: 2,501 unmet storey-hours, as low as 17.9 °C on the top floor. The rating
 needed is 2.23 times what is there.
 
 | Building | Heating kWh | Unmet storey-hours | Energy kWh | EUI kWh/m² |
 |---|---|---|---|---|
-| 50/40 | 111,760 | 2845 | 555,005 | 131.6 |
+| 50/40 | 112,567 | 2,501 | 555,301 | 131.7 |
 | 70/60 | 116,703 | 0 | 556,818 | 132.1 |
 
 Energy is lower at 50/40 only because less heat is delivered: the rooms are colder. The heat pump's efficiency is the

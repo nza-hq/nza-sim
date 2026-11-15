@@ -127,11 +127,14 @@ function withEmitters(perRoomW: number | null, radiant = 0, over: (d: any) => vo
   return { doc: ModelDocument.parse(d), lib }
 }
 
+// (b)-(e) test the solver's fixed limit (LimitCapacity's form): the emitters rated with the room at its setpoint.
+const FIXED: RunOptions = { ...REFEREE_OPTIONS, emitter_rating: 'setpoint' }
+
 describe('(b) a cap above the peak changes nothing', () => {
   it('Engine 2 (three rooms): every hourly heating and temperature value equal to the uncapped run', () => {
-    const a = withEmitters(null), base = runModel(a.doc, W, a.lib, REFEREE_OPTIONS)
+    const a = withEmitters(null), base = runModel(a.doc, W, a.lib, FIXED)
     const peak = Math.max(...base.zones.map((z) => z.annual.peak_heating_w))
-    const b = withEmitters(peak * 2), r = runModel(b.doc, W, b.lib, REFEREE_OPTIONS)
+    const b = withEmitters(peak * 2), r = runModel(b.doc, W, b.lib, FIXED)
     for (let i = 0; i < 3; i++) {
       expect(Array.from(r.zones[i].hourly.heating_w)).toEqual(Array.from(base.zones[i].hourly.heating_w))
       expect(Array.from(r.zones[i].hourly.theta_air_c)).toEqual(Array.from(base.zones[i].hourly.theta_air_c))
@@ -146,18 +149,19 @@ describe('(b) a cap above the peak changes nothing', () => {
       d.zones[0].surfaces = d.zones[0].surfaces.filter((id: string) => d.surfaces.some((s: any) => s.id === id))
       d.system_groups[0].zones = [d.zones[0].id]
     })
-    const a = one(null), base = runModel(a.doc, W, a.lib, REFEREE_OPTIONS)
+    const a = one(null), base = runModel(a.doc, W, a.lib, FIXED)
     expect(base.engine).toBe('thermal-1')
-    const b = one(base.zones[0].annual.peak_heating_w * 2), r = runModel(b.doc, W, b.lib, REFEREE_OPTIONS)
+    const b = one(base.zones[0].annual.peak_heating_w * 2), r = runModel(b.doc, W, b.lib, FIXED)
     expect(Array.from(r.zones[0].hourly.heating_w)).toEqual(Array.from(base.zones[0].hourly.heating_w))
-    const c = one(base.zones[0].annual.peak_heating_w * 0.5), rc = runModel(c.doc, W, c.lib, REFEREE_OPTIONS)
+    const c = one(base.zones[0].annual.peak_heating_w * 0.5), rc = runModel(c.doc, W, c.lib, FIXED)
     expect(Math.max(...rc.zones[0].hourly.heating_w)).toBeLessThanOrEqual(base.zones[0].annual.peak_heating_w * 0.5 * (1 + 1e-9))
     expect(rc.zones[0].annual.unmet_heating_hours).toBeGreaterThan(0)
   })
 })
 
 describe('(e) the heated rooms capped below their peak', () => {
-  const run = (radiant: number, options: RunOptions = REFEREE_OPTIONS) => {
+  const run = (radiant: number, opts: RunOptions = FIXED) => {
+    const options: RunOptions = { ...opts, emitter_rating: 'setpoint' }
     // The uncapped run with the same radiant share (emitters far above the peak), so only the cap differs.
     const a = withEmitters(1e9, radiant), base = runModel(a.doc, W, a.lib, options)
     const cap = 0.6 * Math.min(base.zones[0].annual.peak_heating_w, base.zones[2].annual.peak_heating_w)
@@ -165,10 +169,10 @@ describe('(e) the heated rooms capped below their peak', () => {
     return { base, cap, r: runModel(b.doc, W, b.lib, options) }
   }
   for (const [label, radiant, options] of [
-    ['air control, all convective (admittance path)', 0, REFEREE_OPTIONS],
-    ['air control, 30 % radiant (dense path)', 0.3, REFEREE_OPTIONS],
-    ['operative control, 30 % radiant', 0.3, { ...REFEREE_OPTIONS, control: 'operative' }],
-    ['four steps an hour', 0, { ...REFEREE_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }],
+    ['air control, all convective (admittance path)', 0, FIXED],
+    ['air control, 30 % radiant (dense path)', 0.3, FIXED],
+    ['operative control, 30 % radiant', 0.3, { ...FIXED, control: 'operative' }],
+    ['four steps an hour', 0, { ...FIXED, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }],
   ] as const) {
     it(`${label}: never above the cap, closes every hour, colder and with unmet hours`, () => {
       const { base, cap, r } = run(radiant, options as RunOptions)
@@ -303,5 +307,90 @@ describe('review F8 and F11: refusals in words', () => {
   it('a setback says what it is, not a brief number', () => {
     const b = withEmitters(800, 0, (d) => { d.zones[0].setpoints.setback_c = 16 })
     expect(() => runModel(b.doc, W, b.lib, REFEREE_OPTIONS)).toThrow('zones[0].setpoints.setback_c: setbacks (a lower night setpoint) are not modelled yet')
+  })
+})
+
+// ── Review F1 (Linzie, 15 Nov: "work it out each hour"): the limit follows the room ───────────────────────────────
+describe('(g) a colder room draws more from the same radiator', () => {
+  const els = [wall('a', 60), wall('b', 40)]
+  const k = els.reduce((s, e) => s + e.area_m2 / (Rchain(e) + 1 / e.h_ci), 0) + 40 + 60  // W/K, air to 0 °C outside
+  // A radiator rated 800 W at 75/65/20, run at 50/40, n 1.3, in a room heated to 20 °C.
+  const R = 800, n = 1.3
+  const Q = (room: number) => R * Math.pow(logMeanDeltaT(50, 40, Math.min(room, 20)) / logMeanDeltaT(75, 65, 20), n)
+  // Where the steady loss k·θ meets the radiator's output at θ (outside 0 °C), by bisection.
+  let lo = 0, hi = 20
+  for (let i = 0; i < 200; i++) { const m = (lo + hi) / 2; if (k * m < Q(m)) lo = m; else hi = m }
+  const theta = (lo + hi) / 2
+  it('by hand: the steady state is where the loss meets the output at that room temperature, above the setpoint rating', () => {
+    expect(theta).toBeLessThan(20)
+    expect(Q(theta)).toBeGreaterThan(Q(20) * 1.05)
+  })
+  it('Engine 1 settles there; each hour within its own limit; closes', () => {
+    const r = runZone(zone1(els, { heating_cap_at: Q }))
+    expect(Math.abs(last(r.theta_air) - theta)).toBeLessThan(0.01)
+    expect(last(r.heating_w)).toBeCloseTo(Q(theta), 0)
+    for (let h = 0; h < H; h++) expect(r.heating_w[h]).toBeLessThanOrEqual(r.heating_cap_w![h] * (1 + 1e-12))
+    expect(Math.max(...r.closure_wh)).toBeLessThanOrEqual(1)
+    expect(Math.min(...r.heating_cap_w!)).toBeGreaterThanOrEqual(Q(20) * (1 - 1e-12))
+    expect(() => runZone(zone1(els, { heating_cap_at: Q, heating_cap_w: 500 }))).toThrow('give a fixed limit or one that follows the room, not both')
+  })
+  it('Engine 2 settles at the same temperature, on the air and operative paths', () => {
+    const net: NetworkInputs = {
+      zones: [{ air_capacity_j_per_k: 1e6, bridging_w_per_k: 40, ventilation_w_per_k: flat(60), solar_transmitted_w: flat(0), solar_beam_w: null, other_gains: null, setpoints: { heat_c: 20, cool_c: 26 }, initial_c: 20, heating_cap_at: Q }],
+      elements: els.map((element) => ({ element, zone_a: 0, zone_b: null, solar_absorbed_w_per_m2: flat(0), inside_solar_absorptance: 0.6, inside_solar_absorptance_b: null })),
+      hours: H, theta_e: flat(0), theta_ground: 10, control: 'air', hc_convective_fraction: 1, solar_convective_fraction: 0, warmup_days: 60,
+    }
+    const r = runNetwork(net)
+    expect(Math.abs(last(r.zones[0].theta_air) - theta)).toBeLessThan(0.01)
+    expect(last(r.zones[0].heating_w)).toBeCloseTo(Q(theta), 0)
+    expect(Math.max(...r.zones[0].closure_wh)).toBeLessThanOrEqual(1e-6)
+    const op = runNetwork({ ...net, control: 'operative', zones: [{ ...net.zones[0], heating_convective_fraction: 0.7 }] })
+    for (let h = 0; h < H; h++) expect(op.zones[0].heating_w[h]).toBeLessThanOrEqual(op.zones[0].heating_cap_w![h] * (1 + 1e-12))
+    expect(Math.max(...op.zones[0].closure_wh)).toBeLessThanOrEqual(1e-6)
+  })
+})
+
+describe('(g2) the output in a colder room: design water flow, the return falls', () => {
+  it('at the setpoint it is the stated output; colder, the water\'s heat equals the radiator\'s at the lower return', () => {
+    const { doc } = withEmitters(2000, 0, (d) => { d.system_groups[0].design_flow_c = 50; d.system_groups[0].design_return_c = 40; for (const z of d.zones) for (const e of z.emitters) e.rated_room_c = 20 })
+    const z = zoneEmitters(doc)[0]!
+    const sp = doc.zones[0].setpoints.heat_c!
+    expect(z.at(sp)).toBeCloseTo(z.cap_w, 9)
+    expect(z.at(sp + 3)).toBeCloseTo(z.cap_w, 9)  // above the setpoint it is not heating harder
+    const room = 15, q = z.at(room)
+    const mcp = z.cap_w / (50 - 40)
+    const ret = 50 - q / mcp
+    expect(ret).toBeLessThan(40)
+    expect(q).toBeCloseTo(ratedOutputAt(2000, 1.3, { flow_c: 75, return_c: 65, room_c: 20 }, { flow_c: 50, return_c: ret, room_c: room }), 6)
+    expect(q).toBeGreaterThan(z.cap_w)
+    // Less than if the return held at 40 °C (the flow would have to rise).
+    expect(q).toBeLessThan(ratedOutputAt(2000, 1.3, { flow_c: 75, return_c: 65, room_c: 20 }, { flow_c: 50, return_c: 40, room_c: room }))
+  })
+})
+
+describe('(h) the cooled room at 50/40: rated by the room against rated at the setpoint', () => {
+  const at5040 = (d: any) => { d.system_groups[0].design_flow_c = 50; d.system_groups[0].design_return_c = 40; for (const z of d.zones) for (const e of z.emitters) { e.rated_room_c = 20 } }
+  it('fewer hours below, warmer at the coldest, more heat; never above the hour\'s own limit; closes', () => {
+    const b = withEmitters(2000, 0.3, at5040)
+    const room = runModel(b.doc, W, b.lib, REFEREE_OPTIONS), fixed = runModel(b.doc, W, b.lib, FIXED)
+    for (const zi of [0, 2]) {
+      const z = room.zones[zi], f = fixed.zones[zi]
+      expect(f.annual.unmet_heating_hours!).toBeGreaterThan(0)
+      expect(z.annual.unmet_heating_hours!).toBeLessThan(f.annual.unmet_heating_hours!)
+      expect(z.annual.min_control_c).toBeGreaterThan(f.annual.min_control_c)
+      expect(z.annual.heating_kwh).toBeGreaterThan(f.annual.heating_kwh)
+      expect(z.emitters!.cap_w).toBe(f.emitters!.cap_w)  // the stated output is still the one at the setpoint
+      expect(z.closure.max_wh).toBeLessThanOrEqual(1)
+    }
+  })
+  it('electric heaters give their stated output whatever the room: the two ratings are identical', () => {
+    const el = (d: any) => { for (const z of d.zones) z.emitters = z.emitters.map((e: any) => ({ ...e, kind: 'electric', system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null })) }
+    const b = withEmitters(700, 0.3, el)
+    const room = runModel(b.doc, W, b.lib, REFEREE_OPTIONS), fixed = runModel(b.doc, W, b.lib, FIXED)
+    expect(Array.from(room.zones[0].hourly.heating_w)).toEqual(Array.from(fixed.zones[0].hourly.heating_w))
+  })
+  it('an unknown rating is refused', () => {
+    const b = withEmitters(800)
+    expect(() => runModel(b.doc, W, b.lib, { ...REFEREE_OPTIONS, emitter_rating: 'x' as any })).toThrow('options.emitter_rating: unknown emitter_rating "x"')
   })
 })

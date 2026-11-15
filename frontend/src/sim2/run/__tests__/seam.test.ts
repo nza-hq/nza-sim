@@ -164,7 +164,9 @@ describe('simulate', () => {
       expect(z.cap_w).toBeCloseTo(20000 * f(50, 40), 6)
       expect(w.cap_w).toBeCloseTo(20000 * f(70, 60), 6)
       expect(w.peak_w).toBe(z.peak_w)  // the unlimited run does not depend on the design temperatures
-      expect(r.results.zones[i].annual.peak_heating_w).toBeLessThanOrEqual(z.cap_w * (1 + 1e-9))  // the capped run never above the cap
+      // The limit follows the room (review F1): never above the radiators' output at the coldest the room fell to.
+      const fr = (fl: number, rt: number, room: number) => Math.pow(logMeanDeltaT(fl, rt, room) / logMeanDeltaT(75, 65, 20), 1.3)
+      expect(r.results.zones[i].annual.peak_heating_w).toBeLessThanOrEqual(20000 * fr(50, 40, Math.min(21, z.min_c)) * (1 + 1e-9))
       expect(z.shortfall_w).toBeCloseTo(Math.max(0, z.peak_w - z.cap_w), 9)
       expect(w.unmet_hours!).toBeLessThanOrEqual(z.unmet_hours!)
       expect(z.unmet_hours).toBe(r.results.zones[i].annual.unmet_heating_hours)
