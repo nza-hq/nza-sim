@@ -2,9 +2,9 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🟡 Brief 107 — Simulate v2 Engine 4: systems by zone group — IN PROGRESS on `chris/107-systems` (stacked on 106)
+## ✅ Brief 107 — Simulate v2 Engine 4: systems by zone group — CLOSED 15 Nov 2026 on `chris/107-systems` (stacked on 106; PR open, awaiting Linzie)
 
-Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
+Brief [`docs/briefs/archive/107_systems_COMPLETED.md`](docs/briefs/archive/107_systems_COMPLETED.md).
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/107/00_reconnaissance.md)): today's 133.2 decomposed by end use. Electricity 404.144 MWh is heating 37.657 + cooling 30.8 + hot water heat pump 41.174 + pump 1.051 + fans 40.613 + lighting 39.014 + small power 186.136 + auxiliary 27.699; gas 157.428 is the hot water boiler. Every input is in the converted document.
 - **P1 systems** ([`01_systems.md`](docs/audit/107/01_systems.md)): `engine/systems.ts`. Each group's draw from the zones' demand (proportional split, scalar efficiencies), hot water tap-mix per zone, the pump, fans by schedule, and lighting, small power and auxiliary from the gains' electricity. Today's fallbacks are refusals. Served equals demand and the end uses sum to the totals by fuel (tested by hand).
@@ -15,6 +15,7 @@ Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
 - **P3 tolerance table** ([`03_tolerances.md`](docs/audit/107/03_tolerances.md)): heating and cooling electricity −3.9 / +9.3 % (±10 %, pass), EUI 131.89 against 131.86 (pass). Hot water, fans, lighting, small power and auxiliary are shared inputs, equal by construction, and say so.
 - **P4 panel** ([`04_panel.md`](docs/audit/107/04_panel.md)): "Energy used" with EUI, fuels, end uses and each system's served and used energy; missing systems inputs named while demand still shows. Browser-checked on the editor's plan (46 kWh/m²).
 - **Independent review** ([`05_independent_review.md`](docs/audit/107/05_independent_review.md)) and **response** ([`06_review_response.md`](docs/audit/107/06_review_response.md)): no tuning, Rule 11 clean. F1 hot water now refused where a zone with use has no system; F2 served is checked against the model's demand (throws, as closure does; mutation M3 now caught); F3–F9 fixed or stated (unused inputs listed on the panel). Gate unchanged; 176 tests pass; browser-checked (`06_panel.png`).
+- **P5 close** ([`07_final_report.md`](docs/audit/107/07_final_report.md)): brief archived; design note Rev A.9. Next: Brief 108, emitters per room.
 
 ## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
 
