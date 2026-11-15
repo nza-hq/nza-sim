@@ -1,0 +1,23 @@
+{
+ "about": "Brief 108 Part 3: the cooled room (104_cooled_room_spec.json) with its heated rooms' heating limited to a fixed output, W. Chosen before any comparison as round figures below Engine 2's uncapped peaks (west 1,425 W, east 1,427 W): 'tight' about 56 %, 'mild' about 77 %. Emitters are all convective (radiant_fraction 0), as EnergyPlus's ideal loads are.",
+ "unmet_tolerance_k": 0.5,
+ "cases": {
+  "tight": {
+   "west": 800,
+   "east": 800
+  },
+  "mild": {
+   "west": 1100,
+   "east": 1100
+  }
+ },
+ "bridgewater": {
+  "about": "Bridgewater as five storeys (Brief 105's gate referee r2_z_gains_vent_std), the top storey's heating limited to 12,000 W: a round figure about 54 % of Engine 2's uncapped peak there (22,406 W), chosen before any comparison. Engine zone z5 is the referee's Floor_5.",
+  "caps": {
+   "Floor_5": 12000
+  },
+  "engine_zone": {
+   "Floor_5": "z5"
+  }
+ }
+}

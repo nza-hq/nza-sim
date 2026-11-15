@@ -210,3 +210,29 @@ describe('what an emitter needs is named, never filled', () => {
     expect(z.radiant_fraction).toBeCloseTo((1000 * 0.2 + 3000 * 0.6) / 4000, 12)
   })
 })
+
+describe('(f) against EnergyPlus: ideal loads at LimitCapacity (Brief 108 Part 3)', () => {
+  it('each capped room: heating ±10 %, unmet hours ±20 % or ±50 h, lowest temperature ±1 K', async () => {
+    const { createHash } = await import('node:crypto')
+    const repo = (p: string) => new URL(`../../../../../${p}`, import.meta.url)
+    const capsFile = fs.readFileSync(repo('validation/energyplus/108_capped_spec.json'))
+    const EP = JSON.parse(fs.readFileSync(repo('docs/audit/108/03_cooled_room_capped_energyplus.json'), 'utf8'))
+    expect(EP.caps_sha256).toBe(createHash('sha256').update(capsFile).digest('hex'))
+    expect(EP.spec_sha256).toBe(createHash('sha256').update(fs.readFileSync(repo('validation/energyplus/104_cooled_room_spec.json'))).digest('hex'))
+    const CAPS = JSON.parse(capsFile.toString())
+    for (const [name, caps] of Object.entries<Record<string, number>>(CAPS.cases)) {
+      const { doc, lib } = withEmitters(null, 0, (d) => {
+        for (const z of d.zones) if (caps[z.id]) z.emitters = [{ id: `${z.id}_e`, kind: 'electric', count: 1, rated_output_w: caps[z.id], radiant_fraction: 0, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+      })
+      const r = runModel(doc, W, lib, REFEREE_OPTIONS)
+      for (const zid of Object.keys(caps)) {
+        const z = r.zones.find((x) => x.zone_id === zid)!, p = EP.runs[name].zones[zid]
+        expect(Math.abs(z.annual.heating_kwh / 1000 / p.heat_mwh - 1), `${name} ${zid} heating`).toBeLessThanOrEqual(0.1)
+        const du = Math.abs(z.annual.unmet_heating_hours! - p.unmet_hours)
+        expect(du <= 50 || du / p.unmet_hours <= 0.2, `${name} ${zid} unmet ${z.annual.unmet_heating_hours} vs ${p.unmet_hours}`).toBe(true)
+        expect(Math.abs(z.annual.min_control_c - p.min_c), `${name} ${zid} lowest`).toBeLessThanOrEqual(1)
+        expect(p.peak_heating_w).toBeCloseTo(caps[zid], 0)  // EnergyPlus holds the cap too
+      }
+    }
+  })
+})
