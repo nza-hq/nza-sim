@@ -70,19 +70,17 @@ type State =
   | { kind: 'done'; summary: Summary; ms: number }
 
 /**
- * `right`: px from the editor's right edge, so the panel can sit beside a card the editor shows there (default 16).
- * The panel starts closed, as a tab showing the heating when there is a result.
+ * The run for one document: a worker, rerun about a quarter of a second after each change, plus the weather it runs
+ * on. One per editor; the floating panel, the workspace's strip, Heat flow tab and Site weather all read the same one.
  */
-export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?: number }) {
+export function useRun(doc: unknown) {
   const auth = useAuth()
-  const [open, setOpen] = useState(false)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
   const [weatherError, setWeatherError] = useState<string | null>(null)
   const [orgFiles, setOrgFiles] = useState<string[] | null>(null)
   const localFile = useRef<{ bytes: Uint8Array; name: string } | null>(null)
   const [saveNote, setSaveNote] = useState<string | null>(null)
-  const [info, setInfo] = useState(false)
   const client = useRef<RunClient | null>(null)
   const latestDoc = useRef(doc)
   latestDoc.current = doc
@@ -156,41 +154,90 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
     } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
-  const s = state.kind === 'done' ? state.summary : null
-  const [zoneOpen, setZoneOpen] = useState<string | null>(null)
+  return { auth, state, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+}
+export type Run = ReturnType<typeof useRun>
 
-  if (!open) {
-    return <button type="button" className="rp-tab" style={{ right }} onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : state.kind === 'missing' ? ` · ${state.items.length} to set` : ''}</button>
-  }
+/** The weather file the run uses, named with its station (decision 4), and how to choose one. */
+export function WeatherPick({ run }: { run: Run }) {
+  const { auth, weather, orgFiles, canSave, saveNote, weatherError, onLocal, onOrg, onSave } = run
   return (
-    <section className="rp" style={{ right }} aria-label="Results">
-      <header className="rp-head">
-        <h2>Heating and cooling demand</h2>
-        <button type="button" className="rp-x" onClick={() => setOpen(false)} aria-label="Hide results">–</button>
-      </header>
-
-      <div className="rp-weather">
-        <span className="rp-label">Weather</span>
-        {weather ? <span><b>{weather.file_name}</b> · {weather.station}</span> : <span className="rp-none">No weather file</span>}
-        <div className="rp-weather-pick">
-          <label className="rp-btn">
-            Choose a file…
-            <input type="file" accept=".epw" onChange={onLocal} hidden />
-          </label>
-          {auth && orgFiles && orgFiles.length > 0 && (
-            <select defaultValue="" onChange={(e) => onOrg(e.target.value)} aria-label="Your organisation's weather files">
-              <option value="" disabled>Your organisation's files</option>
-              {orgFiles.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          )}
-        </div>
-        {canSave && weather && localFile.current && (
-          <button type="button" className="rp-btn rp-save" onClick={onSave}>Save to {auth!.org.name}</button>
+    <div className="rp-weather">
+      <span className="rp-label">Weather</span>
+      {weather ? <span><b>{weather.file_name}</b> · {weather.station}</span> : <span className="rp-none">No weather file</span>}
+      <div className="rp-weather-pick">
+        <label className="rp-btn">
+          Choose a file…
+          <input type="file" accept=".epw" onChange={onLocal} hidden />
+        </label>
+        {auth && orgFiles && orgFiles.length > 0 && (
+          <select defaultValue="" onChange={(e) => onOrg(e.target.value)} aria-label="Your organisation's weather files">
+            <option value="" disabled>Your organisation's files</option>
+            {orgFiles.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
         )}
-        {saveNote && <p className="rp-note">{saveNote}</p>}
-        {weatherError && <p className="rp-error">That file could not be read: {weatherError}</p>}
       </div>
+      {canSave && weather && run.hasLocalFile() && (
+        <button type="button" className="rp-btn rp-save" onClick={onSave}>Save to {auth!.org.name}</button>
+      )}
+      {saveNote && <p className="rp-note">{saveNote}</p>}
+      {weatherError && <p className="rp-error">That file could not be read: {weatherError}</p>}
+    </div>
+  )
+}
 
+/**
+ * The workspace's strip (Brief 110 P3): always visible above the centre tabs, the building's heating, cooling and
+ * energy from the same run as the Heat flow tab, or what the run is waiting for. Numbers only from a run.
+ */
+export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void }) {
+  const { state, weather } = run
+  const s = state.kind === 'done' ? state.summary : null
+  const last = useRef<Summary | null>(null)
+  if (s) last.current = s
+  const shown = s ?? (state.kind === 'running' ? last.current : null)
+  return (
+    <div className={`rp-strip${state.kind === 'running' ? ' rp-stale' : ''}`} role="status" aria-label="Results">
+      {shown ? (
+        <>
+          <button type="button" className="rp-strip-fig" onClick={onOpen} title="Open the heat flow">
+            <span className="rp-label">Heating <i>estimate</i></span>
+            <span><b>{mwh(shown.building.heating_kwh)}</b> MWh <small>{perM2(shown.building.heating_kwh, shown.building.floor_m2)} kWh/m²</small></span>
+          </button>
+          <button type="button" className="rp-strip-fig" onClick={onOpen} title="Open the heat flow">
+            <span className="rp-label">Cooling <i>estimate</i></span>
+            <span><b>{mwh(shown.building.cooling_kwh)}</b> MWh <small>{perM2(shown.building.cooling_kwh, shown.building.floor_m2)} kWh/m²</small></span>
+          </button>
+          <button type="button" className="rp-strip-fig" onClick={onOpen} title="Open the heat flow">
+            <span className="rp-label">Energy used <i>estimate</i></span>
+            {shown.energy?.ok ? <span><b>{Math.round(shown.energy.eui_kwh_per_m2).toLocaleString('en-GB')}</b> kWh/m² <small>{mwh(shown.energy.total_kwh)} MWh</small></span> : <small className="rp-none">{shown.energy === null ? 'shown when results include systems' : 'systems not complete'}</small>}
+          </button>
+        </>
+      ) : state.kind === 'missing' ? (
+        <button type="button" className="rp-strip-msg" onClick={onOpen}>No results yet: {state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set. See them on Heat flow.</button>
+      ) : state.kind === 'error' ? (
+        <span className="rp-strip-msg rp-error">The run failed: {state.message}</span>
+      ) : !weather ? (
+        <span className="rp-strip-msg">No results yet: choose a weather file (Site).</span>
+      ) : (
+        <span className="rp-strip-msg">Working it out…</span>
+      )}
+      {weather && <span className="rp-strip-wx" title={weather.station}>{weather.file_name}</span>}
+    </div>
+  )
+}
+
+/** The results themselves: totals, energy used, by zone (each opens to its own balance) and the building's balance.
+ * `focusZone`: the zone the person has chosen in the workspace, opened first. */
+export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string | null }) {
+  const { state } = run
+  const [info, setInfo] = useState(false)
+  const s = state.kind === 'done' ? state.summary : null
+  const [zoneOpen, setZoneOpen] = useState<string | null>(focusZone ?? null)
+  useEffect(() => { if (focusZone !== undefined) setZoneOpen(focusZone) }, [focusZone])
+
+  return (
+    <div className="rp-body">
       {state.kind === 'missing' && (
         <div className="rp-missing" role="status">
           <p>To show results, the building needs:</p>
@@ -293,6 +340,29 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           <p className="rp-foot">MWh a year; + into the building, − out. Ran in {Math.round(state.kind === 'done' ? state.ms : 0)} ms.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The standalone editor's panel (`/sim2/geometry`): floats beside the editor's cards, `right` px from its right edge,
+ * and starts closed as a tab showing the heating when there is a result.
+ */
+export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?: number }) {
+  const run = useRun(doc)
+  const [open, setOpen] = useState(false)
+  const s = run.state.kind === 'done' ? run.state.summary : null
+  if (!open) {
+    return <button type="button" className="rp-tab" style={{ right }} onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : run.state.kind === 'missing' ? ` · ${run.state.items.length} to set` : ''}</button>
+  }
+  return (
+    <section className="rp" style={{ right }} aria-label="Results">
+      <header className="rp-head">
+        <h2>Heating and cooling demand</h2>
+        <button type="button" className="rp-x" onClick={() => setOpen(false)} aria-label="Hide results">–</button>
+      </header>
+      <WeatherPick run={run} />
+      <ResultsBody run={run} />
     </section>
   )
 }

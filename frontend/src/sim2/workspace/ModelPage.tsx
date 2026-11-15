@@ -7,5 +7,5 @@ import type { StepId } from './steps'
 export default function ModelPage() {
   const [, setParams] = useSearchParams()
   const onStep = (s: StepId) => setParams((p) => { p.set('step', s); return p }, { replace: true })
-  return <ModelWorkspace render={({ step, slots }) => <GeometryLab slots={slots} step={step} onStep={onStep} />} />
+  return <ModelWorkspace render={({ step, slots, centre, setCentre }) => <GeometryLab slots={slots} step={step} onStep={onStep} centreTab={centre} onCentreTab={setCentre} />} />
 }

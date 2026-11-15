@@ -47,10 +47,12 @@ import { BORROWS, borrow, borrowedFrom } from './borrow'
 import Spark from './Spark'
 import type { Slots } from '../workspace/ModelWorkspace'
 import type { StepId } from '../workspace/steps'
+import type { CentreTab } from '../workspace/layout'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
 import FacadeView from './FacadeView'
 import ResultsPanel from '../run/ResultsPanel'
+import EmbeddedResults from '../run/EmbeddedResults'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { buildDocument } from './toDocument'
 import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
@@ -183,7 +185,7 @@ const STEP_OF: Record<Mode, StepId> = { outline: 'shape', rooms: 'shape', fabric
  * Standalone (`/sim2/geometry`): one full-screen canvas with floating panels. In the Model workspace (`slots` given,
  * Brief 110): the same state and behaviour, rendered into the workspace's panes, the step coming from its rail.
  */
-export default function GeometryLab({ slots, step: railStep, onStep }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void } = {}) {
+export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void } = {}) {
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>(emptyPlan)
@@ -719,6 +721,8 @@ export default function GeometryLab({ slots, step: railStep, onStep }: { slots?:
   const onSite = embedded && railStep === 'site'
   /** Steps 6 and 7 are the workspace's empty states: the editor stays mounted (nothing is lost) with its right side empty. */
   const offStep = embedded && (railStep === 'check' || railStep === 'interventions')
+  /** Where Site puts the weather choice (the run's own picker, rendered there). */
+  const [weatherEl, setWeatherEl] = useState<HTMLElement | null>(null)
 
   // ─── the wall card: a room's piece of an outside wall, or the whole wall ─────────
   const pieces = useMemo(() => wallPieces(plan), [plan])
@@ -949,6 +953,12 @@ export default function GeometryLab({ slots, step: railStep, onStep }: { slots?:
 
   // ─── rooms and zones ───────────────────────────────────────────────────────
   const selRooms = sel?.kind === 'rooms' ? plan.rooms.filter((r) => sel.ids.includes(r.id)) : []
+  /** The zone the person has chosen (every chosen room in one zone): Heat flow opens at it. */
+  const focusZone = (() => {
+    const ids = [...chosenSet.rooms, ...selRooms.map((r) => r.id)]
+    const zs = new Set(plan.rooms.filter((r) => ids.includes(r.id)).map((r) => r.zone))
+    return ids.length && zs.size === 1 && ids.length < plan.rooms.length ? [...zs][0]! : null
+  })()
   const roomsIn = (zid: string) => plan.rooms.filter((r) => r.zone === zid)
   const setZoneOf = (v: string) => {
     if (v === '__mixed' || !selRooms.length) return
@@ -1124,7 +1134,8 @@ export default function GeometryLab({ slots, step: railStep, onStep }: { slots?:
             </div>
             <p className="gl-hint">How much wind reaches the building: it drives air leakage and the vents. One value for the whole site.</p>
             <h4>Weather</h4>
-            <p className="gl-hint">The weather file is chosen on the Heat flow tab for now (a file from this computer, or one your organisation has saved). It moves here with the results.</p>
+            <div ref={setWeatherEl} />
+            <p className="gl-hint">An EPW file from this computer, or one your organisation has saved. Every result is worked out on it, and names it.</p>
           </div>
         }
       />
@@ -1495,7 +1506,8 @@ export default function GeometryLab({ slots, step: railStep, onStep }: { slots?:
   const toPane = (el: HTMLElement | undefined, node: React.ReactNode, key: string) => (embedded && el ? createPortal(<div className="gl-root gl-pane">{node}</div>, el, key) : node)
   const root = (
     <div className={`gl-root${giving ? ' giving' : ''}${embedded ? ' embedded' : ''}`} ref={host}>
-      <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />
+      {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
+      {embedded && slots && <EmbeddedResults doc={built.doc} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
