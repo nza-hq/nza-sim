@@ -6,6 +6,14 @@ Written 15 Nov 2026 by Linzie's project agent.
 
 > "One thing I do want to build into this is a behind-the-metre tool. We can say, 'Right, we've got two radiators in room one. Each of those radiators has 500 W output. Then the most heat that they can ever give out is 1 kW in that room.' I want to do this so we can help size systems. If we ever did change from a gas boiler wet radiator system to one with a heat pump, then we can figure out how those radiators might perform at lower flow and return temperatures."
 
+**Follow-ups from Linzie** (15 Nov 21:35):
+- *Not just radiators.* Any terminal unit (VRF indoor units, fan coils, electric heaters, underfloor) "can do X kW". This brief covers every kind.
+- *Dynamics.* Heat should not arrive instantly. This brief carries each emitter's radiant share (heat that warms the room's surfaces first). The time response goes to Brief 109:
+  - underfloor heat into the slab;
+  - emitter warm-up;
+  - morning boost within capacity.
+- *End goal.* Realistic hourly load profiles, compared and calibrated against metered data. Outputs stay hourly per system.
+
 ## Scope (CLAUDE.md process rule 10), and the scope change it needs
 
 This brief is in the Systems module, and it changes the Simulate v2 engine (Engines 1 and 2). Today's engine (`instantCalc.js`, `systemsEngine.js`, `nza_engine/`) is not touched.
@@ -45,7 +53,11 @@ This brief is in the Systems module, and it changes the Simulate v2 engine (Engi
 
 ## Part 1 — Schema 2.4: emitters per zone, design temperatures per heating system
 
-- **Each zone gets `emitters[]`**, as settled in Part 0 (decision 1). A wet emitter names its heating group and its rating (rated output, flow, return and room temperatures, exponent n). An electric emitter has a fixed output. Nothing is defaulted.
+- **Each zone gets `emitters[]`**, as settled in Part 0 (decision 1), with `kind` one of `radiator`, `underfloor`, `fan_coil`, `vrf_indoor`, `electric`, `other`.
+  - Every emitter states its count, its output, and its `radiant_fraction` (the share of its heat that goes to the room's surfaces rather than the air).
+  - A wet emitter (`radiator`, `underfloor`, wet `fan_coil`, `other`) names its heating group and its rating: flow, return and room temperatures, and exponent n.
+  - A `vrf_indoor` or `electric` unit has a fixed output in kW. A VRF unit's capacity falling with outdoor temperature is out of scope here and stated.
+  - Nothing is defaulted.
 - **Each heating system group gets** `design_flow_c` and `design_return_c` (nullable; required when any zone it serves has emitters).
 - **Optional per zone.** A zone without emitters is uncapped, as today: ideal loads. The panel says so ("no emitters stated: output not limited").
 - **Upgrade and converter.**
@@ -60,6 +72,7 @@ This brief is in the Systems module, and it changes the Simulate v2 engine (Engi
   - ΔT is taken at the system's design flow and return and the zone's heating setpoint, held for the year (a design rating, stated).
   - A zone served by several heating systems (shares) takes each share's emitters at that system's temperatures. Part 0 settles the exact form.
 - **Engine 1:** `phi` is limited to the cap.
+- **Radiant share.** Heating's radiant part goes to the zone's surfaces, by the zone's emitters' output-weighted radiant fraction. Today it is all to the air in Engine 2 (`hc_convective_fraction`), so this becomes a per-zone value. With no emitters stated, nothing changes.
 - **Engine 2:** a third state in the active set. A capped zone floats with its heating fixed at the cap. Convergence stays guarded.
 - **Results:**
   - per zone: unmet heating hours (hours the control temperature is more than 0.5 K below the setpoint, stated), the lowest temperature, and the hours at the cap;

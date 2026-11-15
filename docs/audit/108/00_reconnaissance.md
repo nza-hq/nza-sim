@@ -34,6 +34,9 @@
 
 ## Decisions that refine the brief
 
+(Decision 1 is widened by Linzie's follow-up of 21:35. Kinds are `radiator`, `underfloor`, `fan_coil`, `vrf_indoor`, `electric` and `other`. `vrf_indoor` and `electric` have a fixed output. Every emitter states a `radiant_fraction`. The time response is Brief 109.)
+
+
 1. **Which system feeds an emitter.**
    - A wet emitter (radiator, underfloor, fan coil) names its heating system group (`system_group_id`), and is rated at that group's design flow and return.
    - An electric emitter (`kind: 'electric'`) has a fixed output and no temperatures.
