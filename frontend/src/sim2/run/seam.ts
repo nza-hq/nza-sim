@@ -22,6 +22,7 @@
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine/model'
+import { zoneSizing, type ZoneSizing } from '../../thermal/engine/emitters'
 import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingPeakW, type BreakdownLine, type ModelResults,
@@ -104,7 +105,37 @@ export interface Summary {
     | { ok: false; missing: Missing[] }
     /** Brief 111: no systems at this level, so no energy. */
     | null
+  /**
+   * Brief 108 Part 4: each zone that states emitters, their output against the peak it needs, and the standard rating
+   * that would cover it. Null when no zone states emitters (heating is not limited anywhere).
+   */
+  emitters: EmitterSummary | null
 }
+
+/** One zone's emitters: sizing (peak from a run with the emitters unlimited) and how the capped run went. */
+export type EmitterZone = ZoneSizing & {
+  id: string; name: string
+  /** Hours the zone ran more than 0.5 K below its heating setpoint, in the capped run. */
+  unmet_hours: number | null
+  /** The lowest control temperature of the year, °C, in the capped run. */
+  min_c: number
+  /** Hours the emitters gave all they could, in the capped run. */
+  hours_at_cap: number
+}
+
+export interface EmitterSummary {
+  zones: EmitterZone[]
+  /**
+   * The same building with every wet heating system's design flow and return temperatures replaced, and nothing else
+   * changed (Linzie's case: 70/60 against 50/40). Null when no what-if was asked for.
+   */
+  what_if:
+    | null
+    | { ok: true; flow_c: number; return_c: number; heating_kwh: number; zones: EmitterZone[]; energy: Summary['energy'] }
+    | { ok: false; flow_c: number; return_c: number; missing: Missing[] }
+}
+
+export interface WhatIf { design_flow_c: number; design_return_c: number }
 
 export type SimulateResult =
   | { ok: true; results: ModelResults; summary: Summary }
@@ -129,6 +160,11 @@ const FIELD: Record<string, string> = {
   relationship_to_occupancy: 'how it follows occupancy', gain_fraction: 'a gain fraction', area_share: 'an area share',
   daylight_factor: 'a daylight factor', standby_factor: 'a standby factor', schedule: 'a schedule', density: 'a density',
 }
+const EMITTER_FIELD: Record<string, string> = {
+  count: 'how many there are', rated_output_w: 'the rated output (W)', radiant_fraction: 'the radiant fraction',
+  system_group_id: 'the heating system that feeds it', rated_flow_c: 'the rated flow temperature', rated_return_c: 'the rated return temperature',
+  rated_room_c: 'the rated room temperature', exponent_n: 'the exponent (n)',
+}
 const zoneName = (d: ModelDocument | null, i: string) => `"${d?.zones[Number(i)]?.name || `zone ${Number(i) + 1}`}"`
 const profileLabel = (d: ModelDocument | null, i: string) => d?.profiles[Number(i)]?.label || d?.profiles[Number(i)]?.id || `profile ${i}`
 
@@ -137,6 +173,18 @@ export function explain(path: string, message: string, doc: ModelDocument | null
   for (const [re, f] of WORDS) {
     const m = path.match(re)
     if (m) return { path, what: f(m, doc) }
+  }
+  // Brief 108: emitters and their system's design temperatures, in words; the engine's reason kept when it is not "required".
+  const sentence = (head: string, field: string) => ({ path, what: message.startsWith('required') ? `Set ${field} for ${head}.` : `${head.charAt(0).toUpperCase()}${head.slice(1)}: ${message.replace(/^required: /, '')}.` })
+  const g = path.match(/^system_groups\[(\d+)\]\.design_(flow|return)_c$/)
+  if (g) {
+    const sg = doc?.system_groups[Number(g[1])]
+    return sentence(`the heating system "${sg?.label || sg?.id || g[1]}"`, `the ${g[2]} temperature its emitters run at`)
+  }
+  const e = path.match(/^zones\[(\d+)\]\.emitters\[(\d+)\]\.(\w+)$/)
+  if (e) {
+    const em = doc?.zones[Number(e[1])]?.emitters[Number(e[2])]
+    return sentence(`the emitter "${em?.label || em?.id || e[2]}" in ${zoneName(doc, e[1])}`, EMITTER_FIELD[e[3]] ?? e[3].replace(/_/g, ' '))
   }
   return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)} (${path}).` }
 }
@@ -163,7 +211,7 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
 
 export function simulate(
   input: unknown,
-  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null },
+  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf },
 ): SimulateResult {
   const level = deps.level ?? 'systems'
   if (!LEVELS.includes(level)) return { ok: false, missing: [{ path: 'level', what: `Unknown results level "${String(level)}".` }] }
@@ -189,15 +237,14 @@ export function simulate(
   const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
   if (pre.missing.length) return { ok: false, missing: pre.missing }
   const weather = deps.weather!
+  const options = deps.options ?? RUN_OPTIONS
+  const run = (d: ModelDocument, o: RunOptions) => runModel(d, weather.weather, pre.library, o)
   let results: ModelResults
   try {
-    results = runModel(doc, weather.weather, pre.library, deps.options ?? RUN_OPTIONS)
+    results = run(doc, options)
   } catch (e) {
-    const err = e as Error & { path?: string }
-    if (typeof err.path === 'string') {
-      const msg = err.message.startsWith(`${err.path}: `) ? err.message.slice(err.path.length + 2) : err.message
-      return { ok: false, missing: [explain(err.path, msg, doc)] }
-    }
+    const m = engineMissing(e, doc)
+    if (m) return { ok: false, missing: [m] }
     throw e
   }
   // By term, summed over the given zones' lines. The building leaves heat between zones out (it cancels); a zone keeps it.
@@ -219,8 +266,57 @@ export function simulate(
     drafts: pre.drafts,
     level, fabric_heat_c: fabricC,
     energy: level === 'systems' ? energyOf(doc, results, weather) : null,
+    emitters: null,
   }
+  summary.emitters = emitterSummary(doc, results, options, run, weather, deps.what_if ?? null)
   return { ok: true, results, summary }
+}
+
+/** What the engine refused, named by its path; null for anything else (a fault, rethrown). */
+function engineMissing(e: unknown, doc: ModelDocument): Missing | null {
+  const err = e as Error & { path?: string }
+  if (typeof err?.path !== 'string') return null
+  const msg = err.message.startsWith(`${err.path}: `) ? err.message.slice(err.path.length + 2) : err.message
+  return explain(err.path, msg, doc)
+}
+
+/**
+ * Brief 108 Part 4. Sizing needs each zone's peak with its emitters unlimited: a second run of the same document,
+ * the emitters' radiant share kept and their output not limited (`emitter_limit: 'none'`). The what-if changes only
+ * the wet heating systems' design temperatures, runs capped and unlimited again, and reports the same lines.
+ */
+function emitterSummary(
+  doc: ModelDocument, results: ModelResults, options: RunOptions, run: (d: ModelDocument, o: RunOptions) => ModelResults,
+  weather: WeatherChoice, whatIf: WhatIf | null,
+): EmitterSummary | null {
+  if (!doc.zones.some((z) => z.emitters.length > 0)) return null
+  const sized = (d: ModelDocument, capped: ModelResults): EmitterZone[] => {
+    const free = run(d, { ...options, emitter_limit: 'none' })
+    return capped.zones.flatMap((z, i) => {
+      if (!z.emitters) return []
+      return [{
+        id: z.zone_id, name: d.zones[i].name,
+        ...zoneSizing(d, i, z.emitters, free.zones[i].annual.peak_heating_w),
+        unmet_hours: z.annual.unmet_heating_hours, min_c: z.annual.min_control_c, hours_at_cap: z.emitters.hours_at_cap,
+      }]
+    })
+  }
+  const zones = sized(doc, results)
+  if (!whatIf) return { zones, what_if: null }
+  const { design_flow_c: flow_c, design_return_c: return_c } = whatIf
+  const w = structuredClone(doc)
+  let changed = 0
+  for (const g of w.system_groups) {
+    if (g.service === 'heating' && g.design_flow_c != null) { g.design_flow_c = flow_c; g.design_return_c = return_c; changed++ }
+  }
+  if (changed === 0) return { zones, what_if: { ok: false, flow_c, return_c, missing: [{ path: 'system_groups', what: 'No heating system states flow and return temperatures, so there is nothing to compare.' }] } }
+  let wr: ModelResults
+  try { wr = run(w, options) } catch (e) {
+    const m = engineMissing(e, w)
+    if (m) return { zones, what_if: { ok: false, flow_c, return_c, missing: [m] } }
+    throw e
+  }
+  return { zones, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr), energy: energyOf(w, wr, weather) } }
 }
 
 const SERVICE_WORDS: Record<string, string> = { heating: 'heating', cooling: 'cooling', dhw: 'hot water', lighting: 'lighting', small_power: 'small power', auxiliary: 'auxiliary' }

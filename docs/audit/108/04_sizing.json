@@ -1,0 +1,165 @@
+{
+  "brief": "108 P4",
+  "weather": {
+    "file": "GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw",
+    "sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2"
+  },
+  "radiators": {
+    "exponent_n": 1.3,
+    "radiant_fraction": 0.3,
+    "sized_for": "70/60 °C, room 21 °C"
+  },
+  "zones": [
+    {
+      "zone": "Storey 1",
+      "peak_w": 23157.719014076683,
+      "rated_now_w": 27379.28232783468,
+      "at_50_40": {
+        "output_w": 10389.623748285925,
+        "shortfall_w": 12768.095265790758,
+        "unmet_hours": 634,
+        "min_c": 17.996057386021768,
+        "hours_at_cap": 1340,
+        "needed_rated_w": 61026.43775330891
+      },
+      "at_70_60": {
+        "output_w": 23157.719014076683,
+        "shortfall_w": 0,
+        "unmet_hours": 0,
+        "min_c": 20.99999999999998,
+        "hours_at_cap": 1,
+        "needed_rated_w": 27379.28232783468
+      }
+    },
+    {
+      "zone": "Storey 2",
+      "peak_w": 18947.432483581717,
+      "rated_now_w": 22401.476718852628,
+      "at_50_40": {
+        "output_w": 8500.69449330494,
+        "shortfall_w": 10446.737990276777,
+        "unmet_hours": 500,
+        "min_c": 18.250962138072115,
+        "hours_at_cap": 1099,
+        "needed_rated_w": 49931.26949771936
+      },
+      "at_70_60": {
+        "output_w": 18947.432483581717,
+        "shortfall_w": 0,
+        "unmet_hours": 0,
+        "min_c": 20.99999999999998,
+        "hours_at_cap": 1,
+        "needed_rated_w": 22401.476718852628
+      }
+    },
+    {
+      "zone": "Storey 3",
+      "peak_w": 18990.650804631772,
+      "rated_now_w": 22452.573573989575,
+      "at_50_40": {
+        "output_w": 8520.084230889619,
+        "shortfall_w": 10470.566573742153,
+        "unmet_hours": 481,
+        "min_c": 18.24642757626566,
+        "hours_at_cap": 1089,
+        "needed_rated_w": 50045.16068785603
+      },
+      "at_70_60": {
+        "output_w": 18990.650804631772,
+        "shortfall_w": 0,
+        "unmet_hours": 0,
+        "min_c": 20.99999999999998,
+        "hours_at_cap": 1,
+        "needed_rated_w": 22452.573573989575
+      }
+    },
+    {
+      "zone": "Storey 4",
+      "peak_w": 19022.87488323964,
+      "rated_now_w": 22490.67197847505,
+      "at_50_40": {
+        "output_w": 8534.54144285283,
+        "shortfall_w": 10488.333440386812,
+        "unmet_hours": 517,
+        "min_c": 18.058350374365197,
+        "hours_at_cap": 1109,
+        "needed_rated_w": 50130.07927271862
+      },
+      "at_70_60": {
+        "output_w": 19022.87488323964,
+        "shortfall_w": 0,
+        "unmet_hours": 0,
+        "min_c": 20.999999999999975,
+        "hours_at_cap": 1,
+        "needed_rated_w": 22490.67197847505
+      }
+    },
+    {
+      "zone": "Storey 5",
+      "peak_w": 24929.59125824889,
+      "rated_now_w": 29474.16008296056,
+      "at_50_40": {
+        "output_w": 11184.567582598365,
+        "shortfall_w": 13745.023675650524,
+        "unmet_hours": 713,
+        "min_c": 17.321003213264923,
+        "hours_at_cap": 1375,
+        "needed_rated_w": 65695.76857773346
+      },
+      "at_70_60": {
+        "output_w": 24929.59125824889,
+        "shortfall_w": 0,
+        "unmet_hours": 0,
+        "min_c": 20.99999999999998,
+        "hours_at_cap": 1,
+        "needed_rated_w": 29474.16008296056
+      }
+    }
+  ],
+  "building": {
+    "at_50_40": {
+      "heating_kwh": 111760.12552173593,
+      "unmet_hours": 2845,
+      "energy_kwh": 555005.3673961357,
+      "eui_kwh_per_m2": 131.64388831870693
+    },
+    "at_70_60": {
+      "heating_kwh": 116702.92621509965,
+      "unmet_hours": 0,
+      "energy_kwh": 556817.7675286938,
+      "eui_kwh_per_m2": 132.0737785768114
+    }
+  },
+  "verify_needed_rating_at_50_40": [
+    {
+      "zone": "Storey 1",
+      "rated_w": 61026.437814335346,
+      "unmet_hours": 0,
+      "shortfall_w": 0
+    },
+    {
+      "zone": "Storey 2",
+      "rated_w": 49931.269547650634,
+      "unmet_hours": 0,
+      "shortfall_w": 0
+    },
+    {
+      "zone": "Storey 3",
+      "rated_w": 50045.16073790119,
+      "unmet_hours": 0,
+      "shortfall_w": 0
+    },
+    {
+      "zone": "Storey 4",
+      "rated_w": 50130.0793228487,
+      "unmet_hours": 0,
+      "shortfall_w": 0
+    },
+    {
+      "zone": "Storey 5",
+      "rated_w": 65695.76864342923,
+      "unmet_hours": 0,
+      "shortfall_w": 0
+    }
+  ]
+}
