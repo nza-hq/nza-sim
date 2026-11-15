@@ -1249,7 +1249,7 @@ export default function GeometryLab() {
                       })}
                     </div>
                     {elem === 'partition' ? (
-                      <p className="gl-hint">One type for every wall between zones. The library has no internal wall construction yet, so none can be picked; a typed U alone is not enough to run.</p>
+                      <p className="gl-hint">One type for every wall between zones. The library's internal wall is a draft (plaster, block, plaster from existing library layers) waiting for Chris to check.</p>
                     ) : (<>
                     <div className="gl-btns">
                       <button type="button" className="gl-btn quiet" onClick={() => { const r = newType(plan, elem); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}>Add a type</button>

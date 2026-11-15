@@ -203,5 +203,8 @@ describe('the two-zone test fixture', () => {
     expect(doc.zones.map((z: any) => [z.setpoints.heat_c, z.setpoints.cool_c, z.setpoints.control_strategy, z.infiltration_q50])).toEqual([[21, 24, 'active_setpoint', 5], [16, null, 'active_setpoint', 5]])
     expect(doc.building.thermal_bridging).toEqual({ mode: 'iso14683_auto', multiplier: 1, alpha_pct: null })
     expect(doc.building.site.exposure).toBe('normal')
+    // Walls between zones take the drafted internal wall, flagged as awaiting Chris.
+    expect(doc.surfaces.filter((s: any) => s.kind === 'partition').map((s: any) => s.construction_ref.key)).toEqual(['interior_wall_block_plastered'])
+    expect(b.notes.some((n) => /draft library item/.test(n))).toBe(true)
   })
 })

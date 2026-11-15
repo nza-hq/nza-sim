@@ -354,6 +354,10 @@ export function buildDocument(plan: Plan): Built {
     }
   }
 
+  for (const k of new Set(surfaces.map((sf) => (sf.construction_ref as { key: string }).key))) {
+    const c = construction(k)
+    if (c?.pending) notes.push(`${c.name}: a draft library item, not yet checked by Chris`)
+  }
   // Every library item the document uses, pinned by its body hash (from the snapshot), so a run says what it read.
   function libraryRefs() {
     const refs = new Map<string, { kind: string; key: string; version: null; body_hash: string }>()

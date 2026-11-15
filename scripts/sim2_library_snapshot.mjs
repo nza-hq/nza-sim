@@ -16,11 +16,16 @@ const raw = readFileSync(src)
 const ex = JSON.parse(raw)
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const { canonicalJSON } = await import('../frontend/src/thermal/schema/canonical.ts')
-const items = ex.items.map((i) => ({ ...i, hash: createHash('sha256').update(canonicalJSON(i.body)).digest('hex') }))
-const constructions = items.filter((i) => i.kind === 'construction').map(({ key, body, provenance, hash }) => ({
+// Drafted items awaiting Chris's review (docs/audit/102/library_additions.json) come too, flagged pending.
+const addRaw = readFileSync(join(repo, 'docs/audit/102/library_additions.json'))
+const additions = JSON.parse(addRaw).items.map((i) => ({ ...i, pending: true }))
+const items = [...ex.items, ...additions].map((i) => ({ ...i, hash: createHash('sha256').update(canonicalJSON(i.body)).digest('hex') }))
+const constructions = items.filter((i) => i.kind === 'construction').map(({ key, body, provenance, hash, pending }) => ({
   key,
   body_hash: hash,
-  element: body.type, // wall | glazing | roof | floor | interior
+  ...(pending ? { pending: true } : {}),
+  // wall | glazing | roof | floor | interior; an interior wall (key interior_wall_*) is a wall between zones.
+  element: body.type === 'interior' && key.startsWith('interior_wall') ? 'partition' : body.type,
   name: provenance?.display_name ?? body.description ?? key,
   u: num(body.u_value_W_per_m2K),
   g: num(body.g_value),
@@ -55,6 +60,7 @@ const snap = {
   source: 'docs/audit/102/library_export.json',
   source_sha256: createHash('sha256').update(raw).digest('hex'),
   exported_at: ex.exported_at,
+  additions_sha256: createHash('sha256').update(addRaw).digest('hex'),
   constructions,
   systems,
   profiles,

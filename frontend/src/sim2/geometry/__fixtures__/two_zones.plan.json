@@ -230,7 +230,7 @@
     "id": "f_partition",
     "element": "partition",
     "name": "Wall between zones",
-    "construction": null,
+    "construction": "interior_wall_block_plastered",
     "u": null
    }
   ],

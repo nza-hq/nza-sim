@@ -3,6 +3,7 @@
  "source": "docs/audit/102/library_export.json",
  "source_sha256": "c3891d6632c605671a54843cc4cc0e50b66f0ec2ecfc544b8b9c7f9d96d6b9f0",
  "exported_at": "2026-11-14T19:36:56+00:00",
+ "additions_sha256": "30bcb08bfd432965d8e4be37742073420878c5d5304f44be831eac9105975c13",
  "constructions": [
   {
    "key": "bridgwater_ext_wall",
@@ -123,6 +124,15 @@
    "name": "Triple glazing, double low-e coatings, argon filled",
    "u": 0.8,
    "g": 0.35
+  },
+  {
+   "key": "interior_wall_block_plastered",
+   "body_hash": "0204c0d2fdb03e86fe74164514a58eff776cfc6be7e562494b49c4628ec1cdb3",
+   "pending": true,
+   "element": "partition",
+   "name": "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)",
+   "u": null,
+   "g": null
   }
  ],
  "systems": [
