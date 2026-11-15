@@ -193,3 +193,15 @@ describe('model document', () => {
     expect(diag.area_m2).toBeCloseTo(Math.hypot(6, 6) * 3, 3)
   })
 })
+
+describe('the two-zone test fixture', () => {
+  it('builds a valid document with setpoints, air leakage, bridging and exposure stated', async () => {
+    const fx = (await import('../__fixtures__/two_zones.plan.json')).default as unknown as { plan: Plan }
+    const b = buildDocument(fx.plan)
+    expect(b.issues).toEqual([])
+    const doc = b.doc as any
+    expect(doc.zones.map((z: any) => [z.setpoints.heat_c, z.setpoints.cool_c, z.setpoints.control_strategy, z.infiltration_q50])).toEqual([[21, 24, 'active_setpoint', 5], [16, null, 'active_setpoint', 5]])
+    expect(doc.building.thermal_bridging).toEqual({ mode: 'iso14683_auto', multiplier: 1, alpha_pct: null })
+    expect(doc.building.site.exposure).toBe('normal')
+  })
+})

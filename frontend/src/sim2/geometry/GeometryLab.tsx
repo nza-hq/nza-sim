@@ -36,7 +36,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { FABRIC_ELEMENTS, type FabricElement, type FabricType, type Plan, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, wallRuns } from './plan'
+import { type BuildingInputs, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, wallRuns } from './plan'
 import { LIBRARY, construction, constructionsFor, profilesFor, system, systemsFor } from '../library/library'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
@@ -188,6 +188,17 @@ export default function GeometryLab() {
     setView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, k: Math.max(4, Math.min(60, room[0]! / w, room[1]! / h)) })
   }
 
+  // For browser checks: read the plan, or load one (a fixture), from the page (window.sim2).
+  useEffect(() => {
+    ;(window as unknown as { sim2?: unknown }).sim2 = {
+      getPlan: () => plan,
+      loadPlan: (p: Plan) => {
+        commit({ ...emptyPlan(), ...p })
+        setSel(null)
+        fitTo(p.blocks.flat())
+      },
+    }
+  })
   const runs = useMemo(() => wallRuns(plan.blocks), [plan.blocks])
   const built = useMemo(() => buildDocument(plan), [plan])
   const placed = useMemo(() => allWindows(plan).windows, [plan])
@@ -1159,7 +1170,24 @@ export default function GeometryLab() {
                 const types = plan.fabric_types.filter((t) => t.element === elem)
                 const act = activeOf(elem)
                 const lib = constructionsFor(elem)
+                const bi = plan.building ?? noBuildingInputs()
+                const setBi = (q: Partial<BuildingInputs>) => commit({ ...plan, building: { ...bi, ...q } })
                 return (
+                  <>
+                  <div className="gl-sec">
+                    <h3>Whole building</h3>
+                    <div className="gl-row"><span>Air leakage (q50)</span><Num value={bi.q50 ?? ''} unit="m³/h·m²" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.q50) setBi({ q50: n }) }} /></div>
+                    <div className="gl-row"><span>Thermal bridging</span><Num value={bi.tb_multiplier ?? ''} unit="× ISO 14683" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.tb_multiplier) setBi({ tb_multiplier: n }) }} /></div>
+                    <div className="gl-row"><span>Site exposure</span>
+                      <select className="gl-sel" value={bi.exposure ?? ''} onChange={(e) => setBi({ exposure: (e.target.value || null) as BuildingInputs['exposure'] })}>
+                        <option value="">Not set</option>
+                        <option value="sheltered">Sheltered</option>
+                        <option value="normal">Normal</option>
+                        <option value="exposed">Exposed</option>
+                      </select>
+                    </div>
+                    <p className="gl-hint">Air leakage at 50 Pa, for every room. Thermal bridging: 1 = ISO 14683's default junctions; 2 doubles them. Empty stays unset.</p>
+                  </div>
                   <div className="gl-sec">
                     <div className="gl-chips" role="group" aria-label="Element">
                       {FABRIC_ELEMENTS.map((e) => <button key={e.key} type="button" aria-pressed={elem === e.key} onClick={() => setElem(e.key)}>{e.name}</button>)}
@@ -1199,6 +1227,7 @@ export default function GeometryLab() {
                     <p className="gl-hint">Choose a type, then Apply: tap a room's part of a wall (Shift: the whole wall) or tap a room{onWalls(elem) ? ' for all its outside walls' : ''}. U in W/m²K; typed, it is used over the library's.{elem === 'door' ? ' The library has no door constructions yet, so a door needs a typed U.' : ''}</p>
                     <p className="gl-hint">Library: NZA Sim's, exported {exportDate}.</p>
                   </div>
+                  </>
                 )
               })()}
               {mode === 'spaces' && (
@@ -1436,7 +1465,7 @@ export default function GeometryLab() {
           </div>
         )
         // A gain the library has no number for: typed here; empty stays unset (the document says nothing).
-        type Gk = 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'vent_flow'
+        type Gk = 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'vent_flow'
         const typed = (label: string, k: Gk, step: number, unit?: string) => (
           <div className="gl-row gl-typed">
             <span>{label}</span>
@@ -1473,6 +1502,11 @@ export default function GeometryLab() {
                 {opt('Equipment', 'equipment', profilesFor('equipment'))}
                 {typed('Equipment in use', 'equipment_w_per_m2', 0.5, 'W/m²')}
                 {typed('Equipment always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
+              </div>
+              <div className="gl-sec">
+                <h3>Comfort</h3>
+                {typed('Heating to', 'heat_c', 0.5, '°C')}
+                {typed('Cooling to', 'cool_c', 0.5, '°C')}
               </div>
               <div className="gl-sec">
                 <h3>Systems</h3>

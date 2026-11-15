@@ -98,6 +98,9 @@ export type SpaceType = {
   vent_flow?: number | null
   /** When the ventilation runs: 'always_on', or a library ventilation profile's key. */
   vent_schedule?: string | null
+  /** Comfort band the systems hold, °C, typed. */
+  heat_c?: number | null
+  cool_c?: number | null
   lighting: string | null
   equipment: string | null
   heating: string | null
@@ -105,6 +108,11 @@ export type SpaceType = {
   ventilation: string | null
   dhw: string | null
 }
+
+/** Air leakage (q50, m³/h·m² at 50 Pa, every zone), thermal bridging (ISO 14683 default junctions × multiplier) and
+ * site exposure. */
+export type BuildingInputs = { q50: number | null; tb_multiplier: number | null; exposure: 'sheltered' | 'normal' | 'exposed' | null }
+export const noBuildingInputs = (): BuildingInputs => ({ q50: null, tb_multiplier: null, exposure: null })
 
 export type Plan = {
   /** Separate outlines, each anticlockwise. Blocks never touch or overlap (touching ones are joined). */
@@ -117,11 +125,13 @@ export type Plan = {
   fabric_types: FabricType[]
   wall_spans: TypeSpan[]
   spaces: SpaceType[]
+  /** Whole-building fabric inputs, typed (null: not stated). */
+  building?: BuildingInputs
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
 
-export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], fabric_types: defaultFabric(), wall_spans: [], spaces: [], next: { room: 1, zone: 1, system: 1 } })
+export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], fabric_types: defaultFabric(), wall_spans: [], spaces: [], building: noBuildingInputs(), next: { room: 1, zone: 1, system: 1 } })
 
 /** A new zone with nothing assigned. */
 export const blankZone = (n: number): PlanZone => ({ id: `z${n}`, name: `Zone ${n}`, use: null, heating: null, cooling: null })

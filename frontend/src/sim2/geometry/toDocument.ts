@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { allWindows, edgesOf, facade4, type FabricElement, type Plan, type SpaceType, ringArea, wallRuns } from './plan'
+import { allWindows, edgesOf, facade4, type FabricElement, type Plan, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, profile, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -299,6 +299,7 @@ export function buildDocument(plan: Plan): Built {
     return { occupancy, lighting: gain('lighting'), equipment: gain('equipment'), auxiliary: [] }
   }
 
+  const bi = plan.building ?? noBuildingInputs()
   const zones = used.map((z) => ({
     id: z.id,
     name: z.name,
@@ -310,9 +311,14 @@ export function buildDocument(plan: Plan): Built {
     use_type: spaceOf.get(z.id)?.use ?? 'unassigned',
     rooms: plan.rooms.filter((r) => r.zone === z.id).length,
     profile_refs: refsOf(z.id),
-    setpoints: { heat_c: null, cool_c: null, setback_c: null, hours_ref: null, control_strategy: null },
+    setpoints: (() => {
+      const sp = spaceOf.get(z.id)
+      const heat = sp?.heat_c ?? null
+      const cool = sp?.cool_c ?? null
+      return { heat_c: heat, cool_c: cool, setback_c: null, hours_ref: null, control_strategy: heat != null || cool != null ? 'active_setpoint' : null }
+    })(),
     ventilation: ventOf(spaceOf.get(z.id)),
-    infiltration_q50: null,
+    infiltration_q50: bi.q50,
     infiltration_ach: null,
     ...(is21 ? { internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2 } : {}),
     surfaces: byZone.get(z.id) ?? [],
@@ -356,10 +362,10 @@ export function buildDocument(plan: Plan): Built {
       id: 'building_1',
       name: 'Geometry prototype',
       decoded_building_key: null,
-      site: { lat: null, lon: null, name: null, exposure: null, ...(is21 ? { ground: { method: 'annual_mean_outdoor' } } : {}) },
+      site: { lat: null, lon: null, name: null, exposure: bi.exposure, ...(is21 ? { ground: { method: 'annual_mean_outdoor' } } : {}) },
       orientation_deg: 0,
       reported_floor_area_m2: null,
-      thermal_bridging: { mode: null, multiplier: null, alpha_pct: null },
+      thermal_bridging: bi.tb_multiplier != null ? { mode: 'iso14683_auto', multiplier: bi.tb_multiplier, alpha_pct: null } : { mode: null, multiplier: null, alpha_pct: null },
       thermal_mass: { mode: null, category: null },
       opening_defaults: {},
     },
