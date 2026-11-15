@@ -139,6 +139,13 @@ export default function GeometryLab() {
   // ─── actions ─────────────────────────────────────────────────────────────────
   const setFootprint = (shape: XY[]) => {
     const fp = ccw(shape)
+    // Fit the new footprint in view (leaving room for the hint above and the toolbar below).
+    const xs = fp.map((p) => p[0])
+    const ys = fp.map((p) => p[1])
+    const w = Math.max(...xs) - Math.min(...xs) || 1
+    const h = Math.max(...ys) - Math.min(...ys) || 1
+    const fit = Math.min((size.w - 80) / w, (size.h - 180) / h)
+    setView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, s: Math.max(3, Math.min(view.s, fit)) })
     commit({ ...emptyPlan(), storey_height_m: plan.storey_height_m, footprint: fp, zones: [{ id: 'z1', name: 'Zone 1', ring: fp }], zone_next: 2 })
     core.reset()
     setRectPts([])
@@ -356,9 +363,9 @@ export default function GeometryLab() {
   const ghost = typedPt ?? preview?.at ?? null
 
   return (
-    <div className="flex h-screen w-screen bg-off-white text-navy" style={{ fontFamily: 'Stolzl, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+    <div className="flex h-screen w-full flex-col bg-off-white text-navy md:flex-row" style={{ fontFamily: 'Stolzl, -apple-system, Segoe UI, Roboto, sans-serif' }}>
       {/* ─── canvas ─── */}
-      <div className="relative flex-1" ref={box}>
+      <div className="relative min-h-0 flex-1 overflow-hidden" ref={box}>
         <svg
           width={size.w}
           height={size.h}
@@ -471,7 +478,7 @@ export default function GeometryLab() {
         </svg>
 
         {/* toolbar */}
-        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-lg bg-white p-1 shadow-lg" style={{ border: '1px solid #E6E6E6' }}>
+        <div className="absolute bottom-4 left-1/2 flex w-max max-w-[calc(100%-24px)] -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-lg bg-white p-1 shadow-lg" style={{ border: '1px solid #E6E6E6' }}>
           {(['draw', 'rect', 'cut', 'select'] as Tool[]).map((t) => (
             <button
               key={t}
@@ -495,14 +502,14 @@ export default function GeometryLab() {
             <button type="button" className="rounded-md px-3 py-1.5 text-[12px] font-medium text-white" style={{ background: MAGENTA }} onClick={finishDraw}>Finish shape</button>
           )}
         </div>
-        <div className="pointer-events-none absolute left-4 top-4 max-w-[460px] rounded-md bg-white/95 px-3 py-2 text-[12px] leading-snug shadow" style={{ border: '1px solid #E6E6E6' }}>
+        <div className="pointer-events-none absolute left-3 right-14 top-3 max-w-[460px] rounded-md bg-white/95 px-3 py-2 text-[12px] leading-snug shadow" style={{ border: '1px solid #E6E6E6' }}>
           {HINT[tool]}
           {tool === 'cut' && cutFrom && <div className="mt-1 font-medium" style={{ color: MAGENTA }}>Now tap the other end. Esc to cancel.</div>}
         </div>
       </div>
 
       {/* ─── side panel ─── */}
-      <aside className="flex w-[380px] flex-col overflow-y-auto bg-white p-4 text-[12px]" style={{ borderLeft: '1px solid #E6E6E6' }}>
+      <aside className="flex max-h-[45vh] w-full shrink-0 flex-col overflow-y-auto bg-white p-4 text-[12px] md:max-h-none md:w-[380px]" style={{ borderLeft: '1px solid #E6E6E6', borderTop: '1px solid #E6E6E6' }}>
         <div className="text-[16px] font-semibold">Geometry and zoning</div>
         <div className="mb-3 text-[11px] text-mid-grey">Simulate v2 prototype. Nothing here is saved, and today's tool is unchanged.</div>
 
