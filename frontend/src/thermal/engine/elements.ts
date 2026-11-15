@@ -101,6 +101,17 @@ export interface Element {
   /** Sky view factor of the outside face, (1 + cos β)/2 (0 for the ground). */
   f_sky: number
   h_ci: number
+  /**
+   * The node the element's absorbed solar enters (default 0, the outside surface). An 'optical' window absorbs in the
+   * pane, its middle node (Brief 104 Part 1b).
+   */
+  absorbed_node?: number
+  /**
+   * An 'optical' window's response to solar arriving from inside the zone: the share transmitted back out (lost)
+   * and the share absorbed in the pane. The rest is reflected back into the zone. Absent: an inside surface absorbs
+   * all the solar that reaches it (ISO 52016-1's simplification).
+   */
+  interior_solar?: { transmitted: number; absorbed: number }
 }
 
 /** Builds an opaque element from its layers, resized to the stated U when there is one. */
@@ -154,8 +165,16 @@ export function opaqueElement(args: {
   }
 }
 
-/** A window: two massless surface nodes (ISO 52016-1 6.5.7.3), the pane resistance from the stated U. */
-export function windowElement(args: { id: string; area_m2: number; tilt_deg: number; u: number; emissivity: number | null; path: string }): Element {
+/**
+ * A window: two massless surface nodes (ISO 52016-1 6.5.7.3), the pane resistance from the stated U. With `optics`
+ * (Brief 104 Part 1b) the pane gets a massless middle node, half the resistance each side, where its absorbed solar
+ * enters, so the network itself splits that heat between outside and inside (the Simple Window Model's N); and the
+ * window passes solar from inside back out at its diffuse transmittance.
+ */
+export function windowElement(args: {
+  id: string; area_m2: number; tilt_deg: number; u: number; emissivity: number | null; path: string
+  optics?: { interior_transmitted: number; interior_absorbed: number } | null
+}): Element {
   const { id, area_m2, tilt_deg, u, path } = args
   if (!(area_m2 > 0)) throw new ElementError('area must be > 0', `${path}.area_m2`)
   if (!(u > 0)) throw new ElementError('window U must be > 0', `${path}.u`)
@@ -166,9 +185,14 @@ export function windowElement(args: { id: string; area_m2: number; tilt_deg: num
   const dir = heatFlowDirection(tilt_deg)
   return {
     id, kind: 'window', area_m2, tilt_deg, boundary: 'outside', u_w_per_m2k: u,
-    c: new Float64Array(2), g: Float64Array.of(1 / r), g_boundary: K.h_ce + h_re, h_re,
+    c: new Float64Array(args.optics ? 3 : 2), g: args.optics ? Float64Array.of(2 / r, 2 / r) : Float64Array.of(1 / r),
+    g_boundary: K.h_ce + h_re, h_re,
     f_sky: (1 + Math.cos((tilt_deg * Math.PI) / 180)) / 2,
     h_ci: dir === 'upward' ? K.h_ci_upward : dir === 'downward' ? K.h_ci_downward : K.h_ci_horizontal,
+    ...(args.optics ? {
+      absorbed_node: 1,
+      interior_solar: { transmitted: args.optics.interior_transmitted, absorbed: args.optics.interior_absorbed },
+    } : {}),
   }
 }
 

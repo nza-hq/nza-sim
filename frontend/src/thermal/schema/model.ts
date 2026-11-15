@@ -184,6 +184,13 @@ export const Surface = z
     thermal_emissivity: finite.min(0).max(1).nullable(),
     /** Schema 2.1: glazing only, the frame's share of the opening area, 0 to <1 (today's engine: 0.20); null otherwise. */
     frame_fraction: finite.min(0).lt(1).nullable(),
+    /**
+     * Schema 2.2 (Brief 104 Part 1b): inside-face short-wave absorptance, above 0 and at most 1, on every opaque
+     * surface; null on glazing. Solar inside a zone goes to each face in proportion to area × this value; the rest is
+     * reflected and spread again, and some leaves through the windows. Today's EnergyPlus path states none, so
+     * EnergyPlus's default 0.7 applies; today's instant engine has no inside distribution (every face takes all).
+     */
+    inside_solar_absorptance: finite.gt(0).max(1).nullable(),
   })
   .strict()
 export type Surface = z.infer<typeof Surface>
@@ -378,7 +385,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.1' as const
+export const SCHEMA_VERSION = '2.2' as const
 
 export const ModelDocument = z
   .object({
@@ -409,6 +416,12 @@ export const ModelDocument = z
       const exteriorOpaque = (s.kind === 'wall' || s.kind === 'roof' || s.kind === 'floor') && s.zone_b === 'outside'
       if (exteriorOpaque && (s.solar_absorptance == null || s.thermal_emissivity == null)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" faces outside and needs solar_absorptance and thermal_emissivity` })
+      }
+      if (s.kind !== 'glazing' && s.inside_solar_absorptance == null) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'inside_solar_absorptance'], message: `opaque surface "${s.id}" needs inside_solar_absorptance` })
+      }
+      if (s.kind === 'glazing' && s.inside_solar_absorptance != null) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'inside_solar_absorptance'], message: `glazing "${s.id}" takes its inside optics from its U and g, not inside_solar_absorptance` })
       }
       if (s.kind === 'glazing' && (s.frame_fraction == null || s.thermal_emissivity == null)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `glazing "${s.id}" needs frame_fraction and thermal_emissivity` })

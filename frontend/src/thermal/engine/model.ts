@@ -13,6 +13,7 @@ import { opaqueElement, windowElement, type ConstructionBody, type Element } fro
 import type { BreakdownLine, ZoneResults } from './results'
 import { shadingFactor } from './shading'
 import { solarOnSurface, type SolarOptions } from './solar'
+import { simpleGlazingAngular, simpleGlazingOptics } from './glazing'
 import type { Weather } from './types'
 import { runZone } from './zone'
 import type { ModelDocument } from '../schema/model'
@@ -37,19 +38,38 @@ export interface RunOptions {
    * - beam_on_floor: the beam part of transmitted solar lands on the floor-facing inside surfaces, by area.
    */
   surface_physics?: { outside_convection: 'fixed' | 'wind'; inside_convection: 'by_tilt' | 'by_heat_flow'; beam_on_floor: boolean }
+  /**
+   * How solar passes through glazing (Brief 104 Part 1b). Absent or 'g_value': ISO 52016-1's g × F_W, all of it
+   * transmitted into the zone and absorbed by its inside surfaces. 'optical': the window's own optics from its U and g
+   * by the Simple Window Model (glazing.ts), with its angular dependence: the beam is transmitted at T(θ) and absorbed
+   * in the pane at A(θ) for its own angle of incidence, sky and ground diffuse at the hemispherical values; the window's
+   * network splits what the pane absorbs between outside and inside; solar falling on the window from inside leaves at
+   * the diffuse transmittance and is absorbed at the diffuse absorptance (the frame share absorbs). No F_W.
+   */
+  glazing_solar?: 'g_value' | 'optical'
+  /**
+   * Share of transmitted solar given straight to the air node (Brief 104 Part 1b). Absent: ISO 52016-1 Annex B's
+   * default, ENGINE_CONSTANTS.solar_convective_fraction (0.1). EnergyPlus gives none to the air: all of it lands on
+   * the inside surfaces, which pass it on by convection and radiation.
+   */
+  solar_convective_fraction?: number
 }
 
 /**
  * The options the EnergyPlus referee comparison uses: air thermostat, ideal convective loads, apparent solar time,
- * and the sun's beam on the floor, as EnergyPlus distributes it (FullInteriorAndExterior) in both referees. Outside
+ * the sun's beam on the floor, as EnergyPlus distributes it in both referees (FullExterior for Bridgewater,
+ * FullInteriorAndExterior for BESTEST; both put the beam on the floor), and, from Brief 104 Part 1b, EnergyPlus's
+ * conventions for window solar: the window's own optics by the Simple Window Model the referee itself uses, and no
+ * transmitted solar given straight to the air (docs/audit/104/01b_window_solar.md). Outside
  * and inside convection stay ISO 52016-1's fixed values: the referee's own correlations (DOE-2, TARP) are not ISO
  * 6946's or Table 25's, so switching between ISO forms does not make the two models the same (Part 6b,
  * docs/audit/103/07_bestest_referee.md).
  */
 export const REFEREE_OPTIONS: RunOptions = {
   control: 'air', hc_convective_fraction: 1, warmup_days: 25,
-  solar: { albedo: 0.2, sun_day: 'actual', solar_time: 'apparent' }, other_gains: null,
+  solar: { albedo: 0.2, sun_day: 'actual', solar_time: 'apparent', sky: 'perez' }, other_gains: null,
   surface_physics: { outside_convection: 'fixed', inside_convection: 'by_tilt', beam_on_floor: true },
+  glazing_solar: 'optical', solar_convective_fraction: 0,
 }
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
@@ -71,6 +91,7 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
   const elements: Element[] = []
+  const insideAlpha: (number | null)[] = []  // per element: the document's inside solar absorptance (null on glazing)
   const absorbed: Float64Array[] = []
   const transmittedBySurface: { id: string; w: Float64Array }[] = []
   const solarTransmitted = new Float64Array(H)
@@ -107,12 +128,37 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
       const hasShading = !!(s.shading?.overhang?.depth_m || s.shading?.fins?.left_depth_m || s.shading?.fins?.right_depth_m)
       if (hasShading && facade == null) throw new ModelError('shading needs the facade label', `${path}.facade`)
       const sf = facade ? shadingFactor(facade, s.shading) : 1
-      elements.push(windowElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, u, emissivity: s.thermal_emissivity, path }))
-      absorbed.push(new Float64Array(H))
+      const optical = options.glazing_solar === 'optical'
+      if (options.glazing_solar != null && options.glazing_solar !== 'g_value' && !optical) throw new ModelError("'g_value' or 'optical'", 'options.glazing_solar')
+      const op = optical ? simpleGlazingOptics(u, g, path) : null
+      const ang = op ? simpleGlazingAngular(u, g, op, path) : null
+      const fw = K.glazing_angle_factor
+      insideAlpha.push(null)
+      elements.push(windowElement({
+        id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, u, emissivity: s.thermal_emissivity, path,
+        // Solar falling on the window from inside is diffuse: it leaves at the diffuse transmittance and the glass
+        // absorbs its diffuse absorptance; the frame share absorbs all of it.
+        optics: ang ? { interior_transmitted: (1 - ff) * ang.t_dif, interior_absorbed: (1 - ff) * ang.a_dif + ff } : null,
+      }))
+      const a = new Float64Array(H)
+      absorbed.push(a)
       const sun = s.tilt_deg > 90 + 1e-9 ? null : solarOnSurface(weather, s.azimuth_deg ?? 0, s.tilt_deg, options.solar)
       const w = new Float64Array(H)
-      const f = g * K.glazing_angle_factor * (1 - ff) * sf * s.area_m2
-      if (sun) {
+      if (sun && ang) {
+        // Optical: the beam at its own angle of incidence, sky and ground diffuse at the diffuse values (no F_W).
+        const share = (1 - ff) * sf
+        for (let h = 0; h < H; h++) {
+          const dif = sun.diffuse[h] + sun.reflected[h]
+          let tb = 0, ab = 0
+          if (sun.direct[h] > 0) { const p = ang.at(sun.cos_incidence[h]); tb = sun.direct[h] * p.t; ab = sun.direct[h] * (1 - p.t - p.r) }
+          w[h] = (tb + dif * ang.t_dif) * share * s.area_m2
+          solarTransmitted[h] += w[h]
+          if (sp?.beam_on_floor) solarBeam[h] += tb * share * s.area_m2
+          // Absorbed in the pane, per m² of window: the glass share of the opening only (the frame takes no solar here).
+          a[h] = (ab + dif * ang.a_dif) * share
+        }
+      } else if (sun) {
+        const f = g * fw * (1 - ff) * sf * s.area_m2
         for (let h = 0; h < H; h++) { w[h] = sun.total[h] * f; solarTransmitted[h] += w[h] }
         if (sp?.beam_on_floor) for (let h = 0; h < H; h++) solarBeam[h] += Math.min(sun.direct[h] * f, w[h])
       }
@@ -124,6 +170,9 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
     const ground = s.kind === 'ground' && s.zone_b === 'ground'
     if (!outside && !ground) throw new ModelError(`a ${s.kind} facing "${s.zone_b}" needs another zone (Brief 104)`, path)
     const stated = num(ref.u_value_override) ?? num((b as any).u_value_override) ?? num(b.u_value_W_per_m2K)
+    const ia = s.inside_solar_absorptance
+    if (ia == null) throw new ModelError('required', `${path}.inside_solar_absorptance`)
+    insideAlpha.push(ia)
     elements.push(opaqueElement({
       id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, boundary: ground ? 'ground' : 'outside',
       layers: b.layers ?? [], stated_u: stated, emissivity: ground ? null : s.thermal_emissivity, path,
@@ -164,6 +213,7 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
     elements, air_capacity_j_per_k: K.rho_c_air * volume + zone.internal_heat_capacity_j_per_k_m2 * zone.area_m2,
     bridging_w_per_k: bridging.total_w_per_k, hours: H, theta_e: weather.hours.dry_bulb, theta_ground: tg,
     ventilation_w_per_k: Hve, solar_absorbed_w_per_m2: absorbed, solar_transmitted_w: solarTransmitted,
+    inside_solar_absorptance: insideAlpha, solar_convective_fraction: options.solar_convective_fraction,
     other_gains: options.other_gains, setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
     control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
     warmup_days: options.warmup_days,
@@ -187,12 +237,16 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
     if (e.kind === 'opaque' && e.boundary === 'outside') {
       lines.push({ term: 'opaque_solar_absorbed', surface_id: e.id, kwh: kwh(run.terms.solar_absorbed_w[k]) })
     }
+    if (e.kind === 'window' && e.absorbed_node != null) {
+      lines.push({ term: 'glazing_solar_absorbed', surface_id: e.id, kwh: kwh(run.terms.solar_absorbed_w[k]) })
+    }
     if (e.f_sky > 0) lines.push({ term: 'sky_longwave', surface_id: e.id, kwh: kwh(run.terms.sky_w[k]) })
   })
   lines.push({ term: 'bridging', surface_id: null, kwh: kwh(run.terms.bridging_w) })
   lines.push({ term: 'infiltration', surface_id: null, kwh: infW / 1000 })
   lines.push({ term: 'permanent_vents', surface_id: null, kwh: ventW / 1000 })
   for (const t of transmittedBySurface) lines.push({ term: 'solar_transmitted', surface_id: t.id, kwh: kwh(t.w) })
+  if (options.glazing_solar === 'optical') lines.push({ term: 'solar_lost_through_glazing', surface_id: null, kwh: kwh(run.terms.solar_lost_w) })
   if (options.other_gains) lines.push({ term: 'other_gains', surface_id: null, kwh: kwh(run.terms.other_gains_w) })
   lines.push({ term: 'storage', surface_id: null, kwh: -kwh(run.terms.storage_w) })
 

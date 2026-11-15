@@ -11,6 +11,7 @@ export interface BreakdownLine {
   term:
     | 'heating' | 'cooling' | 'conduction' | 'opaque_solar_absorbed' | 'sky_longwave' | 'bridging' | 'infiltration'
     | 'permanent_vents' | 'solar_transmitted' | 'other_gains' | 'storage'
+    | 'glazing_solar_absorbed' | 'solar_lost_through_glazing'
   surface_id: string | null
   kwh: number
 }

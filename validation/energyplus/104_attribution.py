@@ -18,6 +18,11 @@ Flags (each is one of Engine 1's modelling choices, put into EnergyPlus):
   iso_conv     h_ce 20 on every outside face; h_ci by tilt from the zone: walls and windows 2.5, ceilings and roofs
                5.0, floors 0.7 (ISO 52016-1 Table 25, Engine 1's default).
   fullint      solar distribution FullInteriorAndExterior (the referee uses FullExterior; Part 0).
+  frame_split  the frame as the document states it (Part 1b): each window split into glass, (1 - frame_fraction) of
+               the opening with SHGC = the glass g, and frame, the rest, at the same whole-window U with no solar
+               transmission (SHGC 1e-4). Replaces 103's representation (SHGC = g x (1 - ff) over the whole opening).
+  docmass      the document's internal heat capacity (250 kJ/m2K x floor area) on every zone's air node; same as
+               airmass, named for the referee's use (Part 1: the 103 referee lacked it).
 
 Usage: python3 -I validation/energyplus/104_attribution.py --energyplus <path> [--runs <dir>] [--only a,b]
 Writes docs/audit/104/01_attribution.json. Nothing touches data/ or a database.
@@ -154,6 +159,50 @@ def iso_conv(ep: dict, notes: list) -> None:
     notes.append(f"iso_conv: fixed coefficients on {len(cc)} surfaces")
 
 
+def frame_split(ep: dict, today: dict, notes: list) -> None:
+    ff = today["frame_fraction"]
+    gl = ep["WindowMaterial:SimpleGlazingSystem"]
+    for o in gl.values():
+        o["solar_heat_gain_coefficient"] = round(o["solar_heat_gain_coefficient"] / (1 - ff), 6)  # back to the glass g
+    frames = {}
+    for cname, c in list(ep["Construction"].items()):
+        if c.get("outside_layer") in gl:
+            u = gl[c["outside_layer"]]["u_factor"]
+            gl[f"{c['outside_layer']}_frame"] = {"u_factor": u, "solar_heat_gain_coefficient": 0.0001, "visible_transmittance": 0.0001}
+            ep["Construction"][f"{cname}_frame"] = {"outside_layer": f"{c['outside_layer']}_frame"}
+            frames[cname] = f"{cname}_frame"
+    win = ep["FenestrationSurface:Detailed"]
+    n = 0
+    for name, w in list(win.items()):
+        v = [[w[f"vertex_{i}_{a}_coordinate"] for a in "xyz"] for i in range(1, 5)]
+        cut = lambda p, q: [p[j] + (1 - ff) * (q[j] - p[j]) for j in range(3)]  # noqa: E731
+        m12, m43 = cut(v[0], v[1]), cut(v[3], v[2])
+        glass, frame = [v[0], m12, m43, v[3]], [m12, v[1], v[2], m43]
+        def put(o, pts):
+            for i, p in enumerate(pts, 1):
+                for j, ax in enumerate("xyz"):
+                    o[f"vertex_{i}_{ax}_coordinate"] = round(p[j], 6)
+        put(w, glass)
+        f = dict(w); f["construction_name"] = frames[w["construction_name"]]; put(f, frame)
+        win[f"{name}_frame"] = f
+        n += 1
+    notes.append(f"frame_split: {n} windows split into glass ({1 - ff:.2f}, SHGC = glass g) and frame ({ff:.2f}, no solar)")
+
+
+def inside_alpha(ep: dict, value: float, notes: list) -> None:
+    """Every opaque construction's inside layer at the given solar absorptance (EnergyPlus's default is 0.7)."""
+    n = 0
+    for c in ep["Construction"].values():
+        layers = [c[k] for k in c]
+        inner = layers[-1]
+        mat = ep.get("Material", {}).get(inner) or ep.get("Material:NoMass", {}).get(inner)
+        if mat is None:
+            continue  # glazing
+        mat["solar_absorptance"] = value
+        n += 1
+    notes.append(f"inside_alpha: {n} inside layers at solar absorptance {value}")
+
+
 def fullint(ep: dict, notes: list) -> None:
     for b in ep["Building"].values():
         b["solar_distribution"] = "FullInteriorAndExterior"
@@ -175,6 +224,18 @@ RUNS = {
     "e1_building_lw": ["one_zone", "no_slab", "airmass", "lw_area"],
     "e1_building_ts": ["one_zone", "no_slab", "airmass", "ts_1"],
     "e1_building_conv": ["one_zone", "no_slab", "airmass", "iso_conv"],
+    # Part 1b: the referee with the document's frame and internal mass (r1), and EnergyPlus with Engine 1's building
+    # and simplifications on that basis.
+    "frame_split": ["frame_split"],
+    "docmass": ["docmass"],
+    "r1": ["frame_split", "docmass"],
+    "e1_like_r1": ["frame_split", "one_zone", "no_slab", "airmass", "sky_fixed", "lw_area", "ts_1", "iso_conv"],
+    # the same at EnergyPlus's own four steps per hour: the 1 h step measures EnergyPlus's scheme, not Engine 1's
+    "e1_like_r1_ts4": ["frame_split", "one_zone", "no_slab", "airmass", "sky_fixed", "lw_area", "iso_conv"],
+    "e1_building_r1": ["frame_split", "one_zone", "no_slab", "airmass"],
+    # the shared inside solar absorptance swept in both engines (Part 1b): agreement must hold at every value
+    "e1_like_r1_ts4_a50": ["frame_split", "one_zone", "no_slab", "airmass", "sky_fixed", "lw_area", "iso_conv", "inside_alpha_50"],
+    "e1_like_r1_ts4_a99": ["frame_split", "one_zone", "no_slab", "airmass", "sky_fixed", "lw_area", "iso_conv", "inside_alpha_99"],
 }
 
 
@@ -182,7 +243,7 @@ def build_run(flags: list, fx: dict, today: dict, psi: dict, tg: float) -> tuple
     checks: list = []
     ep, _ = R.build(set(), fx, today, psi, tg, checks)
     notes: list = []
-    order = ["one_zone", "no_slab", "airmass", "sky_fixed", "lw_area", "ts_1", "iso_conv", "fullint"]
+    order = ["inside_alpha_50", "inside_alpha_70", "inside_alpha_99", "frame_split", "one_zone", "no_slab", "airmass", "docmass", "sky_fixed", "lw_area", "ts_1", "iso_conv", "fullint"]
     for f in order:
         if f not in flags:
             continue
@@ -190,8 +251,12 @@ def build_run(flags: list, fx: dict, today: dict, psi: dict, tg: float) -> tuple
             to_one_zone(ep, notes)
         elif f == "no_slab":
             drop_slabs(ep, notes)
-        elif f == "airmass":
+        elif f in ("airmass", "docmass"):
             airmass(ep, today, notes)
+        elif f.startswith("inside_alpha_"):
+            inside_alpha(ep, int(f.rsplit("_", 1)[1]) / 100, notes)
+        elif f == "frame_split":
+            frame_split(ep, today, notes)
         else:
             globals()[f](ep, notes)
     bad = [c for c in checks if not c[1]]

@@ -19,6 +19,9 @@ for (const [env, v] of Object.entries(process.env)) {
   ;(ENGINE_CONSTANTS as any)[key] = Number(v); console.log(`DIAGNOSTIC: ${key} = ${v}`)
 }
 
+// GLAZING=optical runs Engine 1 with RunOptions.glazing_solar 'optical' (Part 1b); the default is REFEREE_OPTIONS as is.
+const opts = process.env.GLAZING ? { ...REFEREE_OPTIONS, glazing_solar: process.env.GLAZING as 'g_value' | 'optical' } : REFEREE_OPTIONS
+if (process.env.GLAZING) console.log(`glazing_solar = ${process.env.GLAZING}`)
 const root = path.resolve(__dirname, '..')
 const runs = process.argv[2]
 const fx = parse(readFileSync(path.join(root, 'validation/fixtures/report_baseline_v1.yaml'), 'utf8'))
@@ -42,7 +45,7 @@ for (const [name, f] of Object.entries(variants)) {
   const d = structuredClone(base) as any
   d.zones[0].setpoints = { ...d.zones[0].setpoints, heat_c: 22, cool_c: 22 }
   f(d)
-  const r = runZoneModel(d, weather, lib, REFEREE_OPTIONS)
+  const r = runZoneModel(d, weather, lib, opts)
   const net = Array.from(r.hourly.cooling_w, (c, h) => c - r.hourly.heating_w[h])
   out[name] = net
   let line = `${name.padEnd(12)} E1 heat ${mwh(r.hourly.heating_w).toFixed(3)} cool ${mwh(r.hourly.cooling_w).toFixed(3)} net ${mwh(net).toFixed(3)}`

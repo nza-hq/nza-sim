@@ -597,9 +597,391 @@
    ],
    "severe": 0,
    "warnings": 6
+  },
+  "frame_split": {
+   "flags": [
+    "frame_split"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)"
+   ],
+   "heating_mwh": 90.13,
+   "cooling_mwh": 13.645,
+   "heating_monthly_mwh": [
+    19.787,
+    14.574,
+    12.824,
+    3.516,
+    0.256,
+    0.0,
+    0.0,
+    0.0,
+    0.241,
+    6.057,
+    14.092,
+    18.783
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.021,
+    3.443,
+    8.424,
+    1.739,
+    0.019,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 5
+  },
+  "docmass": {
+   "flags": [
+    "docmass"
+   ],
+   "notes": [
+    "airmass: capacitance multiplier 65.5597 on every zone"
+   ],
+   "heating_mwh": 89.645,
+   "cooling_mwh": 12.847,
+   "heating_monthly_mwh": [
+    19.842,
+    14.608,
+    12.805,
+    3.345,
+    0.209,
+    0.0,
+    0.0,
+    0.0,
+    0.072,
+    5.775,
+    14.157,
+    18.832
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.878,
+    8.409,
+    1.559,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 5
+  },
+  "r1": {
+   "flags": [
+    "frame_split",
+    "docmass"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone"
+   ],
+   "heating_mwh": 89.349,
+   "cooling_mwh": 12.88,
+   "heating_monthly_mwh": [
+    19.793,
+    14.574,
+    12.785,
+    3.332,
+    0.202,
+    0.0,
+    0.0,
+    0.0,
+    0.066,
+    5.723,
+    14.092,
+    18.783
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.892,
+    8.398,
+    1.59,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 5
+  },
+  "e1_like_r1": {
+   "flags": [
+    "frame_split",
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "sky_fixed",
+    "lw_area",
+    "ts_1",
+    "iso_conv"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)",
+    "ts_1: one time step per hour",
+    "iso_conv: fixed coefficients on 62 surfaces"
+   ],
+   "heating_mwh": 94.882,
+   "cooling_mwh": 9.198,
+   "heating_monthly_mwh": [
+    20.088,
+    14.891,
+    13.242,
+    4.056,
+    0.651,
+    0.0,
+    0.0,
+    0.0,
+    1.119,
+    7.276,
+    14.604,
+    18.955
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.205,
+    6.301,
+    0.692,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 8
+  },
+  "e1_like_r1_ts4": {
+   "flags": [
+    "frame_split",
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "sky_fixed",
+    "lw_area",
+    "iso_conv"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)",
+    "iso_conv: fixed coefficients on 62 surfaces"
+   ],
+   "heating_mwh": 93.504,
+   "cooling_mwh": 10.338,
+   "heating_monthly_mwh": [
+    19.956,
+    14.853,
+    13.014,
+    3.863,
+    0.529,
+    0.0,
+    0.0,
+    0.0,
+    0.995,
+    7.063,
+    14.414,
+    18.817
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.633,
+    6.7,
+    1.005,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 7
+  },
+  "e1_building_r1": {
+   "flags": [
+    "frame_split",
+    "one_zone",
+    "no_slab",
+    "airmass"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone"
+   ],
+   "heating_mwh": 89.299,
+   "cooling_mwh": 10.037,
+   "heating_monthly_mwh": [
+    19.18,
+    14.131,
+    12.42,
+    3.697,
+    0.479,
+    0.0,
+    0.0,
+    0.0,
+    0.951,
+    6.554,
+    13.88,
+    18.006
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.517,
+    6.811,
+    0.709,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 6
+  },
+  "e1_like_r1_ts4_a50": {
+   "flags": [
+    "frame_split",
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "sky_fixed",
+    "lw_area",
+    "iso_conv",
+    "inside_alpha_50"
+   ],
+   "notes": [
+    "inside_alpha: 4 inside layers at solar absorptance 0.5",
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)",
+    "iso_conv: fixed coefficients on 62 surfaces"
+   ],
+   "heating_mwh": 94.967,
+   "cooling_mwh": 9.262,
+   "heating_monthly_mwh": [
+    20.062,
+    14.992,
+    13.226,
+    4.194,
+    0.667,
+    0.0,
+    0.0,
+    0.0,
+    1.154,
+    7.237,
+    14.532,
+    18.903
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.231,
+    6.273,
+    0.757,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 7
+  },
+  "e1_like_r1_ts4_a99": {
+   "flags": [
+    "frame_split",
+    "one_zone",
+    "no_slab",
+    "airmass",
+    "sky_fixed",
+    "lw_area",
+    "iso_conv",
+    "inside_alpha_99"
+   ],
+   "notes": [
+    "inside_alpha: 4 inside layers at solar absorptance 0.99",
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "one_zone: 24 per-zone objects of Floor_2..5 removed; volume 13491.1 m3; vents x5",
+    "no_slab: 8 slab surfaces deleted",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 1 zone(s)",
+    "iso_conv: fixed coefficients on 62 surfaces"
+   ],
+   "heating_mwh": 92.42,
+   "cooling_mwh": 11.184,
+   "heating_monthly_mwh": [
+    19.879,
+    14.748,
+    12.856,
+    3.615,
+    0.427,
+    0.0,
+    0.0,
+    0.0,
+    0.886,
+    6.932,
+    14.323,
+    18.753
+   ],
+   "cooling_monthly_mwh": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.004,
+    2.955,
+    7.029,
+    1.196,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "severe": 0,
+   "warnings": 7
   }
  },
- "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.15 18:11",
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.15 18:29",
  "source": "validation/energyplus/104_attribution.py",
  "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
  "bestest": {

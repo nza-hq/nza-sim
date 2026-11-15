@@ -10,7 +10,7 @@ Drivers switched off (each in EnergyPlus here, and identically in Engine 1 by sc
 Every run: e1_like flags plus both setpoints at 22 C (heating and cooling share one setpoint).
 Writes the hourly net sensible load (cooling - heating, W) per run to <runs>/<name>/net_w.json, and prints annual sums.
 
-Usage: python3 -I validation/energyplus/104_superposition.py --energyplus <path> --runs <dir>
+Usage: python3 -I validation/energyplus/104_superposition.py --energyplus <path> --runs <dir> [--base <run>]
 """
 from __future__ import annotations
 
@@ -29,13 +29,13 @@ SET = 22.0
 RUNS = {"all": set(), "win_dark": {"win_dark"}, "opaque_dark": {"opaque_dark"}, "both_dark": {"win_dark", "opaque_dark"}}
 
 
-def build(extra: set, fx, today, psi, tg) -> dict:
-    ep, _ = A.build_run(A.RUNS["e1_like"], fx, today, psi, tg)
+def build(extra: set, fx, today, psi, tg, base: str = "e1_like") -> dict:
+    ep, _ = A.build_run(A.RUNS[base], fx, today, psi, tg)
     ep["Schedule:Compact"]["hotel_heating_setpoint"] = R.A._flat_temperature_schedule(SET)
     ep["Schedule:Compact"]["hotel_cooling_setpoint"] = R.A._flat_temperature_schedule(SET)
     if "win_dark" in extra:
         for o in ep["WindowMaterial:SimpleGlazingSystem"].values():
-            o["solar_heat_gain_coefficient"] = 1e-4
+            o["solar_heat_gain_coefficient"] = 1e-4  # the frame windows of frame_split are already 1e-4
     if "opaque_dark" in extra:
         for s in ep["BuildingSurface:Detailed"].values():
             if s["outside_boundary_condition"] != "Outdoors":
@@ -50,12 +50,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--energyplus", required=True)
     ap.add_argument("--runs", required=True)
+    ap.add_argument("--base", default="e1_like", help="the 104_attribution.py run to start from (Part 1b: e1_like_r1_ts4)")
     a = ap.parse_args()
     import yaml
     fx = yaml.safe_load(R.FIXTURE.read_text())
     today, psi, tg = R.today_constants(), R.iso14683_psi(), R.epw_mean_dry_bulb(R.EPW)
     for name, extra in RUNS.items():
-        ep = build(extra, fx, today, psi, tg)
+        ep = build(extra, fx, today, psi, tg, a.base)
         d = Path(a.runs) / name
         R.run_ep(a.energyplus, ep, d)
         con = sqlite3.connect(d / "eplusout.sql")

@@ -200,7 +200,20 @@ Commit: `104 P1b: window solar from the window's optics (SHGC split, angular bea
   - the remainder from Part 1 is reported again;
   - the analytic tests are unchanged.
 
+**Outcome (15 Nov):** done, scope widened as the measurements required, all published methods:
+- the angular curves, as planned;
+- the Perez sky (ISO 52010-1's own; the isotropic sky had cost 6 % of transmitted solar in Denver);
+- inside solar absorptance as a document input (schema 2.2), because what leaves through a window depends on it;
+- the referee's convention of no solar straight to the air (`RunOptions.solar_convective_fraction`).
+
+The referee represents the frame as the document states it. Same building, same simplifications: heating −0.6 %,
+cooling +2.1 %, at inside absorptance 0.5, 0.7 and 0.99 alike. BESTEST cooling is in range for both cases.
+`docs/audit/104/01b_window_solar.md`.
+
 ### Part 2 — Schema 2.2: interzone surfaces and internal mass
+
+(Schema 2.2 already exists from Part 1b, with `inside_solar_absorptance`. It is not stored anywhere outside this
+branch, so Part 2 adds its kinds to the same 2.2 rather than making a 2.3.)
 
 Files: `frontend/src/thermal/schema/{model,upgrade,fromBuildingConfig}.ts`, tests. Commit: `104 P2: schema 2.2,
 interzone surfaces and internal mass; per-storey zoning`.

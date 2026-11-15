@@ -252,12 +252,14 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
       area_m2: gross * (1 - wwr), azimuth_deg: azimuth, tilt_deg: 90,
       construction_ref: wallRef, g_value: null, openings,
       solar_absorptance: TODAY.wall_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: null,
+      inside_solar_absorptance: TODAY.inside_solar_absorptance,
     })
     const glazing: Obj = {
       id: `glazing_${f}`, kind: 'glazing', zone_a: ZONE_ID, zone_b: 'outside', facade: f,
       area_m2: gross * wwr, azimuth_deg: azimuth, tilt_deg: 90,
       construction_ref: glazingRef, g_value: null, wwr, openings: [],
       solar_absorptance: null, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: TODAY.frame_fraction,
+      inside_solar_absorptance: null,
     }
     const wc = src.take(`${B}.window_count.${f}`, `surfaces[${glzIdx}].window_count`)
     if (wc !== undefined) glazing.window_count = wc
@@ -274,6 +276,7 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     area_m2: length * width, azimuth_deg: null, tilt_deg: 0,
     construction_ref: await constructionRef('roof', `surfaces[${roofIdx}]`), g_value: null, openings: [],
     solar_absorptance: TODAY.roof_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: null,
+    inside_solar_absorptance: TODAY.inside_solar_absorptance,
   })
   const groundIdx = surfaces.length
   surfaces.push({
@@ -281,6 +284,7 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     area_m2: length * width, azimuth_deg: null, tilt_deg: 180,
     construction_ref: await constructionRef('ground_floor', `surfaces[${groundIdx}]`), g_value: null, openings: [],
     solar_absorptance: null, thermal_emissivity: null, frame_fraction: null,
+    inside_solar_absorptance: TODAY.inside_solar_absorptance,
   })
 
   // ── Profiles ───────────────────────────────────────────────────────────────────────────────

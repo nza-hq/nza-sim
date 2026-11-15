@@ -9,6 +9,17 @@ Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/104/00_reconnaissance.md)): referee zones and slab (0.528 m²K/W, 485 kJ/m²K); the Bridgewater referee uses FullExterior (103 said FullInteriorAndExterior; beam still on the floor).
 - **P1 cooling gap attributed** ([`01_cooling_gap.md`](docs/audit/104/01_cooling_gap.md)): not the slabs. The main cause is window solar kept — Engine 1 134.6 MWh against EnergyPlus about 122.5 (EnergyPlus loses 9.4 MWh back out through the glass) — 4.39 of the 5.99 MWh between Engine 1 and EnergyPlus-with-Engine-1's-simplifications; solar convective fraction 0.65; remainder 0.95. Slabs about 1 MWh; zone count 0.27; the referee lacked the document's 250 kJ/m²K internal mass (−2.25 MWh in one zone). 103's near-match was net of these. Next: P1b, window solar from the window's optics.
+- **P1b window solar** ([`01b_window_solar.md`](docs/audit/104/01b_window_solar.md)): Engine 1 gets four published methods:
+  - the Simple Window Model's optics and angular curves (as EnergyPlus);
+  - the Perez sky (ISO 52010-1);
+  - inside solar absorptance as a document input, **schema 2.2**, with the upgrades filling today's EnergyPlus value of 0.7;
+  - window losses as a breakdown line.
+
+  `REFEREE_OPTIONS` now uses them, with no solar to the air. The referee states the document's frame (glass and frame sub-windows).
+  - **Same building, same simplifications:** Engine 1 92.90 / 10.56 against EnergyPlus 93.50 / 10.34 (−0.6 % / +2.1 %). It holds at inside absorptance 0.5 and 0.99. Transmitted solar is 110.43 against 110.44.
+  - **Against the five-zone referee r1** (89.35 / 12.88), Engine 1 is +4 % / −18 %. That is because Engine 1's building has no slabs: EnergyPlus gives 89.30 / 10.04 for the same single zone. Part 5 closes it.
+  - **BESTEST re-recorded:** 600 4.574 / 5.510, 900 2.048 / 2.424. Cooling is in range for both; heating is above, as EnergyPlus with the same ISO simplifications is.
+  - **Open:** the no-sun (+4.7) and opaque-solar (−4.6) terms that cancel; the ISO simplifications (+4 % / +5 %).
 
 ## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
 

@@ -9,7 +9,8 @@
  * Method (as today): sun position from Cooper's declination and the hour angle at the hour's midpoint; isotropic sky
  * diffuse; ground reflection of DNI·sin(α) + DHI with a stated albedo. ASHRAE Handbook of Fundamentals 2021, Ch. 14.
  * Stated options, never silent changes: solar time is the EPW clock hour ('clock', today) or apparent solar time
- * ('apparent', Part 4); the day used for the sun position is 'mid_month' (today) or 'actual'. Perez sky is later.
+ * ('apparent', Part 4); the day used for the sun position is 'mid_month' (today) or 'actual'; the sky is isotropic
+ * (today) or Perez ('perez', Brief 104 Part 1b).
  */
 import type { SurfaceIrradiance, Weather } from './types'
 
@@ -27,6 +28,37 @@ export interface SolarOptions {
    * ISO 52010-1 and EnergyPlus do.
    */
   solar_time: 'clock' | 'apparent'
+  /**
+   * Sky diffuse on a tilted surface (Brief 104 Part 1b). Absent or 'isotropic': DHI · (1 + cos β) / 2 (today's
+   * engine). 'perez': Perez et al. (1990), the anisotropic model ISO 52010-1 specifies, with circumsolar and horizon
+   * brightening; coefficients, air mass and the 85° cap as EnergyPlus 25.2.0 implements them (SolarShading.cc,
+   * AnisoSkyViewFactors), which is the referee's own sky.
+   */
+  sky?: 'isotropic' | 'perez'
+}
+
+// Perez 1990 coefficients by sky-clearness bin (upper limits 1.065 … 6.2), as EnergyPlus 25.2.0 holds them.
+const EPS_LIMIT = [1.065, 1.23, 1.5, 1.95, 2.8, 4.5, 6.2]
+const F11 = [-0.0083117, 0.1299457, 0.3296958, 0.5682053, 0.8730280, 1.1326077, 1.0601591, 0.6777470]
+const F12 = [0.5877285, 0.6825954, 0.4868735, 0.1874525, -0.3920403, -1.2367284, -1.5999137, -0.3272588]
+const F13 = [-0.0620636, -0.1513752, -0.2210958, -0.2951290, -0.3616149, -0.4118494, -0.3589221, -0.2504286]
+const F21 = [-0.0596012, -0.0189325, 0.0554140, 0.1088631, 0.2255647, 0.2877813, 0.2642124, 0.1561313]
+const F22 = [0.0721249, 0.0659650, -0.0639588, -0.1519229, -0.4620442, -0.8230357, -1.1272340, -1.3765031]
+const F23 = [-0.0220216, -0.0288748, -0.0260542, -0.0139754, 0.0012448, 0.0558651, 0.1310694, 0.2506212]
+
+/** Perez F1 (circumsolar) and F2 (horizon) for one hour; the sun is up and DHI > 0. */
+function perezF(sinAlt: number, dni: number, dhi: number, elevationM: number): [number, number] {
+  const cosZ = sinAlt
+  const z = Math.acos(Math.min(1, Math.max(-1, cosZ)))
+  const zDeg = z / DEG
+  const mH = 1 - (0.1 * elevationM) / 1000
+  const m = zDeg <= 75 ? mH / cosZ : mH / (cosZ + 0.15 * Math.pow(93.9 - zDeg, -1.253))
+  const k = 1.041 * z ** 3
+  const eps = ((dni + dhi) / dhi + k) / (1 + k)
+  const delta = (dhi * m) / 1353
+  let b = 0
+  while (b < 7 && eps >= EPS_LIMIT[b]) b++
+  return [Math.max(0, F11[b] + F12[b] * delta + F13[b] * z), F21[b] + F22[b] * delta + F23[b] * z]
 }
 
 /** Minutes of apparent solar time ahead of local standard time (Duffie & Beckman eq. 1.5.2–1.5.3). */
@@ -100,10 +132,12 @@ export function solarOnSurface(weather: Weather, azimuthDeg: number, tiltDeg: nu
   check('albedo', options?.albedo, 0, 1)
   if (options.sun_day !== 'mid_month' && options.sun_day !== 'actual') throw new Error(`solarOnSurface: sun_day must be 'mid_month' or 'actual'`)
   if (options.solar_time !== 'clock' && options.solar_time !== 'apparent') throw new Error(`solarOnSurface: solar_time must be 'clock' or 'apparent'`)
+  const perez = options.sky === 'perez'
+  if (options.sky != null && options.sky !== 'isotropic' && !perez) throw new Error(`solarOnSurface: sky must be 'isotropic' or 'perez'`)
   const h = weather.hours
   const n = h.count
   const sun = sunTrack(weather, options)
-  const out: SurfaceIrradiance = { direct: new Float64Array(n), diffuse: new Float64Array(n), reflected: new Float64Array(n), total: new Float64Array(n) }
+  const out: SurfaceIrradiance = { direct: new Float64Array(n), diffuse: new Float64Array(n), reflected: new Float64Array(n), total: new Float64Array(n), cos_incidence: new Float64Array(n) }
   const gs = azimuthDeg * DEG
   const beta = tiltDeg * DEG
   const cosB = Math.abs(Math.cos(beta)) < 1e-12 ? 0 : Math.cos(beta)
@@ -117,9 +151,17 @@ export function solarOnSurface(weather: Weather, azimuthDeg: number, tiltDeg: nu
     const sinA = sun.sinAlt[i], cosA = sun.cosAlt[i]
     const cosT = sinA * cosB + cosA * sinB * Math.cos(sun.az[i] - gs)
     const direct = cosT > 0 ? dn * cosT : 0
-    const diffuse = dh * skyVf
+    let diffuse = dh * skyVf
+    if (perez && dh > 0) {
+      const [F1, F2] = perezF(sinA, dn, dh, weather.header.elevation)
+      // Circumsolar: cos θ / max(cos 85°, cos z), with EnergyPlus's exception for a flat surface at a low sun.
+      let cs = Math.max(0, cosT) / Math.max(0.0871557, sinA)
+      if (cs > 0 && sinA < 0.0871557 && tiltDeg < 2) cs = 1
+      diffuse = Math.max(0, dh * (skyVf * (1 - F1) + F1 * cs + F2 * sinB))
+    }
     const reflected = (dn * sinA + dh) * options.albedo * gndVf
     out.direct[i] = direct
+    out.cos_incidence[i] = cosT > 0 ? cosT : 0
     out.diffuse[i] = diffuse
     out.reflected[i] = reflected
     out.total[i] = Math.max(0, direct + diffuse + reflected)
