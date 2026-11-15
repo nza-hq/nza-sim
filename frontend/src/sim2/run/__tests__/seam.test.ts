@@ -104,3 +104,15 @@ describe('simulate', () => {
     expect(simulate({ schema_version: '9.9' }, { weather: WEATHER })).toEqual({ ok: false, missing: [expect.objectContaining({ path: 'schema_version' })] })
   })
 })
+
+describe('saving weather to the organisation', () => {
+  it('names a file as the bucket policy accepts (0007_weather_upload.sql)', async () => {
+    const { organisationFileName } = await import('../weather')
+    const ok = /^[A-Za-z0-9._-]{1,120}\.epw$/
+    for (const [a, b] of [['GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw', 'GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw'], ['my weather (2).EPW', 'my_weather_2.epw'], ['../../x.epw', '.._.._x.epw'], ['@@@.epw', 'weather.epw']]) {
+      expect(organisationFileName(a)).toBe(b)
+      expect(organisationFileName(a)).toMatch(ok)
+    }
+    expect(organisationFileName('x'.repeat(300))).toMatch(ok)
+  })
+})

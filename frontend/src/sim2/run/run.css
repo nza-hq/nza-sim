@@ -45,3 +45,5 @@
 .rp-expand:focus-visible { outline: 2px solid #235546; outline-offset: 2px; border-radius: 2px; }
 .rp-part td { color: #6B7A75; padding-left: 14px; }
 .rp-draft { margin: 8px 0 0; padding: 6px 8px; border-radius: 6px; background: #FBF3E6; color: #A0522D; font-size: 12px; line-height: 17px; }
+.rp-save { margin-top: 6px; }
+.rp-note { margin: 4px 0 0; font-size: 12px; color: #3A4743; }

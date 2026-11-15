@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../../auth/AuthGate'
 import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
-import { BUCKET, listOrganisationWeather } from './weather'
+import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
 import type { Summary } from './seam'
 import './run.css'
 
@@ -46,6 +46,8 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
   const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
   const [weatherError, setWeatherError] = useState<string | null>(null)
   const [orgFiles, setOrgFiles] = useState<string[] | null>(null)
+  const localFile = useRef<{ bytes: Uint8Array; name: string } | null>(null)
+  const [saveNote, setSaveNote] = useState<string | null>(null)
   const [info, setInfo] = useState(false)
   const client = useRef<RunClient | null>(null)
   const latestDoc = useRef(doc)
@@ -93,14 +95,31 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
   const onLocal = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f || !client.current) return
-    client.current.setWeather(new Uint8Array(await f.arrayBuffer()), f.name, 'local')
+    const bytes = new Uint8Array(await f.arrayBuffer())
+    localFile.current = { bytes, name: f.name }
+    setSaveNote(null)
+    client.current.setWeather(bytes.slice(), f.name, 'local')
     e.target.value = ''
   }
   const onOrg = async (name: string) => {
     if (!auth || !client.current || !name) return
     const { data, error } = await auth.supabase.storage.from(BUCKET).download(`${auth.org.id}/${name}`)
     if (error || !data) { setWeatherError(error?.message ?? 'The weather file could not be downloaded.'); return }
+    localFile.current = null
+    setSaveNote(null)
     client.current.setWeather(new Uint8Array(await data.arrayBuffer()), name, 'organisation')
+  }
+  const canSave = !!auth && (auth.org.role === 'admin' || auth.org.role === 'editor')
+  const onSave = async () => {
+    const f = localFile.current
+    if (!auth || !f) return
+    setSaveNote('Saving…')
+    try {
+      const saved = await saveToOrganisation(auth.supabase, auth.org.id, f.bytes, f.name)
+      setSaveNote(`Saved to ${auth.org.name} as ${saved}.`)
+      localFile.current = null
+      listOrganisationWeather(auth.supabase, auth.org.id).then(setOrgFiles, () => {})
+    } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
   const s = state.kind === 'done' ? state.summary : null
@@ -140,6 +159,10 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
             </select>
           )}
         </div>
+        {canSave && weather && localFile.current && (
+          <button type="button" className="rp-btn rp-save" onClick={onSave}>Save to {auth!.org.name}</button>
+        )}
+        {saveNote && <p className="rp-note">{saveNote}</p>}
         {weatherError && <p className="rp-error">That file could not be read: {weatherError}</p>}
       </div>
 
