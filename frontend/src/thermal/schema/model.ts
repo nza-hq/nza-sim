@@ -180,7 +180,7 @@ export const Surface = z
      * outside; null on glazing, ground and internal surfaces. Today's engine hard-codes 0.6 (walls) and 0.7 (roofs).
      */
     solar_absorptance: finite.min(0).max(1).nullable(),
-    /** Schema 2.1: outside-face long-wave emissivity, 0 to 1, on the same surfaces (ISO 52016-1 uses it for sky exchange). */
+    /** Schema 2.1: outside-face long-wave emissivity, 0 to 1, on outside walls, roofs and glazing (ISO 52016-1 sky exchange); null otherwise. */
     thermal_emissivity: finite.min(0).max(1).nullable(),
     /** Schema 2.1: glazing only, the frame's share of the opening area, 0 to <1 (today's engine: 0.20); null otherwise. */
     frame_fraction: finite.min(0).lt(1).nullable(),
@@ -410,8 +410,8 @@ export const ModelDocument = z
       if (exteriorOpaque && (s.solar_absorptance == null || s.thermal_emissivity == null)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" faces outside and needs solar_absorptance and thermal_emissivity` })
       }
-      if (s.kind === 'glazing' && s.frame_fraction == null) {
-        ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'frame_fraction'], message: `glazing "${s.id}" needs frame_fraction` })
+      if (s.kind === 'glazing' && (s.frame_fraction == null || s.thermal_emissivity == null)) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `glazing "${s.id}" needs frame_fraction and thermal_emissivity` })
       }
       if (s.zone_b !== 'outside' && s.zone_b !== 'ground' && !zoneIds.has(s.zone_b)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'zone_b'], message: `surface "${s.id}" names zone "${s.zone_b}", which does not exist` })

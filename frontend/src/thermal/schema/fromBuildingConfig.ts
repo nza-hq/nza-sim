@@ -251,7 +251,7 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
       id: `glazing_${f}`, kind: 'glazing', zone_a: ZONE_ID, zone_b: 'outside', facade: f,
       area_m2: gross * wwr, azimuth_deg: azimuth, tilt_deg: 90,
       construction_ref: glazingRef, g_value: null, wwr, openings: [],
-      solar_absorptance: null, thermal_emissivity: null, frame_fraction: TODAY.frame_fraction,
+      solar_absorptance: null, thermal_emissivity: TODAY.outside_emissivity, frame_fraction: TODAY.frame_fraction,
     }
     const wc = src.take(`${B}.window_count.${f}`, `surfaces[${glzIdx}].window_count`)
     if (wc !== undefined) glazing.window_count = wc

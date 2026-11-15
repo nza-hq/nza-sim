@@ -31,7 +31,7 @@ Part 0 §5 listed constants today's engine hard-codes that Engine 1 needs as inp
 | Field | Where | Today's value (instantCalc.js) |
 |---|---|---|
 | `solar_absorptance` | outside walls / roofs; null otherwise | 0.6 walls, 0.7 roofs |
-| `thermal_emissivity` | outside walls / roofs; null otherwise | 0.9 (not in today's engine; its h_out = 25 lumps radiation) |
+| `thermal_emissivity` | outside walls, roofs and (from Part 3) glazing; null otherwise | 0.9 (not in today's engine; its h_out = 25 lumps radiation) |
 | `frame_fraction` | glazing; null otherwise | 0.20 |
 | `zones[].internal_heat_capacity_j_per_k_m2` | every zone | 250,000 |
 | `building.site.ground.method` | building | `'annual_mean_outdoor'` |

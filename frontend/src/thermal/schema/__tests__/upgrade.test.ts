@@ -38,7 +38,7 @@ describe('schema 2.1', () => {
     for (const s of d.surfaces) {
       if (s.kind === 'wall') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.6, 0.9, null])
       if (s.kind === 'roof') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.7, 0.9, null])
-      if (s.kind === 'glazing') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([null, null, 0.2])
+      if (s.kind === 'glazing') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([null, 0.9, 0.2])
     }
     expect(d.zones.map((z) => z.internal_heat_capacity_j_per_k_m2)).toEqual(d.zones.map(() => 250_000))
     expect(d.building.site.ground).toEqual({ method: 'annual_mean_outdoor' })
@@ -59,7 +59,7 @@ describe('schema 2.1', () => {
     const a = structuredClone(d); a.surfaces[wall].solar_absorptance = null
     expect(() => ModelDocument.parse(a)).toThrow('needs solar_absorptance')
     const b = structuredClone(d); b.surfaces[glz].frame_fraction = null
-    expect(() => ModelDocument.parse(b)).toThrow('needs frame_fraction')
+    expect(() => ModelDocument.parse(b)).toThrow('needs frame_fraction and thermal_emissivity')
     expect(() => upgradeDocument({ ...d, schema_version: '1.0' })).toThrow('schema version "1.0"')
     expect(SCHEMA_VERSION).toBe('2.1')
     expect(TODAY.internal_heat_capacity_j_per_k_m2).toBe(250_000)
