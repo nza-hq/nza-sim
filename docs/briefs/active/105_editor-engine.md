@@ -107,7 +107,9 @@ Room-level results on screen must say plainly that they are **not yet validated*
      layer). It is refused for interzone elements, as now.
 4. **Weather in the browser.** Weather is chosen from NZA Sim's own store:
    - the EPWs in the library (Supabase Storage) when signed in;
-   - otherwise one committed, freely licensed UK EPW (Climate.OneBuilding, with its licence recorded).
+   - ~~otherwise one committed, freely licensed UK EPW~~ **(P0: Climate.OneBuilding states no open licence, "All
+     Rights Reserved", so no EPW is committed.)** Weather comes only from a private `weather` bucket on NZA Sim (dev),
+     readable by the organisation that uploaded it. Signed out, or with none chosen, the panel says "No weather file".
 
    No silent default: the panel shows which file and station.
 5. **The run happens in a web worker,** debounced on edit. The worker holds the parsed weather and library.
