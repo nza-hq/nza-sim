@@ -3,7 +3,7 @@
  *
  *   simulate(doc, { weather, constructions? }) → { ok: true, results, summary } | { ok: false, missing }
  *
- * The document is checked against the schema (an older stored version is upgraded first). Then the inputs a run
+ * The document is checked against the schema; an older version is refused, not upgraded (review F1). Then the inputs a run
  * needs and the editor may not have yet are checked together, so the person sees every gap at once:
  *   weather, each construction, the building's thermal bridging, each zone's setpoints and air leakage. A zone with
  *   its control stated and only a heating (or only a cooling) setpoint is heated only (or cooled only).
@@ -102,8 +102,13 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     const v = (input as { schema_version?: unknown })?.schema_version
     const parsed = ModelDocument.safeParse(input)
     if (parsed.success) doc = parsed.data
-    else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) doc = upgradeDocument(input)
-    else return { ok: false, missing: parsed.error.issues.slice(0, 12).map((i) => explain(i.path.join('.'), i.message, null)) }
+    else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
+      // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
+      // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
+      // current version; an older saved plan is brought up to date by the editor, which shows what it fills.
+      upgradeDocument(input)  // still read, so a document that cannot be read says why
+      return { ok: false, missing: [{ path: 'schema_version', what: `This building was saved in an older format (${String(v)}). Open it in the editor and save it again before results can be shown.` }] }
+    } else return { ok: false, missing: parsed.error.issues.slice(0, 12).map((i) => explain(i.path.join('.'), i.message, null)) }
   } catch (e) {
     return { ok: false, missing: [{ path: 'schema_version', what: `The building cannot be read (${(e as Error).message}).` }] }
   }

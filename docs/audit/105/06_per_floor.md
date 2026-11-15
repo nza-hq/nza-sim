@@ -10,7 +10,7 @@
   - Each hour can be split into 1 to 60 steps.
   - Solar, gains and ventilation are held over the hour.
   - The outdoor temperature is either held at the hour's value, or moved linearly from the previous reading to this one. The linear form is EnergyPlus's convention.
-  - Outputs stay hourly: the mean of the steps, with each hour's closure.
+  - Outputs stay hourly: the mean of the steps. Each hour's closure is the mean of the steps' own residual sizes, so steps cannot cancel (review F8).
 - **`surface_physics.inside_convection: 'tarp'`** (network.ts).
   - Walton's natural-convection correlations, which EnergyPlus's TARP inside algorithm uses.
   - Each face's coefficient comes from its tilt and its temperature difference with the air at the previous step. The minimum is EnergyPlus's 0.1 W/m²K.
@@ -78,6 +78,9 @@ Two cheaper forms were looked at:
 - Not tried: a fixed-matrix correction iteration. A floor's TARP coefficient can be several times its ISO value, so convergence is not assured.
 
 **Decision: TARP stays an option and does not join `REFEREE_OPTIONS` or the editor's run options yet.**
+
+(Review F7: `REFEREE_OPTIONS` is spread into the editor's run options, so putting TARP there would put it in the editor.
+And the speed miss is not only at 50 zones: five storeys take 1.0–1.2 s, against Brief 104's 150 ms five-zone budget.)
 
 - It is the physics that matches the referee per storey. It brings the worst storey's cooling error from 31 % to 17 % and the building's from +7.9 % to +1.6 %.
 - It fails the 50-zone speed budget by 25×.

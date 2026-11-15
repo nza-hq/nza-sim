@@ -87,6 +87,14 @@ describe('simulate', () => {
     if (!r.ok) throw new Error(JSON.stringify(r.missing))
     expect(r.summary.drafts).toEqual([draft.draft])
   })
+  it('an older document is refused, not upgraded with today\'s gain fallbacks (review F1)', async () => {
+    const d = await doc()
+    d.schema_version = '2.2'
+    for (const p of d.profiles) delete p.radiant_fraction
+    const r = simulate(d, { weather: WEATHER })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.missing.map((m) => m.path)).toEqual(['schema_version'])
+  })
   it('what the engine refuses comes back named, in words', async () => {
     const d = await doc()
     const i = d.profiles.findIndex((p: any) => p.kind === 'lighting')

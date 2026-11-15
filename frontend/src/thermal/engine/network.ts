@@ -694,7 +694,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       sum[z] += izs[z]
       zOut[o + 10] += w * izs[z]
       zOut[o + 11] += w * stored[z]
-      zOut[o + 12] += w * (sum[z] - stored[z])  // signed over the steps; its size is taken at the hour's end
+      zOut[o + 12] += w * Math.abs(sum[z] - stored[z])  // each step's own residual, so steps cannot cancel (review F8)
       const mrt = xF[rad[z]]  // the star node is the area-weighted mean of the zone's faces
       zOut[o] += w * xF[z]; zOut[o + 1] += w * mrt; zOut[o + 2] += w * 0.5 * (xF[z] + mrt)
     }
@@ -708,7 +708,6 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       const prev = linear ? inp.theta_e[h > 0 ? h - 1 : Math.min(23, H - 1)] : cur
       for (let s = 1; s <= N; s++) sub(h, prev + ((cur - prev) * s) / N, record, 1 / N)
     }
-    if (record) { const ob = h * Z * NO; for (let z = 0; z < Z; z++) { const o = ob + z * NO + 12; zOut[o] = Math.abs(zOut[o]) } }
   }
 
   for (let d = 0; d < inp.warmup_days; d++) for (let h = 0; h < 24; h++) step(h, false)

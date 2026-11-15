@@ -84,3 +84,12 @@ The thermal suite is 114 tests, all passing. That is the 104 from Part 1 unchang
 - **This is not yet the brief's gate (verification 3).** That gate is "Bridgewater five storeys with gains and
   ventilation". Ventilation is Part 3, where Bridgewater's 3.8 m³/s of mechanical extract and supply remove much of
   this heat, so the gate is run there with heating and cooling both present.
+
+## Stated after the independent review (F4, F5)
+
+- **A lighting, equipment or auxiliary profile with no schedule of its own follows the zone's occupancy schedule**
+  (gains.ts, as today's helpers do). A zone with no occupancy profile then refuses the gain, naming the zone's
+  occupancy reference. The editor's space types write their own schedules.
+- **Refused, not read as defaults** (changed after review): an exception day active on a date with no values for that
+  day type (today read 0); a gain fraction or standby factor outside 0 to 1 (today clamped the gain fraction); a
+  negative area share. Bridgewater's values are inside these ranges, so its hours are unchanged.

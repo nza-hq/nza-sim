@@ -84,7 +84,9 @@ function ownValue(s: Sched, c: Calendar, h: number): number {
   const e = activeException(s, c.mmdd[h])
   const dt = c.day[h], hr = c.hourOfDay[h]
   const mm = Number(s.monthly_multipliers?.[c.monthIdx[h]] ?? 1)
-  if (e) return Number(e[dt]?.[hr] ?? 0) * (e.ignore_monthly_multipliers ? 1 : mm)
+  // An active exception without this day's values is NaN, refused by the caller with its path (review F5): today's
+  // engine read it as 0.
+  if (e) return (Array.isArray(e[dt]) ? Number(e[dt][hr] ?? 0) : NaN) * (e.ignore_monthly_multipliers ? 1 : mm)
   return Number(s[dt]?.[hr] ?? 0) * mm
 }
 
@@ -172,6 +174,7 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
       const w = new Float64Array(H)
       for (let h = 0; h < H; h++) {
         presence[h] = ownValue(occSched, c, h)
+        if (Number.isNaN(presence[h])) throw new GainsError(`an exception active on ${c.mmdd[h]} has no ${c.day[h]} values`, `${pp}.schedule.exceptions`)
         w[h] = people * occRate * presence[h] * sensible
       }
       out.push({ kind: 'occupancy', profile_id: o.id, w, radiant_fraction: rf })
@@ -182,8 +185,10 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
       const { p, i } = get(id, kind, `${zp}.profile_refs.${kind}[${j}]`)
       const pp = `profiles[${i}]`
       const g = p as Extract<Profile, { kind: 'lighting' }>
+      // Range-checked, not clamped (review F5; today's engine clamps the gain fraction to 0..1).
       const areaShare = need(g.area_share, `${pp}.area_share`)
-      const gainFraction = Math.max(0, Math.min(1, need(g.gain_fraction, `${pp}.gain_fraction`)))
+      if (!(areaShare >= 0)) throw new GainsError('must be ≥ 0', `${pp}.area_share`)
+      const gainFraction = frac01(g.gain_fraction, `${pp}.gain_fraction`)
       const rf = frac01(g.radiant_fraction, `${pp}.radiant_fraction`)
       const rel = need(g.relationship_to_occupancy, `${pp}.relationship_to_occupancy`)
       const isEquip = kind === 'equipment'
@@ -198,7 +203,7 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
       }
       const sched = (ownSched ?? occSched) as Sched
       const daylight = !isEquip && rel === 'proportional_with_spill' ? frac01(g.daylight_factor, `${pp}.daylight_factor`) : 1
-      const standby = isEquip && rel !== 'independent' ? need(g.standby_factor, `${pp}.standby_factor`) : 0
+      const standby = isEquip && rel !== 'independent' ? frac01(g.standby_factor, `${pp}.standby_factor`) : 0
 
       let base = 0, act = 0
       if (isEquip) {
@@ -210,7 +215,10 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
       const w = new Float64Array(H)
       for (let h = 0; h < H; h++) {
         let f: number
-        if (rel === 'independent') f = ownValue(sched, c, h)
+        if (rel === 'independent') {
+          f = ownValue(sched, c, h)
+          if (Number.isNaN(f)) throw new GainsError(`an exception active on ${c.mmdd[h]} has no ${c.day[h]} values`, `${pp}.schedule.exceptions`)
+        }
         else if (isEquip) f = Math.max(standby, dayValue(sched, c, h) * occRate)
         else if (rel === 'always_on') f = 1
         else if (rel === 'proportional') f = presence![h] * occRate

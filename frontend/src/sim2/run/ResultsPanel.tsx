@@ -197,7 +197,8 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           {info && (
             <p className="rp-note">
               Demand to hold each zone's setpoints, from the multi-room engine. The building total is checked against
-              EnergyPlus on a five-storey hotel (heating within 4 %, cooling within 10 %). Figures for single zones and
+              EnergyPlus on a five-storey hotel (heating within 4 %, cooling within 10 %, with the same air density;
+              with EnergyPlus's default outdoor air density, −11 % and +10 %). Figures for single zones and
               rooms are not yet validated: storeys differed from EnergyPlus by up to 31 % for cooling. Delivered energy,
               fuel and carbon are not included yet.
             </p>

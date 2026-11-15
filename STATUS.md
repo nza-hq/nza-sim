@@ -40,6 +40,8 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - TARP inside convection: the building vs full r2_z goes from +1.1 / +7.9 % to −1.4 / +1.6 %, the worst storey's cooling from 31 % to 17 %, and z5's slab heat from 0.77 to 2.60 MWh (EnergyPlus 3.44). It is 25× too slow at 50 zones (50 s), so it stays an option; a faster factorisation is the follow-up.
   - Roof slab gap attributed: 1.83 MWh inside convection form, 0.52 the rest of EnergyPlus's surface physics, 0.31 not attributed (step, slab discretisation and air temperatures ruled out).
   - Cooled-room twin with gains (brief deliverable 5): per room within 4.3 % of EnergyPlus with the same coefficients; gain energy equal to four figures.
+- **P5 additions:** the panel starts closed as a tab; the drafted internal wall (`docs/audit/102/library_additions.json`) runs and is named in the panel ("Uses a draft construction, awaiting Chris"); editors and admins can save a weather file to their organisation (migration 0007, applied on dev: insert only, `.epw` names, no update or delete; Linzie 15 Nov 21:02).
+- **Independent review** ([`07_independent_review.md`](docs/audit/105/07_independent_review.md), response [`08_review_response.md`](docs/audit/105/08_review_response.md)): no tuning; F1, F2, F5, F7, F8 fixed; F4 stated; F3 (per-zone breakdown) and F6 (unpinned constructions) carried to the next brief; F9 a note.
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 
