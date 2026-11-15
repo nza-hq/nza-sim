@@ -482,6 +482,8 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
     infiltration_ach: src.take(`${B}.infiltration_ach`, 'zones[0].infiltration_ach') ?? null,
     internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2,
     surfaces: surfaces.map((s) => s.id as string),
+    // Today's tool has no emitters: none stated, so heating is not limited (Brief 108).
+    emitters: [],
   }
   const location = src.get(`${B}.location`)
   const building = {

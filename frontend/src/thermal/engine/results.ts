@@ -46,6 +46,8 @@ export interface ZoneResults {
     theta_mean_radiant_c: Float64Array
     heating_w: Float64Array
     cooling_w: Float64Array
+    /** Heat into the zone from the other zones, W (Brief 105 Part 6; zeros for a one-zone model). */
+    interzone_w: Float64Array
   }
   annual: {
     heating_kwh: number

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../../auth/AuthGate'
 import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
-import { BUCKET, listOrganisationWeather } from './weather'
+import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
 import type { Summary } from './seam'
 import './run.css'
 
@@ -20,13 +20,47 @@ const TERMS: Record<string, string> = {
   solar_transmitted: 'Sun through windows', solar_lost_through_glazing: 'Sun lost back out through windows',
   glazing_solar_absorbed: 'Sun absorbed in the glass', other_gains: 'Other gains', storage: 'Heat stored in the building',
   occupancy_gains: 'People', lighting_gains: 'Lighting', equipment_gains: 'Equipment', auxiliary_gains: 'Other equipment',
-  mechanical_ventilation: 'Ventilation',
+  mechanical_ventilation: 'Ventilation', interzone: 'From other zones',
+}
+const FUEL_WORDS: Record<string, string> = { electricity: 'Electricity', gas: 'Gas', oil: 'Oil', biomass: 'Biomass', district_heating: 'District heat', district_cooling: 'District cooling' }
+const END_USE_WORDS: Record<string, string> = {
+  heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', dhw_circulation: 'Hot water pump', fans: 'Fans', lighting: 'Lighting',
+  small_power: 'Small power', auxiliary: 'Other electrical',
 }
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const signed = (kwh: number) => `${kwh >= 0 ? '+' : '−'}${mwh(Math.abs(kwh))}`
 const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
 interface Row { key: string; label: string; kwh: number; parts?: Row[] }
 const perM2 = (kwh: number, m2: number) => (m2 > 0 ? Math.round(kwh / m2).toLocaleString('en-GB') : '–')
+
+/**
+ * A balance as rows, largest in first (Rule 9: every term). The outside faces' three terms (sun on them, radiation to
+ * the sky, conduction) are large and mostly cancel, so they show as one net line for walls, roof and floor, opened to
+ * see the three.
+ */
+function balanceRows(lines: { term: string; kwh: number }[]): Row[] {
+  const parts = lines.filter((l) => FABRIC.includes(l.term))
+  const rows: Row[] = lines.filter((l) => !FABRIC.includes(l.term)).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh }))
+  if (parts.length) rows.push({ key: 'fabric', label: 'Walls, roof and floor', kwh: parts.reduce((a, l) => a + l.kwh, 0), parts: [...parts].sort((a, b) => b.kwh - a.kwh).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh })) })
+  return rows.sort((a, b) => b.kwh - a.kwh)
+}
+
+function BalanceRows({ lines, indent = false }: { lines: { term: string; kwh: number }[]; indent?: boolean }) {
+  const [fabricOpen, setFabricOpen] = useState(false)
+  const rows = useMemo(() => balanceRows(lines), [lines])
+  const cls = indent ? 'rp-zone-line' : undefined
+  return <>{rows.flatMap((l) => [
+    <tr key={l.key} className={cls}>
+      <td>{l.parts
+        ? <button type="button" className="rp-expand" aria-expanded={fabricOpen} onClick={() => setFabricOpen(!fabricOpen)}>{fabricOpen ? '▾' : '▸'} {l.label}</button>
+        : l.label}</td>
+      <td className={l.kwh >= 0 ? 'in' : 'out'} colSpan={indent ? 2 : undefined}>{signed(l.kwh)}</td>
+    </tr>,
+    ...(l.parts && fabricOpen ? l.parts.map((q) => (
+      <tr key={q.key} className={indent ? 'rp-part rp-zone-line' : 'rp-part'}><td>{q.label}</td><td className={q.kwh >= 0 ? 'in' : 'out'} colSpan={indent ? 2 : undefined}>{signed(q.kwh)}</td></tr>
+    )) : []),
+  ])}</>
+}
 
 type State =
   | { kind: 'idle' }
@@ -46,6 +80,8 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
   const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
   const [weatherError, setWeatherError] = useState<string | null>(null)
   const [orgFiles, setOrgFiles] = useState<string[] | null>(null)
+  const localFile = useRef<{ bytes: Uint8Array; name: string } | null>(null)
+  const [saveNote, setSaveNote] = useState<string | null>(null)
   const [info, setInfo] = useState(false)
   const client = useRef<RunClient | null>(null)
   const latestDoc = useRef(doc)
@@ -93,27 +129,35 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
   const onLocal = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f || !client.current) return
-    client.current.setWeather(new Uint8Array(await f.arrayBuffer()), f.name, 'local')
+    const bytes = new Uint8Array(await f.arrayBuffer())
+    localFile.current = { bytes, name: f.name }
+    setSaveNote(null)
+    client.current.setWeather(bytes.slice(), f.name, 'local')
     e.target.value = ''
   }
   const onOrg = async (name: string) => {
     if (!auth || !client.current || !name) return
     const { data, error } = await auth.supabase.storage.from(BUCKET).download(`${auth.org.id}/${name}`)
     if (error || !data) { setWeatherError(error?.message ?? 'The weather file could not be downloaded.'); return }
+    localFile.current = null
+    setSaveNote(null)
     client.current.setWeather(new Uint8Array(await data.arrayBuffer()), name, 'organisation')
+  }
+  const canSave = !!auth && (auth.org.role === 'admin' || auth.org.role === 'editor')
+  const onSave = async () => {
+    const f = localFile.current
+    if (!auth || !f) return
+    setSaveNote('Saving…')
+    try {
+      const saved = await saveToOrganisation(auth.supabase, auth.org.id, f.bytes, f.name)
+      setSaveNote(`Saved to ${auth.org.name} as ${saved}.`)
+      localFile.current = null
+      listOrganisationWeather(auth.supabase, auth.org.id).then(setOrgFiles, () => {})
+    } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
   const s = state.kind === 'done' ? state.summary : null
-  // Every term is listed (Rule 9). The outside faces' three terms (sun on them, radiation to the sky, conduction) are
-  // large and mostly cancel, so they show as one net line for walls, roof and floor, opened to see the three.
-  const [fabricOpen, setFabricOpen] = useState(false)
-  const breakdown = useMemo(() => {
-    if (!s) return []
-    const parts = s.breakdown.filter((l) => FABRIC.includes(l.term))
-    const rows: Row[] = s.breakdown.filter((l) => !FABRIC.includes(l.term)).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh }))
-    if (parts.length) rows.push({ key: 'fabric', label: 'Walls, roof and floor', kwh: parts.reduce((a, l) => a + l.kwh, 0), parts: parts.sort((a, b) => b.kwh - a.kwh).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh })) })
-    return rows.sort((a, b) => b.kwh - a.kwh)
-  }, [s])
+  const [zoneOpen, setZoneOpen] = useState<string | null>(null)
 
   if (!open) {
     return <button type="button" className="rp-tab" style={{ right }} onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : state.kind === 'missing' ? ` · ${state.items.length} to set` : ''}</button>
@@ -140,6 +184,10 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
             </select>
           )}
         </div>
+        {canSave && weather && localFile.current && (
+          <button type="button" className="rp-btn rp-save" onClick={onSave}>Save to {auth!.org.name}</button>
+        )}
+        {saveNote && <p className="rp-note">{saveNote}</p>}
         {weatherError && <p className="rp-error">That file could not be read: {weatherError}</p>}
       </div>
 
@@ -167,6 +215,42 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
             </div>
           </div>
 
+          <h3>Energy used <i>estimate</i></h3>
+          {s.energy.ok ? (
+            <>
+              <div className="rp-totals">
+                <div>
+                  <span className="rp-label">EUI</span>
+                  <span className="rp-metric">{Math.round(s.energy.eui_kwh_per_m2).toLocaleString('en-GB')} <small>kWh/m² a year</small></span>
+                  <span className="rp-sub">{mwh(s.energy.total_kwh)} MWh a year</span>
+                </div>
+                <div>
+                  <span className="rp-label">By fuel</span>
+                  {s.energy.by_fuel.map((f) => <span key={f.fuel} className="rp-sub">{FUEL_WORDS[f.fuel] ?? f.fuel} {mwh(f.kwh)} MWh</span>)}
+                </div>
+              </div>
+              <table className="rp-table">
+                <thead><tr><th>End use</th><th>Fuel</th><th>MWh</th></tr></thead>
+                <tbody>
+                  {s.energy.end_uses.map((l) => <tr key={`${l.end_use}|${l.fuel}`}><td>{END_USE_WORDS[l.end_use] ?? l.end_use}</td><td>{FUEL_WORDS[l.fuel] ?? l.fuel}</td><td>{mwh(l.kwh)}</td></tr>)}
+                </tbody>
+              </table>
+              {s.energy.systems.length > 0 && (
+                <table className="rp-table">
+                  <thead><tr><th>System</th><th>Serves MWh</th><th>Uses MWh</th></tr></thead>
+                  <tbody>
+                    {s.energy.systems.map((g) => <tr key={g.id}><td>{g.label}{g.efficiency != null ? <span className="rp-eff"> · {g.efficiency}</span> : null}</td><td>{mwh(g.served_kwh)}</td><td>{mwh(g.fuel_kwh)}</td></tr>)}
+                  </tbody>
+                </table>
+              )}
+            </>
+          ) : (
+            <div className="rp-missing" role="status">
+              <p>To show energy use, the systems need:</p>
+              <ul>{s.energy.missing.map((m) => <li key={m.path + m.what}>{m.what}</li>)}</ul>
+            </div>
+          )}
+
           <h3>
             By zone <i>estimate</i>
             <button type="button" className="rp-info" aria-expanded={info} onClick={() => setInfo((v) => !v)} aria-label="About these figures">ⓘ</button>
@@ -174,34 +258,32 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           {info && (
             <p className="rp-note">
               Demand to hold each zone's setpoints, from the multi-room engine. The building total is checked against
-              EnergyPlus on a five-storey hotel (heating within 4 %, cooling within 10 %). Figures for single zones and
-              rooms are not yet validated: storeys differed from EnergyPlus by up to 31 % for cooling. Delivered energy,
-              fuel and carbon are not included yet.
+              EnergyPlus on a five-storey hotel (heating within 4 %, cooling within 10 %, with the same air density;
+              with EnergyPlus's default outdoor air density, −11 % and +10 %). Figures for single zones and
+              rooms are not yet validated: storeys differed from EnergyPlus by up to 31 % for cooling. Energy used is
+              that demand through each system's share and efficiency, plus hot water, fans, lighting and equipment; it
+              matches today's tool given the same demand. Carbon is not included yet.
             </p>
           )}
           <table className="rp-table">
             <thead><tr><th>Zone</th><th>Heating MWh</th><th>Cooling MWh</th></tr></thead>
             <tbody>
-              {s.zones.map((z) => <tr key={z.id}><td>{z.name || z.id}</td><td>{z.heated ? mwh(z.heating_kwh) : <span className="rp-none">not heated</span>}</td><td>{z.cooled ? mwh(z.cooling_kwh) : <span className="rp-none">not cooled</span>}</td></tr>)}
+              {s.zones.flatMap((z) => [
+                <tr key={z.id}>
+                  <td><button type="button" className="rp-expand" aria-expanded={zoneOpen === z.id} onClick={() => setZoneOpen(zoneOpen === z.id ? null : z.id)}>{zoneOpen === z.id ? '▾' : '▸'} {z.name || z.id}</button></td>
+                  <td>{z.heated ? mwh(z.heating_kwh) : <span className="rp-none">not heated</span>}</td>
+                  <td>{z.cooled ? mwh(z.cooling_kwh) : <span className="rp-none">not cooled</span>}</td>
+                </tr>,
+                ...(zoneOpen === z.id ? [<BalanceRows key={`${z.id}-balance`} lines={z.breakdown} indent />] : []),
+              ])}
             </tbody>
           </table>
 
           <h3>Where the heat goes <i>estimate</i></h3>
           <table className="rp-table rp-breakdown">
-            <tbody>
-              {breakdown.flatMap((l) => [
-                <tr key={l.key}>
-                  <td>{l.parts
-                    ? <button type="button" className="rp-expand" aria-expanded={fabricOpen} onClick={() => setFabricOpen(!fabricOpen)}>{fabricOpen ? '▾' : '▸'} {l.label}</button>
-                    : l.label}</td>
-                  <td className={l.kwh >= 0 ? 'in' : 'out'}>{signed(l.kwh)}</td>
-                </tr>,
-                ...(l.parts && fabricOpen ? l.parts.map((q) => (
-                  <tr key={q.key} className="rp-part"><td>{q.label}</td><td className={q.kwh >= 0 ? 'in' : 'out'}>{signed(q.kwh)}</td></tr>
-                )) : []),
-              ])}
-            </tbody>
+            <tbody><BalanceRows lines={s.breakdown} /></tbody>
           </table>
+          {s.drafts.length > 0 && <p className="rp-draft">Uses a draft construction, awaiting Chris: {s.drafts.join('; ')}.</p>}
           <p className="rp-foot">MWh a year; + into the building, − out. Ran in {Math.round(state.kind === 'done' ? state.ms : 0)} ms.</p>
         </div>
       )}

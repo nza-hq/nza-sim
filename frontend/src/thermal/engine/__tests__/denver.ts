@@ -7,6 +7,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import type { ConstructionBody } from '../elements'
 import type { Weather } from '../types'
+import { ModelDocument } from '../../schema/model'
 
 // Committed (validation/fixtures/weather/README.md), so this gate runs from a fresh checkout.
 export const MOS = path.resolve(__dirname, '../../../../../validation/fixtures/weather/USA_CO_Denver.Intl.AP.725650_TMY3.mos')
@@ -61,3 +62,34 @@ export function window600() {
   return { U, g: T + qi }
 }
 
+/** The BESTEST Case 600/900 document (moved here from bestest.test.ts for Brief 105 Part 6's measurement script). */
+export function bestestDoc(wall: string, floor: string) {
+  const win = window600()
+  LIB.window600 = { u_value_W_per_m2K: win.U, g_value: win.g, layers: [] }
+  const s = (id: string, kind: string, area: number, az: number | null, tilt: number, key: string, x: Record<string, unknown> = {}) => ({
+    id, kind, zone_a: 'z', zone_b: 'outside', facade: null, area_m2: area, azimuth_deg: az, tilt_deg: tilt,
+    construction_ref: { key }, g_value: null, openings: [], solar_absorptance: 0.6, thermal_emissivity: 0.9, frame_fraction: null, inside_solar_absorptance: 0.6, inside_solar_absorptance_b: null, faces_up: null, ...x,
+  })
+  const surfaces = [
+    s('south', 'wall', 8 * 2.7 - 12, 180, 90, wall), s('east', 'wall', 6 * 2.7, 90, 90, wall), s('west', 'wall', 6 * 2.7, 270, 90, wall),
+    s('north', 'wall', 8 * 2.7, 0, 90, wall), s('roof', 'roof', 48, null, 0, 'roof600'),
+    s('floor', 'floor', 48, null, 180, floor, { solar_absorptance: 0 }),
+    s('window', 'glazing', 12, 180, 90, 'window600', { solar_absorptance: null, frame_fraction: 0, inside_solar_absorptance: null }),
+  ]
+  return ModelDocument.parse({
+    schema_version: '2.4',
+    building: { id: 'bestest', name: 'BESTEST', decoded_building_key: null, site: { lat: 39.83, lon: -104.65, name: 'Denver', exposure: null, ground: { method: 'annual_mean_outdoor' } }, orientation_deg: 0, reported_floor_area_m2: null, thermal_bridging: { mode: 'absent', multiplier: null, alpha_pct: null }, thermal_mass: { mode: null, category: null }, opening_defaults: {} },
+    zones: [{
+      id: 'z', name: 'Case', floor: 0, storeys: 1, polygon: [[0, 0], [8, 0], [8, 6], [0, 6]], area_m2: 48, height_m: 2.7, use_type: 'test', rooms: null,
+      profile_refs: { occupancy: null, lighting: [], equipment: [], auxiliary: [] },
+      setpoints: { heat_c: 20, cool_c: 27, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' },
+      // 0.5 ach at Denver's altitude is 0.414 ach of sea-level air (as the Modelica case); no internal mass beyond air.
+      ventilation: [], infiltration_q50: null, infiltration_ach: 0.414, internal_heat_capacity_j_per_k_m2: 0, emitters: [],
+      surfaces: surfaces.map((x) => x.id),
+    }],
+    surfaces, system_groups: [], profiles: [],
+    services: { heating: { setpoint_mode: 'follow_comfort', setpoint_c: null }, cooling: { setpoint_mode: 'follow_comfort', setpoint_c: null }, dhw: { storage_setpoint_c: null, tap_outlet_temp_c: null, cold_supply_temp_c: null, demand_basis: null, litres_per_person_per_day: null, litres_per_m2_per_day: null, load_shape: null, circulation_pump_w: null } },
+    weather_ref: { kind: 'epw', station_id: '725650', file_name: 'USA_CO_Denver.Intl.AP.725650_TMY3.mos', file_hash: MOS_SHA },
+    library_refs: [],
+  })
+}

@@ -19,6 +19,9 @@ or `NZA Decoded Test` (`stxitqwhaesraisfwyes`).
 - Data API on; **automatic table exposure off**; **automatic RLS on** (project defaults when it was created). So a table
   is reachable only by the grants in the migration, and every table starts locked. The migrations grant `select` to
   `authenticated` behind RLS policies and nothing to `anon`; writes go through security-definer functions only.
+  One documented exception: weather files in the private `weather` Storage bucket are uploaded by the client, held
+  by the insert policy in `0007_weather_upload.sql` (admins and editors, own organisation's folder, new `.epw` files
+  only; no update or delete).
 - The anon (publishable) key is public by design because of the above. There is no service-role key in this repo,
   in a laptop `.env`, in a log or in Notion. Names in `frontend/.env.example`; values in Bitwarden org "NZA".
 

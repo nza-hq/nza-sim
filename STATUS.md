@@ -2,9 +2,42 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🟡 Brief 105 — Simulate v2: the drawn building runs — IN PROGRESS on `chris/105-editor-engine`
+## 🟡 Brief 108 — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
 
-Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-engine.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).
+Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/108/00_reconnaissance.md)):
+  - EN 442 log-mean rating; a 75/65/20 radiator at 50/40 gives 38 % of its rating.
+  - Engine 1 limits `phi`; Engine 2 gets a fourth active-set state.
+  - Today's `capacity_kw` is unused.
+  - The referee is EnergyPlus's `IdealLoadsAirSystem` with `LimitCapacity`.
+  - Each wet emitter names its heating system; electric emitters have a fixed output; the rating is taken at the heating setpoint.
+- **P1 schema 2.4** ([`01_schema.md`](docs/audit/108/01_schema.md)): `zones[].emitters[]` (six kinds, each with its count, output and radiant share; wet kinds name their heating system and EN 442 rating); `design_flow_c`/`design_return_c` on heating groups. The 2.3 → 2.4 upgrade adds empty lists and fills nothing; the seam runs 2.3 through it and still refuses 2.2. 177 tests pass.
+
+## 🟡 Brief 107 — Simulate v2 Engine 4: systems by zone group — IN PROGRESS on `chris/107-systems` (stacked on 106)
+
+Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/107/00_reconnaissance.md)): today's 133.2 decomposed by end use. Electricity 404.144 MWh is heating 37.657 + cooling 30.8 + hot water heat pump 41.174 + pump 1.051 + fans 40.613 + lighting 39.014 + small power 186.136 + auxiliary 27.699; gas 157.428 is the hot water boiler. Every input is in the converted document.
+- **P1 systems** ([`01_systems.md`](docs/audit/107/01_systems.md)): `engine/systems.ts`. Each group's draw from the zones' demand (proportional split, scalar efficiencies), hot water tap-mix per zone, the pump, fans by schedule, and lighting, small power and auxiliary from the gains' electricity. Today's fallbacks are refusals. Served equals demand and the end uses sum to the totals by fuel (tested by hand).
+- **P2 gate** ([`02_gate.md`](docs/audit/107/02_gate.md)):
+  - Fed today's demand, every end use equals today's to its 1 kWh rounding (electricity 404.144, gas 157.428, EUI 133.2).
+  - On Engine 2's own demand (five storeys), the EUI is 131.9. The whole −1.3 is demand: heating +1.03, cooling −2.35.
+  - Engine 2's demand is within −3.9 / +9.3 % of EnergyPlus; today's is −13.8 / +61 %.
+- **P3 tolerance table** ([`03_tolerances.md`](docs/audit/107/03_tolerances.md)): heating and cooling electricity −3.9 / +9.3 % (±10 %, pass), EUI 131.89 against 131.86 (pass). Hot water, fans, lighting, small power and auxiliary are shared inputs, equal by construction, and say so.
+- **P4 panel** ([`04_panel.md`](docs/audit/107/04_panel.md)): "Energy used" with EUI, fuels, end uses and each system's served and used energy; missing systems inputs named while demand still shows. Browser-checked on the editor's plan (46 kWh/m²).
+
+## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
+
+Brief [`docs/briefs/archive/106_zone-breakdown_COMPLETED.md`](docs/briefs/archive/106_zone-breakdown_COMPLETED.md). Carries Brief 105 review F3 and F6. Run seam and panel only.
+
+- **P1 pins** ([`01_pins.md`](docs/audit/106/01_pins.md)): a construction the document does not pin is refused and named, not run on whatever the library holds. The editor already pins every construction it uses (all 16 hashes match).
+- **P2 room-by-room breakdown** ([`02_zone_breakdown.md`](docs/audit/106/02_zone_breakdown.md)): each zone's row opens to its own balance, every term including heat from the other zones; the zone lines close and the interzone lines cancel across the building (tested). Browser-checked on the editor's two-zone plan.
+- **P3 close:** 158 thermal and sim2 tests pass; build clean; no file of today's engine or the editor changed; anchor 133.2. Next: systems by zone group (design note Engine 4).
+
+## ✅ Brief 105 — Simulate v2: the drawn building runs — CLOSED 15 Nov 2026 on `chris/105-editor-engine` (PR open, awaiting Linzie)
+
+Brief [`docs/briefs/archive/105_editor-engine_COMPLETED.md`](docs/briefs/archive/105_editor-engine_COMPLETED.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/105/00_reconnaissance.md)):
   - The editor's documents run on Engine 2 once their nulls are filled.
@@ -35,6 +68,15 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - Building and per-zone heating and cooling ("estimate"), the full breakdown with the outside-face terms as one expandable net line.
   - A zone with its control stated and only a heating setpoint runs heated only ("not cooled").
   - Browser-checked on the editor's two-zone plan: it refuses until a partition construction and the space types' gain fields are stated (asked of the editor). With them stated in a scratch copy, 9.1 MWh heating; a rerun shows in about 0.4 s.
+- **P6 per-floor accuracy** ([`06_per_floor.md`](docs/audit/105/06_per_floor.md)): two engine options, neither a default.
+  - Sub-hourly steps: Engine 2's own 1 h step error is ≤0.1 % on Bridgewater and 1.0–1.3 % on BESTEST 900. EnergyPlus moves 9 % on cooling with its own step, so the like-for-like referee is EnergyPlus at 4 steps: −2.3 % / +3.2 %, every storey within 4.3 %.
+  - TARP inside convection: the building vs full r2_z goes from +1.1 / +7.9 % to −1.4 / +1.6 %, the worst storey's cooling from 31 % to 17 %, and z5's slab heat from 0.77 to 2.60 MWh (EnergyPlus 3.44). It is 25× too slow at 50 zones (50 s), so it stays an option; a faster factorisation is the follow-up.
+  - Roof slab gap attributed: 1.83 MWh inside convection form, 0.52 the rest of EnergyPlus's surface physics, 0.31 not attributed (step, slab discretisation and air temperatures ruled out).
+  - Cooled-room twin with gains (brief deliverable 5): per room within 4.3 % of EnergyPlus with the same coefficients; gain energy equal to four figures.
+- **P5 additions:** the panel starts closed as a tab; the drafted internal wall (`docs/audit/102/library_additions.json`) runs and is named in the panel ("Uses a draft construction, awaiting Chris"); editors and admins can save a weather file to their organisation (migration 0007, applied on dev: insert only, `.epw` names, no update or delete; Linzie 15 Nov 21:02).
+- **Independent review** ([`07_independent_review.md`](docs/audit/105/07_independent_review.md), response [`08_review_response.md`](docs/audit/105/08_review_response.md)): no tuning; F1, F2, F5, F7, F8 fixed; F4 stated; F3 (per-zone breakdown) and F6 (unpinned constructions) carried to the next brief; F9 a note.
+- **P7 close:** final report [`09_final_report.md`](docs/audit/105/09_final_report.md). All 156 thermal and sim2 tests pass; no file of today's engine changed; `_brief93_anchor.mjs --fixture` gives 133.2. Design note Rev A.8.
+- **Carried forward:** a per-zone breakdown on tap (F3); a pin for every construction the document uses (F6); a fast TARP factorisation; MVHR summer bypass (F9); Chris to check the drafted internal wall; saving and reloading plans.
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 

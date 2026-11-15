@@ -95,6 +95,11 @@ describe('gains.ts is today\'s engine\'s gains, per zone', () => {
     expect(at((d) => { delete d.profiles[idx('equipment')].standby_factor })).toThrow('standby_factor: required')
     expect(at((d) => { d.profiles[idx('lighting')].relationship_to_occupancy = 'sometimes' })).toThrow('unknown relationship "sometimes"')
     expect(at((d) => { d.zones[0].profile_refs.occupancy = null })).toThrow('zones[0].profile_refs.occupancy: profile "default_lighting" follows occupancy')
+    // Review F5: out-of-range values are refused, not clamped; an active exception day without values is refused.
+    expect(at((d) => { d.profiles[idx('lighting')].gain_fraction = 1.2 })).toThrow('gain_fraction: must be 0 to 1')
+    expect(at((d) => { d.profiles[idx('lighting')].area_share = -1 })).toThrow('area_share: must be ≥ 0')
+    expect(at((d) => { d.profiles[idx('equipment')].standby_factor = 2 })).toThrow('standby_factor: must be 0 to 1')
+    expect(at((d) => { d.profiles[idx('occupancy')].schedule.exceptions = [{ start_date: '01-01', end_date: '01-07' }] })).toThrow('has no weekday values')
     // A gain that does not follow occupancy runs without it (the external lighting has its own schedule).
     const lone: any = structuredClone(doc)
     lone.zones[0].profile_refs = { occupancy: null, lighting: [], equipment: [], auxiliary: lone.zones[0].profile_refs.auxiliary }

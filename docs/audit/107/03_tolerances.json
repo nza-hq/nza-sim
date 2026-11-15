@@ -1,0 +1,202 @@
+{
+ "source": "scripts/107_tolerances.py",
+ "tolerances_pct": {
+  "heating": 10,
+  "cooling": 10,
+  "eui": 5
+ },
+ "referees": {
+  "standard_density (gate)": {
+   "run": "r2_z_gains_vent_std",
+   "rows": {
+    "heating_demand": {
+     "nza": 114.546,
+     "ep": 119.16,
+     "delta_pct": -3.9,
+     "tolerance_pct": 10,
+     "pass": true
+    },
+    "cooling_demand": {
+     "nza": 62.725,
+     "ep": 57.383,
+     "delta_pct": 9.3,
+     "tolerance_pct": 10,
+     "pass": true
+    },
+    "heating_electricity": {
+     "nza": 42,
+     "ep": 43.692,
+     "delta_pct": -3.9,
+     "tolerance_pct": 10,
+     "pass": true
+    },
+    "cooling_electricity": {
+     "nza": 20.908,
+     "ep": 19.128,
+     "delta_pct": 9.3,
+     "tolerance_pct": 10,
+     "pass": true
+    },
+    "dhw_electricity": {
+     "nza": 41.174,
+     "ep": 41.174,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "dhw_gas": {
+     "nza": 157.428,
+     "ep": 157.428,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "dhw_circulation": {
+     "nza": 1.051,
+     "ep": 1.051,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "fans": {
+     "nza": 40.613,
+     "ep": 40.613,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "lighting": {
+     "nza": 39.014,
+     "ep": 39.014,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "small_power": {
+     "nza": 186.136,
+     "ep": 186.136,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "auxiliary": {
+     "nza": 27.699,
+     "ep": 27.699,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "eui_kwh_per_m2": {
+     "nza": 131.89,
+     "ep": 131.86,
+     "delta_pct": 0.0,
+     "tolerance_pct": 5,
+     "pass": true
+    }
+   }
+  },
+  "default_density": {
+   "run": "r2_z_gains_vent",
+   "rows": {
+    "heating_demand": {
+     "nza": 114.546,
+     "ep": 129.28,
+     "delta_pct": -11.4,
+     "tolerance_pct": 10,
+     "pass": false
+    },
+    "cooling_demand": {
+     "nza": 62.725,
+     "ep": 56.907,
+     "delta_pct": 10.2,
+     "tolerance_pct": 10,
+     "pass": false
+    },
+    "heating_electricity": {
+     "nza": 42,
+     "ep": 47.403,
+     "delta_pct": -11.4,
+     "tolerance_pct": 10,
+     "pass": false
+    },
+    "cooling_electricity": {
+     "nza": 20.908,
+     "ep": 18.969,
+     "delta_pct": 10.2,
+     "tolerance_pct": 10,
+     "pass": false
+    },
+    "dhw_electricity": {
+     "nza": 41.174,
+     "ep": 41.174,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "dhw_gas": {
+     "nza": 157.428,
+     "ep": 157.428,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "dhw_circulation": {
+     "nza": 1.051,
+     "ep": 1.051,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "fans": {
+     "nza": 40.613,
+     "ep": 40.613,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "lighting": {
+     "nza": 39.014,
+     "ep": 39.014,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "small_power": {
+     "nza": 186.136,
+     "ep": 186.136,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "auxiliary": {
+     "nza": 27.699,
+     "ep": 27.699,
+     "delta_pct": 0.0,
+     "tolerance_pct": null,
+     "pass": null,
+     "note": "shared input, equal by construction"
+    },
+    "eui_kwh_per_m2": {
+     "nza": 131.89,
+     "ep": 132.71,
+     "delta_pct": -0.6,
+     "tolerance_pct": 5,
+     "pass": true
+    }
+   }
+  }
+ }
+}

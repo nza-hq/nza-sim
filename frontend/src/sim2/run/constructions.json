@@ -1,8 +1,10 @@
 {
- "_note": "Made by scripts/sim2_run_constructions.mjs from docs/audit/102/library_export.json. Do not edit by hand.",
+ "_note": "Made by scripts/sim2_run_constructions.mjs from docs/audit/102/library_export.json and library_additions.json (drafts). Do not edit by hand.",
  "source": "docs/audit/102/library_export.json",
  "source_sha256": "c3891d6632c605671a54843cc4cc0e50b66f0ec2ecfc544b8b9c7f9d96d6b9f0",
  "exported_at": "2026-11-14T19:36:56+00:00",
+ "additions": "docs/audit/102/library_additions.json",
+ "additions_sha256": "30bcb08bfd432965d8e4be37742073420878c5d5304f44be831eac9105975c13",
  "constructions": [
   {
    "key": "bridgwater_ext_wall",
@@ -707,6 +709,53 @@
      }
     }
    }
+  },
+  {
+   "key": "interior_wall_block_plastered",
+   "body_hash": "0204c0d2fdb03e86fe74164514a58eff776cfc6be7e562494b49c4628ec1cdb3",
+   "body": {
+    "name": "interior_wall_block_plastered",
+    "type": "interior",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Internal wall: plaster skim, 100mm dense concrete block, plaster skim",
+    "epjson": {
+     "Material": {
+      "IntWall_PlasterA": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      },
+      "IntWall_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "IntWall_PlasterB": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "interior_wall_block_plastered": {
+       "outside_layer": "IntWall_PlasterA",
+       "layer_2": "IntWall_ConcreteBlock",
+       "layer_3": "IntWall_PlasterB"
+      }
+     }
+    }
+   },
+   "draft": "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)"
   }
  ]
 }

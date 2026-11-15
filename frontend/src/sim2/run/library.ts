@@ -23,7 +23,8 @@ export interface Missing {
 }
 
 type Obj = Record<string, any>
-export interface LibraryItem { key: string; body_hash: string; body: Obj }
+/** `draft`: the display name of an item drafted for review and not yet in Chris's library (library_additions.json). */
+export interface LibraryItem { key: string; body_hash: string; body: Obj; draft?: string }
 
 export const CONSTRUCTIONS: LibraryItem[] = (snap as { constructions: LibraryItem[] }).constructions
 export const LIBRARY_SOURCE = { source: (snap as Obj).source as string, source_sha256: (snap as Obj).source_sha256 as string, exported_at: (snap as Obj).exported_at as string }
@@ -78,15 +79,16 @@ const SURFACE_WORDS: Record<string, string> = {
 
 /**
  * The library the engine needs for this document, keyed by construction key, or what is missing. Every surface's key
- * must name a library construction; where the document pins the construction's body hash (`library_refs`), the
+ * must name a library construction, the document must pin its body hash (`library_refs`, Brief 106 P1), and the
  * library's body must be that one.
  */
-export function resolveConstructions(doc: ModelDocument, items: readonly LibraryItem[] = CONSTRUCTIONS): { library: Record<string, ConstructionBody>; missing: Missing[] } {
+export function resolveConstructions(doc: ModelDocument, items: readonly LibraryItem[] = CONSTRUCTIONS): { library: Record<string, ConstructionBody>; missing: Missing[]; drafts: string[] } {
   const byKey = new Map(items.map((i) => [i.key, i]))
   const pinned = new Map(doc.library_refs.filter((r) => r.kind === 'construction').map((r) => [r.key, r.body_hash]))
   const library: Record<string, ConstructionBody> = {}
   const missing: Missing[] = []
   const said = new Set<string>()
+  const drafts: string[] = []
   doc.surfaces.forEach((s, i) => {
     const key = s.construction_ref.key
     const path = `surfaces[${i}].construction_ref.key`
@@ -103,14 +105,20 @@ export function resolveConstructions(doc: ModelDocument, items: readonly Library
       return
     }
     const pin = pinned.get(key)
-    if (pin && pin !== item.body_hash) {
+    if (!pin) {
+      // Brief 106 P1 (review F6): a run uses only a construction whose version the document records.
+      if (!said.has(key)) { said.add(key); missing.push({ path, what: `Choose the construction "${key}" again, so the version used is recorded.` }) }
+      return
+    }
+    if (pin !== item.body_hash) {
       if (!said.has(key)) { said.add(key); missing.push({ path, what: `The construction "${key}" has changed in the library since it was chosen. Choose it again.` }) }
       return
     }
+    if (item.draft) drafts.push(item.draft)
     try { library[key] = bodyFromLibrary(item.body, `library.${key}`) } catch (e) {
       if (!(e instanceof LibraryBodyError)) throw e
       missing.push({ path, what: `The library's "${key}" cannot be read (${e.message}).` })
     }
   })
-  return { library, missing }
+  return { library, missing, drafts }
 }

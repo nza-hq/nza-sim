@@ -43,6 +43,41 @@ describe('simulate', () => {
     expect(r.summary.breakdown.map((l) => l.term)).toEqual(expect.arrayContaining(['occupancy_gains', 'mechanical_ventilation', 'heating', 'cooling']))
     expect(r.summary.weather.file_name).toBe('denver.mos')
   })
+  it('each zone\'s own breakdown closes, shows heat from the other zones, and those lines cancel across the building (Brief 106 P2)', async () => {
+    const r = simulate(await doc(), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    let interzone = 0, interzoneGross = 0
+    for (const z of r.summary.zones) {
+      const sum = z.breakdown.reduce((s, l) => s + l.kwh, 0)
+      const gross = z.breakdown.reduce((s, l) => s + Math.abs(l.kwh), 0)
+      expect(Math.abs(sum)).toBeLessThan(1e-6 * gross)
+      expect(z.breakdown.find((l) => l.term === 'heating')?.kwh ?? 0).toBeCloseTo(z.heating_kwh, 6)
+      const iz = z.breakdown.find((l) => l.term === 'interzone')
+      expect(iz).toBeDefined()
+      interzone += iz!.kwh; interzoneGross += Math.abs(iz!.kwh)
+    }
+    expect(interzoneGross).toBeGreaterThan(0)
+    expect(Math.abs(interzone)).toBeLessThan(1e-6 * interzoneGross)
+    expect(r.summary.breakdown.some((l) => l.term === 'interzone')).toBe(false)
+  })
+  it('energy used by the installed systems, and what they still need while demand still shows (Brief 107 P4)', async () => {
+    const r = simulate(await doc(), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const e = r.summary.energy
+    if (!e.ok) throw new Error(JSON.stringify(e.missing))
+    expect(e.by_fuel.map((f) => f.fuel).sort()).toEqual(['electricity', 'gas'])
+    expect(e.by_fuel.reduce((a, f) => a + f.kwh, 0)).toBeCloseTo(e.total_kwh, 6)
+    expect(e.end_uses.reduce((a, l) => a + l.kwh, 0)).toBeCloseTo(e.total_kwh, 6)
+    expect(e.eui_kwh_per_m2).toBeCloseTo(e.total_kwh / r.summary.building.floor_m2, 9)
+    expect(e.systems.find((s) => s.service === 'heating' && s.fuel === 'electricity' && s.efficiency === 3)).toBeDefined()
+    const d = await doc()
+    d.system_groups = d.system_groups.filter((g: any) => g.service !== 'heating')
+    const r2 = simulate(d, { weather: WEATHER })
+    if (!r2.ok) throw new Error('demand should still show')
+    expect(r2.summary.building.heating_kwh).toBeGreaterThan(0)
+    expect(r2.summary.energy.ok).toBe(false)
+    if (!r2.summary.energy.ok) expect(r2.summary.energy.missing[0].what).toMatch(/^No heating system serves /)
+  })
   it('every missing input at once, in plain words, and no number', async () => {
     const d = await doc()
     d.surfaces.forEach((s: any) => { if (s.kind === 'roof') s.construction_ref.key = 'unassigned:roof' })
@@ -73,6 +108,38 @@ describe('simulate', () => {
     const both = simulate(d, { weather: WEATHER })
     expect(both.ok ? [] : both.missing.map((m) => m.what)).toEqual(['Set the heating setpoint for "Storey 1".', 'Set the cooling setpoint for "Storey 1".'])
   })
+  it('a draft construction runs and is named in the summary', async () => {
+    const d = await doc()
+    const draft = CONSTRUCTIONS.find((c) => c.draft)!
+    expect(draft.key).toBe('interior_wall_block_plastered')
+    expect(draft.body_hash).toBe('0204c0d2fdb03e86fe74164514a58eff776cfc6be7e562494b49c4628ec1cdb3')
+    const r0 = simulate(d, { weather: WEATHER })
+    expect(r0.ok && r0.summary.drafts).toEqual([])
+    // Two storeys joined by an internal wall of the draft construction (each storey's share of a 30 m² wall).
+    d.surfaces.push({ ...structuredClone(d.surfaces.find((s: any) => s.kind === 'ceiling')), id: 'iw', kind: 'partition', tilt_deg: 90, area_m2: 30, construction_ref: { key: draft.key } })
+    d.zones[0].surfaces.push('iw'); d.zones[1].surfaces.push('iw')
+    d.library_refs.push({ kind: 'construction', key: draft.key, version: null, body_hash: draft.body_hash })
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.drafts).toEqual([draft.draft])
+  })
+  it('an older document is refused, not upgraded with today\'s gain fallbacks (review F1)', async () => {
+    const d = await doc()
+    d.schema_version = '2.2'
+    for (const p of d.profiles) delete p.radiant_fraction
+    const r = simulate(d, { weather: WEATHER })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.missing.map((m) => m.path)).toEqual(['schema_version'])
+  })
+  it('a 2.3 document runs, upgraded by adding empty emitter lists only (Brief 108)', async () => {
+    const d = await doc()
+    const now = simulate(d, { weather: WEATHER })
+    d.schema_version = '2.3'
+    for (const z of d.zones) delete z.emitters
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok || !now.ok) throw new Error(JSON.stringify(r))
+    expect(r.summary.zones).toEqual(now.summary.zones)
+  })
   it('what the engine refuses comes back named, in words', async () => {
     const d = await doc()
     const i = d.profiles.findIndex((p: any) => p.kind === 'lighting')
@@ -88,5 +155,17 @@ describe('simulate', () => {
     const r = simulate({ schema_version: '2.3', zones: [] }, { weather: WEATHER })
     expect(r.ok).toBe(false)
     expect(simulate({ schema_version: '9.9' }, { weather: WEATHER })).toEqual({ ok: false, missing: [expect.objectContaining({ path: 'schema_version' })] })
+  })
+})
+
+describe('saving weather to the organisation', () => {
+  it('names a file as the bucket policy accepts (0007_weather_upload.sql)', async () => {
+    const { organisationFileName } = await import('../weather')
+    const ok = /^[A-Za-z0-9._-]{1,120}\.epw$/
+    for (const [a, b] of [['GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw', 'GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw'], ['my weather (2).EPW', 'my_weather_2.epw'], ['../../x.epw', '.._.._x.epw'], ['@@@.epw', 'weather.epw']]) {
+      expect(organisationFileName(a)).toBe(b)
+      expect(organisationFileName(a)).toMatch(ok)
+    }
+    expect(organisationFileName('x'.repeat(300))).toMatch(ok)
   })
 })
