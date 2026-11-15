@@ -20,6 +20,7 @@ import type { Weather } from './types'
 import { runZone } from './zone'
 import type { ModelDocument } from '../schema/model'
 import { GainsError, zoneGains, type ZoneGains } from './gains'
+import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
 
 export class ModelError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'ModelError' }
@@ -39,6 +40,12 @@ export interface RunOptions {
    * Briefs 103 and 104 ran.
    */
   internal_gains?: 'none' | 'profiles'
+  /**
+   * Mechanical and natural ventilation (Brief 105 Part 3). 'document': each zone's ventilation entries
+   * (ventilation.ts), on both solvers, added to the zone's conductance to outdoor air. Absent or 'none': infiltration
+   * and permanent vents only, as Briefs 103 and 104 ran.
+   */
+  ventilation?: 'none' | 'document'
   /**
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
@@ -309,6 +316,17 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     return s + (A > 0 && a > 0 ? 4 * Math.sqrt(A) * (a / A) : 0)
   }, 0)
 
+  // Mechanical and natural ventilation per zone (Brief 105 Part 3).
+  let mech: ZoneVentilation[][] = doc.zones.map(() => [])
+  if (options.ventilation === 'document') {
+    try { mech = zoneVentilation(doc, weather.hours) } catch (e) {
+      if (e instanceof VentilationError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
+      throw e
+    }
+  } else if (options.ventilation != null && options.ventilation !== 'none') {
+    throw new ModelError(`unknown value ${JSON.stringify(options.ventilation)} ('none' or 'document')`, 'options.ventilation')
+  }
+
   // Air, bridging and ground, per zone.
   let tg = 0
   for (let h = 0; h < H; h++) tg += weather.hours.dry_bulb[h]
@@ -320,7 +338,11 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const inf = infiltration({ q50: zone.infiltration_q50, ach: zone.infiltration_ach, envelope_area_m2: Z.envelopeArea, volume_m3: volume, path })
     const ventH = ventConductance(Z.vents.map((v) => v.m3s_per_ms), weather.hours.wind_speed, H)
     const Hve = new Float64Array(H)
-    for (let h = 0; h < H; h++) Hve[h] = inf.h_w_per_k + ventH[h]
+    for (let h = 0; h < H; h++) {
+      let m = 0
+      for (const v of mech[zi]) m += v.h_w_per_k[h]
+      Hve[h] = inf.h_w_per_k + ventH[h] + m
+    }
     // Σ U·A of the zone's envelope (the legacy α bridging mode only): elements facing outside or the ground.
     const areaUA = elements.reduce((s, e, k) => s + (zoneA[k] === zi && e.boundary !== 'zone' ? e.u_w_per_m2k * e.area_m2 : 0), 0)
     const bridging = computeBridging({
@@ -422,10 +444,15 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     // Breakdown: annual kWh per term (Rule 9). Ventilation is split into infiltration and vents by their conductances.
     const kwh = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
     const lines: BreakdownLine[] = []
+    // Mechanical ventilation shares it too, one line per entry (Brief 105 Part 3).
     let infW = 0, ventW = 0
+    const mechW = mech[zi].map(() => 0)
     for (let h = 0; h < H; h++) {
       const v = run.ventilation_w[h], tot = a.Hve[h]
-      if (tot > 0) { infW += (v * a.inf.h_w_per_k) / tot; ventW += (v * a.ventH[h]) / tot }
+      if (tot > 0) {
+        infW += (v * a.inf.h_w_per_k) / tot; ventW += (v * a.ventH[h]) / tot
+        mech[zi].forEach((m, j) => { mechW[j] += (v * m.h_w_per_k[h]) / tot })
+      }
     }
     lines.push({ term: 'heating', surface_id: null, kwh: kwh(run.heating_w) })
     lines.push({ term: 'cooling', surface_id: null, kwh: -kwh(run.cooling_w) })
@@ -445,6 +472,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     lines.push({ term: 'bridging', surface_id: null, kwh: kwh(run.bridging_w) })
     lines.push({ term: 'infiltration', surface_id: null, kwh: infW / 1000 })
     lines.push({ term: 'permanent_vents', surface_id: null, kwh: ventW / 1000 })
+    mech[zi].forEach((m, j) => lines.push({ term: 'mechanical_ventilation', surface_id: null, ventilation_id: m.id, kwh: mechW[j] / 1000 }))
     for (const t of Z.transmittedBySurface) lines.push({ term: 'solar_transmitted', surface_id: t.id, kwh: kwh(t.w) })
     if (options.glazing_solar === 'optical') lines.push({ term: 'solar_lost_through_glazing', surface_id: null, kwh: kwh(run.solar_lost_w) })
     if (options.other_gains) lines.push({ term: 'other_gains', surface_id: null, kwh: kwh(run.other_gains_w) })

@@ -552,7 +552,9 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
  * storey of today's box is the same. Zone `z1` is the ground storey.
  *
  * The room count is divided evenly too (Brief 105 Part 2, schema 2.3), so per-room gains add up to the building's.
- * The zone's mechanical ventilation entries stay on z1 and are not divided (Brief 105 Part 3 decides their split).
+ * Each ventilation entry is given to every storey (Brief 105 Part 3): a building flow ('constant', l/s) divided
+ * evenly, a flow per m², per person or per air change kept as it is, so each storey's flow is its share of the
+ * building's and the storeys add up to it.
  */
 function perStorey(single: Obj, g: { storeys: number; area_m2: number; interior_key: string }): Obj {
   const N = g.storeys
@@ -561,7 +563,7 @@ function perStorey(single: Obj, g: { storeys: number; area_m2: number; interior_
   const ids = Array.from({ length: N }, (_, i) => `z${i + 1}`)
   const zones: Obj[] = ids.map((id, i) => ({
     ...structuredClone(z0), id, name: `Storey ${i + 1}`, floor: i, storeys: 1, area_m2: g.area_m2,
-    ventilation: i === 0 ? structuredClone(z0.ventilation) : [], rooms: z0.rooms == null ? null : z0.rooms / N, surfaces: [] as string[],
+    ventilation: (z0.ventilation as Obj[]).map((v) => ({ ...structuredClone(v), flow_rate: v.flow_rate != null && (v.flow_rate_basis ?? 'constant') === 'constant' ? v.flow_rate / N : v.flow_rate })), rooms: z0.rooms == null ? null : z0.rooms / N, surfaces: [] as string[],
   }))
   const surfaces: Obj[] = []
   const put = (s: Obj, zone: number) => { surfaces.push(s); (zones[zone].surfaces as string[]).push(s.id as string) }

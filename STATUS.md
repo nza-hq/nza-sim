@@ -20,6 +20,12 @@ Brief [`docs/briefs/active/105_editor-engine.md`](docs/briefs/active/105_editor-
   - With gains, Bridgewater's five storeys give cooling 228.65 MWh against EnergyPlus's 223.68 (+2.2 %), each storey within ±8 %. Neither needs heating.
   - The brief's gate, with gains and ventilation together, comes in P3.
   - The per-storey converter now divides rooms evenly; `rooms` may be a share.
+- **P3 ventilation** ([`03_ventilation.md`](docs/audit/105/03_ventilation.md)):
+  - `engine/ventilation.ts` is today's ρc·q·(1 − η) per entry, scheduled. It is on both solvers when `ventilation: 'document'` is set, with one breakdown line per entry.
+  - Summer bypass is refused, not ignored. Each storey gets each entry, with building flows divided evenly.
+  - **Gate** (gains and ventilation, five storeys): passes like for like at −3.9 % heating / +9.3 % cooling. It misses with EnergyPlus's default outdoor-air density (−11.4 % / +10.2 %).
+  - **The miss is attributed.** With the air heat capacity matched in a diagnostic, heating is −0.5 % and ventilation-only heating −0.04 %. The cooling remainder (+6.5 %) is Brief 104's F2.
+  - The density convention is flagged for review, not changed.
 
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 

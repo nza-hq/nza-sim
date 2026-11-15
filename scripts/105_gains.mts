@@ -1,6 +1,6 @@
 /**
- * Brief 105 Part 2: Bridgewater's five storeys with internal gains, against the five-zone EnergyPlus referee given
- * the same gains.
+ * Brief 105 Parts 2 and 3: Bridgewater's five storeys with internal gains and ventilation, against the five-zone
+ * EnergyPlus referee given the same gains and ventilation.
  *
  * Run from frontend/:
  *   npx vite-node ../scripts/105_gains.mts -- export <dir>   writes <dir>/gains.csv and <dir>/gains.json (each zone's
@@ -19,7 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { parse } from 'yaml'
 import { fromBuildingConfig } from '../frontend/src/thermal/schema/fromBuildingConfig'
-import { parseEpw, REFEREE_OPTIONS, runModel, zoneGains, type ModelResults } from '../frontend/src/thermal/engine/index'
+import { parseEpw, REFEREE_OPTIONS, runModel, zoneGains, zoneVentilation, type ModelResults } from '../frontend/src/thermal/engine/index'
 
 const root = path.resolve(__dirname, '..')
 const EPW_SHA = 'c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2'
@@ -50,11 +50,17 @@ if (args[0] === 'export') {
   const lines = [cols.map((c) => `${c.zone}_${c.profile_id}`).join(',')]
   for (let h = 0; h < H; h++) lines.push(series.map((s) => s[h].toPrecision(12)).join(','))
   writeFileSync(path.join(dir, 'gains.csv'), lines.join('\n') + '\n')
-  writeFileSync(path.join(dir, 'gains.json'), JSON.stringify({ epw_sha256: EPW_SHA, hours: H, columns: cols }, null, 1) + '\n')
+  // Ventilation per zone (Part 3): each entry's flow and recovery; every Bridgewater entry runs always_on.
+  const vent = zoneVentilation(five, weather.hours).flatMap((zv, zi) => zv.map((v) => {
+    const hw = v.h_w_per_k
+    if (hw.some((x) => x !== hw[0])) throw new Error(`${v.id}: the referee export expects a constant schedule`)
+    return { zone: five.zones[zi].id, storey: five.zones[zi].floor + 1, id: v.id, kind: v.kind, flow_m3s: v.flow_m3s, recovery: v.recovery, h_w_per_k: hw[0] }
+  }))
+  writeFileSync(path.join(dir, 'gains.json'), JSON.stringify({ epw_sha256: EPW_SHA, hours: H, columns: cols, ventilation: vent }, null, 1) + '\n')
   console.log(`wrote ${cols.length} columns × ${H} hours to ${dir}`)
 } else if (args[0] === 'compare') {
   const ref = JSON.parse(readFileSync(path.join(root, 'docs/audit/105/02_gains_referee.json'), 'utf8'))
-  const run = (gains: boolean) => runModel(five, weather, lib, { ...REFEREE_OPTIONS, internal_gains: gains ? 'profiles' : 'none' })
+  const run = (gains: boolean, vent: boolean) => runModel(five, weather, lib, { ...REFEREE_OPTIONS, internal_gains: gains ? 'profiles' : 'none', ventilation: vent ? 'document' : 'none' })
   const summ = (r: ModelResults) => ({
     heating_mwh: r.zones.reduce((s, z) => s + z.annual.heating_kwh, 0) / 1000,
     cooling_mwh: r.zones.reduce((s, z) => s + z.annual.cooling_kwh, 0) / 1000,
@@ -62,8 +68,16 @@ if (args[0] === 'export') {
   })
   const pct = (a: number, b: number) => (100 * (a - b)) / b
   const out: any = { source: 'scripts/105_gains.mts', epw_sha256: EPW_SHA, options: 'REFEREE_OPTIONS', comparisons: {} }
-  for (const [label, gains, refName] of [['without gains (Brief 104 gate, r2_z)', false, 'r2_z'], ['with gains (r2_z_gains)', true, 'r2_z_gains']] as const) {
-    const e = summ(run(gains)), r = ref.runs[refName]
+  const cases = [
+    ['envelope only (Brief 104 gate, r2_z)', false, false, 'r2_z'],
+    ['with gains (r2_z_gains)', true, false, 'r2_z_gains'],
+    ['with ventilation (r2_z_vent)', false, true, 'r2_z_vent'],
+    ['with gains and ventilation, EnergyPlus default (outdoor) air density (r2_z_gains_vent)', true, true, 'r2_z_gains_vent'],
+    ['with ventilation, standard air density (r2_z_vent_std)', false, true, 'r2_z_vent_std'],
+    ['with gains and ventilation, standard air density: the gate (r2_z_gains_vent_std)', true, true, 'r2_z_gains_vent_std'],
+  ] as const
+  for (const [label, gains, vent, refName] of cases) {
+    const e = summ(run(gains, vent)), r = ref.runs[refName]
     if (!r) throw new Error(`referee run ${refName} missing`)
     const zones = Object.fromEntries(Object.entries(e.zones).map(([zid, v], i) => {
       const rz = r.zones[`Floor_${i + 1}`]
