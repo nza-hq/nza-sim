@@ -62,6 +62,14 @@ export interface ZoneInputs {
    * surface by area. Null or absent: all of it by area (ISO 52016-1's simplification).
    */
   solar_beam_w?: ArrayLike<number> | null
+  /**
+   * Solar absorptance of each element's inside face (Brief 104 Part 1b), used only for opaque elements; absent or null
+   * entries are 1. Diffuse solar inside the zone goes to each face in proportion to area × absorptance (a window:
+   * its diffuse transmittance plus absorptance), which is the sum of the reflections, as EnergyPlus distributes it.
+   */
+  inside_solar_absorptance?: ArrayLike<number | null> | null
+  /** Share of transmitted solar given straight to the air node; absent: ENGINE_CONSTANTS.solar_convective_fraction. */
+  solar_convective_fraction?: number
   /** Every node starts here before the warm-up, °C. */
   initial_c: number
   /** The first day is repeated this many times before the year, as EnergyPlus's warm-up does. */
@@ -88,6 +96,8 @@ export interface ZoneRun {
     bridging_w: Float64Array
     ventilation_w: Float64Array
     solar_transmitted_w: Float64Array
+    /** Transmitted solar that leaves again through windows from inside (negative; 'optical' windows only). */
+    solar_lost_w: Float64Array
     other_gains_w: Float64Array
     /** Heat stored in all nodes over the hour (positive = stored). */
     storage_w: Float64Array
@@ -248,7 +258,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     terms: {
       boundary_w: els.map(() => new Float64Array(H)), solar_absorbed_w: els.map(() => new Float64Array(H)),
       sky_w: els.map(() => new Float64Array(H)), bridging_w: new Float64Array(H), ventilation_w: new Float64Array(H),
-      solar_transmitted_w: new Float64Array(H), other_gains_w: new Float64Array(H), storage_w: new Float64Array(H),
+      solar_transmitted_w: new Float64Array(H), solar_lost_w: new Float64Array(H), other_gains_w: new Float64Array(H), storage_w: new Float64Array(H),
     },
     closure_wh: new Float64Array(H),
   }
@@ -263,8 +273,28 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   const beamIn = inp.solar_beam_w ?? null
   const ground = els.map((e) => e.boundary === 'ground')
   const { heat_c, cool_c } = inp.setpoints
-  const fsc = K.solar_convective_fraction
+  const fsc = inp.solar_convective_fraction ?? K.solar_convective_fraction
+  if (!(fsc >= 0 && fsc <= 1)) throw new ZoneError('solar_convective_fraction must be in [0, 1]', 'solar_convective_fraction')
   const og = inp.other_gains
+  // Diffuse solar inside the zone (Brief 104 Part 1b): spread over the inside surfaces by area; an 'optical' window
+  // absorbs part in its pane, passes part back out, and reflects the rest back into the zone, where it is spread again.
+  // Summing the reflections: of diffuse D, each opaque surface takes D·s_k/den, a window D·s_k·a/den in its pane and
+  // D·s_k·t/den lost, with den = 1 − Σ_windows s_k·(1 − t − a). Without optical windows den = 1 and this is the area share.
+  const absNode = els.map((e) => e.absorbed_node ?? 0)
+  for (let k = 0; k < E; k++) if (!(absNode[k] >= 0 && absNode[k] < nI[k])) throw new ZoneError('absorbed_node must be an interior node', `elements[${k}]`)
+  const iso = els.map((e) => e.interior_solar ?? null)
+  // An opaque inside face absorbs α of the solar reaching it and reflects the rest into the pool (α = 1 when the zone
+  // gives none: every opaque face black, as before Part 1b). The sun patch on the floor reflects (1 − α) likewise.
+  const alphaIn = els.map((_, k) => {
+    const v = inp.inside_solar_absorptance?.[k] ?? 1
+    if (!(v > 0 && v <= 1)) throw new ZoneError('inside_solar_absorptance must be in (0, 1]', `inside_solar_absorptance[${k}]`)
+    return v
+  })
+  const den = 1 - els.reduce((s, e, k) => s + share[k] * (iso[k] ? 1 - iso[k]!.transmitted - iso[k]!.absorbed : 1 - alphaIn[k]), 0)
+  const difSurf = els.map((_, k) => (iso[k] ? 0 : (share[k] * alphaIn[k]) / den))
+  const beamReflected = floorShare ? els.reduce((s, _, k) => s + floorShare[k] * (1 - alphaIn[k]), 0) : 0
+  const difPane = els.map((_, k) => (iso[k] ? (share[k] * iso[k]!.absorbed) / den : 0))
+  const difLost = els.reduce((s, _, k) => s + (iso[k] ? (share[k] * iso[k]!.transmitted) / den : 0), 0)
 
   const step = (h: number, record: boolean) => {
     if (dynamic) {
@@ -291,15 +321,17 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     const ogw = og ? og.w[h] : 0, ogc = og ? og.convective_fraction : 0
     for (let i = 0; i < F; i++) bF[i] = (capF[i] / DT) * xF[i]
     bF[0] += inp.bridging_w_per_k * te + hv * te + fsc * sol + ogc * ogw
-    const radDiffuse = (1 - fsc) * (sol - beam) + (1 - ogc) * ogw
     const radBeam = (1 - fsc) * beam
+    const solDiffuse = (1 - fsc) * (sol - beam) + radBeam * beamReflected
+    const ogRad = (1 - ogc) * ogw
     for (let k = 0; k < E; k++) {
       const t = tri[k], b = bs[k], x = xs[k], y = ys[k]
       for (let j = 0; j < t.m; j++) b[j] = (t.cap[j] / DT) * x[j]
-      b[0] += gB[k] * (ground[k] ? inp.theta_ground : te) + sky[k] + inp.solar_absorbed_w_per_m2[k][h] * els[k].area_m2
+      b[0] += gB[k] * (ground[k] ? inp.theta_ground : te) + sky[k]
+      b[absNode[k]] += inp.solar_absorbed_w_per_m2[k][h] * els[k].area_m2 + solDiffuse * difPane[k]
       solveChain(t, b, y)
       // Condensed right-hand side: b_f − cᵀ·y = b_f + gLink·y_last.
-      bF[k + 1] += radDiffuse * share[k] + (floorShare ? radBeam * floorShare[k] : 0) + t.gLink * y[t.m - 1]
+      bF[k + 1] += solDiffuse * difSurf[k] + ogRad * share[k] + (floorShare ? radBeam * floorShare[k] * alphaIn[k] : 0) + t.gLink * y[t.m - 1]
     }
     luSolve(lu, bF, z)
     const den = 1 + hv * uAir[0]
@@ -327,7 +359,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     const T = out.terms
     const ta = xF[0]
     let sum = phi + (T.bridging_w[h] = inp.bridging_w_per_k * (te - ta)) + (T.ventilation_w[h] = hv * (te - ta))
-      + (T.solar_transmitted_w[h] = sol) + (T.other_gains_w[h] = ogw)
+      + (T.solar_transmitted_w[h] = sol) + (T.solar_lost_w[h] = -solDiffuse * difLost) + (T.other_gains_w[h] = ogw)
     let mrt = 0
     for (let k = 0; k < E; k++) {
       const tb = ground[k] ? inp.theta_ground : te

@@ -11,12 +11,16 @@ export interface BreakdownLine {
   term:
     | 'heating' | 'cooling' | 'conduction' | 'opaque_solar_absorbed' | 'sky_longwave' | 'bridging' | 'infiltration'
     | 'permanent_vents' | 'solar_transmitted' | 'other_gains' | 'storage'
+    | 'glazing_solar_absorbed' | 'solar_lost_through_glazing'
+    /** Heat into this zone from another through the element they share (Brief 104); the two zones' lines cancel. */
+    | 'interzone'
   surface_id: string | null
   kwh: number
 }
 
 export interface ZoneResults {
-  engine: 'thermal-1'
+  /** 'thermal-1': one zone alone (Engine 1's solver); 'thermal-2': solved as part of a network of zones (Brief 104). */
+  engine: 'thermal-1' | 'thermal-2'
   zone_id: string
   constants: typeof ENGINE_CONSTANTS
   conductances: {
@@ -45,6 +49,23 @@ export interface ZoneResults {
   /** Every term of the balance, per element where it has one (Rule 9). The lines sum to the closure residual. */
   breakdown: BreakdownLine[]
   closure: { max_wh: number; sum_kwh: number }
+  /** The whole run's time (every zone), ms. */
+  run_ms: number
+}
+
+/**
+ * A model's results (Brief 104 Part 3): one `ZoneResults` per zone, in the document's order. Building totals are not
+ * stored a second time (Rule 11): they are read from the zones with the helpers below.
+ */
+export interface ModelResults {
+  engine: 'thermal-1' | 'thermal-2'
+  zones: ZoneResults[]
+  solver: {
+    /** Temperature nodes solved per hour. */
+    nodes: number
+    /** Most passes the heating/cooling set took in any hour, and how many hours needed more than one (Engine 2). */
+    active_set: { max_passes: number; hours_over_one: number } | null
+  }
   run_ms: number
 }
 
@@ -62,3 +83,16 @@ export const readZoneClosure = (r: ZoneResults) => r.closure
 /** Sum of one breakdown term over the year (all surfaces), kWh. */
 export const readZoneTermKwh = (r: ZoneResults, term: BreakdownLine['term']) =>
   r.breakdown.filter((l) => l.term === term).reduce((s, l) => s + l.kwh, 0)
+
+const sumZones = (r: ModelResults, f: (z: ZoneResults) => number) => r.zones.reduce((s, z) => s + f(z), 0)
+export const readModelZones = (r: ModelResults) => r.zones
+export const readBuildingHeatingKwh = (r: ModelResults) => sumZones(r, readZoneHeatingKwh)
+export const readBuildingCoolingKwh = (r: ModelResults) => sumZones(r, readZoneCoolingKwh)
+/** The building's hourly heating or cooling, W: the zones' summed hour by hour. */
+export function readBuildingHourlyW(r: ModelResults, which: 'heating' | 'cooling'): Float64Array {
+  const out = new Float64Array(r.zones[0]?.hourly.heating_w.length ?? 0)
+  for (const z of r.zones) { const a = which === 'heating' ? z.hourly.heating_w : z.hourly.cooling_w; for (let h = 0; h < out.length; h++) out[h] += a[h] }
+  return out
+}
+/** The building's peak, W: the largest hour of the zones' sum (not the sum of the zones' own peaks). */
+export const readBuildingPeakW = (r: ModelResults, which: 'heating' | 'cooling') => readBuildingHourlyW(r, which).reduce((m, v) => Math.max(m, v), 0)

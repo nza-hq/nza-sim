@@ -32,6 +32,16 @@ export function computeBridging(args: {
   glazing_areas_m2: number[]
   /** Σ U·A of the envelope, for the legacy α mode only. */
   area_ua_w_per_k: number
+  /**
+   * One zone of several (Brief 104 Part 3): which of the building's junctions are this zone's. Absent: the zone is the
+   * whole building (Engine 1). The roof junction goes to a zone with a roof, the ground junction to a zone with
+   * ground; the intermediate-floor junction is the perimeter at each slab the zone spans inside itself (storeys − 1)
+   * plus half the perimeter at each slab it shares with another zone (the other half is that zone's). Corners follow
+   * the zone's own storeys and height. The window junction is given (`window_perimeter_m`): the caller shares the
+   * building's window perimeter out, since 4√A per surface would grow by √N when a facade's glazing is cut into N
+   * storeys. Over the zones of a per-storey building every length sums to the single zone's.
+   */
+  zone_share?: { has_roof: boolean; has_ground: boolean; shared_slabs: number; window_perimeter_m: number }
 }): Bridging {
   const { tb } = args
   if (tb.mode === 'iso14683_auto') {
@@ -44,12 +54,15 @@ export function computeBridging(args: {
       const [x0, y0] = p[i], [x1, y1] = p[(i + 1) % p.length]
       perimeter += Math.hypot(x1 - x0, y1 - y0)
     }
+    const zs = args.zone_share
+    if (zs && !(Number.isInteger(zs.shared_slabs) && zs.shared_slabs >= 0)) throw new BridgingError('shared_slabs must be a whole number ≥ 0', 'zone_share.shared_slabs')
+    if (zs && !(zs.window_perimeter_m >= 0)) throw new BridgingError('window_perimeter_m must be ≥ 0', 'zone_share.window_perimeter_m')
     const lengths: Record<JunctionType, number> = {
-      wall_to_roof: perimeter,
-      wall_to_intermediate_floor: perimeter * Math.max(0, args.storeys - 1),
-      wall_to_ground_floor: perimeter,
+      wall_to_roof: zs && !zs.has_roof ? 0 : perimeter,
+      wall_to_intermediate_floor: perimeter * Math.max(0, args.storeys - 1) + (zs ? 0.5 * perimeter * zs.shared_slabs : 0),
+      wall_to_ground_floor: zs && !zs.has_ground ? 0 : perimeter,
       external_corner: p.length * args.storeys * args.storey_height_m,
-      window_perimeter: args.glazing_areas_m2.reduce((s, a) => s + (a > 0 ? 4 * Math.sqrt(a) : 0), 0),
+      window_perimeter: zs ? zs.window_perimeter_m : args.glazing_areas_m2.reduce((s, a) => s + (a > 0 ? 4 * Math.sqrt(a) : 0), 0),
       door_perimeter: 0,  // doors are operable openings, not in Engine 1's document scope
     }
     const junctions = (Object.keys(ISO14683_DEFAULT_PSI) as JunctionType[]).map((type) => ({

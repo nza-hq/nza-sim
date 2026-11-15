@@ -1,0 +1,122 @@
+{
+ "source": "scripts/104_perf.mts",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "options": {
+  "control": "air",
+  "hc_convective_fraction": 1,
+  "warmup_days": 25,
+  "solar": {
+   "albedo": 0.2,
+   "sun_day": "actual",
+   "solar_time": "apparent",
+   "sky": "perez"
+  },
+  "other_gains": null,
+  "surface_physics": {
+   "outside_convection": "fixed",
+   "inside_convection": "by_tilt",
+   "beam_on_floor": true
+  },
+  "glazing_solar": "optical",
+  "solar_convective_fraction": 0
+ },
+ "machine": {
+  "platform": "linux",
+  "cpus": 4,
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "node": "v22.23.4",
+  "browser": "153.0.8010.12"
+ },
+ "cases": [
+  {
+   "name": "one_zone",
+   "engine": "thermal-1",
+   "zones": 1,
+   "surfaces": 10,
+   "nodes": 49,
+   "budget_ms": 100,
+   "node_median_ms": 53.5,
+   "worker_median_ms": 37.6,
+   "node_ms": [
+    83,
+    59,
+    48.5,
+    53.5,
+    50.5
+   ],
+   "worker_ms": [
+    41.3,
+    34,
+    37.6,
+    39.6,
+    33.6
+   ],
+   "heating_kwh": 92899.56642695963,
+   "cooling_kwh": 10564.031454314447,
+   "worker_heating_kwh": 92899.56642695963,
+   "worker_cooling_kwh": 10564.031454314445,
+   "totals_identical": false,
+   "within_budget": true
+  },
+  {
+   "name": "five_zones",
+   "engine": "thermal-2",
+   "zones": 5,
+   "surfaces": 46,
+   "nodes": 233,
+   "budget_ms": 150,
+   "node_median_ms": 254.6,
+   "worker_median_ms": 219.1,
+   "node_ms": [
+    265.3,
+    254.6,
+    248.7,
+    240.5,
+    297.8
+   ],
+   "worker_ms": [
+    183.5,
+    264.7,
+    237,
+    219.1,
+    156
+   ],
+   "heating_kwh": 91206.72249659651,
+   "cooling_kwh": 14891.66454614798,
+   "worker_heating_kwh": 91206.72249659651,
+   "worker_cooling_kwh": 14891.664546147978,
+   "totals_identical": false,
+   "within_budget": false
+  },
+  {
+   "name": "fifty_zones",
+   "engine": "thermal-2",
+   "zones": 50,
+   "surfaces": 265,
+   "nodes": 1485,
+   "budget_ms": 2000,
+   "node_median_ms": 1859.8,
+   "worker_median_ms": 1318,
+   "node_ms": [
+    1859.8,
+    1977.9,
+    1756.5,
+    1930.5,
+    1648.2
+   ],
+   "worker_ms": [
+    1413.3,
+    1318,
+    1278.5,
+    1604.5,
+    1287.3
+   ],
+   "heating_kwh": 124714.15010079941,
+   "cooling_kwh": 9391.739123454146,
+   "worker_heating_kwh": 124714.15010079941,
+   "worker_cooling_kwh": 9391.739123454145,
+   "totals_identical": false,
+   "within_budget": true
+  }
+ ]
+}

@@ -60,4 +60,6 @@ export interface SurfaceIrradiance {
   diffuse: Float64Array
   reflected: Float64Array
   total: Float64Array
+  /** cos θ of the sun's beam on the surface, 0 when the sun is behind it or down (Brief 104 Part 1b: glazing optics). */
+  cos_incidence: Float64Array
 }

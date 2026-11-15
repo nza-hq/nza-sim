@@ -124,6 +124,27 @@ describe('solarOnSurface', () => {
     expect(() => solarOnSurface(w, 0, 90, { albedo: undefined as unknown as number, sun_day: 'mid_month', solar_time: 'clock' })).toThrow('albedo')
     expect(() => solarOnSurface(w, 0, 90, { albedo: 0.2, sun_day: 'noon' as never, solar_time: 'clock' })).toThrow('sun_day')
   })
+  it('Perez (Brief 104 Part 1b): a flat roof still sees exactly DHI while the sun is above 5° (circumsolar = F1, horizon term 0)', async () => {
+    const w = await parseEpw(bytes(makeEpw()))
+    const o = { albedo: 0.2, sun_day: 'actual', solar_time: 'apparent', sky: 'perez' } as const
+    const roof = solarOnSurface(w, 0, 0, o)
+    let n = 0
+    for (let i = 0; i < w.hours.count; i++) {
+      const dn = w.hours.direct_normal[i]
+      if (!(dn > 0) || !(w.hours.diffuse_horizontal[i] > 0) || roof.direct[i] / dn < 0.0872) continue
+      expect(roof.diffuse[i]).toBeCloseTo(w.hours.diffuse_horizontal[i], 9); n++
+    }
+    expect(n).toBeGreaterThan(1000)
+  })
+  it('Perez: a vertical surface differs from isotropic, the beam is unchanged, and an unknown sky is refused', async () => {
+    const w = await parseEpw(bytes(makeEpw()))
+    const base = { albedo: 0.2, sun_day: 'actual', solar_time: 'apparent' } as const
+    const iso = solarOnSurface(w, 180, 90, base), per = solarOnSurface(w, 180, 90, { ...base, sky: 'perez' })
+    let d = 0
+    for (let i = 0; i < w.hours.count; i++) { expect(per.direct[i]).toBe(iso.direct[i]); d += Math.abs(per.diffuse[i] - iso.diffuse[i]) }
+    expect(d).toBeGreaterThan(0)
+    expect(() => solarOnSurface(w, 0, 90, { ...base, sky: 'hay' as never })).toThrow('sky')
+  })
 })
 
 const ANCHOR_EPW = path.resolve(__dirname, '../../../../../data/weather/current/GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw')

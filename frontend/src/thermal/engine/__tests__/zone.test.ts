@@ -196,3 +196,51 @@ describe('surface physics options (Brief 103 Part 6b)', () => {
     expect(() => runZone(base({ inside_convection: 'x' as any }))).toThrow('inside_convection')
   })
 })
+
+describe('inside solar: absorptance and optical windows (Brief 104 Part 1b)', () => {
+  const box = (alphaWin?: { transmitted: number; absorbed: number }) => {
+    const els: Element[] = [
+      wall('w1', 30), wall('w2', 30),
+      opaqueElement({ id: 'roof', area_m2: 20, tilt_deg: 0, boundary: 'outside', layers: WALL, stated_u: null, emissivity: 0.9, path: 'roof' }),
+      opaqueElement({ id: 'floor', area_m2: 20, tilt_deg: 180, boundary: 'ground', layers: WALL, stated_u: null, emissivity: null, path: 'floor' }),
+    ]
+    if (alphaWin) {
+      els.push(windowElement({ id: 'win', area_m2: 10, tilt_deg: 90, u: 1.4, emissivity: 0.9, path: 'win',
+        optics: { interior_transmitted: alphaWin.transmitted, interior_absorbed: alphaWin.absorbed } }))
+    }
+    return els
+  }
+  const sun = Float64Array.from({ length: H }, (_, h) => (h % 24 >= 8 && h % 24 < 16 ? 2000 : 0))
+  const run = (els: Element[], over: Partial<ZoneInputs> = {}) => runZone(zone(els, {
+    theta_e: Float64Array.from({ length: H }, (_, h) => 5 + 5 * Math.sin((2 * Math.PI * h) / 24)), solar_transmitted_w: sun,
+    solar_convective_fraction: 0, ...over,
+  }))
+  const sum = (x: ArrayLike<number>) => Array.from(x).reduce((s, v) => s + v, 0)
+
+  it('one absorptance on every opaque face and no window: the area share again, the same run', () => {
+    const a = run(box()), b = run(box(), { inside_solar_absorptance: [0.7, 0.7, 0.7, 0.7] })
+    closes(b)
+    for (let h = 0; h < H; h++) expect(b.theta_air[h]).toBeCloseTo(a.theta_air[h], 9)
+    expect(sum(b.terms.solar_lost_w)).toBe(0)
+  })
+  it('a window loses D·s_w·t / den, den = 1 − Σ s·(1 − α) − s_w·(1 − t − a), by hand; the run closes', () => {
+    const t = 0.4, a = 0.2, alpha = [0.7, 0.5, 0.9, 0.6, null]
+    const r = run(box({ transmitted: t, absorbed: a }), { inside_solar_absorptance: alpha })
+    closes(r)
+    const area = [30, 30, 20, 20, 10], A = 110
+    const den = 1 - area.slice(0, 4).reduce((s, x, k) => s + (x / A) * (1 - (alpha[k] as number)), 0) - (10 / A) * (1 - t - a)
+    for (let h = 0; h < 24; h++) expect(r.terms.solar_lost_w[h]).toBeCloseTo(-sun[h] * ((10 / A) * t) / den, 9)
+  })
+  it('the sun patch reflects (1 − α_floor) of the beam into the pool, and some of it leaves through the window', () => {
+    const t = 0.4, a = 0.2, alpha = [1, 1, 1, 0.6, null]
+    const r = run(box({ transmitted: t, absorbed: a }), { inside_solar_absorptance: alpha, solar_beam_w: sun })
+    closes(r)
+    const A = 110, den = 1 - (20 / A) * 0.4 - (10 / A) * (1 - t - a)
+    for (let h = 0; h < 24; h++) expect(r.terms.solar_lost_w[h]).toBeCloseTo(-(sun[h] * 0.4) * ((10 / A) * t) / den, 9)
+  })
+  it('refuses an absorptance outside (0, 1] and a solar convective fraction outside [0, 1]', () => {
+    expect(() => run(box(), { inside_solar_absorptance: [0, 1, 1, 1] })).toThrow('inside_solar_absorptance[0]')
+    expect(() => run(box(), { inside_solar_absorptance: [1, 1.2, 1, 1] })).toThrow('inside_solar_absorptance[1]')
+    expect(() => run(box(), { solar_convective_fraction: 1.5 })).toThrow('solar_convective_fraction')
+  })
+})
