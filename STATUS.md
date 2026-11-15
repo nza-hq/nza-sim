@@ -12,6 +12,7 @@ Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
   - Fed today's demand, every end use equals today's to its 1 kWh rounding (electricity 404.144, gas 157.428, EUI 133.2).
   - On Engine 2's own demand (five storeys), the EUI is 131.9. The whole −1.3 is demand: heating +1.03, cooling −2.35.
   - Engine 2's demand is within −3.9 / +9.3 % of EnergyPlus; today's is −13.8 / +61 %.
+- **P3 tolerance table** ([`03_tolerances.md`](docs/audit/107/03_tolerances.md)): heating and cooling electricity −3.9 / +9.3 % (±10 %, pass), EUI 131.89 against 131.86 (pass). Hot water, fans, lighting, small power and auxiliary are shared inputs, equal by construction, and say so.
 
 ## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
 
