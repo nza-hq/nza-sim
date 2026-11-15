@@ -109,6 +109,15 @@ export function buildDocument(plan: Plan): Built {
     return n === 1 ? base : `${base}_${n}`
   }
 
+  const shade = (ws: Array<{ shading_m: number }>) => {
+    const d = ws[0]?.shading_m ?? 0
+    if (!(d > 0)) return {}
+    if (ws.some((x) => Math.abs(x.shading_m - d) > 1e-9)) {
+      notes.push('Windows with different shading depths share one glazing surface; its shading is left out')
+      return {}
+    }
+    return { shading: { overhang: { depth_m: r3(d), offset_m: 0 } } }
+  }
   let windowsPlaced = 0
   const taken = new Set<number>()
   for (const w of walls) {
@@ -136,6 +145,9 @@ export function buildDocument(plan: Plan): Built {
         area_m2: r3(glz), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
         construction_ref: { key: 'unassigned:glazing' }, g_value: null,
         wwr: r3(glz / gross), window_count: mine.length, openings: [],
+        // Same mapping as today's tool (building.shading_overhang → overhang, offset 0); one depth per glazing surface,
+        // so it is written only when every window on it has the same depth.
+        ...(shade(mine)),
       }, 'glazing'))
     }
   }

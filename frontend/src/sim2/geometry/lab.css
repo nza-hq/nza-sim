@@ -210,3 +210,14 @@
 .gl-step:hover { background: var(--gl-tint); }
 .gl-num.auto .gl-step { border-style: dashed; }
 .gl-num .gl-auto-tag { margin-right: 4px; }
+
+/* 3D view (Plan3D) and the Plan / 3D switch. */
+.gl-3d { position: absolute; inset: 0 0 0 328px; z-index: 0; background: #E4EEF2; }
+@media (max-width: 760px) { .gl-3d { inset: 0; } }
+.gl-3d-wait { position: absolute; top: 50%; left: calc(328px + (100% - 328px) / 2); transform: translate(-50%, -50%); color: var(--gl-soft); font-size: 13px; }
+.gl-3d-label { display: inline-block; padding: 2px 7px; border: 1.5px solid; border-radius: 8px; background: rgba(255,255,255,.88); font: 600 11px var(--gl-detail); color: #2A2A2A; white-space: nowrap; }
+.gl-viewswitch { position: absolute; top: 14px; left: calc(328px + (100% - 328px) / 2); transform: translateX(-50%); z-index: 6; display: flex; padding: 3px; gap: 2px; border-radius: 11px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.gl-viewswitch button { border: 0; border-radius: 8px; padding: 6px 16px; background: transparent; font: 600 13px var(--gl-detail); color: var(--gl-soft); cursor: pointer; }
+.gl-viewswitch button[aria-pressed="true"] { background: var(--gl-green); color: #fff; }
+.gl-viewswitch button:disabled { opacity: .4; cursor: default; }
+@media (max-width: 760px) { .gl-viewswitch { left: 50%; } }

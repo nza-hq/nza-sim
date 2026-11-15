@@ -42,6 +42,8 @@ export type WindowSet = {
   width_m: number
   height_m: number
   sill_m: number
+  /** Shading round each window (frame of fins and overhang), metres out from the wall; 0 or absent = none. */
+  shading_m?: number
   /** Only while blocks are being rebuilt: the wall's ends, to find it again. */
   at?: { a: XY; b: XY }
 }
@@ -108,7 +110,7 @@ export function facade4(az: number): 'north' | 'east' | 'south' | 'west' {
 // ─── Windows ──────────────────────────────────────────────────────────────────────────────────────
 
 /** One placed window: distance of its left edge from the run's start (looking at the wall from outside, run a→b). */
-export type PlacedWindow = { set: string; wall: number; offset_m: number; width_m: number; height_m: number; sill_m: number }
+export type PlacedWindow = { set: string; wall: number; offset_m: number; width_m: number; height_m: number; sill_m: number; shading_m: number }
 
 export type Layout = { windows: PlacedWindow[]; gap_m: number } | { why: string }
 
@@ -117,13 +119,14 @@ export function layoutSet(run: WallRun, s: WindowSet, storeyHeight: number): Lay
   if (!(s.count >= 1) || !Number.isInteger(s.count)) return { why: 'Number of windows must be a whole number, 1 or more' }
   if (!(s.width_m > 0) || !(s.height_m > 0)) return { why: 'Window size must be more than zero' }
   if (s.sill_m < 0) return { why: 'Sill height cannot be below the floor' }
+  if ((s.shading_m ?? 0) < 0) return { why: 'Shading depth cannot be less than zero' }
   if (s.sill_m + s.height_m > storeyHeight + 1e-9) return { why: `Sill + window height (${round(s.sill_m + s.height_m, 2)} m) is taller than the storey (${storeyHeight} m)` }
   const total = s.count * s.width_m
   if (total > run.length_m + 1e-9) return { why: `${s.count} windows ${round(s.width_m, 2)} m wide need ${round(total, 2)} m; this wall is ${round(run.length_m, 2)} m` }
   const gap = (run.length_m - total) / (s.count + 1)
   const windows: PlacedWindow[] = []
   for (let i = 0; i < s.count; i++) {
-    windows.push({ set: s.id, wall: run.index, offset_m: gap + i * (s.width_m + gap), width_m: s.width_m, height_m: s.height_m, sill_m: s.sill_m })
+    windows.push({ set: s.id, wall: run.index, offset_m: gap + i * (s.width_m + gap), width_m: s.width_m, height_m: s.height_m, sill_m: s.sill_m, shading_m: s.shading_m ?? 0 })
   }
   return { windows, gap_m: gap }
 }
@@ -174,7 +177,7 @@ export type PieceWall = { piece: string; side: number; run: number; t0: number; 
 export type PieceShare = { a: string; b: string; length_m: number }
 export type Piece = { id: string; ring: XY[] }
 
-export function edgesOf(blocks: readonly (readonly XY[])[], pieces: readonly Piece[]): { walls: PieceWall[]; shares: PieceShare[]; open: Array<{ piece: string; side: number; length_m: number }> } {
+export function edgesOf(blocks: readonly (readonly XY[])[], pieces: readonly Piece[]): { walls: PieceWall[]; shares: PieceShare[]; open: Array<{ piece: string; side: number; length_m: number }>; inner: Array<{ zone: string; a: XY; b: XY }> } {
   const runs = wallRuns(blocks)
   const walls: PieceWall[] = []
   const open: Array<{ piece: string; side: number; length_m: number }> = []
@@ -243,7 +246,7 @@ export function edgesOf(blocks: readonly (readonly XY[])[], pieces: readonly Pie
     const left = L - (covered.get(i) ?? 0)
     if (left > EPS) open.push({ piece: s.zone, side: i, length_m: left })
   })
-  return { walls, shares: [...shares.values()], open }
+  return { walls, shares: [...shares.values()], open, inner }
 }
 
 export const ringArea = (r: readonly XY[]) => area(r)

@@ -43,6 +43,14 @@ describe('model document', () => {
     expect(g).toMatchObject({ facade: 'south', azimuth_deg: 180, window_count: 3 })
     expect(g.wwr).toBeCloseTo(3 / 36, 3)
   })
+  it('shading depth on a wall becomes the glazing overhang and still validates', () => {
+    const p = plan(box)
+    p.windows = [{ id: 'w1', wall: 0, count: 2, width_m: 1, height_m: 1.5, sill_m: 0.9, shading_m: 0.4 }]
+    const b = buildDocument(p)
+    expect(b.ok).toBe(true)
+    const glz = JSON.stringify(b.doc).match(/"shading":\{"overhang":\{"depth_m":0.4,"offset_m":0\}\}/)
+    expect(glz).not.toBeNull()
+  })
   it('two rooms in two zones make two zones, a partition, and keep every window', () => {
     const p = plan(box)
     p.windows = [{ id: 'w1', wall: 0, count: 3, width_m: 1, height_m: 1, sill_m: 1 }]

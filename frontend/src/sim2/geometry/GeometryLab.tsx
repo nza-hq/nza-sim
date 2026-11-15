@@ -24,7 +24,7 @@
  *
  * Nothing is saved, and nothing in today's tool reads this page.
  */
-import { type PointerEvent as RPointerEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
@@ -32,6 +32,9 @@ import { type Plan, type WindowSet, type XY, allWindows, along, blankZone, compa
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
 import { buildDocument } from './toDocument'
+
+// three.js only loads when 3D is first opened.
+const Plan3D = lazy(() => import('./Plan3D'))
 
 type Mode = 'outline' | 'rooms'
 type Tool = 'select' | 'rect' | 'tri' | 'shape' | 'cut' | 'corner' | 'pick' | 'room' | 'halve' | 'divide' | 'join'
@@ -102,6 +105,7 @@ export default function GeometryLab() {
   }
 
   const [mode, setMode] = useState<Mode>('outline')
+  const [in3d, setIn3d] = useState(false)
   const [tool, setTool] = useState<Tool>('rect')
   const [joinFrom, setJoinFrom] = useState<string | null>(null)
   const [sel, setSel] = useState<Sel>(null)
@@ -556,14 +560,14 @@ export default function GeometryLab() {
   type Dim = 'width' | 'height' | 'area'
   const editing = useRef<Sel>(null)
   const r3s = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 1000) / 1000) : '')
-  const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', recent: ['height', 'area'] as Dim[] })
+  const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', shade: '0', recent: ['height', 'area'] as Dim[] })
   const autoDim: Dim = (['width', 'height', 'area'] as Dim[]).find((d) => !form.recent.includes(d))!
   useEffect(() => {
-    if (selSet) setForm((f) => ({ ...f, count: String(selSet.count), width: r3s(selSet.width_m), height: r3s(selSet.height_m), area: r3s(selSet.width_m * selSet.height_m), sill: r3s(selSet.sill_m) }))
+    if (selSet) setForm((f) => ({ ...f, count: String(selSet.count), width: r3s(selSet.width_m), height: r3s(selSet.height_m), area: r3s(selSet.width_m * selSet.height_m), sill: r3s(selSet.sill_m), shade: r3s(selSet.shading_m ?? 0) }))
   }, [selSet?.id, sel]) // eslint-disable-line react-hooks/exhaustive-deps
   const toSet = (f: typeof form): WindowSet | null =>
-    selWall ? { id: selSet?.id ?? `w${Date.now().toString(36)}`, wall: selWall.index, count: Number(f.count), height_m: Number(f.height), width_m: Number(f.width), sill_m: Number(f.sill) } : null
-  const edit = (k: 'count' | 'sill' | Dim, v: string) => {
+    selWall ? { id: selSet?.id ?? `w${Date.now().toString(36)}`, wall: selWall.index, count: Number(f.count), height_m: Number(f.height), width_m: Number(f.width), sill_m: Number(f.sill), shading_m: Number(f.shade) } : null
+  const edit = (k: 'count' | 'sill' | 'shade' | Dim, v: string) => {
     let f = { ...form, [k]: v }
     if (k === 'width' || k === 'height' || k === 'area') {
       const recent: Dim[] = [form.recent.filter((d) => d !== k).slice(-1)[0] ?? (k === 'height' ? 'area' : 'height'), k]
@@ -669,7 +673,18 @@ export default function GeometryLab() {
 
   return (
     <div className="gl-root" ref={host}>
-      <svg className="gl-svg" width={size[0]} height={size[1]} style={{ cursor }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setPointer(null)} onDoubleClick={onDouble} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()}>
+      {in3d && (
+        <div className="gl-3d">
+          <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
+            <Plan3D plan={plan} runs={runs} placed={placed} chosenWall={sel?.kind === 'wall' ? sel.index : null} onPickWall={(i) => setSel({ kind: 'wall', index: i })} />
+          </Suspense>
+        </div>
+      )}
+      <div className="gl-viewswitch" role="group" aria-label="View">
+        <button type="button" aria-pressed={!in3d} onClick={() => setIn3d(false)}>Plan</button>
+        <button type="button" aria-pressed={in3d} onClick={() => setIn3d(true)} disabled={!plan.blocks.length}>3D</button>
+      </div>
+      <svg className="gl-svg" width={size[0]} height={size[1]} style={{ cursor, display: in3d ? "none" : undefined }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setPointer(null)} onDoubleClick={onDouble} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()}>
         {grid}
         {shown.blocks.map((b, i) => <polygon key={`f${i}`} className="gl-floor" points={P(b)} />)}
         {inRooms &&
@@ -881,6 +896,7 @@ export default function GeometryLab() {
               <div className="gl-row"><span>Width</span><Num value={form.width} unit="m" step={0.1} auto={autoDim === 'width'} onChange={(s) => edit('width', s)} /></div>
               <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" step={0.1} auto={autoDim === 'height'} onChange={(s) => edit('height', s)} /></div>
               <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" step={0.1} onChange={(s) => edit('sill', s)} /></div>
+              <div className="gl-row"><span>Shading depth</span><Num value={form.shade} unit="m" step={0.1} min={0} onChange={(s) => edit('shade', s)} /></div>
               <p className="gl-hint">Type any two of area, width and height; the one marked <i className="gl-auto-tag">auto</i> is worked out.{selSet ? ' Changes show straight away.' : ''}</p>
               {lay && 'why' in lay && <p className="gl-err">{lay.why}</p>}
               {draft && lay && !('why' in lay) && (
@@ -968,8 +984,8 @@ export default function GeometryLab() {
       })()}
 
       {/* ─── bottom: tools ─── */}
-      <p className="gl-tip">{tipLine}</p>
-      <div className="gl-bar" role="toolbar" aria-label={mode === 'outline' ? 'Outline tools' : 'Room tools'}>
+      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : tipLine}</p>
+      {!in3d && <div className="gl-bar" role="toolbar" aria-label={mode === 'outline' ? 'Outline tools' : 'Room tools'}>
         <span className="gl-step-tag">{mode === 'outline' ? '1 Outline' : '2 Rooms'}</span>
         {TOOLS[mode].map((t, i) => (
           <button key={t.key} type="button" className={`gl-tool${t.key === 'corner' ? ' optional' : ''}`} aria-pressed={tool === t.key} title={`${t.name} (${i + 1})`} onClick={() => pick(t.key)} disabled={(t.key === 'cut' || t.key === 'select' || t.key === 'corner') && !has}>
@@ -980,8 +996,8 @@ export default function GeometryLab() {
         <span className="gl-sep" />
         <button type="button" className="gl-tool" onClick={undo} disabled={!past.length}><span>↶</span>Undo</button>
         <button type="button" className="gl-tool" onClick={redo} disabled={!future.length}><span>↷</span>Redo</button>
-      </div>
-      <div className="gl-compass">
+      </div>}
+      {!in3d && <div className="gl-compass">
         <svg width="34" height="40" viewBox="-17 -20 34 40" aria-label="North is up">
           <circle r="15" fill="#fff" stroke="#DCE2DF" />
           <path d="M0 -11 L5 2 L0 -1 L-5 2 Z" fill="#235546" />
@@ -992,7 +1008,7 @@ export default function GeometryLab() {
           <i />
           {scaleM} m
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
