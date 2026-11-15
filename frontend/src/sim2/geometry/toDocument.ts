@@ -354,6 +354,8 @@ export function buildDocument(plan: Plan): Built {
 
   const bi = plan.building ?? noBuildingInputs()
   const hw = plan.dhw ?? noDhw()
+  const noHw = used.filter((z) => !system(zoneSys(z.id, 'dhw')?.template)?.fuel)
+  if (hw.basis != null && noHw.length) notes.push(`Hot water use is stated, but ${noHw.map((z) => z.name ?? z.id).join(', ')} ${noHw.length > 1 ? 'have' : 'has'} no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)`)
   if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && ([hw.storage_c, hw.tap_c, hw.cold_c, hw.basis, hw.litres].some((v) => v == null) || hw.shape === null)) notes.push('Hot water: a system is given but its temperatures or daily demand or when it is used are not all stated (Systems, Hot water)')
   const zones = used.map((z) => ({
     id: z.id,
