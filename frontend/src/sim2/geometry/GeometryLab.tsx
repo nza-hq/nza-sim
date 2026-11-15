@@ -80,15 +80,15 @@ const TOOLS: Record<Mode, Array<{ key: Tool; name: string; glyph: string; line: 
     { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a room (Shift: more than one) to put it in a zone. Drag a wall between rooms to move it.' },
   ],
   fabric: [
+    { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a wall or a room (Shift: more rooms), then set its U-value or construction on the card. Esc to let go.' },
     { key: 'paint', name: 'Apply', glyph: '◧', line: 'Tap a room\'s part of a wall to give it the chosen type (Shift: the whole wall), or tap a room for all of its parts.' },
-    { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a wall or a room (Shift: more) to see and set its types on the card.' },
   ],
   spaces: [
+    { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a room (Shift: more), then give it a space type on the card. Tap a space type on the left to see or edit it. Esc to let go.' },
     { key: 'paint', name: 'Apply', glyph: '◧', line: 'Tap rooms to give them the chosen space type.' },
-    { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a room (Shift: more) to see and set its space type on the card.' },
   ],
 }
-const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'paint', spaces: 'paint' }
+const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'pick', spaces: 'pick' }
 const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', spaces: 'Spaces' }
 const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, spaces: 4 }
 const SPACE_COLOURS = ['#E0A84E', '#5B9BD5', '#6AA84F', '#C27BA0', '#45A5A0', '#D9734E', '#8E7CC3', '#A0A04A']
@@ -505,7 +505,10 @@ export default function GeometryLab() {
     if (tool === 'pick' || tool === 'room') {
       const w = wallAt(x, y)
       if (w != null && tool === 'pick') return setSel({ kind: 'wall', index: w, t: tOn(w, m), whole: false })
-      if (!room) return setSel(null)
+      if (!room) {
+        setActiveSpace(null)
+        return setSel(null)
+      }
       if (sh && sel?.kind === 'rooms') {
         const ids = sel.ids.includes(room.id) ? sel.ids.filter((i) => i !== room.id) : [...sel.ids, room.id]
         return setSel(ids.length ? { kind: 'rooms', ids } : null)
@@ -560,6 +563,8 @@ export default function GeometryLab() {
         setJoinFrom(null)
         setDrag(null)
         setSel(null)
+        setActiveSpace(null)
+        if (tool === 'paint') setTool('pick')
       }
       const t = TOOLS[mode][Number(e.key) - 1]
       if (t && !ctl && !e.altKey) pick(t.key)
@@ -691,6 +696,57 @@ export default function GeometryLab() {
     }
     commit('rooms' in to ? setTypeOnRooms(p, to.rooms, id) : setTypeOn(p, to.spans, id))
   }
+  /** The wall pieces a card's wall stretches cover. */
+  const piecesIn = (spans: Span[]) => pieces.filter((p) => spans.some((s) => s.run === p.run && (p.t0 + p.t1) / 2 >= s.t0 - 1e-6 && (p.t0 + p.t1) / 2 <= s.t1 + 1e-6))
+  const samePiece = (a: Span, b: Span) => a.run === b.run && Math.abs(a.t0 - b.t0) < 1e-6 && Math.abs(a.t1 - b.t1) < 1e-6
+  type Target = { spans: Span[] } | { rooms: string[] }
+  /** The types a card's selection has for element `e`. */
+  const typesOn = (e: FabricElement, to: Target) =>
+    onWalls(e) ? ('rooms' in to ? piecesOfRooms(plan, to.rooms) : piecesIn(to.spans)).map((p) => typeOfSpan(plan, p, e)) : 'rooms' in to ? to.rooms.map((r) => roomType(plan, r, e)) : []
+  /** Change the construction or U of what is chosen. When its type is also used elsewhere, the chosen things get a
+   * type of their own (named after them) so nothing else changes; when only they use it, the type itself changes. */
+  const editFor = (e: FabricElement, to: Target, q: Partial<FabricType>, label: string) => {
+    const ids = [...new Set(typesOn(e, to))]
+    const cur = ids.length === 1 ? plan.fabric_types.find((t) => t.id === ids[0]) : undefined
+    if (cur) {
+      const mine = onWalls(e)
+        ? (() => { const ps = 'rooms' in to ? piecesOfRooms(plan, to.rooms) : piecesIn(to.spans); return pieces.filter((p) => typeOfSpan(plan, p, e) === cur.id).every((p) => ps.some((x) => samePiece(x, p))) })()
+        : 'rooms' in to && plan.rooms.filter((r) => roomType(plan, r.id, e) === cur.id).every((r) => to.rooms.includes(r.id))
+      if (mine) return setFT(cur.id, q)
+    }
+    const r = newType(plan, e)
+    let p: Plan = { ...r.plan, fabric_types: r.plan.fabric_types.map((t) => (t.id === r.id ? { ...t, name: `${FABRIC_ELEMENTS.find((x) => x.key === e)!.one} · ${label}`, construction: cur?.construction ?? null, u: cur?.u ?? null, ...q } : t)) }
+    p = 'rooms' in to ? setTypeOnRooms(p, to.rooms, r.id) : setTypeOn(p, to.spans, r.id)
+    commit(p)
+  }
+  /** A card's fabric rows: per element, its type, and the construction and U of what is chosen. */
+  const fabricRows = (els: readonly FabricElement[], to: Target, label: string) =>
+    els.map((e) => {
+      const ids = [...new Set(typesOn(e, to))]
+      if (!ids.length) return null
+      const t = ids.length === 1 ? plan.fabric_types.find((x) => x.id === ids[0]) : undefined
+      const lib = constructionsFor(e)
+      const c = construction(t?.construction)
+      return (
+        <div key={e} className="gl-fabcard">
+          <div className="gl-row">
+            <span>{FABRIC_ELEMENTS.find((x) => x.key === e)!.name}</span>
+            {typeSelect(e, t ? t.id : '__mixed', (x) => setFabric(e, to, x))}
+          </div>
+          <div className="gl-fab-detail">
+            <select className="gl-sel" aria-label={`Construction of ${FABRIC_ELEMENTS.find((x) => x.key === e)!.name}`} value={t ? (t.construction ?? '') : '__mixed'} onChange={(ev) => ev.target.value !== '__mixed' && editFor(e, to, { construction: ev.target.value || null }, label)}>
+              {!t && <option value="__mixed">Several</option>}
+              <option value="">{lib.length ? 'Construction not set' : 'None in the library yet'}</option>
+              {lib.map((x) => <option key={x.key} value={x.key}>{short(x.name)}{x.u != null ? ` · U ${x.u}` : ''}</option>)}
+            </select>
+            <label className="gl-u" title="A U-value you know, W/m²K, used over the library's. Empty: the library's.">
+              U
+              <input aria-label={`U-value of ${FABRIC_ELEMENTS.find((x) => x.key === e)!.name}`} inputMode="decimal" placeholder={c?.u != null ? String(c.u) : t ? '—' : 'mixed'} defaultValue={t?.u ?? ''} key={`${e}-${t?.id ?? 'mixed'}-${t?.u}`} onBlur={(ev) => { const v = ev.target.value.trim(); const u = v === '' ? null : Number(v); if (u === null || (Number.isFinite(u) && u > 0)) { if (!t || u !== t.u) editFor(e, to, { u }, label) } else ev.target.value = t?.u == null ? '' : String(t.u) }} onKeyDown={(ev) => ev.key === 'Enter' && (ev.target as HTMLInputElement).blur()} />
+            </label>
+          </div>
+        </div>
+      )
+    })
   /** What a type is used on: wall metres, numbers of windows or doors, or roof / floor area. */
   const usage = (t: FabricType): { n: number; text: string } => {
     if (t.element === 'wall') {
@@ -911,7 +967,7 @@ export default function GeometryLab() {
         {grid}
         {shown.blocks.map((b, i) => <polygon key={`f${i}`} className="gl-floor" points={P(b)} />)}
         {inRooms &&
-          shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) ? ' on' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
+          shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) ? ' on' : ''}${mode === 'spaces' && !chosen.size && curSpace && r.space === curSpace.id ? ' mark' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
         {liveInner && <line className="gl-wall-hover" x1={toPx(liveInner[0])[0]} y1={toPx(liveInner[0])[1]} x2={toPx(liveInner[1])[0]} y2={toPx(liveInner[1])[1]} />}
         {shown.blocks.map((b, i) => <polygon key={`s${i}`} className={`gl-shell${chosenBlocks.has(i) || (drag && drag.kind === 'corner' && drag.block === i) ? ' chosen' : ''}`} points={P(b)} />)}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
@@ -1152,7 +1208,7 @@ export default function GeometryLab() {
                     {plan.spaces.map((sp) => {
                       const rs = plan.rooms.filter((r) => r.space === sp.id)
                       return (
-                        <div key={sp.id} className="gl-zonerow" aria-selected={sp.id === curSpace?.id} onClick={() => { setActiveSpace(sp.id); if (tool !== 'paint') setSel(rs.length ? { kind: 'rooms', ids: rs.map((r) => r.id) } : null) }}>
+                        <div key={sp.id} className="gl-zonerow" aria-selected={sp.id === curSpace?.id} onClick={() => { setActiveSpace(sp.id); setSel(null) }}>
                           <span className="gl-sw" style={{ background: spaceColour(sp.id)! + '59', borderColor: spaceColour(sp.id)! }} />
                           <input aria-label="Space type name" defaultValue={sp.name} key={`${sp.id}-${sp.name}`} onClick={(e) => e.stopPropagation()} onBlur={(e) => e.target.value.trim() && e.target.value !== sp.name && setSpace(sp.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
                           {rs.length ? <small>{rs.length} room{rs.length === 1 ? '' : 's'} · {f1(rs.reduce((t, r) => t + ringArea(r.ring), 0))} m²</small> : (
@@ -1227,15 +1283,8 @@ export default function GeometryLab() {
               {mode === 'fabric' && (
                 <div className="gl-sec">
                   <h3>Fabric</h3>
-                  {(['wall', 'glazing', 'door'] as const).map((e) => {
-                    const v = oneOf((isWhole ? runPieces : [selSpan]).map((p) => typeOfSpan(plan, p, e)))
-                    return (
-                      <div key={e} className="gl-row">
-                        <span>{FABRIC_ELEMENTS.find((x) => x.key === e)!.name}</span>
-                        {typeSelect(e, v, (x) => setFabric(e, { spans: [selSpan] }, x))}
-                      </div>
-                    )
-                  })}
+                  {fabricRows((['wall', 'glazing', 'door'] as const).filter((e) => e === 'wall' || (e === 'door' ? selDoors.length : selWins.length)), { spans: [selSpan] }, `wall ${selWall.index + 1}${!isWhole && selPiece ? ` (${roomName(selPiece.room)})` : ''}`)}
+                  <p className="gl-hint">Type a U-value or pick a construction for this {isWhole ? 'wall' : 'part'}. If others share its type, it gets a type of its own; the list on the left shows it.</p>
                   {runPieces.length > 1 && !isWhole && <p className="gl-hint">Each room's part of a wall is its own element, so an extension's wall can differ from the rest.</p>}
                 </div>
               )}
@@ -1336,17 +1385,8 @@ export default function GeometryLab() {
                 return (
                   <div className="gl-sec">
                     <h3>Fabric</h3>
-                    {FABRIC_ELEMENTS.map(({ key: e, name }) => {
-                      if (onWalls(e) && !own.length) return null
-                      const v = onWalls(e) ? oneOf(own.map((p) => typeOfSpan(plan, p, e))) : oneOf(selRooms.map((r) => roomType(plan, r.id, e)))
-                      return (
-                        <div key={e} className="gl-row">
-                          <span>{name}</span>
-                          {typeSelect(e, v, (x) => setFabric(e, { rooms: ids }, x))}
-                        </div>
-                      )
-                    })}
-                    <p className="gl-hint">{own.length ? `${own.length} outside wall part${own.length === 1 ? '' : 's'}, ${f1(own.reduce((t, p) => t + p.length_m, 0))} m. Tap a wall to change one part on its own.` : 'No outside walls: only its roof and floor.'}</p>
+                    {fabricRows(FABRIC_ELEMENTS.map((x) => x.key), { rooms: ids }, one ? one.name : `${ids.length} rooms`)}
+                    <p className="gl-hint">{own.length ? `${own.length} outside wall part${own.length === 1 ? '' : 's'}, ${f1(own.reduce((t, p) => t + p.length_m, 0))} m. ` : 'No outside walls: only its roof and floor. '}Type a U-value or pick a construction for {one ? 'this room' : 'these rooms'}; if other rooms share the type, {one ? 'it gets' : 'they get'} a type of {one ? 'its' : 'their'} own.</p>
                   </div>
                 )
               })()}
@@ -1361,6 +1401,12 @@ export default function GeometryLab() {
                       <option value="__new">New space type…</option>
                     </select>
                   </div>
+                  {(() => {
+                    const sid = oneOf(selRooms.map((r) => r.space ?? ''))
+                    const sp = plan.spaces.find((x) => x.id === sid)
+                    return sp ? <div className="gl-btns"><button type="button" className="gl-btn quiet" onClick={() => { setActiveSpace(sp.id); setSel(null) }}>Edit {sp.name}</button></div> : null
+                  })()}
+                  <p className="gl-hint">Editing a space type changes every room that has it.</p>
                 </div>
               )}
               <div className="gl-sec">
@@ -1430,12 +1476,25 @@ export default function GeometryLab() {
               </div>
               <div className="gl-sec">
                 <div className="gl-btns">
+                  <button type="button" className="gl-btn orange" onClick={() => pick('paint')}>Give it to rooms…</button>
                   <button type="button" className="gl-btn quiet" onClick={() => newSpace(sp)}>Copy for an exception</button>
                   <button type="button" className="gl-btn quiet" disabled={!rs.length} onClick={() => { setTool('pick'); setSel({ kind: 'rooms', ids: rs.map((r) => r.id) }) }}>Choose its rooms</button>
                 </div>
               </div>
             </div>
           </aside>
+        )
+      })()}
+
+      {tool === 'paint' && (mode === 'fabric' || mode === 'spaces') && shownLook === 'plan' && (() => {
+        const name = mode === 'spaces' ? curSpace?.name ?? plan.spaces[0]?.name : typeName(activeOf(elem))
+        const colour = mode === 'spaces' ? spaceColour(curSpace?.id ?? plan.spaces[0]?.id) : typeColour(plan, activeOf(elem))
+        return (
+          <div className="gl-applying" role="status">
+            {colour && <span className="gl-sw" style={{ background: colour, borderColor: colour }} />}
+            <span>{name ? <>Giving <b>{name}</b>: tap {mode === 'spaces' ? 'rooms' : onWalls(elem) ? 'walls or rooms' : 'rooms'}</> : 'Make a space type first'}</span>
+            <button type="button" className="gl-btn quiet" onClick={() => pick('pick')}>Done</button>
+          </div>
         )
       })()}
 
