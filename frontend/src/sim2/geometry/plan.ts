@@ -1,18 +1,36 @@
 /**
  * Sim2 geometry prototype: the plan as the editor holds it, and the sums on it (no screen, no React).
  *
- * A plan is one floor: a footprint (drawn with decodED's drawing core), cut into zones (decodED's zone cut), and
- * window sets on the footprint's walls. Everything is in local metres, x east, y north, north up (orientation 0).
+ * A plan is one floor: a footprint (drawn with decodED's drawing core), filled with rooms (decodED's room editor and
+ * zone cut), and window sets on the footprint's walls. Rooms always cover the floor exactly, wall to wall, with no
+ * gaps and no overlaps (partitions have no thickness here). Each room sits in one zone; a zone is what the model
+ * document calls a zone, and carries what is assigned to it (its use, its heating and its cooling system).
+ * Everything is in local metres, x east, y north, north up (orientation 0).
  *
  * A "wall run" is one side of the footprint (index i: footprint[i] → footprint[i+1]). Windows belong to a run and are
- * placed along it by distance from its start, so cutting the footprint into zones never moves or loses a window;
- * when the model document is written, each zone's stretch of the run takes the windows whose middles fall on it.
+ * placed along it by distance from its start, so cutting the floor into rooms never moves or loses a window; when the
+ * model document is written, each zone's stretch of the run takes the windows whose middles fall on it.
  */
 import { area, ccw, type XY } from './ported/zones'
 
 export type { XY }
 
-export type PlanZone = { id: string; name: string; ring: XY[] }
+/** A room: drawn, always inside the footprint, in exactly one zone. */
+export type PlanRoom = { id: string; name: string; ring: XY[]; zone: string }
+/** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
+export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
+/** A heating or cooling system the user has named. Its kit (fuel, efficiency) is not asked yet, so stays unset. */
+export type PlanSystem = { id: string; service: 'heating' | 'cooling'; label: string }
+
+/** Uses a zone can be given: the zone types today's schedule editor offers (UnifiedScheduleEditor.jsx). */
+export const USES: ReadonlyArray<{ key: string; name: string }> = [
+  { key: 'bedroom', name: 'Bedroom' },
+  { key: 'office', name: 'Office' },
+  { key: 'public', name: 'Public' },
+  { key: 'retail', name: 'Retail' },
+  { key: 'industrial', name: 'Industrial' },
+  { key: 'other', name: 'Other' },
+]
 
 /** N windows of one size, spaced equally along a wall run (equal gaps at both ends and between). */
 export type WindowSet = {
@@ -27,14 +45,19 @@ export type WindowSet = {
 
 export type Plan = {
   footprint: XY[] | null
+  rooms: PlanRoom[]
   zones: PlanZone[]
+  systems: PlanSystem[]
   storey_height_m: number
   windows: WindowSet[]
-  /** Next zone number, so names and ids are never reused within a plan. */
-  zone_next: number
+  /** Next numbers, so names and ids are never reused within a plan. */
+  next: { room: number; zone: number; system: number }
 }
 
-export const emptyPlan = (): Plan => ({ footprint: null, zones: [], storey_height_m: 3, windows: [], zone_next: 1 })
+export const emptyPlan = (): Plan => ({ footprint: null, rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], next: { room: 1, zone: 1, system: 1 } })
+
+/** A new zone with nothing assigned. */
+export const blankZone = (n: number): PlanZone => ({ id: `z${n}`, name: `Zone ${n}`, use: null, heating: null, cooling: null })
 
 export const dist = (a: XY, b: XY) => Math.hypot(b[0] - a[0], b[1] - a[1])
 const round = (n: number, dp = 3) => Math.round(n * 10 ** dp) / 10 ** dp
@@ -117,7 +140,7 @@ export const along = (run: WallRun, t: number): XY => {
   return [run.a[0] + (run.b[0] - run.a[0]) * f, run.a[1] + (run.b[1] - run.a[1]) * f]
 }
 
-// ─── Zones against the footprint ──────────────────────────────────────────────────────────────────
+// ─── Rooms (or any pieces of the floor) against the footprint ──────────────────────────────────────────────────────────────────
 
 const EPS = 0.05
 
@@ -133,35 +156,52 @@ export function onRun(run: WallRun, p: XY): number | null {
   return Math.max(0, Math.min(L, t))
 }
 
-/** A zone side lying on the footprint: which run, and the stretch [t0, t1] of it (t0 < t1). */
-export type ZoneWall = { zone: string; side: number; run: number; t0: number; t1: number; length_m: number; azimuth_deg: number }
-/** A zone side shared with another zone (or a part of one). */
-export type ZoneShare = { a: string; b: string; length_m: number }
+/** A piece's side lying on the footprint: which run, and the stretch [t0, t1] of it (t0 < t1). */
+export type PieceWall = { piece: string; side: number; run: number; t0: number; t1: number; length_m: number; azimuth_deg: number }
+/** A stretch two pieces share. */
+export type PieceShare = { a: string; b: string; length_m: number }
+export type Piece = { id: string; ring: XY[] }
 
-export function zoneEdges(plan: Plan): { walls: ZoneWall[]; shares: ZoneShare[]; open: Array<{ zone: string; side: number; length_m: number }> } {
-  const runs = wallRuns(plan.footprint)
-  const walls: ZoneWall[] = []
-  const open: Array<{ zone: string; side: number; length_m: number }> = []
+export function edgesOf(footprint: readonly XY[] | null, pieces: readonly Piece[]): { walls: PieceWall[]; shares: PieceShare[]; open: Array<{ piece: string; side: number; length_m: number }> } {
+  const runs = wallRuns(footprint)
+  const walls: PieceWall[] = []
+  const open: Array<{ piece: string; side: number; length_m: number }> = []
   const inner: Array<{ zone: string; a: XY; b: XY }> = []
-  for (const z of plan.zones) {
+  for (const z of pieces) {
     const r = ccw(z.ring)
     r.forEach((a, i) => {
       const b = r[(i + 1) % r.length] as XY
       const L = dist(a, b)
       if (L < 1e-6) return
+      // The stretches of this side that lie on the outside wall are walls; what is left of it is inside (a side can
+      // be both, when a corner in line with it was tidied away).
+      const u: XY = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]
+      const at = (s: number): XY => [a[0] + u[0] * s, a[1] + u[1] * s]
+      const onLine = (p: XY) => Math.abs((p[0] - a[0]) * u[1] - (p[1] - a[1]) * u[0]) < EPS
+      const covered: Array<[number, number]> = []
       for (const run of runs) {
-        const ta = onRun(run, a)
-        const tb = onRun(run, b)
-        if (ta != null && tb != null && Math.abs(tb - ta) > 1e-6) {
-          walls.push({ zone: z.id, side: i, run: run.index, t0: Math.min(ta, tb), t1: Math.max(ta, tb), length_m: L, azimuth_deg: run.azimuth_deg })
-          return
-        }
+        if (!onLine(run.a) || !onLine(run.b)) continue
+        const sa = (run.a[0] - a[0]) * u[0] + (run.a[1] - a[1]) * u[1]
+        const sb = (run.b[0] - a[0]) * u[0] + (run.b[1] - a[1]) * u[1]
+        const s0 = Math.max(0, Math.min(sa, sb))
+        const s1 = Math.min(L, Math.max(sa, sb))
+        if (s1 - s0 <= EPS) continue
+        const ta = onRun(run, at(s0))!
+        const tb = onRun(run, at(s1))!
+        walls.push({ piece: z.id, side: i, run: run.index, t0: Math.min(ta, tb), t1: Math.max(ta, tb), length_m: s1 - s0, azimuth_deg: run.azimuth_deg })
+        covered.push([s0, s1])
       }
-      inner.push({ zone: z.id, a, b })
+      covered.sort((x, y) => x[0] - y[0])
+      let s = 0
+      for (const [c0, c1] of covered) {
+        if (c0 - s > EPS) inner.push({ zone: z.id, a: at(s), b: at(c0) })
+        s = Math.max(s, c1)
+      }
+      if (L - s > EPS) inner.push({ zone: z.id, a: at(s), b })
     })
   }
   // Shared stretches between zones: collinear overlap of their inner sides (a cut line, or part of one).
-  const shares = new Map<string, ZoneShare>()
+  const shares = new Map<string, PieceShare>()
   const covered = new Map<number, number>()
   for (let i = 0; i < inner.length; i++) {
     for (let j = i + 1; j < inner.length; j++) {
@@ -189,9 +229,9 @@ export function zoneEdges(plan: Plan): { walls: ZoneWall[]; shares: ZoneShare[];
   inner.forEach((s, i) => {
     const L = dist(s.a, s.b)
     const left = L - (covered.get(i) ?? 0)
-    if (left > EPS) open.push({ zone: s.zone, side: i, length_m: left })
+    if (left > EPS) open.push({ piece: s.zone, side: i, length_m: left })
   })
   return { walls, shares: [...shares.values()], open }
 }
 
-export const zoneArea = (z: PlanZone) => area(z.ring)
+export const ringArea = (r: readonly XY[]) => area(r)

@@ -5,15 +5,16 @@
  *   - addShape: a drawn box, triangle or shape joins the outline (the first one is the outline); it must touch it.
  *   - cutShape: a drawn box is taken out of the outline; it must leave one piece with no hole.
  *   - setRing: the outline after a corner was dragged, added or taken away; it must not cross itself.
- *   - moveBy / turnBy: the whole building (outline, zones, windows) moves or turns; nothing else changes.
+ *   - moveBy / turnBy: the whole building (outline, rooms, windows) moves or turns; nothing else changes.
  *
- * When the outline's shape changes, zones go back to one zone (the old cut lines no longer fit) and window sets stay
- * on any wall that is still there, exactly as it was; the rest are dropped, and the reply says so.
+ * When the outline's shape changes, rooms are clipped to it and new floor becomes new rooms (rooms.ts fitRooms); window
+ * sets stay on any wall that is still there, exactly as it was; the rest are dropped, and the reply says so.
  */
 import pc from 'polygon-clipping'
 import { ringCrossings } from './ported/drawCore'
 import { area, ccw, type XY } from './ported/zones'
 import { type Plan, wallRuns } from './plan'
+import { fitRooms } from './rooms'
 
 export type Changed = { plan: Plan; said?: string } | { why: string }
 
@@ -56,7 +57,7 @@ export function cleanRing(r: readonly XY[]): XY[] {
 
 const closed = (r: readonly XY[]): [number, number][][] => [[...r.map((p) => [p[0], p[1]] as [number, number]), [r[0]![0], r[0]![1]]]]
 
-/** The plan with a new outline: zones back to one, windows kept on walls that did not change. */
+/** The plan with a new outline: rooms fitted to it, windows kept on walls that did not change. */
 export function withOutline(plan: Plan, ring: XY[], what: string): { plan: Plan; said?: string } {
   const before = wallRuns(plan.footprint)
   const after = wallRuns(ring)
@@ -71,24 +72,14 @@ export function withOutline(plan: Plan, ring: XY[], what: string): { plan: Plan;
     }
     return [{ ...w, wall: now.index }]
   })
-  const hadZones = plan.zones.length > 1
-  const first = plan.zones[0]
-  const notes = [hadZones ? 'zones went back to one (split again)' : '', lost ? `${lost} window set${lost > 1 ? 's' : ''} removed (the wall changed)` : ''].filter(Boolean)
-  return {
-    plan: {
-      ...plan,
-      footprint: ring,
-      zones: [{ id: first?.id ?? 'z1', name: first?.name ?? 'Zone 1', ring }],
-      zone_next: first ? plan.zone_next : 2,
-      windows,
-    },
-    said: notes.length ? `${what}: ${notes.join('; ')}` : undefined,
-  }
+  const fitted = fitRooms(plan, ring)
+  const notes = [fitted.said ?? '', lost ? `${lost} window set${lost > 1 ? 's' : ''} removed (the wall changed)` : ''].filter(Boolean)
+  return { plan: { ...fitted.plan, windows }, said: notes.length ? `${what}: ${notes.join('; ')}` : undefined }
 }
 
 export function addShape(plan: Plan, shape: XY[]): Changed {
   if (area(shape) < 1) return { why: 'Too small. Drag a bigger shape.' }
-  if (!plan.footprint) return withOutline({ ...plan, zones: [], windows: [], zone_next: 1 }, cleanRing(shape), 'Added')
+  if (!plan.footprint) return withOutline({ ...plan, rooms: [], windows: [] }, cleanRing(shape), 'Added')
   const u = pc.union(closed(plan.footprint), closed(shape))
   if (u.length !== 1) return { why: 'Draw it touching the building.' }
   if (u[0]!.length > 1) return { why: 'That would leave a courtyard (a hole). Not yet supported.' }
@@ -118,7 +109,7 @@ export function setRing(plan: Plan, ring: XY[]): Changed {
 const mapPlan = (plan: Plan, f: (p: XY) => XY): Plan => ({
   ...plan,
   footprint: plan.footprint ? plan.footprint.map(f) : null,
-  zones: plan.zones.map((z) => ({ ...z, ring: z.ring.map(f) })),
+  rooms: plan.rooms.map((z) => ({ ...z, ring: z.ring.map(f) })),
 })
 
 export const moveBy = (plan: Plan, d: XY): Plan => mapPlan(plan, (p) => [p[0] + d[0], p[1] + d[1]])

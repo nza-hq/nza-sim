@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { azimuthOf, emptyPlan, layoutSet, wallRuns, type Plan, type XY } from '../plan'
 import { cutZones } from '../ported/zones'
+import { fitRooms } from '../rooms'
 import { buildDocument } from '../toDocument'
 
 const box: XY[] = [[0, 0], [12, 0], [12, 8], [0, 8]]
-const plan = (fp: XY[]): Plan => ({ ...emptyPlan(), footprint: fp, zones: [{ id: 'z1', name: 'Zone 1', ring: fp }], zone_next: 2 })
+const plan = (fp: XY[]): Plan => fitRooms(emptyPlan(), fp).plan
 
 describe('walls and windows', () => {
   it('azimuth of outward normals on an anticlockwise box', () => {
@@ -42,12 +43,13 @@ describe('model document', () => {
     expect(g).toMatchObject({ facade: 'south', azimuth_deg: 180, window_count: 3 })
     expect(g.wwr).toBeCloseTo(3 / 36, 3)
   })
-  it('a cut makes two zones, a partition, and keeps every window', () => {
+  it('two rooms in two zones make two zones, a partition, and keep every window', () => {
     const p = plan(box)
     p.windows = [{ id: 'w1', wall: 0, count: 3, width_m: 1, height_m: 1, sill_m: 1 }]
     const cut = cutZones([box], [6, 0], [6, 8])
     if ('why' in cut) throw new Error(cut.why)
-    p.zones = cut.zones.map((ring, i) => ({ id: `z${i + 1}`, name: `Zone ${i + 1}`, ring }))
+    p.rooms = cut.zones.map((ring, i) => ({ id: `r${i + 1}`, name: `Room ${i + 1}`, ring, zone: `z${i + 1}` }))
+    p.zones = [1, 2].map((n) => ({ id: `z${n}`, name: `Zone ${n}`, use: null, heating: null, cooling: null }))
     const b = buildDocument(p)
     expect(b.ok).toBe(true)
     expect(b.totals.zones).toBe(2)
@@ -57,7 +59,7 @@ describe('model document', () => {
     const part = (b.doc as any).surfaces.find((s: any) => s.kind === 'partition')
     expect(part.area_m2).toBeCloseTo(24, 6)
     // The middle window sits right on the cut line: counted once, and said.
-    expect(b.notes).toEqual(['A window on wall 1 straddles a zone line; it is counted in the zone its middle is in'])
+    expect(b.notes).toContain('A window on wall 1 straddles a line between zones; it is counted in the zone its middle is in')
   })
   it('an L with a diagonal side validates', () => {
     const L: XY[] = [[0, 0], [20, 0], [20, 6], [14, 12], [0, 12]]
