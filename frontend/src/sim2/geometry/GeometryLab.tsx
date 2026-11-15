@@ -1233,6 +1233,13 @@ export default function GeometryLab() {
               </div>
               {hw.basis && n('Litres a day', 'litres', hw.basis === 'per_person' ? 5 : 0.5, hw.basis === 'per_person' ? 'per person' : 'per m²')}
               {n('Circulation pump', 'pump_w', 10, 'W')}
+              <div className="gl-row gl-librow"><span>Used</span>
+                <select className="gl-sel" aria-label="When hot water is used" value={hw.shape === undefined ? 'flat' : hw.shape ?? ''} onChange={(e) => setHw({ shape: (e.target.value || null) as DhwInputs['shape'] })}>
+                  <option value="">Not set</option>
+                  <option value="flat">Evenly through the day</option>
+                  <option value="follow_occupancy">With occupancy</option>
+                </select>
+              </div>
               <p className="gl-hint">One set for the building. The heater only heats the hot share of what runs from the tap. Empty stays unset.</p>
             </details>
           )

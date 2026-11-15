@@ -245,7 +245,7 @@ describe('hot water for the whole building', () => {
     p = { ...p, dhw: { storage_c: 60, tap_c: 43, cold_c: 10, basis: 'per_person', litres: 50, pump_w: 0 } }
     const b = buildDocument(p)
     expect(b.issues).toEqual([])
-    expect((b.doc as any).services.dhw).toMatchObject({ storage_setpoint_c: 60, tap_outlet_temp_c: 43, cold_supply_temp_c: 10, demand_basis: 'per_person', litres_per_person_per_day: 50, litres_per_m2_per_day: null, circulation_pump_w: 0 })
+    expect((b.doc as any).services.dhw).toMatchObject({ storage_setpoint_c: 60, tap_outlet_temp_c: 43, cold_supply_temp_c: 10, demand_basis: 'per_person', litres_per_person_per_day: 50, litres_per_m2_per_day: null, circulation_pump_w: 0, load_shape: 'flat' })
     expect(b.notes.some((n) => /Hot water/.test(n))).toBe(false)
   })
 })

@@ -137,9 +137,9 @@ export type SpaceType = {
  * site exposure. */
 export type BuildingInputs = { q50: number | null; tb_multiplier: number | null; exposure: 'sheltered' | 'normal' | 'exposed' | null }
 /** Hot water, for the whole building (the schema's service-level fields): stored, tap and cold-supply temperatures,
- * daily demand per person or per m² of floor, and a circulation pump. Typed; null is not stated. */
-export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c: number | null; basis: 'per_person' | 'per_m2' | null; litres: number | null; pump_w: number | null }
-export const noDhw = (): DhwInputs => ({ storage_c: null, tap_c: null, cold_c: null, basis: null, litres: null, pump_w: null })
+ * daily demand per person or per m² of floor, a circulation pump, and when it is used (shown as 'flat' until changed). Typed; null is not stated. */
+export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c: number | null; basis: 'per_person' | 'per_m2' | null; litres: number | null; pump_w: number | null; shape?: 'flat' | 'follow_occupancy' | null }
+export const noDhw = (): DhwInputs => ({ storage_c: null, tap_c: null, cold_c: null, basis: null, litres: null, pump_w: null, shape: 'flat' })
 export const noBuildingInputs = (): BuildingInputs => ({ q50: null, tb_multiplier: null, exposure: null })
 
 export type Plan = {

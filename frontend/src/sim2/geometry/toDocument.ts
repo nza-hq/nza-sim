@@ -333,7 +333,7 @@ export function buildDocument(plan: Plan): Built {
 
   const bi = plan.building ?? noBuildingInputs()
   const hw = plan.dhw ?? noDhw()
-  if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && [hw.storage_c, hw.tap_c, hw.cold_c, hw.basis, hw.litres].some((v) => v == null)) notes.push('Hot water: a system is given but its temperatures or daily demand are not all stated (Systems, Hot water)')
+  if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && ([hw.storage_c, hw.tap_c, hw.cold_c, hw.basis, hw.litres].some((v) => v == null) || hw.shape === null)) notes.push('Hot water: a system is given but its temperatures or daily demand or when it is used are not all stated (Systems, Hot water)')
   const zones = used.map((z) => ({
     id: z.id,
     name: z.name,
@@ -415,7 +415,7 @@ export function buildDocument(plan: Plan): Built {
     services: {
       heating: { setpoint_mode: 'follow_comfort', setpoint_c: null },
       cooling: { setpoint_mode: 'follow_comfort', setpoint_c: null },
-      dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, demand_basis: hw.basis, litres_per_person_per_day: hw.basis === 'per_person' ? hw.litres : null, litres_per_m2_per_day: hw.basis === 'per_m2' ? hw.litres : null, load_shape: null, circulation_pump_w: hw.pump_w },
+      dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, demand_basis: hw.basis, litres_per_person_per_day: hw.basis === 'per_person' ? hw.litres : null, litres_per_m2_per_day: hw.basis === 'per_m2' ? hw.litres : null, load_shape: hw.shape === undefined ? 'flat' : hw.shape, circulation_pump_w: hw.pump_w },
     },
     profiles,
     weather_ref: { kind: 'legacy', id: 'unassigned' },
