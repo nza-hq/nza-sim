@@ -1,0 +1,771 @@
+{
+ "source": "scripts/104_anchor_zones.mts",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "options": {
+  "control": "air",
+  "hc_convective_fraction": 1,
+  "warmup_days": 25,
+  "solar": {
+   "albedo": 0.2,
+   "sun_day": "actual",
+   "solar_time": "apparent",
+   "sky": "perez"
+  },
+  "other_gains": null,
+  "surface_physics": {
+   "outside_convection": "fixed",
+   "inside_convection": "by_tilt",
+   "beam_on_floor": true
+  },
+  "glazing_solar": "optical",
+  "solar_convective_fraction": 0
+ },
+ "five_zones": {
+  "engine2": {
+   "heating_mwh": 91.2067,
+   "cooling_mwh": 14.8917,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.9405,
+     "cooling_mwh": 1.4316,
+     "heating_monthly_mwh": [
+      5.19,
+      3.9814,
+      3.5788,
+      1.3195,
+      0.15,
+      0,
+      0,
+      0,
+      0.0689,
+      1.9683,
+      3.7998,
+      4.8839
+     ],
+     "cooling_monthly_mwh": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.3031,
+      1.091,
+      0.0374,
+      0,
+      0,
+      0,
+      0
+     ],
+     "interzone_mwh": 4.5972,
+     "bridging_w_per_k": 94.234,
+     "infiltration_ach": 0.112748
+    },
+    "z2": {
+     "heating_mwh": 13.5514,
+     "cooling_mwh": 3.6858,
+     "heating_monthly_mwh": [
+      3.1884,
+      2.2815,
+      1.8556,
+      0.2801,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.7081,
+      2.2047,
+      3.033
+     ],
+     "cooling_monthly_mwh": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.9848,
+      1.9503,
+      0.7489,
+      0.0018,
+      0,
+      0,
+      0
+     ],
+     "interzone_mwh": -2.0922,
+     "bridging_w_per_k": 41.5732,
+     "infiltration_ach": 0.040248
+    },
+    "z3": {
+     "heating_mwh": 13.215,
+     "cooling_mwh": 4.2435,
+     "heating_monthly_mwh": [
+      3.136,
+      2.2353,
+      1.8096,
+      0.2557,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.6428,
+      2.1568,
+      2.9787
+     ],
+     "cooling_monthly_mwh": [
+      0,
+      0,
+      0,
+      0,
+      0.0379,
+      1.2323,
+      2.0282,
+      0.8675,
+      0.0776,
+      0,
+      0,
+      0
+     ],
+     "interzone_mwh": -1.0186,
+     "bridging_w_per_k": 41.5732,
+     "infiltration_ach": 0.040248
+    },
+    "z4": {
+     "heating_mwh": 13.8303,
+     "cooling_mwh": 3.7589,
+     "heating_monthly_mwh": [
+      3.2472,
+      2.3283,
+      1.903,
+      0.3014,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.7289,
+      2.2415,
+      3.0802
+     ],
+     "cooling_monthly_mwh": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      1.0279,
+      1.9531,
+      0.7717,
+      0.0062,
+      0,
+      0,
+      0
+     ],
+     "interzone_mwh": -2.2547,
+     "bridging_w_per_k": 41.5732,
+     "infiltration_ach": 0.040248
+    },
+    "z5": {
+     "heating_mwh": 25.6695,
+     "cooling_mwh": 1.772,
+     "heating_monthly_mwh": [
+      5.3652,
+      4.1042,
+      3.6857,
+      1.4325,
+      0.189,
+      0,
+      0,
+      0,
+      0.1142,
+      1.9318,
+      3.8739,
+      4.973
+     ],
+     "cooling_monthly_mwh": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0.3999,
+      1.2266,
+      0.1455,
+      0,
+      0,
+      0,
+      0
+     ],
+     "interzone_mwh": 0.7682,
+     "bridging_w_per_k": 59.1268,
+     "infiltration_ach": 0.112748
+    }
+   },
+   "solver": {
+    "nodes": 233,
+    "active_set": {
+     "max_passes": 1,
+     "hours_over_one": 0
+    }
+   },
+   "run_ms": 684
+  },
+  "vs": {
+   "r2_z": {
+    "referee": {
+     "heating_mwh": 90.184,
+     "cooling_mwh": 13.805
+    },
+    "heating_pct": 1.1,
+    "cooling_pct": 7.9,
+    "zones": [
+     {
+      "zone": "z1",
+      "heating": [
+       24.94,
+       23.71
+      ],
+      "cooling": [
+       1.43,
+       1.09
+      ],
+      "interzone": [
+       4.6,
+       4.7751
+      ]
+     },
+     {
+      "zone": "z2",
+      "heating": [
+       13.55,
+       14.12
+      ],
+      "cooling": [
+       3.69,
+       3.05
+      ],
+      "interzone": [
+       -2.09,
+       -3.4128
+      ]
+     },
+     {
+      "zone": "z3",
+      "heating": [
+       13.22,
+       13.5
+      ],
+      "cooling": [
+       4.24,
+       3.77
+      ],
+      "interzone": [
+       -1.02,
+       -1.7777
+      ]
+     },
+     {
+      "zone": "z4",
+      "heating": [
+       13.83,
+       14.36
+      ],
+      "cooling": [
+       3.76,
+       3.65
+      ],
+      "interzone": [
+       -2.25,
+       -2.9274
+      ]
+     },
+     {
+      "zone": "z5",
+      "heating": [
+       25.67,
+       24.49
+      ],
+      "cooling": [
+       1.77,
+       2.25
+      ],
+      "interzone": [
+       0.77,
+       3.435
+      ]
+     }
+    ]
+   },
+   "r2_z_e2like": {
+    "referee": {
+     "heating_mwh": 93.336,
+     "cooling_mwh": 14.423
+    },
+    "heating_pct": -2.3,
+    "cooling_pct": 3.2,
+    "zones": [
+     {
+      "zone": "z1",
+      "heating": [
+       24.94,
+       25.01
+      ],
+      "cooling": [
+       1.43,
+       1.48
+      ],
+      "interzone": [
+       4.6,
+       4.6507
+      ]
+     },
+     {
+      "zone": "z2",
+      "heating": [
+       13.55,
+       14.1
+      ],
+      "cooling": [
+       3.69,
+       3.56
+      ],
+      "interzone": [
+       -2.09,
+       -2.3565
+      ]
+     },
+     {
+      "zone": "z3",
+      "heating": [
+       13.22,
+       13.59
+      ],
+      "cooling": [
+       4.24,
+       4.07
+      ],
+      "interzone": [
+       -1.02,
+       -1.1247
+      ]
+     },
+     {
+      "zone": "z4",
+      "heating": [
+       13.83,
+       14.26
+      ],
+      "cooling": [
+       3.76,
+       3.62
+      ],
+      "interzone": [
+       -2.25,
+       -2.3892
+      ]
+     },
+     {
+      "zone": "z5",
+      "heating": [
+       25.67,
+       26.37
+      ],
+      "cooling": [
+       1.77,
+       1.7
+      ],
+      "interzone": [
+       0.77,
+       1.276
+      ]
+     }
+    ]
+   },
+   "r2": {
+    "referee": {
+     "heating_mwh": 89.821,
+     "cooling_mwh": 13.264
+    },
+    "heating_pct": 1.5,
+    "cooling_pct": 12.3,
+    "zones": [
+     {
+      "zone": "z1",
+      "heating": [
+       24.94,
+       18.78
+      ],
+      "cooling": [
+       1.43,
+       1.46
+      ],
+      "interzone": [
+       4.6,
+       3.0333
+      ]
+     },
+     {
+      "zone": "z2",
+      "heating": [
+       13.55,
+       15.88
+      ],
+      "cooling": [
+       3.69,
+       2.9
+      ],
+      "interzone": [
+       -2.09,
+       -2.2004
+      ]
+     },
+     {
+      "zone": "z3",
+      "heating": [
+       13.22,
+       15.55
+      ],
+      "cooling": [
+       4.24,
+       3.3
+      ],
+      "interzone": [
+       -1.02,
+       -1.3038
+      ]
+     },
+     {
+      "zone": "z4",
+      "heating": [
+       13.83,
+       16.58
+      ],
+      "cooling": [
+       3.76,
+       3.17
+      ],
+      "interzone": [
+       -2.25,
+       -2.6486
+      ]
+     },
+     {
+      "zone": "z5",
+      "heating": [
+       25.67,
+       23.03
+      ],
+      "cooling": [
+       1.77,
+       2.44
+      ],
+      "interzone": [
+       0.77,
+       3.2116
+      ]
+     }
+    ]
+   },
+   "r1_z": {
+    "referee": {
+     "heating_mwh": 89.757,
+     "cooling_mwh": 13.434
+    },
+    "heating_pct": 1.6,
+    "cooling_pct": 10.9,
+    "zones": [
+     {
+      "zone": "z1",
+      "heating": [
+       24.94,
+       23.66
+      ],
+      "cooling": [
+       1.43,
+       1.09
+      ],
+      "interzone": [
+       4.6,
+       4.822
+      ]
+     },
+     {
+      "zone": "z2",
+      "heating": [
+       13.55,
+       14.04
+      ],
+      "cooling": [
+       3.69,
+       2.95
+      ],
+      "interzone": [
+       -2.09,
+       -3.4213
+      ]
+     },
+     {
+      "zone": "z3",
+      "heating": [
+       13.22,
+       13.4
+      ],
+      "cooling": [
+       4.24,
+       3.68
+      ],
+      "interzone": [
+       -1.02,
+       -1.7759
+      ]
+     },
+     {
+      "zone": "z4",
+      "heating": [
+       13.83,
+       14.26
+      ],
+      "cooling": [
+       3.76,
+       3.56
+      ],
+      "interzone": [
+       -2.25,
+       -2.9244
+      ]
+     },
+     {
+      "zone": "z5",
+      "heating": [
+       25.67,
+       24.4
+      ],
+      "cooling": [
+       1.77,
+       2.16
+      ],
+      "interzone": [
+       0.77,
+       3.4362
+      ]
+     }
+    ]
+   },
+   "r1_tbz": {
+    "referee": {
+     "heating_mwh": 89.351,
+     "cooling_mwh": 13.022
+    },
+    "heating_pct": 2.1,
+    "cooling_pct": 14.4,
+    "zones": [
+     {
+      "zone": "z1",
+      "heating": [
+       24.94,
+       20.87
+      ],
+      "cooling": [
+       1.43,
+       1.28
+      ],
+      "interzone": [
+       4.6,
+       4.1851
+      ]
+     },
+     {
+      "zone": "z2",
+      "heating": [
+       13.55,
+       15.76
+      ],
+      "cooling": [
+       3.69,
+       2.71
+      ],
+      "interzone": [
+       -2.09,
+       -2.9304
+      ]
+     },
+     {
+      "zone": "z3",
+      "heating": [
+       13.22,
+       15.11
+      ],
+      "cooling": [
+       4.24,
+       3.27
+      ],
+      "interzone": [
+       -1.02,
+       -1.4732
+      ]
+     },
+     {
+      "zone": "z4",
+      "heating": [
+       13.83,
+       15.98
+      ],
+      "cooling": [
+       3.76,
+       3.21
+      ],
+      "interzone": [
+       -2.25,
+       -2.5177
+      ]
+     },
+     {
+      "zone": "z5",
+      "heating": [
+       25.67,
+       21.64
+      ],
+      "cooling": [
+       1.77,
+       2.56
+      ],
+      "interzone": [
+       0.77,
+       2.8898
+      ]
+     }
+    ]
+   },
+   "r1": {
+    "referee": {
+     "heating_mwh": 89.349,
+     "cooling_mwh": 12.88
+    },
+    "heating_pct": 2.1,
+    "cooling_pct": 15.6,
+    "zones": [
+     {
+      "zone": "z1",
+      "heating": [
+       24.94,
+       18.72
+      ],
+      "cooling": [
+       1.43,
+       1.46
+      ],
+      "interzone": [
+       4.6,
+       3.0864
+      ]
+     },
+     {
+      "zone": "z2",
+      "heating": [
+       13.55,
+       15.78
+      ],
+      "cooling": [
+       3.69,
+       2.8
+      ],
+      "interzone": [
+       -2.09,
+       -2.2067
+      ]
+     },
+     {
+      "zone": "z3",
+      "heating": [
+       13.22,
+       15.44
+      ],
+      "cooling": [
+       4.24,
+       3.2
+      ],
+      "interzone": [
+       -1.02,
+       -1.3016
+      ]
+     },
+     {
+      "zone": "z4",
+      "heating": [
+       13.83,
+       16.47
+      ],
+      "cooling": [
+       3.76,
+       3.06
+      ],
+      "interzone": [
+       -2.25,
+       -2.6482
+      ]
+     },
+     {
+      "zone": "z5",
+      "heating": [
+       25.67,
+       22.93
+      ],
+      "cooling": [
+       1.77,
+       2.36
+      ],
+      "interzone": [
+       0.77,
+       3.2232
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "one_zone_slabs_as_mass": {
+  "engine2": {
+   "heating_mwh": 90.7505,
+   "cooling_mwh": 14.1022,
+   "solver": {
+    "nodes": 85,
+    "active_set": {
+     "max_passes": 1,
+     "hours_over_one": 0
+    }
+   }
+  },
+  "vs": {
+   "r2_one_zone": {
+    "referee": {
+     "heating_mwh": 89.773,
+     "cooling_mwh": 13.029
+    },
+    "heating_pct": 1.1,
+    "cooling_pct": 8.2
+   },
+   "r2_one_zone_e2like": {
+    "referee": {
+     "heating_mwh": 92.957,
+     "cooling_mwh": 13.689
+    },
+    "heating_pct": -2.4,
+    "cooling_pct": 3
+   },
+   "r1_one_zone": {
+    "referee": {
+     "heating_mwh": 89.322,
+     "cooling_mwh": 12.648
+    },
+    "heating_pct": 1.6,
+    "cooling_pct": 11.5
+   }
+  }
+ },
+ "gate": {
+  "against": "r2_z",
+  "heating_pct": 1.1,
+  "cooling_pct": 7.9,
+  "pass": true
+ }
+}

@@ -35,6 +35,13 @@ Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
   - **Hand cases.** Two zones and three zones in a row match their hand solutions in steady state. Three uncoupled copies equal the one-zone solver hour by hour. Internal mass follows the hand step recursion exactly.
   - **Cooled room against EnergyPlus.** The three Denver rooms (outer two heated at 20 °C, middle cooled at 24 °C) built from one shared spec are within ±10 % per room of EnergyPlus with the same surface coefficients: −3.7 %, +4.5 % and −3.5 %. Against EnergyPlus's own convection the heated rooms are +10 %; that is Brief 103's open convection finding, not a multi-zone effect.
   - **Finding.** Internal mass stores nothing at steady state but raises the steady heating 2.7 %, because it joins the room's long-wave exchange. The brief expected no change. This is recorded, not tuned.
+- **P5 Bridgewater five zones** ([`05_anchor_zones.md`](docs/audit/104/05_anchor_zones.md)):
+  - **Gate passed.** Engine 2 on the per-storey document gives 91.21 / 14.89 MWh against referee r2_z's 90.18 / 13.81: +1.1 % / +7.9 %. With Engine 2's surface simplifications in EnergyPlus the result is −2.3 % / +3.2 %, with every zone within 5 %. One zone with the slabs as internal mass gives +1.1 % / +8.2 %.
+  - **Three referee findings, each measured.** None is a tuning knob: each makes the referee build the building the document states.
+    - Bridging by zone.
+    - Infiltration by each zone's own envelope area. r0 gave every storey the building's rate, which caused the end-heavy, middle-light heating.
+    - Each slab as one construction from both sides. r0 used the carpet-first construction on both faces, and EnergyPlus warned. **This is in today's EnergyPlus assembler**, recorded and not changed (`nza_engine/` is out of scope).
+  - **What remains.** The rest of the cooling gap is Brief 103's open surface-coefficient forms. No engine change in this part.
 
 ## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
 
@@ -7475,6 +7482,7 @@ All checklist items:
 
 ## Suggestions
 
+- **Today's EnergyPlus assembler, interzone slabs (Brief 104 P5):** both faces of each slab pair get the same carpet-first `interior_floor_ceiling` construction, so each storey's floor has plaster as its inside face, and EnergyPlus warns "does not have the same materials in the reverse order". The upper face should get the reversed construction. Measured on Bridgewater r1 → r2: +0.47 MWh heating, +0.38 MWh cooling. `nza_engine/` was out of scope for 104; for the brief that next touches the assembler.
 - Report export to PowerPoint/PDF using NZA template
 - CIBSE TM54 benchmark integration — show building type comparison on Results dashboard
 - Multi-zone building types (office, retail, hotel mix)
