@@ -2,6 +2,9 @@
 
 **No active brief.** Brief 102a (Simulate v2 foundations: the QA fixes) CLOSED and merged 14 Nov 2026 (PR #27); 0004 applied and the anchor round trip verified on NZA Sim (dev). The next Simulate v2 brief (103) is written by the architect.
 
+**UI — adopt decodED's type system — CLOSED 15 Nov 2026 (PR to follow).**
+NZA Sim now uses decodED's faces and sizes: DM Sans for UI, Inter for figures, Stolzl for titles only. Root cause of "everything too big": the Tailwind v4 size tokens were in the wrong namespace, so ~1,600 size classes generated nothing. One shared file, `frontend/src/design-system/tokens.css`. Visual only; anchor 133.2 unchanged. Brief [`archive/ui-decoded-type-system_COMPLETED.md`](archive/ui-decoded-type-system_COMPLETED.md).
+
 **Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026; MERGED (PR #27).**
 The run key now pins the engine source (content hash, templates included) and the EPW bytes; the database stores and checks the client's canonical text, so float noise and huge numbers save; runs belong to their model version (no cross-organisation sharing); accepting an invitation never demotes. The anchor round trip checks the stored document and can be proved from the SQL editor. No engine change. Brief [`archive/102a_foundations-fixes_COMPLETED.md`](archive/102a_foundations-fixes_COMPLETED.md); evidence [`../audit/102a/`](../audit/102a/).
 

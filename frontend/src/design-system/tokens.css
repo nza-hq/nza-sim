@@ -1,0 +1,111 @@
+/* frontend/src/design-system/tokens.css — NZA Sim's one type-and-token file.
+
+   Adopts decodED's type system (nza-hq/nza-decoded: public/tokens.css, public/style.css's
+   Design System v0.1 ramp, src/twin/ui/ui.css) so NZA Sim and decodED read as one family:
+
+     Stolzl   display only: page titles, hero figures, the wordmark      (--font-display)
+     DM Sans  everything else: UI, labels, body                          (--font-sans)
+     Inter    figures: every `tabular-nums` number, chart ticks/values   (--font-figures)
+
+   Sizes are decodED's ramp (micro 11 · small 12/13 · detail 14 · h2 22), tightened one step for
+   NZA Sim's dense three-column modules.
+
+   Tailwind v4 note: font sizes MUST live in the `--text-*` namespace to generate utilities. The
+   old Pablo names (`--font-size-xxs` …) generated nothing, so ~1,600 `text-xxs` / `text-caption` /
+   `text-table` … classes silently fell back to one body size. That flat, all-Stolzl size is what
+   made the app feel big and samey. The class names are kept so no component has to change.
+
+   Shared: imported by src/index.css, so every route gets it, including the Simulate v2
+   prototypes under src/sim2/ (they render inside the same app). New work should use these
+   utilities and variables rather than literal sizes or font names. */
+
+@theme {
+  /* ── Faces ──────────────────────────────────────────────────────────────── */
+  --font-sans:    "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Stolzl", "DM Sans", system-ui, sans-serif;
+  --font-figures: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* legacy alias: some code reads the old name */
+  --font-family-sans: var(--font-sans);
+
+  /* ── Type ramp (size / line height) ─────────────────────────────────────── */
+  --text-xxs:                 11px;   /* micro: UPPERCASE labels, axis text, hints  (decodED micro 11/16) */
+  --text-xxs--line-height:    16px;
+  --text-panel:               12px;   /* body text inside side panels */
+  --text-panel--line-height:  18px;
+  --text-xs:                  12px;   /* compact controls, badges */
+  --text-xs--line-height:     16px;
+  --text-caption:             12px;   /* card labels, sidebar items, tab labels */
+  --text-caption--line-height: 18px;
+  --text-table:               12px;   /* table cells */
+  --text-table--line-height:  18px;
+  --text-body:                13px;   /* base body text                             (decodED small 13/20) */
+  --text-body--line-height:   20px;
+  --text-subsection:          13px;   /* subsection headings (use with font-semibold) */
+  --text-subsection--line-height: 20px;
+  --text-section:             14px;   /* section headings                           (decodED detail 14) */
+  --text-section--line-height: 20px;
+  --text-heading:             18px;   /* module headings, Stolzl */
+  --text-heading--line-height: 24px;
+  --text-page-title:          22px;   /* page titles, Stolzl                        (decodED h2 22/30) */
+  --text-page-title--line-height: 28px;
+  --text-metric:              20px;   /* data card values */
+  --text-metric--line-height: 26px;
+  --text-metric-lg:           26px;   /* hero metrics */
+  --text-metric-lg--line-height: 32px;
+
+  /* ── decodED "Assembly" colours, available as utilities for new work
+        (bg-surface, text-ink, border-line, bg-act, text-select …). NZA Sim's own
+        Pablo palette in index.css is unchanged. ───────────────────────────── */
+  --color-cream:     #F5F4F1;   /* page ground */
+  --color-surface:   #FFFFFF;   /* panels, cards */
+  --color-ink:       #2A2A2A;   /* primary text */
+  --color-ink-soft:  #62625F;   /* secondary text */
+  --color-ink-faint: #6F6F6B;   /* captions, disabled */
+  --color-line:      #E5E1D8;   /* hairlines */
+  --color-act:       #235546;   /* decodED green: primary actions, active state */
+  --color-select:    #E28F2C;   /* decodED orange: the selection */
+  --color-neutral:   #CBCAC5;   /* other / no data */
+
+  /* ── Shape and motion (decodED) ─────────────────────────────────────────── */
+  --radius-control: 8px;
+  --radius-panel:   12px;
+  --radius-pill:    999px;
+  --ease-standard:  cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-hover: 150ms;
+  --duration-panel: 180ms;
+}
+
+/* Old Pablo variable names, for any inline style that still reads them. */
+:root {
+  --font-size-xxs: var(--text-xxs);
+  --font-size-panel: var(--text-panel);
+  --font-size-xs: var(--text-xs);
+  --font-size-caption: var(--text-caption);
+  --font-size-table: var(--text-table);
+  --font-size-body: var(--text-body);
+  --font-size-subsection: var(--text-subsection);
+  --font-size-section: var(--text-section);
+  --font-size-page-title: var(--text-page-title);
+  --font-size-heading: var(--text-heading);
+  --font-size-metric: var(--text-metric);
+  --font-size-metric-lg: var(--text-metric-lg);
+}
+
+/* ── Roles that a size alone can't carry ─────────────────────────────────── */
+@layer utilities {
+  /* Figures are Inter (decodED): every tabular number, and the metric sizes. */
+  .tabular-nums,
+  .text-metric,
+  .text-metric-lg {
+    font-family: var(--font-figures);
+  }
+  /* Headings are Stolzl Medium with decodED's tight tracking. */
+  .text-heading,
+  .text-page-title {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  .font-display {
+    font-family: var(--font-display);
+  }
+}
