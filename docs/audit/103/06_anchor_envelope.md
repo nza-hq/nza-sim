@@ -8,6 +8,13 @@ and taking them out leaves 0.000 %.
 > Gate (b) moves to heating 89.98 (−0.5 %) and cooling 15.32 MWh (+12.2 %): still a miss, with the same diagnosis.
 > `06_anchor_envelope.json` holds the re-run. The tables below are the Part 6 run, kept as recorded. See
 > [`07_bestest_referee.md`](07_bestest_referee.md).
+>
+> **Independent review ([`09_review_response.md`](09_review_response.md)):**
+> - The heating pass is net of offsetting differences. The referee loses about 2.7 MWh more by infiltration and
+>   vents (outdoor air density against Engine 1's 0.33 Wh/m³K), and something in Engine 1 offsets it. So read the pass
+>   as agreement to about ±3 %.
+> - The slab diagnosis below is **consistent with** the cooling miss, not proven its cause. BESTEST 900, with one zone
+>   and no slabs, shows a same-sign residual. Open for 104.
 
 **Gate (b): heating passes, cooling misses.** Against the EnergyPlus referee, heating is −0.6 % and cooling is
 +13.1 % (15.45 against 13.65 MWh). Instrumentation places the cooling miss in the internal-mass representation. Engine

@@ -476,7 +476,9 @@ export async function fromBuildingConfig(input: ConverterInput): Promise<Convers
     reported_floor_area_m2: src.take(`${B}.reported_gia`, 'building.reported_floor_area_m2') ?? null,
     thermal_bridging: {
       mode: src.take(`${B}.thermal_bridges.mode`, 'building.thermal_bridging.mode') ?? null,
-      multiplier: src.take(`${B}.thermal_bridges.multiplier`, 'building.thermal_bridging.multiplier') ?? null,
+      // Today's auto mode reads a missing multiplier as 1 (thermalBridges.js 182); the document states it.
+      multiplier: src.take(`${B}.thermal_bridges.multiplier`, 'building.thermal_bridging.multiplier')
+        ?? (src.get(`${B}.thermal_bridges.mode`) === 'iso14683_auto' ? TODAY.bridging_multiplier : null),
       alpha_pct: src.take(`${B}.fabric.thermal_bridging_alpha_pct`, 'building.thermal_bridging.alpha_pct') ?? null,
     },
     thermal_mass: {

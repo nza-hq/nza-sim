@@ -86,6 +86,10 @@ inputs are refused.
 
 ## What the referee comparison uses: the beam on the floor, nothing else
 
+> **Open, not settled (independent review, finding 3).** The inside-convection call cuts both ways: by tilt gives a
+> sunlit floor 0.7 W/m²K, below EnergyPlus's TARP, just as by heat flow's 5.0 is above it. The set chosen is also the
+> nearest-landing set. See [`09_review_response.md`](09_review_response.md).
+
 The choice rests on what makes Engine 1 and EnergyPlus the same model. It does not rest on which row lands nearest.
 
 - **The beam on the floor: on.** Both referees put it there: FullInteriorAndExterior in the BESTEST twin and in the
@@ -103,8 +107,10 @@ The choice rests on what makes Engine 1 and EnergyPlus the same model. It does n
 
 ## Results with the referee options as now set
 
-- **BESTEST 600:** 4.547 / 5.628 MWh. Cooling is in range; heating is 0.04 above (4.504).
-- **BESTEST 900:** 2.186 / 2.755 MWh. Heating is 0.37 above range (1.814); cooling is 0.04 above (2.714).
+- **BESTEST 600:** 4.547 / 5.628 MWh. Cooling is in range; heating is 0.04 above (4.504). Peak heating 3.277 kW is in
+  range; **peak cooling 4.978 kW is below range (5.422–6.481)**.
+- **BESTEST 900:** 2.186 / 2.755 MWh. Heating is 0.37 above range (1.814); cooling is 0.04 above (2.714). **Peak
+  heating 2.827 kW is above range (max 2.778)**; peak cooling 2.847 kW is in range.
   - Against EnergyPlus with the same simplifications (2.082 / 2.370), the residual is +0.10 heating and +0.39
     cooling.
   - Still open: the inside long-wave network, the fixed 11 K sky, and the node count in heavy layers. Not chased in

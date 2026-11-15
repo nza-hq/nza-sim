@@ -26,6 +26,8 @@ export const TODAY = {
   vent_cd: 0.25,
   /** resolveFlowMode fallback (instantCalc.js 210). */
   vent_flow_mode: 'single_sided',
+  /** ISO 14683 auto-mode multiplier when none is set (thermalBridges.js 182, `tb.multiplier ?? 1.0`). */
+  bridging_multiplier: 1,
 } as const
 
 type Obj = Record<string, any>
@@ -47,6 +49,8 @@ export function upgradeDocument(input: unknown): ModelDocument {
       o.flow_mode ??= doc.building.opening_defaults?.flow_mode ?? TODAY.vent_flow_mode
     }
   }
+  const tb = doc.building.thermal_bridging
+  if (tb?.mode === 'iso14683_auto' && tb.multiplier == null) tb.multiplier = TODAY.bridging_multiplier
   for (const z of doc.zones as Obj[]) z.internal_heat_capacity_j_per_k_m2 = TODAY.internal_heat_capacity_j_per_k_m2
   doc.building.site.ground = { method: 'annual_mean_outdoor' }
   doc.schema_version = SCHEMA_VERSION

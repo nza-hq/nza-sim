@@ -24,7 +24,8 @@ import { REFEREE_OPTIONS, runZoneModel, type RunOptions } from '../model'
 import type { ConstructionBody } from '../elements'
 import type { Weather } from '../types'
 
-const MOS = path.resolve(__dirname, '../../../../../data/weather/reference/USA_CO_Denver.Intl.AP.725650_TMY3.mos')
+// Committed (validation/fixtures/weather/README.md), so this gate runs from a fresh checkout.
+const MOS = path.resolve(__dirname, '../../../../../validation/fixtures/weather/USA_CO_Denver.Intl.AP.725650_TMY3.mos')
 const MOS_SHA = '13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48'
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
@@ -118,8 +119,8 @@ const RANGES = {
 
 export const BESTEST_RESULTS: Record<string, unknown> = {}
 
-describe.skipIf(!fs.existsSync(MOS))('ASHRAE 140 / BESTEST (local weather; skipped when absent)', () => {
-  const weather = fs.existsSync(MOS) ? readMos(fs.readFileSync(MOS)) : (null as unknown as Weather)
+describe('ASHRAE 140 / BESTEST (committed reference weather)', () => {
+  const weather = readMos(fs.readFileSync(MOS))
   it('reads the pinned weather file', () => {
     expect(weather.sha256).toBe(MOS_SHA)
   })
@@ -142,8 +143,27 @@ describe.skipIf(!fs.existsSync(MOS))('ASHRAE 140 / BESTEST (local weather; skipp
       const verdict = Object.fromEntries((Object.keys(rg) as (keyof typeof rg)[]).map((k) => [k, `${got[k].toFixed(3)} ${got[k] < rg[k][0] ? 'BELOW' : got[k] > rg[k][1] ? 'ABOVE' : 'in'} [${rg[k][0]}, ${rg[k][1]}]`]))
       console.log(`BESTEST ${name}`, JSON.stringify(verdict))
       expect(r.closure.max_wh).toBeLessThanOrEqual(1)
+      // Rule 9: the displayed breakdown, demand included, sums to zero (runZoneModel also refuses a run where it does not).
+      expect(Math.abs(r.closure.sum_kwh)).toBeLessThan(1e-3)
       expect(got.heat).toBeCloseTo(RECORDED[name].heat, 3)
       expect(got.cool).toBeCloseTo(RECORDED[name].cool, 3)
     })
   }
 })
+
+describe('the engine refuses what it cannot carry', () => {
+  const fakeWeather = { hours: { count: 24 } } as unknown as Weather
+  it('a library y-factor other than 1, on an opaque element or glazing, naming the surface and the library item', () => {
+    const lib = { ...LIB, wall600: { ...LIB.wall600, y_factor: 1.15 } }
+    expect(() => runZoneModel(doc('wall600', 'floor600'), fakeWeather, lib, OPTIONS)).toThrow('surfaces[0].construction_ref (library "wall600").y_factor')
+    const d = doc('wall600', 'floor600')
+    const libG = { ...LIB, window600: { ...LIB.window600, y_factor: 1.1 } }
+    expect(() => runZoneModel(d, readMosOnce(), libG, OPTIONS)).toThrow('window600')
+  })
+  it('a y-factor of exactly 1 (no uplift) is accepted', () => {
+    const lib = { ...LIB, wall600: { ...LIB.wall600, y_factor: 1 } }
+    expect(runZoneModel(doc('wall600', 'floor600'), readMosOnce(), lib, OPTIONS).annual.heating_kwh).toBeCloseTo(4547, 0)
+  })
+})
+let mosCache: Weather | null = null
+function readMosOnce() { return (mosCache ??= readMos(fs.readFileSync(MOS))) }

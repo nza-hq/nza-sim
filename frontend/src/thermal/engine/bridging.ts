@@ -35,7 +35,8 @@ export function computeBridging(args: {
 }): Bridging {
   const { tb } = args
   if (tb.mode === 'iso14683_auto') {
-    const m = tb.multiplier ?? 1
+    const m = tb.multiplier
+    if (m == null) throw new BridgingError('required in iso14683_auto mode (the document states it; today reads none as 1)', 'building.thermal_bridging.multiplier')
     if (!(m > 0)) throw new BridgingError('multiplier must be > 0', 'building.thermal_bridging.multiplier')
     const p = args.polygon
     let perimeter = 0

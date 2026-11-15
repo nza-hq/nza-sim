@@ -85,6 +85,11 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
     envelopeArea += s.area_m2
     const ref = s.construction_ref
     const b = body(ref.key, path)
+    // A y-factor is a bridging allowance folded into U. Engine 1 takes bridging only from building.thermal_bridging,
+    // so a construction carrying one would count bridging twice (with ISO 14683 junctions) or apply it to glazing
+    // only (as Part 4 did). Refused until the document says how to carry it (review finding 4, recorded for 104).
+    const y = num(b.y_factor)
+    if (y != null && y !== 1) throw new ModelError(`y-factor ${y} is not carried by Engine 1: bridging comes from building.thermal_bridging only`, `${path}.construction_ref (library "${ref.key}").y_factor`)
     const solar = () => {
       if (s.tilt_deg > 90 + 1e-9) return new Float64Array(H)  // faces down: no sun reaches it in this model
       return solarOnSurface(weather, s.azimuth_deg ?? 0, s.tilt_deg, options.solar).total
@@ -92,7 +97,7 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
     if (s.kind === 'glazing') {
       if (s.zone_b !== 'outside') throw new ModelError('glazing must face outside in Engine 1', `${path}.zone_b`)
       const pub = num(b.u_value_W_per_m2K)
-      const u = num(ref.u_value_override) ?? (pub != null ? pub * (num(b.y_factor) && b.y_factor! > 0 ? b.y_factor! : 1) : null)
+      const u = num(ref.u_value_override) ?? pub
       if (u == null) throw new ModelError('glazing needs a U (override or library u_value_W_per_m2K)', `${path}.construction_ref`)
       const g = num(ref.g_value_override) ?? num(s.g_value) ?? num(b.g_value)
       if (g == null) throw new ModelError('glazing needs a g-value (override, surface or library)', `${path}.g_value`)
@@ -196,6 +201,7 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
     const t = run.theta_air[h]; mn = Math.min(mn, t); mx = Math.max(mx, t); mean += t / H
     maxClosure = Math.max(maxClosure, run.closure_wh[h])
   }
+  const closure = checkClosure(lines, maxClosure)
   return {
     engine: 'thermal-1', zone_id: zone.id, constants: K,
     conductances: {
@@ -211,7 +217,25 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
       theta_air_c: { min: mn, max: mx, mean },
     },
     breakdown: lines,
-    closure: { max_wh: maxClosure, sum_kwh: lines.reduce((s, l) => s + l.kwh, 0) },
+    closure,
     run_ms: now() - t0,
   }
+}
+
+/** Largest hourly residual a run may have, Wh: |Σ terms − demand − Δstorage| (brief: "fails loudly"). */
+export const CLOSURE_MAX_WH = 1
+
+/**
+ * Refuses a result whose balance does not close (CLAUDE.md Rule 9, integrand against display). Two checks:
+ * - every hour, the solver's own terms sum to the storage change within CLOSURE_MAX_WH;
+ * - over the year, the displayed breakdown lines (demand included) sum to zero within rounding, so a term computed
+ *   but missing from the breakdown, or shown but not computed, fails here rather than passing silently.
+ */
+export function checkClosure(lines: readonly BreakdownLine[], maxHourlyWh: number): { max_wh: number; sum_kwh: number } {
+  if (!(maxHourlyWh <= CLOSURE_MAX_WH)) throw new ModelError(`the hourly balance misses by ${maxHourlyWh} Wh (limit ${CLOSURE_MAX_WH})`, 'closure.max_wh')
+  let sum = 0, gross = 0
+  for (const l of lines) { sum += l.kwh; gross += Math.abs(l.kwh) }
+  const tol = 1e-9 * gross + 1e-3
+  if (!(Math.abs(sum) <= tol)) throw new ModelError(`the breakdown lines sum to ${sum} kWh, not zero (tolerance ${tol}): a term is missing from the display or from the balance`, 'closure.sum_kwh')
+  return { max_wh: maxHourlyWh, sum_kwh: sum }
 }

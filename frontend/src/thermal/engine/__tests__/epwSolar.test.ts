@@ -127,6 +127,13 @@ describe('solarOnSurface', () => {
 })
 
 const ANCHOR_EPW = path.resolve(__dirname, '../../../../../data/weather/current/GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw')
+// The anchor EPW is project weather in the gitignored data/ folder. Without it this block skips and says so; with
+// NZA_REQUIRE_REFERENCE_DATA=1 its absence fails the run instead (Brief 103 review, finding 5).
+const requireReference = process.env.NZA_REQUIRE_REFERENCE_DATA === '1'
+if (!fs.existsSync(ANCHOR_EPW)) {
+  if (requireReference) throw new Error(`NZA_REQUIRE_REFERENCE_DATA=1 but the anchor EPW is missing: ${ANCHOR_EPW}`)
+  console.warn(`SKIPPED: the anchor EPW gate (no ${ANCHOR_EPW}). Set NZA_REQUIRE_REFERENCE_DATA=1 to make this a failure.`)
+}
 describe.skipIf(!fs.existsSync(ANCHOR_EPW))('the anchor EPW (local data; skipped when absent)', () => {
   it('parses with the pinned sha256 and matches today\'s solar on the anchor\'s facades (orientation 42°)', async () => {
     const w = await parseEpw(new Uint8Array(fs.readFileSync(ANCHOR_EPW)))

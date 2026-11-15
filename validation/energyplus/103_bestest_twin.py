@@ -39,7 +39,7 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-MOS = REPO / "data/weather/reference/USA_CO_Denver.Intl.AP.725650_TMY3.mos"
+MOS = REPO / "validation/fixtures/weather/USA_CO_Denver.Intl.AP.725650_TMY3.mos"
 MOS_SHA = "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48"
 OUT = REPO / "docs/audit/103/bestest_energyplus.json"
 MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
