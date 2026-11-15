@@ -386,8 +386,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   }
   // A setback (a lower heating setpoint outside stated hours) is not modelled until Brief 109: refused, not ignored.
   doc.zones.forEach((z, zi) => {
-    if (z.setpoints.setback_c != null) throw new ModelError('a heating setback is not modelled yet (Brief 109)', `zones[${zi}].setpoints.setback_c`)
-    if (z.setpoints.hours_ref != null) throw new ModelError('setpoint hours are not modelled yet (Brief 109)', `zones[${zi}].setpoints.hours_ref`)
+    if (z.setpoints.setback_c != null) throw new ModelError('setbacks (a lower night setpoint) are not modelled yet', `zones[${zi}].setpoints.setback_c`)
+    if (z.setpoints.hours_ref != null) throw new ModelError('setpoints that change by the hour are not modelled yet', `zones[${zi}].setpoints.hours_ref`)
   })
   // Emitters per zone (Brief 108): a zone that states them is limited to their output, and their radiant share sets
   // how heating reaches the room. A zone that states none is not limited, as before.
@@ -396,6 +396,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     if (e instanceof EmitterError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
     throw e
   }
+  // Review F8: a mode parameter that is not one of its values is refused, never read as the default (CLAUDE.md lesson 11).
+  if (options.emitter_limit != null && options.emitter_limit !== 'cap' && options.emitter_limit !== 'none') throw new ModelError(`unknown emitter_limit "${String(options.emitter_limit)}"`, 'options.emitter_limit')
   const capOf = (zi: number) => (options.emitter_limit === 'none' ? null : emit[zi]?.cap_w ?? null)
   const hcfHeatOf = (zi: number) => (emit[zi] ? 1 - emit[zi]!.radiant_fraction : null)
   const gainsIn = (zi: number) => {

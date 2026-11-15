@@ -55,3 +55,34 @@ editor has been told.
 - the what-if refusal.
 
 The full suite has 212 tests and they pass. `npm run build` is clean.
+
+## Browser check on the editor's fixture (15 Nov, after the editor placed the component)
+
+Branch `sim2/110-model-workspace` at 8a837c2, run in a scratch worktree at 1440×900 and never pushed. The steps:
+
+1. `/model`, then the two-zone fixture through `window.sim2.loadPlan`.
+2. Yeovilton TMYx through the file input.
+3. Systems, then Heating: the VRF heating system set to "Air Source Heat Pump — Space Heating" at 45/40 °C and applied to
+   the whole building.
+4. Emitters: one radiator per room, rated 2 kW at 75/65/20 °C, n 1.3, 30 % radiant, applied to the whole building.
+
+There were no page errors.
+
+| | Zone 1 (21 °C) | Zone 2 (16 °C) |
+|---|---|---|
+| Output at 45/40 | 0.7 kW | 0.9 kW |
+| Peak need | 3.6 kW | 1.2 kW |
+| Hours below / lowest | 5,280 h / 12.0 °C | 472 h / 13.3 °C |
+| Rating needed | 10.7 kW | 2.8 kW |
+| Output at 55/45 | 1.0 kW | 1.2 kW |
+| Hours below at 55/45 | 4,102 h | 0 h |
+
+**Checks:**
+- **By hand.** 2,000 × (LMTD(45,40,21) / 49.83)^1.3 = 2,000 × 0.334 = 667 W. With the room at 16 °C it is 877 W.
+- **Against the document.** The same document (`window.sim2.getDocument()`) run through `simulate` in Node gives
+  667 / 877 W, 5,280 / 472 h and 10,665 / 2,772 W. This matches the page to the figure.
+- **Building.** 6.7 MWh heating at 45/40 against 7.9 MWh at 55/45.
+
+**One fault found and fixed.** At 55/45, Zone 2 was 9.6 W short with 0 hours below, and showed "0.0 kW short". A
+shortfall under 50 W now reads "under 0.1 kW". There is a test for it. Screenshots: `05_editor_45_40.png` and
+`05_editor_compare.png`, taken before the review wording below.

@@ -101,6 +101,12 @@ export interface ZoneSizing {
   needed_rated_w: number | null
   /** Why `needed_rated_w` is null, in words. */
   note: string | null
+  /**
+   * Review F7: heating systems that serve the zone but have none of its listed emitters (a wet system no emitter here
+   * names; or a system without design temperatures where the zone lists no fixed-output unit). The zone's heat is
+   * still limited to the emitters that are listed, so this is said beside the figures.
+   */
+  unlisted_systems: string[]
 }
 
 /**
@@ -120,7 +126,12 @@ export function zoneSizing(doc: ModelDocument, zi: number, em: ZoneEmitters, pea
     groups.add(e.system_group_id!); ns.add(e.exponent_n!)
     ratedNow += e.count! * ratedOutputAt(e.rated_output_w!, e.exponent_n!, { flow_c: e.rated_flow_c!, return_c: e.rated_return_c!, room_c: e.rated_room_c! }, EN442_STANDARD)
   })
-  const base = { cap_w: em.cap_w, peak_w, shortfall_w: Math.max(0, peak_w - em.cap_w) }
+  const hasFixed = zone.emitters.some((e) => FIXED_OUTPUT_KINDS.includes(e.kind))
+  const unlisted = doc.system_groups
+    .filter((g) => g.service === 'heating' && g.enabled && g.zones.includes(zone.id))
+    .filter((g) => !(zone.emitters.some((e) => e.system_group_id === g.id) || (g.design_flow_c == null && hasFixed)))
+    .map((g) => g.label || g.id)
+  const base = { cap_w: em.cap_w, peak_w, shortfall_w: Math.max(0, peak_w - em.cap_w), unlisted_systems: unlisted }
   if (groups.size === 0) return { ...base, design: null, rated_now_w: null, needed_rated_w: null, note: 'Only fixed-output emitters (VRF indoor units or electric heaters): a larger unit is chosen by its stated output.' }
   const g = doc.system_groups.find((x) => x.id === [...groups][0])!
   const design = { flow_c: g.design_flow_c!, return_c: g.design_return_c!, room_c: room }

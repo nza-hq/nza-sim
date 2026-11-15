@@ -25,7 +25,7 @@ import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine
 import { zoneSizing, type ZoneSizing } from '../../thermal/engine/emitters'
 import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
-  readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingPeakW, type BreakdownLine, type ModelResults,
+  readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
 import { ModelDocument } from '../../thermal/schema/model'
 import { upgradeDocument } from '../../thermal/schema/upgrade'
@@ -290,18 +290,18 @@ function emitterSummary(
   weather: WeatherChoice, whatIf: WhatIf | null,
 ): EmitterSummary | null {
   if (!doc.zones.some((z) => z.emitters.length > 0)) return null
-  const sized = (d: ModelDocument, capped: ModelResults): EmitterZone[] => {
-    const free = run(d, { ...options, emitter_limit: 'none' })
-    return capped.zones.flatMap((z, i) => {
+  const unlimited = (d: ModelDocument) => run(d, { ...options, emitter_limit: 'none' })
+  const sized = (d: ModelDocument, capped: ModelResults, free: ModelResults): EmitterZone[] =>
+    capped.zones.flatMap((z, i) => {
       if (!z.emitters) return []
       return [{
         id: z.zone_id, name: d.zones[i].name,
         ...zoneSizing(d, i, z.emitters, free.zones[i].annual.peak_heating_w),
-        unmet_hours: z.annual.unmet_heating_hours, min_c: z.annual.min_control_c, hours_at_cap: z.emitters.hours_at_cap,
+        unmet_hours: z.annual.unmet_heating_hours, min_c: readZoneMinControlC(z), hours_at_cap: z.emitters.hours_at_cap,
       }]
     })
-  }
-  const zones = sized(doc, results)
+  const free = unlimited(doc)
+  const zones = sized(doc, results, free)
   if (!whatIf) return { zones, what_if: null }
   const { design_flow_c: flow_c, design_return_c: return_c } = whatIf
   const w = structuredClone(doc)
@@ -316,7 +316,10 @@ function emitterSummary(
     if (m) return { zones, what_if: { ok: false, flow_c, return_c, missing: [m] } }
     throw e
   }
-  return { zones, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr), energy: energyOf(w, wr, weather) } }
+  // Review F10: unlimited, only the radiant share can differ between the two pairs (when a zone mixes fixed and wet
+  // emitters, the output weighting moves). Where no zone's share moves, the base run's peaks are the what-if's.
+  const same = results.zones.every((z, i) => Math.abs((z.emitters?.radiant_fraction ?? 0) - (wr.zones[i].emitters?.radiant_fraction ?? 0)) < 1e-12)
+  return { zones, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr, same ? free : unlimited(w)), energy: energyOf(w, wr, weather) } }
 }
 
 const SERVICE_WORDS: Record<string, string> = { heating: 'heating', cooling: 'cooling', dhw: 'hot water', lighting: 'lighting', small_power: 'small power', auxiliary: 'auxiliary' }

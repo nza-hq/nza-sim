@@ -14,6 +14,8 @@ import type { EmitterZone, Summary, WhatIf } from './seam'
 import './emitters.css'
 
 const kw = (w: number) => (w / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+/** A shortfall: a few watts still counts as short (the zone does dip), so it never reads "0.0 kW". */
+const shortKw = (w: number) => (w > 0 && w < 50 ? 'under 0.1' : kw(w))
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const deg = (c: number) => c.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const pair = (z: EmitterZone) => (z.design ? `${z.design.flow_c}/${z.design.return_c} °C` : 'their stated output')
@@ -24,7 +26,7 @@ function ZoneBlock({ z, other }: { z: EmitterZone; other: EmitterZone | null }) 
     <li className={short ? 'es-zone es-short' : 'es-zone'}>
       <div className="es-zone-head">
         <strong>{z.name}</strong>
-        <span>{short ? `${kw(z.shortfall_w)} kW short` : 'enough'}</span>
+        <span>{short ? `${shortKw(z.shortfall_w)} kW short` : 'enough'}</span>
       </div>
       <div className="es-bar" aria-hidden="true">
         <span style={{ width: `${Math.min(100, (z.cap_w / Math.max(z.peak_w, z.cap_w, 1)) * 100)}%` }} />
@@ -38,18 +40,23 @@ function ZoneBlock({ z, other }: { z: EmitterZone; other: EmitterZone | null }) 
       )}
       {z.needed_rated_w != null && z.design && (
         <p className="es-line es-need">
-          {short ? `Needs ${kw(z.shortfall_w)} kW more at ${pair(z)}: ` : 'At these temperatures, '}
+          {short ? `Needs ${shortKw(z.shortfall_w)} kW more at ${pair(z)}: ` : 'At these temperatures, '}
           {kw(z.needed_rated_w)} kW rated at ΔT 50 (75/65/20 °C){z.rated_now_w != null ? `, against ${kw(z.rated_now_w)} kW there now` : ''}.
         </p>
       )}
       {z.note && <p className="es-line es-muted">{z.note}</p>}
+      {z.unlisted_systems.length > 0 && (
+        <p className="es-line es-muted">
+          Also heated by {z.unlisted_systems.map((n) => `"${n}"`).join(' and ')}, with no emitters listed here: the room gets only what the listed emitters give.
+        </p>
+      )}
       {other && (
         <table className="rp-table es-compare">
           <thead><tr><th /><th>{pair(z)}</th><th>{pair(other)}</th></tr></thead>
           <tbody>
             <tr><td>Peak need</td><td>{kw(z.peak_w)} kW</td><td>{kw(other.peak_w)} kW</td></tr>
             <tr><td>Emitters give</td><td>{kw(z.cap_w)} kW</td><td>{kw(other.cap_w)} kW</td></tr>
-            <tr><td>Short</td><td>{kw(z.shortfall_w)} kW</td><td>{kw(other.shortfall_w)} kW</td></tr>
+            <tr><td>Short</td><td>{shortKw(z.shortfall_w)} kW</td><td>{shortKw(other.shortfall_w)} kW</td></tr>
             <tr><td>Hours below</td><td>{z.unmet_hours ?? 0}</td><td>{other.unmet_hours ?? 0}</td></tr>
             <tr><td>Lowest</td><td>{deg(z.min_c)} °C</td><td>{deg(other.min_c)} °C</td></tr>
             {z.needed_rated_w != null && other.needed_rated_w != null && (
@@ -73,7 +80,10 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
   const shortCount = em.zones.filter((z) => z.shortfall_w > 0).length
   const f = Number(flow), r = Number(ret)
   const valid = flow.trim() !== '' && ret.trim() !== '' && Number.isFinite(f) && Number.isFinite(r) && f >= r
-  const firstPair = em.zones.find((z) => z.design)?.design
+  // Review F6: one heading only when every zone's emitters run at one pair; otherwise "as designed".
+  const pairs = new Set(em.zones.filter((z) => z.design).map((z) => `${z.design!.flow_c}/${z.design!.return_c} °C`))
+  const baseHead = pairs.size === 1 ? [...pairs][0] : 'As designed'
+  const unmetAt = (zs: EmitterZone[]) => zs.reduce((a, z) => a + (z.unmet_hours ?? 0), 0)
 
   return (
     <section className="es" aria-label="Emitters">
@@ -87,7 +97,10 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
           its heating setpoint. The peak need is the zone's highest hourly heat with its emitters unlimited. Where the
           emitters give less, the zone runs colder and the hours more than 0.5 °C below the setpoint are counted. The
           rating needed is what would cover the peak at those temperatures, given at 75/65/20 °C as catalogues list it.
-          A heat pump's efficiency does not yet change with the flow temperature.
+          The output is taken with the room at its setpoint; a colder room draws more from the same emitters, so the
+          hours below are an upper bound. The peak is the coldest hour of the chosen weather file, not a design-day
+          calculation (BS EN 12831). The emitters' radiant share changes the heat needed: its annual heat is checked against
+          EnergyPlus (within 4 %), its hours below are not yet. A heat pump's efficiency does not yet change with the flow temperature.
         </p>
       )}
       <p className="es-sum">
@@ -96,6 +109,7 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
 
       <form className="es-whatif" onSubmit={(e) => { e.preventDefault(); if (valid) onWhatIf({ design_flow_c: f, design_return_c: r }) }}>
         <span className="rp-label">Compare at another flow / return</span>
+        <span className="es-hint">Every heating system with flow and return temperatures moves to this pair; the systems and their efficiency stay as they are.</span>
         <label>Flow <input type="number" inputMode="decimal" value={flow} onChange={(e) => setFlow(e.target.value)} aria-label="Flow temperature, °C" /> °C</label>
         <label>Return <input type="number" inputMode="decimal" value={ret} onChange={(e) => setRet(e.target.value)} aria-label="Return temperature, °C" /> °C</label>
         <button type="submit" className="rp-btn" disabled={!valid}>Compare</button>
@@ -104,9 +118,9 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
       {wi && !wi.ok && (
         <div className="rp-missing"><p>{wi.flow_c}/{wi.return_c} °C cannot be compared:</p><ul>{wi.missing.map((m) => <li key={m.path}>{m.what}</li>)}</ul></div>
       )}
-      {wi?.ok && firstPair && (
+      {wi?.ok && (
         <table className="rp-table es-compare es-building">
-          <thead><tr><th>Building</th><th>{firstPair.flow_c}/{firstPair.return_c} °C</th><th>{wi.flow_c}/{wi.return_c} °C</th></tr></thead>
+          <thead><tr><th>Building</th><th>{baseHead}</th><th>{wi.flow_c}/{wi.return_c} °C</th></tr></thead>
           <tbody>
             <tr><td>Zones short</td><td>{shortCount}</td><td>{wi.zones.filter((z) => z.shortfall_w > 0).length}</td></tr>
             <tr><td>Heating delivered</td><td>{mwh(summary.building.heating_kwh)} MWh</td><td>{mwh(wi.heating_kwh)} MWh</td></tr>
@@ -115,6 +129,13 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
             )}
           </tbody>
         </table>
+      )}
+      {/* Review F3: less energy at a pair where rooms run cold is heat not delivered, never a saving. */}
+      {wi?.ok && (unmetAt(em.zones) > 0 || unmetAt(wi.zones) > 0) && (
+        <p className="es-line es-warn">
+          {[unmetAt(em.zones) > 0 ? baseHead : null, unmetAt(wi.zones) > 0 ? `${wi.flow_c}/${wi.return_c} °C` : null].filter(Boolean).join(' and ')}: less heat
+          is delivered because rooms run colder. Lower energy there is not a saving.
+        </p>
       )}
 
       <ul className="es-zones">
