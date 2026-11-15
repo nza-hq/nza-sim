@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ProjectProvider } from './context/ProjectContext.jsx'
 import { SimulationProvider } from './context/SimulationContext.jsx'
@@ -42,6 +43,8 @@ import ChartComponentsTestPage from './pages/ChartComponentsTestPage.jsx'
 // Bespoke confirm dialog — mounted once at app root; module-scoped
 // `confirm()` from this file replaces all native window.confirm() calls.
 import ConfirmDialogHost from './components/shared/ConfirmDialog.jsx'
+// Simulate v2 geometry prototype: its own route, loaded only when visited, so today's tool is unchanged.
+const GeometryLab = lazy(() => import('./sim2/geometry/GeometryLab.tsx'))
 
 export default function App() {
   return (
@@ -54,6 +57,7 @@ export default function App() {
             <Routes>
               {/* Pop-out results window — standalone, no sidebar/topbar */}
               <Route path="/popout" element={<PopOutResults />} />
+              <Route path="/sim2/geometry" element={<ErrorBoundary moduleName="Geometry prototype"><Suspense fallback={null}><GeometryLab /></Suspense></ErrorBoundary>} />
 
               <Route element={<AppShell />}>
                 <Route path="/"          element={<ErrorBoundary moduleName="Home"><HomePage /></ErrorBoundary>} />
