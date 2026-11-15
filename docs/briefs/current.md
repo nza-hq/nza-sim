@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 107 — Simulate v2 Engine 4: systems by zone group, delivered energy by end use and fuel — ACTIVE 15 Nov 2026 on `chris/107-systems` (stacked on 106).**
+Delivered energy per system group from the zones' demand (proportional split, scalar efficiencies, DHW tap-mix, lighting and small power from the gains, fans), gated path by path against today's `computeSystemsDelivered`, a tolerance table against EnergyPlus, and delivered energy and EUI in the results panel. No change to today's engine. Brief [`active/107_systems.md`](active/107_systems.md). Claims: `frontend/src/thermal/engine/systems.ts`, `frontend/src/sim2/run/`.
+
 **Brief 106 — Simulate v2: the room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie).**
 Review F3 and F6 from Brief 105. Each zone's row in the results panel opens to its own balance, every term including heat from the other zones (zone lines close; interzone lines cancel across the building). A construction the document does not pin to its library version is refused and named. Run seam and panel only; anchor 133.2. Brief [`archive/106_zone-breakdown_COMPLETED.md`](archive/106_zone-breakdown_COMPLETED.md); evidence [`../audit/106/`](../audit/106/). **Next:** systems by zone group (design note Engine 4).
 
