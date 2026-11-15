@@ -38,6 +38,11 @@ export interface ZoneGain {
   profile_id: string
   w: Float64Array
   radiant_fraction: number
+  /**
+   * The electricity the profile draws, W per hour, before the gain fraction (Brief 107: what Systems meters). Null for
+   * occupancy. Heat and electricity are two quantities from one loop; neither is recomputed elsewhere.
+   */
+  electric_w: Float64Array | null
 }
 
 /** A zone's gains: each profile's, their total, and the hourly convective share of the total (0 when there is none). */
@@ -45,6 +50,8 @@ export interface ZoneGains {
   gains: ZoneGain[]
   total_w: Float64Array
   convective_fraction: Float64Array
+  /** Occupancy (Brief 107, for hot water): the zone's people at full presence × occupancy rate, and the hourly presence 0 to 1; null without an occupancy profile. */
+  occupancy: { people: number; presence: Float64Array } | null
 }
 
 const CUM_DAYS = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
@@ -152,6 +159,7 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
     const out: ZoneGain[] = []
     // ── Occupancy ──────────────────────────────────────────────────────────────────────────────────────────────
     let presence: Float64Array | null = null
+    let occupancy: ZoneGains['occupancy'] = null
     let occRate = NaN
     let occSched: Sched | null = null
     if (refs.occupancy != null) {
@@ -177,7 +185,8 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
         if (Number.isNaN(presence[h])) throw new GainsError(`an exception active on ${c.mmdd[h]} has no ${c.day[h]} values`, `${pp}.schedule.exceptions`)
         w[h] = people * occRate * presence[h] * sensible
       }
-      out.push({ kind: 'occupancy', profile_id: o.id, w, radiant_fraction: rf })
+      out.push({ kind: 'occupancy', profile_id: o.id, w, radiant_fraction: rf, electric_w: null })
+      occupancy = { people: people * occRate, presence }
     }
 
     // ── Lighting, auxiliary, equipment ─────────────────────────────────────────────────────────────────────────
@@ -213,6 +222,7 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
         act = watts(need(g.magnitude, `${pp}.magnitude`), g.id, `${pp}.magnitude`) * areaShare
       }
       const w = new Float64Array(H)
+      const e = new Float64Array(H)
       for (let h = 0; h < H; h++) {
         let f: number
         if (rel === 'independent') {
@@ -227,9 +237,10 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
           const hr = c.hourOfDay[h]
           if (hr >= 9 && hr <= 16 && daylight < 1) f *= daylight
         }
-        w[h] = (base + act * f) * gainFraction
+        e[h] = base + act * f
+        w[h] = e[h] * gainFraction
       }
-      out.push({ kind, profile_id: g.id, w, radiant_fraction: rf })
+      out.push({ kind, profile_id: g.id, w, radiant_fraction: rf, electric_w: e })
     }
     refs.lighting.forEach((id, j) => gainProfile(id, 'lighting', j))
     refs.equipment.forEach((id, j) => gainProfile(id, 'equipment', j))
@@ -242,6 +253,6 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
       total_w[h] = t
       convective_fraction[h] = t > 0 ? cv / t : 0
     }
-    return { gains: out, total_w, convective_fraction }
+    return { gains: out, total_w, convective_fraction, occupancy }
   })
 }

@@ -2,6 +2,13 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 107 — Simulate v2 Engine 4: systems by zone group — IN PROGRESS on `chris/107-systems` (stacked on 106)
+
+Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/107/00_reconnaissance.md)): today's 133.2 decomposed by end use. Electricity 404.144 MWh is heating 37.657 + cooling 30.8 + hot water heat pump 41.174 + pump 1.051 + fans 40.613 + lighting 39.014 + small power 186.136 + auxiliary 27.699; gas 157.428 is the hot water boiler. Every input is in the converted document.
+- **P1 systems** ([`01_systems.md`](docs/audit/107/01_systems.md)): `engine/systems.ts`. Each group's draw from the zones' demand (proportional split, scalar efficiencies), hot water tap-mix per zone, the pump, fans by schedule, and lighting, small power and auxiliary from the gains' electricity. Today's fallbacks are refusals. Served equals demand and the end uses sum to the totals by fuel (tested by hand).
+
 ## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
 
 Brief [`docs/briefs/archive/106_zone-breakdown_COMPLETED.md`](docs/briefs/archive/106_zone-breakdown_COMPLETED.md). Carries Brief 105 review F3 and F6. Run seam and panel only.

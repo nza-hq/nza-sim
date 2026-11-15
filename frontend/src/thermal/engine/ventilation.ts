@@ -55,6 +55,8 @@ export interface ZoneVentilation {
   recovery: number
   /** Hourly conductance to outdoor air, W/K. */
   h_w_per_k: Float64Array
+  /** The fraction of each hour the system runs, 0 to 1, from its schedule (Brief 107: fan hours follow it too). */
+  running: Float64Array
 }
 
 /** Each zone's ventilation entries that run (enabled, kind not 'none'), with their hourly conductance. */
@@ -95,6 +97,7 @@ export function zoneVentilation(doc: ModelDocument, hours: Weather['hours']): Zo
       if (ref == null) throw new VentilationError(`required: when the system runs ('${ALWAYS_ON}' or a schedule profile)`, `${p}.control_schedule_ref`)
       const h0 = K.rho_c_air * q * (1 - eta)
       const hw = new Float64Array(H)
+      const run = new Float64Array(H)
       const s = sched.get(ref)
       if (s) {
         const dt = s.p.day_types
@@ -102,10 +105,11 @@ export function zoneVentilation(doc: ModelDocument, hours: Weather['hours']): Zo
           const f = dt[c.day[h]][c.hourOfDay[h]]
           if (!(f >= 0 && f <= 1)) throw new VentilationError(`hour ${c.hourOfDay[h]} of ${c.day[h]} must be 0 to 1`, `profiles[${s.i}].day_types`)
           hw[h] = h0 * f
+          run[h] = f
         }
-      } else if (ref === ALWAYS_ON) hw.fill(h0)
+      } else if (ref === ALWAYS_ON) { hw.fill(h0); run.fill(1) }
       else throw new VentilationError(`schedule profile "${ref}" does not exist`, `${p}.control_schedule_ref`)
-      out.push({ id: v.id, kind: v.kind, flow_m3s: q, recovery: eta, h_w_per_k: hw })
+      out.push({ id: v.id, kind: v.kind, flow_m3s: q, recovery: eta, h_w_per_k: hw, running: run })
     })
     return out
   })
