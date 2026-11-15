@@ -99,8 +99,8 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
           rating needed is what would cover the peak at those temperatures, given at 75/65/20 °C as catalogues list it.
           The output is taken with the room at its setpoint; a colder room draws more from the same emitters, so the
           hours below are an upper bound. The peak is the coldest hour of the chosen weather file, not a design-day
-          calculation (BS EN 12831). The emitters' radiant share changes the heat needed and is not yet checked against
-          EnergyPlus. A heat pump's efficiency does not yet change with the flow temperature.
+          calculation (BS EN 12831). The emitters' radiant share changes the heat needed: its annual heat is checked against
+          EnergyPlus (within 4 %), its hours below are not yet. A heat pump's efficiency does not yet change with the flow temperature.
         </p>
       )}
       <p className="es-sum">

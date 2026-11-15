@@ -1,0 +1,132 @@
+{
+ "source": "scripts/108_radiant.mts",
+ "radiant_fraction": 0.3,
+ "cases": {
+  "unlimited": {
+   "caps": {
+    "west": 100000,
+    "east": 100000
+   },
+   "rooms": {
+    "west": {
+     "engine2": {
+      "heat_mwh": 1.969,
+      "unmet_hours": 0,
+      "min_c": 20,
+      "peak_w": 1546.806
+     },
+     "energyplus": {
+      "heat_mwh": 1.905,
+      "unmet_hours": 273,
+      "min_c": 19.232,
+      "peak_w": 1473
+     },
+     "heating_pct": 3.4,
+     "unmet_diff_h": -273,
+     "min_diff_k": 0.77
+    },
+    "east": {
+     "engine2": {
+      "heat_mwh": 1.97,
+      "unmet_hours": 0,
+      "min_c": 20,
+      "peak_w": 1549.022
+     },
+     "energyplus": {
+      "heat_mwh": 1.902,
+      "unmet_hours": 273,
+      "min_c": 19.231,
+      "peak_w": 1473.4
+     },
+     "heating_pct": 3.6,
+     "unmet_diff_h": -273,
+     "min_diff_k": 0.77
+    }
+   }
+  },
+  "tight": {
+   "caps": {
+    "west": 800,
+    "east": 800
+   },
+   "rooms": {
+    "west": {
+     "engine2": {
+      "heat_mwh": 1.899,
+      "unmet_hours": 644,
+      "min_c": 13.652,
+      "peak_w": 800
+     },
+     "energyplus": {
+      "heat_mwh": 1.853,
+      "unmet_hours": 693,
+      "min_c": 13.602,
+      "peak_w": 800
+     },
+     "heating_pct": 2.5,
+     "unmet_diff_h": -49,
+     "min_diff_k": 0.05
+    },
+    "east": {
+     "engine2": {
+      "heat_mwh": 1.899,
+      "unmet_hours": 654,
+      "min_c": 13.614,
+      "peak_w": 800
+     },
+     "energyplus": {
+      "heat_mwh": 1.85,
+      "unmet_hours": 692,
+      "min_c": 13.596,
+      "peak_w": 800
+     },
+     "heating_pct": 2.6,
+     "unmet_diff_h": -38,
+     "min_diff_k": 0.02
+    }
+   }
+  },
+  "mild": {
+   "caps": {
+    "west": 1100,
+    "east": 1100
+   },
+   "rooms": {
+    "west": {
+     "engine2": {
+      "heat_mwh": 1.962,
+      "unmet_hours": 74,
+      "min_c": 16.898,
+      "peak_w": 1100
+     },
+     "energyplus": {
+      "heat_mwh": 1.901,
+      "unmet_hours": 278,
+      "min_c": 16.693,
+      "peak_w": 1100
+     },
+     "heating_pct": 3.2,
+     "unmet_diff_h": -204,
+     "min_diff_k": 0.21
+    },
+    "east": {
+     "engine2": {
+      "heat_mwh": 1.964,
+      "unmet_hours": 75,
+      "min_c": 16.873,
+      "peak_w": 1100
+     },
+     "energyplus": {
+      "heat_mwh": 1.898,
+      "unmet_hours": 279,
+      "min_c": 16.69,
+      "peak_w": 1100
+     },
+     "heating_pct": 3.4,
+     "unmet_diff_h": -204,
+     "min_diff_k": 0.18
+    }
+   }
+  }
+ }
+}
