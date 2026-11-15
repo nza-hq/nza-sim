@@ -136,6 +136,10 @@ export type SpaceType = {
 /** Air leakage (q50, m³/h·m² at 50 Pa, every zone), thermal bridging (ISO 14683 default junctions × multiplier) and
  * site exposure. */
 export type BuildingInputs = { q50: number | null; tb_multiplier: number | null; exposure: 'sheltered' | 'normal' | 'exposed' | null }
+/** Hot water, for the whole building (the schema's service-level fields): stored, tap and cold-supply temperatures,
+ * daily demand per person or per m² of floor, and a circulation pump. Typed; null is not stated. */
+export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c: number | null; basis: 'per_person' | 'per_m2' | null; litres: number | null; pump_w: number | null }
+export const noDhw = (): DhwInputs => ({ storage_c: null, tap_c: null, cold_c: null, basis: null, litres: null, pump_w: null })
 export const noBuildingInputs = (): BuildingInputs => ({ q50: null, tb_multiplier: null, exposure: null })
 
 export type Plan = {
@@ -151,6 +155,8 @@ export type Plan = {
   spaces: SpaceType[]
   /** Whole-building fabric inputs, typed (null: not stated). */
   building?: BuildingInputs
+  /** Hot water for the whole building, typed (Systems step). */
+  dhw?: DhwInputs
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }

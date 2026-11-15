@@ -38,7 +38,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { type BuildingInputs, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
+import { type BuildingInputs, type DhwInputs, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profilesFor, system, systemsFor } from '../library/library'
@@ -1212,6 +1212,31 @@ export default function GeometryLab() {
       <GivePanel
         kinds={SERVICES.map((s) => ({ key: s.key, name: s.name, icon: SERVICE_ICON[s.key] }))} kind={service} onKind={(k) => setService(k as Service)}
         title={`${sv.name} systems`} icon={SERVICE_ICON[service]}
+        top={service === 'dhw' ? (() => {
+          const hw = plan.dhw ?? noDhw()
+          const setHw = (q: Partial<DhwInputs>) => commit({ ...plan, dhw: { ...hw, ...q } })
+          const n = (label: string, k: 'storage_c' | 'tap_c' | 'cold_c' | 'litres' | 'pump_w', step: number, unit: string) => (
+            <div className="gl-row gl-typed"><span>{label}</span><Num value={hw[k] ?? ''} unit={unit} step={step} min={0} onCommit={(v) => { const x = Number.isFinite(v) && v > 0 ? v : k === 'pump_w' && v === 0 ? 0 : null; if (x !== hw[k]) setHw({ [k]: x }) }} /></div>
+          )
+          return (
+            <details className="ap-hw" open>
+              <summary>For the whole building</summary>
+              {n('Stored at', 'storage_c', 1, '°C')}
+              {n('Hot at the tap', 'tap_c', 1, '°C')}
+              {n('Cold water in', 'cold_c', 1, '°C')}
+              <div className="gl-row gl-librow"><span>Daily use</span>
+                <select className="gl-sel" aria-label="Daily use basis" value={hw.basis ?? ''} onChange={(e) => setHw({ basis: (e.target.value || null) as DhwInputs['basis'] })}>
+                  <option value="">Not set</option>
+                  <option value="per_person">Per person</option>
+                  <option value="per_m2">Per m² of floor</option>
+                </select>
+              </div>
+              {hw.basis && n('Litres a day', 'litres', hw.basis === 'per_person' ? 5 : 0.5, hw.basis === 'per_person' ? 'per person' : 'per m²')}
+              {n('Circulation pump', 'pump_w', 10, 'W')}
+              <p className="gl-hint">One set for the building. The heater only heats the hot share of what runs from the tap. Empty stays unset.</p>
+            </details>
+          )
+        })() : undefined}
         items={items} active={x?.id ?? null}
         onActive={(id) => setActiveSys((a) => ({ ...a, [service]: id }))}
         onNew={() => newSystem()} newLabel="New system"

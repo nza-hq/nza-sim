@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { allWindows, edgesOf, facade4, type FabricElement, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { allWindows, edgesOf, facade4, type FabricElement, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, profile, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -332,6 +332,8 @@ export function buildDocument(plan: Plan): Built {
   }
 
   const bi = plan.building ?? noBuildingInputs()
+  const hw = plan.dhw ?? noDhw()
+  if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && [hw.storage_c, hw.tap_c, hw.cold_c, hw.basis, hw.litres].some((v) => v == null)) notes.push('Hot water: a system is given but its temperatures or daily demand are not all stated (Systems, Hot water)')
   const zones = used.map((z) => ({
     id: z.id,
     name: z.name,
@@ -413,7 +415,7 @@ export function buildDocument(plan: Plan): Built {
     services: {
       heating: { setpoint_mode: 'follow_comfort', setpoint_c: null },
       cooling: { setpoint_mode: 'follow_comfort', setpoint_c: null },
-      dhw: { storage_setpoint_c: null, tap_outlet_temp_c: null, cold_supply_temp_c: null, demand_basis: null, litres_per_person_per_day: null, litres_per_m2_per_day: null, load_shape: null, circulation_pump_w: null },
+      dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, demand_basis: hw.basis, litres_per_person_per_day: hw.basis === 'per_person' ? hw.litres : null, litres_per_m2_per_day: hw.basis === 'per_m2' ? hw.litres : null, load_shape: null, circulation_pump_w: hw.pump_w },
     },
     profiles,
     weather_ref: { kind: 'legacy', id: 'unassigned' },

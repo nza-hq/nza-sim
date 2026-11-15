@@ -348,3 +348,5 @@
 .gl-key-note { color: var(--gl-soft); }
 @media (max-width: 760px) { .gl-root.giving .gl-viewswitch, .gl-key { left: 50%; } .gl-key { display: none; } }
 .ap-give .gl-row > span:first-child { min-width: 0; }
+.ap-hw { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--gl-line); border-radius: 10px; }
+.ap-hw > summary { cursor: pointer; font: 700 11px var(--gl-detail); letter-spacing: .06em; text-transform: uppercase; color: var(--gl-soft); }
