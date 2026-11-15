@@ -1,0 +1,457 @@
+{
+ "source": "scripts/105_gains.mts",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "options": "REFEREE_OPTIONS",
+ "comparisons": {
+  "envelope only (Brief 104 gate, r2_z)": {
+   "referee_run": "r2_z",
+   "engine": {
+    "heating_mwh": 91.20672249659651,
+    "cooling_mwh": 14.89166454614798
+   },
+   "referee": {
+    "heating_mwh": 90.184,
+    "cooling_mwh": 13.805
+   },
+   "heating_pct": 1.1340398480844884,
+   "cooling_pct": 7.871528766012176,
+   "zones": {
+    "z1": {
+     "engine": {
+      "heating_mwh": 24.940502170692024,
+      "cooling_mwh": 1.4315568412846322
+     },
+     "referee": {
+      "heating_mwh": 23.7141,
+      "cooling_mwh": 1.0902
+     },
+     "heating_pct": 5.171615919187429,
+     "cooling_pct": 31.31139619194938
+    },
+    "z2": {
+     "engine": {
+      "heating_mwh": 13.55138889153986,
+      "cooling_mwh": 3.685777284363762
+     },
+     "referee": {
+      "heating_mwh": 14.1231,
+      "cooling_mwh": 3.0454
+     },
+     "heating_pct": -4.048056789657659,
+     "cooling_pct": 21.027690430280497
+    },
+    "z3": {
+     "engine": {
+      "heating_mwh": 13.215020147928346,
+      "cooling_mwh": 4.243473169540552
+     },
+     "referee": {
+      "heating_mwh": 13.4961,
+      "cooling_mwh": 3.775
+     },
+     "heating_pct": -2.082674639871179,
+     "cooling_pct": 12.409885285842442
+    },
+    "z4": {
+     "engine": {
+      "heating_mwh": 13.830321338911764,
+      "cooling_mwh": 3.7588985047521786
+     },
+     "referee": {
+      "heating_mwh": 14.3589,
+      "cooling_mwh": 3.649
+     },
+     "heating_pct": -3.681191881608174,
+     "cooling_pct": 3.011743073504482
+    },
+    "z5": {
+     "engine": {
+      "heating_mwh": 25.66948994752453,
+      "cooling_mwh": 1.7719587462068558
+     },
+     "referee": {
+      "heating_mwh": 24.4923,
+      "cooling_mwh": 2.2452
+     },
+     "heating_pct": 4.806367501314815,
+     "cooling_pct": -21.077910822783906
+    }
+   }
+  },
+  "with gains (r2_z_gains)": {
+   "referee_run": "r2_z_gains",
+   "engine": {
+    "heating_mwh": 0,
+    "cooling_mwh": 228.6470705153185
+   },
+   "referee": {
+    "heating_mwh": 0,
+    "cooling_mwh": 223.683
+   },
+   "heating_pct": null,
+   "cooling_pct": 2.219243534519162,
+   "zones": {
+    "z1": {
+     "engine": {
+      "heating_mwh": 0,
+      "cooling_mwh": 35.781824781468856
+     },
+     "referee": {
+      "heating_mwh": 0,
+      "cooling_mwh": 33.5622
+     },
+     "heating_pct": null,
+     "cooling_pct": 6.613466284894492
+    },
+    "z2": {
+     "engine": {
+      "heating_mwh": 0,
+      "cooling_mwh": 53.00232534054317
+     },
+     "referee": {
+      "heating_mwh": 0,
+      "cooling_mwh": 50.4026
+     },
+     "heating_pct": null,
+     "cooling_pct": 5.157919116361405
+    },
+    "z3": {
+     "engine": {
+      "heating_mwh": 0,
+      "cooling_mwh": 54.2086743243036
+     },
+     "referee": {
+      "heating_mwh": 0,
+      "cooling_mwh": 52.4554
+     },
+     "heating_pct": null,
+     "cooling_pct": 3.3424095980654114
+    },
+    "z4": {
+     "engine": {
+      "heating_mwh": 0,
+      "cooling_mwh": 51.772405676348455
+     },
+     "referee": {
+      "heating_mwh": 0,
+      "cooling_mwh": 50.4677
+     },
+     "heating_pct": null,
+     "cooling_pct": 2.5852291195129853
+    },
+    "z5": {
+     "engine": {
+      "heating_mwh": 0,
+      "cooling_mwh": 33.88184039265439
+     },
+     "referee": {
+      "heating_mwh": 0,
+      "cooling_mwh": 36.7949
+     },
+     "heating_pct": null,
+     "cooling_pct": -7.917020041760161
+    }
+   }
+  },
+  "with ventilation (r2_z_vent)": {
+   "referee_run": "r2_z_vent",
+   "engine": {
+    "heating_mwh": 342.53758319068805,
+    "cooling_mwh": 1.7749944076205102
+   },
+   "referee": {
+    "heating_mwh": 360.183,
+    "cooling_mwh": 1.745
+   },
+   "heating_pct": -4.899014336965359,
+   "cooling_pct": 1.7188772275363946,
+   "zones": {
+    "z1": {
+     "engine": {
+      "heating_mwh": 77.27824234642034,
+      "cooling_mwh": 0.2150485702171643
+     },
+     "referee": {
+      "heating_mwh": 80.175,
+      "cooling_mwh": 0.1598
+     },
+     "heating_pct": -3.613043534243412,
+     "cooling_pct": 34.573573352418215
+    },
+    "z2": {
+     "engine": {
+      "heating_mwh": 62.46792199672751,
+      "cooling_mwh": 0.3746391264801917
+     },
+     "referee": {
+      "heating_mwh": 67.2007,
+      "cooling_mwh": 0.3291
+     },
+     "heating_pct": -7.042751047641596,
+     "cooling_pct": 13.83747386210626
+    },
+    "z3": {
+     "engine": {
+      "heating_mwh": 61.97456912411119,
+      "cooling_mwh": 0.4108502705453607
+     },
+     "referee": {
+      "heating_mwh": 66.0666,
+      "cooling_mwh": 0.3856
+     },
+     "heating_pct": -6.1937966777294475,
+     "cooling_pct": 6.548306676701432
+    },
+    "z4": {
+     "engine": {
+      "heating_mwh": 62.8253079534908,
+      "cooling_mwh": 0.40606745887590545
+     },
+     "referee": {
+      "heating_mwh": 67.1146,
+      "cooling_mwh": 0.4079
+     },
+     "heating_pct": -6.390996961181615,
+     "cooling_pct": -0.44926234961866474
+    },
+    "z5": {
+     "engine": {
+      "heating_mwh": 77.99154176993817,
+      "cooling_mwh": 0.368388981501888
+     },
+     "referee": {
+      "heating_mwh": 79.6257,
+      "cooling_mwh": 0.4624
+     },
+     "heating_pct": -2.052299986137426,
+     "cooling_pct": -20.331102616373702
+    }
+   }
+  },
+  "with gains and ventilation, EnergyPlus default (outdoor) air density (r2_z_gains_vent)": {
+   "referee_run": "r2_z_gains_vent",
+   "engine": {
+    "heating_mwh": 114.5455931910392,
+    "cooling_mwh": 62.72542211895042
+   },
+   "referee": {
+    "heating_mwh": 129.28,
+    "cooling_mwh": 56.907
+   },
+   "heating_pct": -11.397282494555073,
+   "cooling_pct": 10.224440084612478,
+   "zones": {
+    "z1": {
+     "engine": {
+      "heating_mwh": 27.757543913419997,
+      "cooling_mwh": 10.143365156735427
+     },
+     "referee": {
+      "heating_mwh": 30.6502,
+      "cooling_mwh": 7.8275
+     },
+     "heating_pct": -9.437641798683218,
+     "cooling_pct": 29.58626837094127
+    },
+    "z2": {
+     "engine": {
+      "heating_mwh": 18.790221998688835,
+      "cooling_mwh": 14.281901128574164
+     },
+     "referee": {
+      "heating_mwh": 22.5082,
+      "cooling_mwh": 12.4685
+     },
+     "heating_pct": -16.518326660111263,
+     "cooling_pct": 14.543859554671078
+    },
+    "z3": {
+     "engine": {
+      "heating_mwh": 18.56912819992732,
+      "cooling_mwh": 14.567178220938503
+     },
+     "referee": {
+      "heating_mwh": 21.8963,
+      "cooling_mwh": 13.2337
+     },
+     "heating_pct": -15.1951325113041,
+     "cooling_pct": 10.076382424707395
+    },
+    "z4": {
+     "engine": {
+      "heating_mwh": 19.200698064990114,
+      "cooling_mwh": 14.062757929355303
+     },
+     "referee": {
+      "heating_mwh": 22.6834,
+      "cooling_mwh": 13.0107
+     },
+     "heating_pct": -15.35352696249189,
+     "cooling_pct": 8.086097822217893
+    },
+    "z5": {
+     "engine": {
+      "heating_mwh": 30.228001014012932,
+      "cooling_mwh": 9.670219683347021
+     },
+     "referee": {
+      "heating_mwh": 31.5423,
+      "cooling_mwh": 10.3669
+     },
+     "heating_pct": -4.166782339864463,
+     "cooling_pct": -6.720237647252104
+    }
+   }
+  },
+  "with ventilation, standard air density (r2_z_vent_std)": {
+   "referee_run": "r2_z_vent_std",
+   "engine": {
+    "heating_mwh": 342.53758319068805,
+    "cooling_mwh": 1.7749944076205102
+   },
+   "referee": {
+    "heating_mwh": 348.447,
+    "cooling_mwh": 1.786
+   },
+   "heating_pct": -1.6959298858397258,
+   "cooling_pct": -0.6162145789188038,
+   "zones": {
+    "z1": {
+     "engine": {
+      "heating_mwh": 77.27824234642034,
+      "cooling_mwh": 0.2150485702171643
+     },
+     "referee": {
+      "heating_mwh": 77.7011,
+      "cooling_mwh": 0.167
+     },
+     "heating_pct": -0.5442106399776256,
+     "cooling_pct": 28.771598932433708
+    },
+    "z2": {
+     "engine": {
+      "heating_mwh": 62.46792199672751,
+      "cooling_mwh": 0.3746391264801917
+     },
+     "referee": {
+      "heating_mwh": 64.9366,
+      "cooling_mwh": 0.3371
+     },
+     "heating_pct": -3.801674253460278,
+     "cooling_pct": 11.135902248647788
+    },
+    "z3": {
+     "engine": {
+      "heating_mwh": 61.97456912411119,
+      "cooling_mwh": 0.4108502705453607
+     },
+     "referee": {
+      "heating_mwh": 63.8034,
+      "cooling_mwh": 0.3936
+     },
+     "heating_pct": -2.866353322689405,
+     "cooling_pct": 4.382690687337579
+    },
+    "z4": {
+     "engine": {
+      "heating_mwh": 62.8253079534908,
+      "cooling_mwh": 0.40606745887590545
+     },
+     "referee": {
+      "heating_mwh": 64.8513,
+      "cooling_mwh": 0.4158
+     },
+     "heating_pct": -3.124057723606459,
+     "cooling_pct": -2.3406784810232204
+    },
+    "z5": {
+     "engine": {
+      "heating_mwh": 77.99154176993817,
+      "cooling_mwh": 0.368388981501888
+     },
+     "referee": {
+      "heating_mwh": 77.1544,
+      "cooling_mwh": 0.4722
+     },
+     "heating_pct": 1.0850214244918903,
+     "cooling_pct": -21.984544366393905
+    }
+   }
+  },
+  "with gains and ventilation, standard air density: the gate (r2_z_gains_vent_std)": {
+   "referee_run": "r2_z_gains_vent_std",
+   "engine": {
+    "heating_mwh": 114.5455931910392,
+    "cooling_mwh": 62.72542211895042
+   },
+   "referee": {
+    "heating_mwh": 119.16,
+    "cooling_mwh": 57.383
+   },
+   "heating_pct": -3.8724461303799886,
+   "cooling_pct": 9.31011295845532,
+   "zones": {
+    "z1": {
+     "engine": {
+      "heating_mwh": 27.757543913419997,
+      "cooling_mwh": 10.143365156735427
+     },
+     "referee": {
+      "heating_mwh": 28.3754,
+      "cooling_mwh": 7.8758
+     },
+     "heating_pct": -2.1774356892942532,
+     "cooling_pct": 28.791553324556588
+    },
+    "z2": {
+     "engine": {
+      "heating_mwh": 18.790221998688835,
+      "cooling_mwh": 14.281901128574164
+     },
+     "referee": {
+      "heating_mwh": 20.6381,
+      "cooling_mwh": 12.5835
+     },
+     "heating_pct": -8.953721521415082,
+     "cooling_pct": 13.497048742990131
+    },
+    "z3": {
+     "engine": {
+      "heating_mwh": 18.56912819992732,
+      "cooling_mwh": 14.567178220938503
+     },
+     "referee": {
+      "heating_mwh": 20.0311,
+      "cooling_mwh": 13.3628
+     },
+     "heating_pct": -7.298509817597028,
+     "cooling_pct": 9.012918108020049
+    },
+    "z4": {
+     "engine": {
+      "heating_mwh": 19.200698064990114,
+      "cooling_mwh": 14.062757929355303
+     },
+     "referee": {
+      "heating_mwh": 20.8153,
+      "cooling_mwh": 13.1289
+     },
+     "heating_pct": -7.756803577223901,
+     "cooling_pct": 7.112994457687267
+    },
+    "z5": {
+     "engine": {
+      "heating_mwh": 30.228001014012932,
+      "cooling_mwh": 9.670219683347021
+     },
+     "referee": {
+      "heating_mwh": 29.3001,
+      "cooling_mwh": 10.4321
+     },
+     "heating_pct": 3.166886850259663,
+     "cooling_pct": -7.303230573450973
+    }
+   }
+  }
+ }
+}

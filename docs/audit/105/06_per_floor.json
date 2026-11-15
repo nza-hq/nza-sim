@@ -1,0 +1,1167 @@
+{
+ "source": "scripts/105_per_floor.mts",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "referee": "docs/audit/105/06_referee.json",
+ "base_options": {
+  "control": "air",
+  "hc_convective_fraction": 1,
+  "warmup_days": 25,
+  "solar": {
+   "albedo": 0.2,
+   "sun_day": "actual",
+   "solar_time": "apparent",
+   "sky": "perez"
+  },
+  "other_gains": null,
+  "surface_physics": {
+   "outside_convection": "fixed",
+   "inside_convection": "by_tilt",
+   "beam_on_floor": true
+  },
+  "glazing_solar": "optical",
+  "solar_convective_fraction": 0
+ },
+ "bridgewater": {
+  "base": {
+   "options": {},
+   "heating_mwh": 91.2067,
+   "cooling_mwh": 14.8917,
+   "run_ms": 385,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.9405,
+     "cooling_mwh": 1.4316,
+     "slab_in_mwh": 4.5972,
+     "closure_max_wh": 1.66e-9
+    },
+    "z2": {
+     "heating_mwh": 13.5514,
+     "cooling_mwh": 3.6858,
+     "slab_in_mwh": -2.0922,
+     "closure_max_wh": 1.55e-9
+    },
+    "z3": {
+     "heating_mwh": 13.215,
+     "cooling_mwh": 4.2435,
+     "slab_in_mwh": -1.0186,
+     "closure_max_wh": 1.64e-9
+    },
+    "z4": {
+     "heating_mwh": 13.8303,
+     "cooling_mwh": 3.7589,
+     "slab_in_mwh": -2.2547,
+     "closure_max_wh": 1.73e-9
+    },
+    "z5": {
+     "heating_mwh": 25.6695,
+     "cooling_mwh": 1.772,
+     "slab_in_mwh": 0.7682,
+     "closure_max_wh": 1.53e-9
+    }
+   },
+   "vs_same_form": {
+    "referee": "r2_z_e2like_ts1",
+    "heating_pct": -3.7,
+    "cooling_pct": 13.8,
+    "zones": {
+     "z1": {
+      "heating_pct": -1.7,
+      "cooling_pct": 5.8,
+      "slab_in_mwh_referee": 4.6848
+     },
+     "z2": {
+      "heating_pct": -5.4,
+      "cooling_pct": 15,
+      "slab_in_mwh_referee": -2.4167
+     },
+     "z3": {
+      "heating_pct": -4.3,
+      "cooling_pct": 14.1,
+      "slab_in_mwh_referee": -1.1685
+     },
+     "z4": {
+      "heating_pct": -4.5,
+      "cooling_pct": 14.9,
+      "slab_in_mwh_referee": -2.4506
+     },
+     "z5": {
+      "heating_pct": -4,
+      "cooling_pct": 15.4,
+      "slab_in_mwh_referee": 1.4013
+     }
+    }
+   },
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": 1.1,
+    "cooling_pct": 7.9,
+    "zones": {
+     "z1": {
+      "heating_pct": 5.2,
+      "cooling_pct": 31.3,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4,
+      "cooling_pct": 21,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -2.1,
+      "cooling_pct": 12.4,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.7,
+      "cooling_pct": 3,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": 4.8,
+      "cooling_pct": -21.1,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  },
+  "steps2": {
+   "options": {
+    "time_step": {
+     "steps_per_hour": 2,
+     "theta_e_between": "linear"
+    }
+   },
+   "heating_mwh": 91.208,
+   "cooling_mwh": 14.8852,
+   "run_ms": 378,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.9408,
+     "cooling_mwh": 1.4312,
+     "slab_in_mwh": 4.5977,
+     "closure_max_wh": 3.44e-9
+    },
+    "z2": {
+     "heating_mwh": 13.5516,
+     "cooling_mwh": 3.6843,
+     "slab_in_mwh": -2.0922,
+     "closure_max_wh": 3.79e-9
+    },
+    "z3": {
+     "heating_mwh": 13.2154,
+     "cooling_mwh": 4.2415,
+     "slab_in_mwh": -1.0193,
+     "closure_max_wh": 4.34e-9
+    },
+    "z4": {
+     "heating_mwh": 13.8306,
+     "cooling_mwh": 3.7577,
+     "slab_in_mwh": -2.2545,
+     "closure_max_wh": 4.32e-9
+    },
+    "z5": {
+     "heating_mwh": 25.6696,
+     "cooling_mwh": 1.7707,
+     "slab_in_mwh": 0.7683,
+     "closure_max_wh": 2.75e-9
+    }
+   },
+   "vs_same_form": null,
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": 1.1,
+    "cooling_pct": 7.8,
+    "zones": {
+     "z1": {
+      "heating_pct": 5.2,
+      "cooling_pct": 31.3,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4,
+      "cooling_pct": 21,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -2.1,
+      "cooling_pct": 12.4,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.7,
+      "cooling_pct": 3,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": 4.8,
+      "cooling_pct": -21.1,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  },
+  "steps4": {
+   "options": {
+    "time_step": {
+     "steps_per_hour": 4,
+     "theta_e_between": "linear"
+    }
+   },
+   "heating_mwh": 91.2089,
+   "cooling_mwh": 14.8822,
+   "run_ms": 538,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.941,
+     "cooling_mwh": 1.431,
+     "slab_in_mwh": 4.5979,
+     "closure_max_wh": 3.44e-9
+    },
+    "z2": {
+     "heating_mwh": 13.5518,
+     "cooling_mwh": 3.6836,
+     "slab_in_mwh": -2.0923,
+     "closure_max_wh": 3.15e-9
+    },
+    "z3": {
+     "heating_mwh": 13.2157,
+     "cooling_mwh": 4.2405,
+     "slab_in_mwh": -1.0196,
+     "closure_max_wh": 4.49e-9
+    },
+    "z4": {
+     "heating_mwh": 13.8308,
+     "cooling_mwh": 3.757,
+     "slab_in_mwh": -2.2544,
+     "closure_max_wh": 3.53e-9
+    },
+    "z5": {
+     "heating_mwh": 25.6697,
+     "cooling_mwh": 1.7701,
+     "slab_in_mwh": 0.7683,
+     "closure_max_wh": 4.88e-9
+    }
+   },
+   "vs_same_form": {
+    "referee": "r2_z_e2like",
+    "heating_pct": -2.3,
+    "cooling_pct": 3.2,
+    "zones": {
+     "z1": {
+      "heating_pct": -0.3,
+      "cooling_pct": -3.2,
+      "slab_in_mwh_referee": 4.6507
+     },
+     "z2": {
+      "heating_pct": -3.9,
+      "cooling_pct": 3.6,
+      "slab_in_mwh_referee": -2.3565
+     },
+     "z3": {
+      "heating_pct": -2.8,
+      "cooling_pct": 4.3,
+      "slab_in_mwh_referee": -1.1247
+     },
+     "z4": {
+      "heating_pct": -3,
+      "cooling_pct": 3.7,
+      "slab_in_mwh_referee": -2.3892
+     },
+     "z5": {
+      "heating_pct": -2.7,
+      "cooling_pct": 4.1,
+      "slab_in_mwh_referee": 1.276
+     }
+    }
+   },
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": 1.1,
+    "cooling_pct": 7.8,
+    "zones": {
+     "z1": {
+      "heating_pct": 5.2,
+      "cooling_pct": 31.3,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4,
+      "cooling_pct": 21,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -2.1,
+      "cooling_pct": 12.3,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.7,
+      "cooling_pct": 3,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": 4.8,
+      "cooling_pct": -21.2,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  },
+  "steps4_hold": {
+   "options": {
+    "time_step": {
+     "steps_per_hour": 4,
+     "theta_e_between": "hold"
+    }
+   },
+   "heating_mwh": 91.2067,
+   "cooling_mwh": 14.8927,
+   "run_ms": 699,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.941,
+     "cooling_mwh": 1.4327,
+     "slab_in_mwh": 4.5976,
+     "closure_max_wh": 3.96e-9
+    },
+    "z2": {
+     "heating_mwh": 13.5513,
+     "cooling_mwh": 3.6853,
+     "slab_in_mwh": -2.0926,
+     "closure_max_wh": 3.56e-9
+    },
+    "z3": {
+     "heating_mwh": 13.2152,
+     "cooling_mwh": 4.2436,
+     "slab_in_mwh": -1.0187,
+     "closure_max_wh": 4.51e-9
+    },
+    "z4": {
+     "heating_mwh": 13.8303,
+     "cooling_mwh": 3.7592,
+     "slab_in_mwh": -2.2545,
+     "closure_max_wh": 3.63e-9
+    },
+    "z5": {
+     "heating_mwh": 25.669,
+     "cooling_mwh": 1.7718,
+     "slab_in_mwh": 0.7683,
+     "closure_max_wh": 5.28e-9
+    }
+   },
+   "vs_same_form": null,
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": 1.1,
+    "cooling_pct": 7.9,
+    "zones": {
+     "z1": {
+      "heating_pct": 5.2,
+      "cooling_pct": 31.4,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4,
+      "cooling_pct": 21,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -2.1,
+      "cooling_pct": 12.4,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.7,
+      "cooling_pct": 3,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": 4.8,
+      "cooling_pct": -21.1,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  },
+  "steps12": {
+   "options": {
+    "time_step": {
+     "steps_per_hour": 12,
+     "theta_e_between": "linear"
+    }
+   },
+   "heating_mwh": 91.2096,
+   "cooling_mwh": 14.8804,
+   "run_ms": 1381,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.9411,
+     "cooling_mwh": 1.4309,
+     "slab_in_mwh": 4.5981,
+     "closure_max_wh": 1.67e-8
+    },
+    "z2": {
+     "heating_mwh": 13.5519,
+     "cooling_mwh": 3.6831,
+     "slab_in_mwh": -2.0923,
+     "closure_max_wh": 1.75e-8
+    },
+    "z3": {
+     "heating_mwh": 13.2158,
+     "cooling_mwh": 4.2398,
+     "slab_in_mwh": -1.0197,
+     "closure_max_wh": 1.64e-8
+    },
+    "z4": {
+     "heating_mwh": 13.831,
+     "cooling_mwh": 3.7567,
+     "slab_in_mwh": -2.2544,
+     "closure_max_wh": 1.89e-8
+    },
+    "z5": {
+     "heating_mwh": 25.6698,
+     "cooling_mwh": 1.7698,
+     "slab_in_mwh": 0.7684,
+     "closure_max_wh": 1.18e-8
+    }
+   },
+   "vs_same_form": null,
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": 1.1,
+    "cooling_pct": 7.8,
+    "zones": {
+     "z1": {
+      "heating_pct": 5.2,
+      "cooling_pct": 31.3,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4,
+      "cooling_pct": 20.9,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -2.1,
+      "cooling_pct": 12.3,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.7,
+      "cooling_pct": 3,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": 4.8,
+      "cooling_pct": -21.2,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  },
+  "steps60": {
+   "options": {
+    "time_step": {
+     "steps_per_hour": 60,
+     "theta_e_between": "linear"
+    }
+   },
+   "heating_mwh": 91.2099,
+   "cooling_mwh": 14.8796,
+   "run_ms": 6275,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.9412,
+     "cooling_mwh": 1.4309,
+     "slab_in_mwh": 4.5982,
+     "closure_max_wh": 5.8e-8
+    },
+    "z2": {
+     "heating_mwh": 13.552,
+     "cooling_mwh": 3.683,
+     "slab_in_mwh": -2.0923,
+     "closure_max_wh": 5.08e-8
+    },
+    "z3": {
+     "heating_mwh": 13.2159,
+     "cooling_mwh": 4.2396,
+     "slab_in_mwh": -1.0198,
+     "closure_max_wh": 5.18e-8
+    },
+    "z4": {
+     "heating_mwh": 13.831,
+     "cooling_mwh": 3.7565,
+     "slab_in_mwh": -2.2544,
+     "closure_max_wh": 5.08e-8
+    },
+    "z5": {
+     "heating_mwh": 25.6698,
+     "cooling_mwh": 1.7696,
+     "slab_in_mwh": 0.7684,
+     "closure_max_wh": 3.82e-8
+    }
+   },
+   "vs_same_form": null,
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": 1.1,
+    "cooling_pct": 7.8,
+    "zones": {
+     "z1": {
+      "heating_pct": 5.2,
+      "cooling_pct": 31.3,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4,
+      "cooling_pct": 20.9,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -2.1,
+      "cooling_pct": 12.3,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.7,
+      "cooling_pct": 2.9,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": 4.8,
+      "cooling_pct": -21.2,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  },
+  "tarp": {
+   "options": {
+    "surface_physics": {
+     "outside_convection": "fixed",
+     "inside_convection": "tarp",
+     "beam_on_floor": true
+    }
+   },
+   "heating_mwh": 88.963,
+   "cooling_mwh": 14.03,
+   "run_ms": 1246,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.4186,
+     "cooling_mwh": 0.9028,
+     "slab_in_mwh": 3.9306,
+     "closure_max_wh": 1.63e-9
+    },
+    "z2": {
+     "heating_mwh": 13.4938,
+     "cooling_mwh": 3.1409,
+     "slab_in_mwh": -2.8094,
+     "closure_max_wh": 1.71e-9
+    },
+    "z3": {
+     "heating_mwh": 13.0896,
+     "cooling_mwh": 3.9485,
+     "slab_in_mwh": -1.36,
+     "closure_max_wh": 1.67e-9
+    },
+    "z4": {
+     "heating_mwh": 13.8014,
+     "cooling_mwh": 3.7908,
+     "slab_in_mwh": -2.3641,
+     "closure_max_wh": 1.59e-9
+    },
+    "z5": {
+     "heating_mwh": 24.1597,
+     "cooling_mwh": 2.247,
+     "slab_in_mwh": 2.6028,
+     "closure_max_wh": 1.71e-9
+    }
+   },
+   "vs_same_form": {
+    "referee": "r2_z_e2tarp_ts1",
+    "heating_pct": -2.6,
+    "cooling_pct": 14.5,
+    "zones": {
+     "z1": {
+      "heating_pct": 1,
+      "cooling_pct": -1.1,
+      "slab_in_mwh_referee": 4.5123
+     },
+     "z2": {
+      "heating_pct": -5,
+      "cooling_pct": 15.9,
+      "slab_in_mwh_referee": -3.1941
+     },
+     "z3": {
+      "heating_pct": -3.6,
+      "cooling_pct": 14.7,
+      "slab_in_mwh_referee": -1.5484
+     },
+     "z4": {
+      "heating_pct": -4,
+      "cooling_pct": 15.4,
+      "slab_in_mwh_referee": -2.6562
+     },
+     "z5": {
+      "heating_pct": -3.4,
+      "cooling_pct": 18.1,
+      "slab_in_mwh_referee": 2.9694
+     }
+    }
+   },
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": -1.4,
+    "cooling_pct": 1.6,
+    "zones": {
+     "z1": {
+      "heating_pct": 3,
+      "cooling_pct": -17.2,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4.5,
+      "cooling_pct": 3.1,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -3,
+      "cooling_pct": 4.6,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.9,
+      "cooling_pct": 3.9,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": -1.4,
+      "cooling_pct": 0.1,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  },
+  "tarp_steps4": {
+   "options": {
+    "surface_physics": {
+     "outside_convection": "fixed",
+     "inside_convection": "tarp",
+     "beam_on_floor": true
+    },
+    "time_step": {
+     "steps_per_hour": 4,
+     "theta_e_between": "linear"
+    }
+   },
+   "heating_mwh": 88.9633,
+   "cooling_mwh": 14.0239,
+   "run_ms": 3867,
+   "zones": {
+    "z1": {
+     "heating_mwh": 24.4242,
+     "cooling_mwh": 0.9016,
+     "slab_in_mwh": 3.923,
+     "closure_max_wh": 4.4e-9
+    },
+    "z2": {
+     "heating_mwh": 13.4926,
+     "cooling_mwh": 3.1403,
+     "slab_in_mwh": -2.8071,
+     "closure_max_wh": 4.27e-9
+    },
+    "z3": {
+     "heating_mwh": 13.0889,
+     "cooling_mwh": 3.9461,
+     "slab_in_mwh": -1.3599,
+     "closure_max_wh": 4.01e-9
+    },
+    "z4": {
+     "heating_mwh": 13.7996,
+     "cooling_mwh": 3.7901,
+     "slab_in_mwh": -2.3609,
+     "closure_max_wh": 4.66e-9
+    },
+    "z5": {
+     "heating_mwh": 24.1581,
+     "cooling_mwh": 2.2458,
+     "slab_in_mwh": 2.6048,
+     "closure_max_wh": 3.44e-9
+    }
+   },
+   "vs_same_form": {
+    "referee": "r2_z_e2tarp",
+    "heating_pct": -1.1,
+    "cooling_pct": 3.7,
+    "zones": {
+     "z1": {
+      "heating_pct": 2.4,
+      "cooling_pct": -9.5,
+      "slab_in_mwh_referee": 4.4452
+     },
+     "z2": {
+      "heating_pct": -3.5,
+      "cooling_pct": 3.9,
+      "slab_in_mwh_referee": -3.16
+     },
+     "z3": {
+      "heating_pct": -2.1,
+      "cooling_pct": 4.8,
+      "slab_in_mwh_referee": -1.5069
+     },
+     "z4": {
+      "heating_pct": -2.4,
+      "cooling_pct": 5,
+      "slab_in_mwh_referee": -2.6031
+     },
+     "z5": {
+      "heating_pct": -2,
+      "cooling_pct": 5.6,
+      "slab_in_mwh_referee": 2.9189
+     }
+    }
+   },
+   "vs_r2_z": {
+    "referee": "r2_z",
+    "heating_pct": -1.4,
+    "cooling_pct": 1.6,
+    "zones": {
+     "z1": {
+      "heating_pct": 3,
+      "cooling_pct": -17.3,
+      "slab_in_mwh_referee": 4.7751
+     },
+     "z2": {
+      "heating_pct": -4.5,
+      "cooling_pct": 3.1,
+      "slab_in_mwh_referee": -3.4128
+     },
+     "z3": {
+      "heating_pct": -3,
+      "cooling_pct": 4.5,
+      "slab_in_mwh_referee": -1.7777
+     },
+     "z4": {
+      "heating_pct": -3.9,
+      "cooling_pct": 3.9,
+      "slab_in_mwh_referee": -2.9274
+     },
+     "z5": {
+      "heating_pct": -1.4,
+      "cooling_pct": 0,
+      "slab_in_mwh_referee": 3.435
+     }
+    }
+   }
+  }
+ },
+ "step_error_vs_60_steps": {
+  "base": {
+   "heating_pct": 0,
+   "cooling_pct": 0.1,
+   "zones": {
+    "z1": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z2": {
+     "heating_pct": 0,
+     "cooling_pct": 0.1
+    },
+    "z3": {
+     "heating_pct": 0,
+     "cooling_pct": 0.1
+    },
+    "z4": {
+     "heating_pct": 0,
+     "cooling_pct": 0.1
+    },
+    "z5": {
+     "heating_pct": 0,
+     "cooling_pct": 0.1
+    }
+   }
+  },
+  "steps2": {
+   "heating_pct": 0,
+   "cooling_pct": 0,
+   "zones": {
+    "z1": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z2": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z3": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z4": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z5": {
+     "heating_pct": 0,
+     "cooling_pct": 0.1
+    }
+   }
+  },
+  "steps4": {
+   "heating_pct": 0,
+   "cooling_pct": 0,
+   "zones": {
+    "z1": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z2": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z3": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z4": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z5": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    }
+   }
+  },
+  "steps12": {
+   "heating_pct": 0,
+   "cooling_pct": 0,
+   "zones": {
+    "z1": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z2": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z3": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z4": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    },
+    "z5": {
+     "heating_pct": 0,
+     "cooling_pct": 0
+    }
+   }
+  }
+ },
+ "fifty_zones_run_ms": {
+  "fixed": 1977,
+  "tarp": 50083
+ },
+ "bestest_900": {
+  "engine2": {
+   "base": {
+    "heating_mwh": 2.0476,
+    "cooling_mwh": 2.4236,
+    "closure_max_wh": 5.55e-11
+   },
+   "steps4": {
+    "heating_mwh": 2.0314,
+    "cooling_mwh": 2.399,
+    "closure_max_wh": 4.08e-11
+   },
+   "steps60": {
+    "heating_mwh": 2.0271,
+    "cooling_mwh": 2.3923,
+    "closure_max_wh": 3.12e-10
+   },
+   "tarp": {
+    "heating_mwh": 1.9634,
+    "cooling_mwh": 2.3523,
+    "closure_max_wh": 5.46e-11
+   },
+   "tarp_steps4": {
+    "heating_mwh": 1.956,
+    "cooling_mwh": 2.3389,
+    "closure_max_wh": 4.57e-11
+   }
+  },
+  "step_error_vs_60": {
+   "base": {
+    "heating_pct": 1,
+    "cooling_pct": 1.3
+   },
+   "steps4": {
+    "heating_pct": 0.2,
+    "cooling_pct": 0.3
+   }
+  },
+  "energyplus_104": {
+   "900_iso3 (4 steps)": {
+    "flags": [
+     "hce20",
+     "hci_iso",
+     "simple_window"
+    ],
+    "notes": [],
+    "heating_mwh": 2.082,
+    "cooling_mwh": 2.37,
+    "peak_heating_kw": 2.885,
+    "peak_cooling_kw": 2.822
+   },
+   "900_iso3_ts (1 step)": {
+    "flags": [
+     "hce20",
+     "hci_iso",
+     "simple_window",
+     "ts_1"
+    ],
+    "notes": [
+     "ts_1: one time step per hour"
+    ],
+    "heating_mwh": 2.032,
+    "cooling_mwh": 2.321,
+    "peak_heating_kw": 2.888,
+    "peak_cooling_kw": 2.847
+   },
+   "900 (TARP, 4 steps)": {
+    "flags": [],
+    "notes": [],
+    "heating_mwh": 1.652,
+    "cooling_mwh": 2.507,
+    "peak_heating_kw": 2.688,
+    "peak_cooling_kw": 3.106
+   }
+  }
+ },
+ "roof_slab_hourly": {
+  "base / r2_z_e2like_ts1": {
+   "annual_mwh": {
+    "engine2": 0.7682,
+    "energyplus": 1.4013
+   },
+   "monthly_mwh": {
+    "engine2": [
+     0.2074,
+     0.1338,
+     0.0433,
+     -0.017,
+     0.2367,
+     -0.1072,
+     -0.3376,
+     -0.0946,
+     0.3528,
+     0.0143,
+     0.1308,
+     0.2056
+    ],
+    "energyplus": [
+     0.2609,
+     0.1732,
+     0.0612,
+     0.0128,
+     0.2307,
+     -0.066,
+     -0.2809,
+     0.0523,
+     0.4626,
+     0.047,
+     0.1957,
+     0.2518
+    ]
+   },
+   "by_engine2_state_mwh": {
+    "heating": {
+     "engine2": 0.9012,
+     "energyplus": 1.266
+    },
+    "cooling": {
+     "engine2": -0.4314,
+     "energyplus": -0.4099
+    },
+    "free": {
+     "engine2": 0.2984,
+     "energyplus": 0.5452
+    }
+   },
+   "mean_air_difference_k": {
+    "z5": 0.057,
+    "z4": 0.04
+   },
+   "energyplus_mean_floor_c": 22.011
+  },
+  "steps4 / r2_z_e2like": {
+   "annual_mwh": {
+    "engine2": 0.7683,
+    "energyplus": 1.276
+   },
+   "monthly_mwh": {
+    "engine2": [
+     0.2074,
+     0.1338,
+     0.0432,
+     -0.0171,
+     0.237,
+     -0.1067,
+     -0.338,
+     -0.0949,
+     0.3533,
+     0.0141,
+     0.1307,
+     0.2057
+    ],
+    "energyplus": [
+     0.2588,
+     0.1723,
+     0.056,
+     0.0174,
+     0.237,
+     -0.1197,
+     -0.3048,
+     0.0086,
+     0.4616,
+     0.0477,
+     0.192,
+     0.2491
+    ]
+   },
+   "by_engine2_state_mwh": {
+    "heating": {
+     "engine2": 0.8962,
+     "energyplus": 1.1958
+    },
+    "cooling": {
+     "engine2": -0.4363,
+     "energyplus": -0.3808
+    },
+    "free": {
+     "engine2": 0.3085,
+     "energyplus": 0.4609
+    }
+   },
+   "mean_air_difference_k": {
+    "z5": 0.02,
+    "z4": 0.013
+   },
+   "energyplus_mean_floor_c": 22.055
+  },
+  "tarp / r2_z_e2tarp_ts1": {
+   "annual_mwh": {
+    "engine2": 2.6028,
+    "energyplus": 2.9694
+   },
+   "monthly_mwh": {
+    "engine2": [
+     0.2334,
+     0.1867,
+     0.1594,
+     0.2097,
+     0.4196,
+     0.1632,
+     0.0481,
+     0.1437,
+     0.4589,
+     0.1688,
+     0.1873,
+     0.2239
+    ],
+    "energyplus": [
+     0.2752,
+     0.2144,
+     0.1479,
+     0.209,
+     0.3947,
+     0.1561,
+     0.0805,
+     0.2383,
+     0.5631,
+     0.1858,
+     0.2481,
+     0.2565
+    ]
+   },
+   "by_engine2_state_mwh": {
+    "heating": {
+     "engine2": 1.4522,
+     "energyplus": 1.7302
+    },
+    "cooling": {
+     "engine2": -0.0866,
+     "energyplus": -0.1321
+    },
+    "free": {
+     "engine2": 1.2372,
+     "energyplus": 1.3713
+    }
+   },
+   "mean_air_difference_k": {
+    "z5": 0.053,
+    "z4": 0.04
+   },
+   "energyplus_mean_floor_c": 21.892
+  },
+  "tarp_steps4 / r2_z_e2tarp": {
+   "annual_mwh": {
+    "engine2": 2.6048,
+    "energyplus": 2.9189
+   },
+   "monthly_mwh": {
+    "engine2": [
+     0.2329,
+     0.1865,
+     0.1598,
+     0.2106,
+     0.4203,
+     0.1637,
+     0.0482,
+     0.1435,
+     0.4594,
+     0.169,
+     0.1871,
+     0.2238
+    ],
+    "energyplus": [
+     0.2743,
+     0.2137,
+     0.1454,
+     0.2165,
+     0.3985,
+     0.1261,
+     0.0691,
+     0.2179,
+     0.5629,
+     0.1941,
+     0.2459,
+     0.2545
+    ]
+   },
+   "by_engine2_state_mwh": {
+    "heating": {
+     "engine2": 1.4588,
+     "energyplus": 1.7041
+    },
+    "cooling": {
+     "engine2": -0.0865,
+     "energyplus": -0.1067
+    },
+    "free": {
+     "engine2": 1.2325,
+     "energyplus": 1.3215
+    }
+   },
+   "mean_air_difference_k": {
+    "z5": 0.019,
+    "z4": 0.011
+   },
+   "energyplus_mean_floor_c": 21.942
+  }
+ }
+}

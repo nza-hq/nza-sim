@@ -14,7 +14,15 @@ export interface BreakdownLine {
     | 'glazing_solar_absorbed' | 'solar_lost_through_glazing'
     /** Heat into this zone from another through the element they share (Brief 104); the two zones' lines cancel. */
     | 'interzone'
+    /** Internal gains from the document's profiles, one line per profile the zone refers to (Brief 105 Part 2). */
+    | 'occupancy_gains' | 'lighting_gains' | 'equipment_gains' | 'auxiliary_gains'
+    /** Mechanical or natural ventilation, one line per zone ventilation entry that runs (Brief 105 Part 3). */
+    | 'mechanical_ventilation'
   surface_id: string | null
+  /** The profile a gains line comes from. */
+  profile_id?: string
+  /** The zone ventilation entry a mechanical_ventilation line comes from. */
+  ventilation_id?: string
   kwh: number
 }
 
@@ -38,6 +46,8 @@ export interface ZoneResults {
     theta_mean_radiant_c: Float64Array
     heating_w: Float64Array
     cooling_w: Float64Array
+    /** Heat into the zone from the other zones, W (Brief 105 Part 6; zeros for a one-zone model). */
+    interzone_w: Float64Array
   }
   annual: {
     heating_kwh: number

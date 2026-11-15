@@ -1,0 +1,761 @@
+{
+ "_note": "Made by scripts/sim2_run_constructions.mjs from docs/audit/102/library_export.json and library_additions.json (drafts). Do not edit by hand.",
+ "source": "docs/audit/102/library_export.json",
+ "source_sha256": "c3891d6632c605671a54843cc4cc0e50b66f0ec2ecfc544b8b9c7f9d96d6b9f0",
+ "exported_at": "2026-11-14T19:36:56+00:00",
+ "additions": "docs/audit/102/library_additions.json",
+ "additions_sha256": "30bcb08bfd432965d8e4be37742073420878c5d5304f44be831eac9105975c13",
+ "constructions": [
+  {
+   "key": "bridgwater_ext_wall",
+   "body_hash": "18df4e10a7eee615f258ce039948cc36b4e696776f0f8d23a760b0965db02155",
+   "body": {
+    "name": "bridgwater_ext_wall",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.14,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "HIEX Bridgwater external wall — precast insulated panel, BRUKL U=0.14",
+    "epjson": {
+     "Material": {
+      "Brdg_Wall_Concrete150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2300,
+       "specific_heat": 1000
+      },
+      "Brdg_Wall_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "Brdg_Wall_Insul": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 6.759
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "bridgwater_ext_wall": {
+       "outside_layer": "Brdg_Wall_Insul",
+       "layer_2": "Brdg_Wall_Concrete150",
+       "layer_3": "Brdg_Wall_Plasterboard"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "bridgwater_glazing",
+   "body_hash": "424b2a5ed11df072d32e8aca42dc144587c41ba94693fea9e829b38bdbd47c4e",
+   "body": {
+    "name": "bridgwater_glazing",
+    "type": "glazing",
+    "u_value_W_per_m2K": 1.4,
+    "g_value": 0.55,
+    "thermal_mass": null,
+    "description": "HIEX Bridgwater glazing — area-weighted G1/G2 bedroom DGU dominant, BRUKL U=1.4 / g=0.55",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "bridgwater_glazing_pane": {
+       "u_factor": 1.4,
+       "solar_heat_gain_coefficient": 0.55,
+       "visible_transmittance": 0.7
+      }
+     },
+     "Construction": {
+      "bridgwater_glazing": {
+       "outside_layer": "bridgwater_glazing_pane"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "bridgwater_ground_floor",
+   "body_hash": "fae84ab89bfa11c005b3c3b1a4d8e51ca57c026d63fed4f81627bffc535f4350",
+   "body": {
+    "name": "bridgwater_ground_floor",
+    "type": "floor",
+    "u_value_W_per_m2K": 0.13,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "HIEX Bridgwater ground floor — insulated precast slab + screed, BRUKL U=0.13",
+    "epjson": {
+     "Material": {
+      "Brdg_GF_Concrete150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2300,
+       "specific_heat": 1000
+      },
+      "Brdg_GF_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "Brdg_GF_Insul": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 7.191
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "bridgwater_ground_floor": {
+       "outside_layer": "Brdg_GF_Insul",
+       "layer_2": "Brdg_GF_Concrete150",
+       "layer_3": "Brdg_GF_Screed"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "bridgwater_roof",
+   "body_hash": "a1894eb8c84972f049e07bcb5fa6f7b5c5f5ae7a8a53983321e6726977e50d91",
+   "body": {
+    "name": "bridgwater_roof",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.15,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "HIEX Bridgwater roof — precast concrete deck + insulation, BRUKL U=0.15",
+    "epjson": {
+     "Material": {
+      "Brdg_Roof_Waterproof": {
+       "roughness": "Smooth",
+       "thickness": 0.005,
+       "conductivity": 0.2,
+       "density": 1100,
+       "specific_heat": 1000
+      },
+      "Brdg_Roof_Concrete150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {
+      "Brdg_Roof_Insul": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 6.369
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "bridgwater_roof": {
+       "outside_layer": "Brdg_Roof_Waterproof",
+       "layer_2": "Brdg_Roof_Insul",
+       "layer_3": "Brdg_Roof_Concrete150"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "cavity_wall_enhanced",
+   "body_hash": "58fae60ea51aae591060348138551bb626c80877ccc5baf67a47f522705c93a0",
+   "body": {
+    "name": "cavity_wall_enhanced",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.18,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Brick outer leaf, 150mm PIR cavity insulation, dense concrete block, plasterboard",
+    "epjson": {
+     "Material": {
+      "CavWall_Enh_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "CavWall_Enh_PIR150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 0.022,
+       "density": 30,
+       "specific_heat": 1400
+      },
+      "CavWall_Enh_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "CavWall_Enh_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "cavity_wall_enhanced": {
+       "outside_layer": "CavWall_Enh_BrickOuter",
+       "layer_2": "CavWall_Enh_PIR150",
+       "layer_3": "CavWall_Enh_ConcreteBlock",
+       "layer_4": "CavWall_Enh_Plasterboard"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "cavity_wall_standard",
+   "body_hash": "f70dd444cd551bb059e6b562408bb84c1b9b6a961761a2cdd440c0025c6dc2fe",
+   "body": {
+    "name": "cavity_wall_standard",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.28,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Brick outer leaf, 100mm mineral wool cavity, dense concrete block inner, plasterboard",
+    "epjson": {
+     "Material": {
+      "CavWall_Std_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "CavWall_Std_MineralWool100": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "CavWall_Std_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "CavWall_Std_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "cavity_wall_standard": {
+       "outside_layer": "CavWall_Std_BrickOuter",
+       "layer_2": "CavWall_Std_MineralWool100",
+       "layer_3": "CavWall_Std_ConcreteBlock",
+       "layer_4": "CavWall_Std_Plasterboard"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "double_low_e",
+   "body_hash": "ff1ee7892b8fe9fe027cb48f737b6d58b09123e959491be3fbe6601093cbb96a",
+   "body": {
+    "name": "double_low_e",
+    "type": "glazing",
+    "u_value_W_per_m2K": 1.4,
+    "g_value": 0.42,
+    "thermal_mass": null,
+    "description": "Double glazing, low-e coating, argon filled",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "double_low_e_glazing": {
+       "u_factor": 1.4,
+       "solar_heat_gain_coefficient": 0.42
+      }
+     },
+     "Construction": {
+      "double_low_e": {
+       "outside_layer": "double_low_e_glazing"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "flat_roof_enhanced",
+   "body_hash": "c76fd01826599c177ef460bb6444a85e4404ce1982a38dae4b78ceb8b1810dfa",
+   "body": {
+    "name": "flat_roof_enhanced",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.11,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Concrete deck, vapour barrier, 200mm PIR insulation, waterproofing",
+    "epjson": {
+     "Material": {
+      "FlatRoof_Enh_Waterproof": {
+       "roughness": "MediumSmooth",
+       "thickness": 0.005,
+       "conductivity": 0.2,
+       "density": 1100,
+       "specific_heat": 1000
+      },
+      "FlatRoof_Enh_PIR200": {
+       "roughness": "MediumRough",
+       "thickness": 0.2,
+       "conductivity": 0.022,
+       "density": 30,
+       "specific_heat": 1400
+      },
+      "FlatRoof_Enh_VapourBarrier": {
+       "roughness": "MediumRough",
+       "thickness": 0.002,
+       "conductivity": 0.19,
+       "density": 920,
+       "specific_heat": 2090
+      },
+      "FlatRoof_Enh_ConcreteDeck": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "flat_roof_enhanced": {
+       "outside_layer": "FlatRoof_Enh_Waterproof",
+       "layer_2": "FlatRoof_Enh_PIR200",
+       "layer_3": "FlatRoof_Enh_VapourBarrier",
+       "layer_4": "FlatRoof_Enh_ConcreteDeck"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "flat_roof_standard",
+   "body_hash": "c0db6d5db9ac935ae3041aae55fabed92d0fa39352368835c43b9b953ca3df32",
+   "body": {
+    "name": "flat_roof_standard",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.18,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Concrete deck, vapour barrier, 120mm PIR insulation, waterproofing",
+    "epjson": {
+     "Material": {
+      "FlatRoof_Std_Waterproof": {
+       "roughness": "MediumSmooth",
+       "thickness": 0.005,
+       "conductivity": 0.2,
+       "density": 1100,
+       "specific_heat": 1000
+      },
+      "FlatRoof_Std_PIR120": {
+       "roughness": "MediumRough",
+       "thickness": 0.12,
+       "conductivity": 0.022,
+       "density": 30,
+       "specific_heat": 1400
+      },
+      "FlatRoof_Std_VapourBarrier": {
+       "roughness": "MediumRough",
+       "thickness": 0.002,
+       "conductivity": 0.19,
+       "density": 920,
+       "specific_heat": 2090
+      },
+      "FlatRoof_Std_ConcreteDeck": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "flat_roof_standard": {
+       "outside_layer": "FlatRoof_Std_Waterproof",
+       "layer_2": "FlatRoof_Std_PIR120",
+       "layer_3": "FlatRoof_Std_VapourBarrier",
+       "layer_4": "FlatRoof_Std_ConcreteDeck"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "ground_floor_enhanced",
+   "body_hash": "be66ccc0b6e33a7cf5b8d1a8137de58ecb31192143bb819ddfd943e19b2d2e2a",
+   "body": {
+    "name": "ground_floor_enhanced",
+    "type": "floor",
+    "u_value_W_per_m2K": 0.15,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Carpet, screed, 150mm concrete slab, 150mm XPS insulation, hardcore",
+    "epjson": {
+     "Material": {
+      "GFloor_Enh_Carpet": {
+       "roughness": "MediumRough",
+       "thickness": 0.01,
+       "conductivity": 0.06,
+       "density": 200,
+       "specific_heat": 1300
+      },
+      "GFloor_Enh_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFloor_Enh_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "GFloor_Enh_XPS150": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 0.033,
+       "density": 35,
+       "specific_heat": 1400
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_enhanced": {
+       "outside_layer": "GFloor_Enh_Carpet",
+       "layer_2": "GFloor_Enh_Screed",
+       "layer_3": "GFloor_Enh_ConcreteSlab",
+       "layer_4": "GFloor_Enh_XPS150"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "ground_floor_slab",
+   "body_hash": "572c7483d8953441c27b4cf79adea0cbb7a56ae9d4bf7fcf023b2284313cbb9a",
+   "body": {
+    "name": "ground_floor_slab",
+    "type": "floor",
+    "u_value_W_per_m2K": 0.22,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Carpet, screed, 150mm concrete slab, 100mm XPS insulation, hardcore",
+    "epjson": {
+     "Material": {
+      "GFloor_Std_Carpet": {
+       "roughness": "MediumRough",
+       "thickness": 0.01,
+       "conductivity": 0.06,
+       "density": 200,
+       "specific_heat": 1300
+      },
+      "GFloor_Std_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFloor_Std_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "GFloor_Std_XPS100": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.033,
+       "density": 35,
+       "specific_heat": 1400
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_slab": {
+       "outside_layer": "GFloor_Std_Carpet",
+       "layer_2": "GFloor_Std_Screed",
+       "layer_3": "GFloor_Std_ConcreteSlab",
+       "layer_4": "GFloor_Std_XPS100"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "interior_floor_ceiling",
+   "body_hash": "f413a74d84088f348ba123e81baa589c083c0f7685a57731d06309562512e48b",
+   "body": {
+    "name": "interior_floor_ceiling",
+    "type": "interior",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Carpet, screed, 200mm reinforced concrete, plaster skim",
+    "epjson": {
+     "Material": {
+      "IntFloor_Carpet": {
+       "roughness": "MediumRough",
+       "thickness": 0.01,
+       "conductivity": 0.06,
+       "density": 200,
+       "specific_heat": 1300
+      },
+      "IntFloor_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "IntFloor_Concrete200": {
+       "roughness": "MediumRough",
+       "thickness": 0.2,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "IntFloor_Plaster": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "interior_floor_ceiling": {
+       "outside_layer": "IntFloor_Carpet",
+       "layer_2": "IntFloor_Screed",
+       "layer_3": "IntFloor_Concrete200",
+       "layer_4": "IntFloor_Plaster"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "pitched_roof_standard",
+   "body_hash": "43f6fa25329397baa7d8cbb82e95bcf67c2b473834a39e4f460bd0c883e68175",
+   "body": {
+    "name": "pitched_roof_standard",
+    "type": "roof",
+    "u_value_W_per_m2K": 0.16,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Tiles, battens, membrane, 200mm mineral wool between rafters, plasterboard",
+    "epjson": {
+     "Material": {
+      "PitchedRoof_Std_Tiles": {
+       "roughness": "Rough",
+       "thickness": 0.012,
+       "conductivity": 0.84,
+       "density": 1900,
+       "specific_heat": 800
+      },
+      "PitchedRoof_Std_MineralWool200": {
+       "roughness": "MediumRough",
+       "thickness": 0.2,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "PitchedRoof_Std_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "PitchedRoof_Std_Membrane": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 0.06
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "pitched_roof_standard": {
+       "outside_layer": "PitchedRoof_Std_Tiles",
+       "layer_2": "PitchedRoof_Std_Membrane",
+       "layer_3": "PitchedRoof_Std_MineralWool200",
+       "layer_4": "PitchedRoof_Std_Plasterboard"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "timber_frame_standard",
+   "body_hash": "49c70a922f15c659a6239411669cdea01ca94ba1c0cd22619639d4e6956a314a",
+   "body": {
+    "name": "timber_frame_standard",
+    "type": "wall",
+    "u_value_W_per_m2K": 0.22,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Brick outer leaf, cavity, OSB sheathing, 140mm mineral wool between studs, plasterboard",
+    "epjson": {
+     "Material": {
+      "TF_Std_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "TF_Std_OSB": {
+       "roughness": "MediumRough",
+       "thickness": 0.012,
+       "conductivity": 0.13,
+       "density": 650,
+       "specific_heat": 1700
+      },
+      "TF_Std_MineralWool140": {
+       "roughness": "MediumRough",
+       "thickness": 0.14,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "TF_Std_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "TF_Std_AirCavity": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 0.18
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "timber_frame_standard": {
+       "outside_layer": "TF_Std_BrickOuter",
+       "layer_2": "TF_Std_AirCavity",
+       "layer_3": "TF_Std_OSB",
+       "layer_4": "TF_Std_MineralWool140",
+       "layer_5": "TF_Std_Plasterboard"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "triple_glazing",
+   "body_hash": "7e2196ae816f79e4593d2d2e69dd5054917f44b46774e2ecc7c388a3bc85d190",
+   "body": {
+    "name": "triple_glazing",
+    "type": "glazing",
+    "u_value_W_per_m2K": 0.8,
+    "g_value": 0.35,
+    "thermal_mass": null,
+    "description": "Triple glazing, double low-e coatings, argon filled",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "triple_glazing_glazing": {
+       "u_factor": 0.8,
+       "solar_heat_gain_coefficient": 0.35
+      }
+     },
+     "Construction": {
+      "triple_glazing": {
+       "outside_layer": "triple_glazing_glazing"
+      }
+     }
+    }
+   }
+  },
+  {
+   "key": "interior_wall_block_plastered",
+   "body_hash": "0204c0d2fdb03e86fe74164514a58eff776cfc6be7e562494b49c4628ec1cdb3",
+   "body": {
+    "name": "interior_wall_block_plastered",
+    "type": "interior",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Internal wall: plaster skim, 100mm dense concrete block, plaster skim",
+    "epjson": {
+     "Material": {
+      "IntWall_PlasterA": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      },
+      "IntWall_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "IntWall_PlasterB": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "interior_wall_block_plastered": {
+       "outside_layer": "IntWall_PlasterA",
+       "layer_2": "IntWall_ConcreteBlock",
+       "layer_3": "IntWall_PlasterB"
+      }
+     }
+    }
+   },
+   "draft": "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)"
+  }
+ ]
+}

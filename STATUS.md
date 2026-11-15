@@ -2,6 +2,49 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## ✅ Brief 105 — Simulate v2: the drawn building runs — CLOSED 15 Nov 2026 on `chris/105-editor-engine` (PR open, awaiting Linzie)
+
+Brief [`docs/briefs/archive/105_editor-engine_COMPLETED.md`](docs/briefs/archive/105_editor-engine_COMPLETED.md). Linzie 15 Nov 19:58: "yep lets gp" (merge #29–#31, then this).
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/105/00_reconnaissance.md)):
+  - The editor's documents run on Engine 2 once their nulls are filled.
+  - Library constructions carry layers as epJSON, so Part 4 converts them.
+  - No EPW is committed, because Climate.OneBuilding states no open licence. Weather will come from a private bucket.
+- **P1 schema 2.3** ([`01_schema.md`](docs/audit/105/01_schema.md)):
+  - Gains stay on the document's profiles (Rule 11), so there is no `zones[].gains`.
+  - `radiant_fraction` is added to each gain profile.
+  - The 2.2 upgrade and the converter write today's `computeHourlyGains` fallbacks and today's 0.3 split.
+- **P2 internal gains** ([`02_gains.md`](docs/audit/105/02_gains.md)):
+  - `engine/gains.ts` equals today's `computeHourlyGains` hour by hour (< 1e-9 W).
+  - Gains run on both solvers when `internal_gains: 'profiles'` is set, with one breakdown line per profile.
+  - With gains, Bridgewater's five storeys give cooling 228.65 MWh against EnergyPlus's 223.68 (+2.2 %), each storey within ±8 %. Neither needs heating.
+  - The brief's gate, with gains and ventilation together, comes in P3.
+  - The per-storey converter now divides rooms evenly; `rooms` may be a share.
+- **P3 ventilation** ([`03_ventilation.md`](docs/audit/105/03_ventilation.md)):
+  - `engine/ventilation.ts` is today's ρc·q·(1 − η) per entry, scheduled. It is on both solvers when `ventilation: 'document'` is set, with one breakdown line per entry.
+  - Summer bypass is refused, not ignored. Each storey gets each entry, with building flows divided evenly.
+  - **Gate** (gains and ventilation, five storeys): passes like for like at −3.9 % heating / +9.3 % cooling. It misses with EnergyPlus's default outdoor-air density (−11.4 % / +10.2 %).
+  - **The miss is attributed.** With the air heat capacity matched in a diagnostic, heating is −0.5 % and ventilation-only heating −0.04 %. The cooling remainder (+6.5 %) is Brief 104's F2.
+  - The density convention is flagged for review, not changed.
+- **P4 run seam** ([`04_seam.md`](docs/audit/105/04_seam.md)): `frontend/src/sim2/run/`.
+  - `simulate(doc, { weather })` returns results, or every missing input at once in plain words. It runs Engine 2 with gains and ventilation.
+  - The library's epJSON layers match the fixture for all 15 constructions.
+  - Weather is a local EPW (never uploaded) or the organisation's private `weather` bucket. Migration 0006 is applied on dev and allows reads only; uploads await a decision.
+  - The run happens in a worker.
+- **P5 results in the editor** ([`05_panel.md`](docs/audit/105/05_panel.md)): `ResultsPanel.tsx`, mounted by the editor with one line.
+  - Building and per-zone heating and cooling ("estimate"), the full breakdown with the outside-face terms as one expandable net line.
+  - A zone with its control stated and only a heating setpoint runs heated only ("not cooled").
+  - Browser-checked on the editor's two-zone plan: it refuses until a partition construction and the space types' gain fields are stated (asked of the editor). With them stated in a scratch copy, 9.1 MWh heating; a rerun shows in about 0.4 s.
+- **P6 per-floor accuracy** ([`06_per_floor.md`](docs/audit/105/06_per_floor.md)): two engine options, neither a default.
+  - Sub-hourly steps: Engine 2's own 1 h step error is ≤0.1 % on Bridgewater and 1.0–1.3 % on BESTEST 900. EnergyPlus moves 9 % on cooling with its own step, so the like-for-like referee is EnergyPlus at 4 steps: −2.3 % / +3.2 %, every storey within 4.3 %.
+  - TARP inside convection: the building vs full r2_z goes from +1.1 / +7.9 % to −1.4 / +1.6 %, the worst storey's cooling from 31 % to 17 %, and z5's slab heat from 0.77 to 2.60 MWh (EnergyPlus 3.44). It is 25× too slow at 50 zones (50 s), so it stays an option; a faster factorisation is the follow-up.
+  - Roof slab gap attributed: 1.83 MWh inside convection form, 0.52 the rest of EnergyPlus's surface physics, 0.31 not attributed (step, slab discretisation and air temperatures ruled out).
+  - Cooled-room twin with gains (brief deliverable 5): per room within 4.3 % of EnergyPlus with the same coefficients; gain energy equal to four figures.
+- **P5 additions:** the panel starts closed as a tab; the drafted internal wall (`docs/audit/102/library_additions.json`) runs and is named in the panel ("Uses a draft construction, awaiting Chris"); editors and admins can save a weather file to their organisation (migration 0007, applied on dev: insert only, `.epw` names, no update or delete; Linzie 15 Nov 21:02).
+- **Independent review** ([`07_independent_review.md`](docs/audit/105/07_independent_review.md), response [`08_review_response.md`](docs/audit/105/08_review_response.md)): no tuning; F1, F2, F5, F7, F8 fixed; F4 stated; F3 (per-zone breakdown) and F6 (unpinned constructions) carried to the next brief; F9 a note.
+- **P7 close:** final report [`09_final_report.md`](docs/audit/105/09_final_report.md). All 156 thermal and sim2 tests pass; no file of today's engine changed; `_brief93_anchor.mjs --fixture` gives 133.2. Design note Rev A.8.
+- **Carried forward:** a per-zone breakdown on tap (F3); a pin for every construction the document uses (F6); a fast TARP factorisation; MVHR summer bypass (F9); Chris to check the drafted internal wall; saving and reloading plans.
+
 ## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 
 Brief [`docs/briefs/archive/104_engine-2_COMPLETED.md`](docs/briefs/archive/104_engine-2_COMPLETED.md). Multi-zone, starting from the open

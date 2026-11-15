@@ -13,6 +13,11 @@
  * such input: it puts all transmitted solar into the zone, which is absorptance 1 with no window losses.
  * It also adds `inside_solar_absorptance_b` and `faces_up` (Brief 104 Part 2): null, except the second face of a
  * surface between two zones (which 2.1 allowed in the document but no engine ran), filled the same way.
+ *
+ * 2.2 → 2.3 (Brief 105 Part 1) states the internal-gain inputs today's engine falls back to when a profile leaves
+ * them out (instantCalc.js computeHourlyGains and its helpers), and adds each gain profile's radiant fraction, filled
+ * with the split today's engine applies to internal gains. Gains stay where 2.x already keeps them, on the document's
+ * profiles referred to by each zone (CLAUDE.md Rule 11: one exposure); the zone's area and rooms scale the densities.
  */
 import { ModelDocument, SCHEMA_VERSION } from './model'
 
@@ -44,7 +49,48 @@ export const TODAY = {
    * floor/ceiling always uses the same library construction"). Read by the per-storey converter (Brief 104 Part 2).
    */
   interior_floor_construction: 'interior_floor_ceiling',
+  /** computeHourlyGains: `occ.occupancy_rate ?? 0.75`. */
+  occupancy_rate: 0.75,
+  /** computeHourlyGains: `occ.sensible_w_per_person ?? 75`. */
+  sensible_w_per_person: 75,
+  /** `profile.area_share ?? 1.0` (lighting, equipment, auxiliary). */
+  area_share: 1,
+  /** `profile.gain_fraction ?? 1.0`: all the electricity becomes heat in the zone. */
+  gain_fraction: 1,
+  /** lightingFractionForHour: `relationship_to_occupancy ?? 'proportional_with_spill'` (auxiliary reuses it). */
+  lighting_relationship: 'proportional_with_spill',
+  /** equipmentFractionForHour: `relationship_to_occupancy ?? 'proportional'`. */
+  equipment_relationship: 'proportional',
+  /** lightingFractionForHour: `daylight_factor ?? 0.6`, read only for 'proportional_with_spill'. */
+  daylight_factor: 0.6,
+  /** equipmentFractionForHour: `standby_factor ?? 0.10`, read only when not 'independent'. */
+  standby_factor: 0.1,
+  /** TUNE_SOLAR_RAD_FRAC (instantCalc.js ~2606): "Internal gains use the same radiative/convective split as solar (30/70)". */
+  gains_radiant_fraction: 0.3,
 } as const
+
+/**
+ * Writes today's fallbacks into a gain profile wherever it leaves them out, so the document says what today's engine
+ * assumed (used by the 2.2 → 2.3 upgrade and by the converter). Only the fields today's engine reads for that profile
+ * are filled. A field a profile states is kept.
+ */
+export function stateTodaysGainInputs(p: Obj): void {
+  if (p.kind === 'occupancy') {
+    p.occupancy_rate ??= TODAY.occupancy_rate
+    p.sensible_w_per_person ??= TODAY.sensible_w_per_person
+  } else if (p.kind === 'lighting' || p.kind === 'auxiliary' || p.kind === 'equipment') {
+    p.area_share ??= TODAY.area_share
+    p.gain_fraction ??= TODAY.gain_fraction
+    if (p.kind === 'equipment') {
+      p.relationship_to_occupancy ??= TODAY.equipment_relationship
+      if (p.relationship_to_occupancy !== 'independent') p.standby_factor ??= TODAY.standby_factor
+    } else {
+      p.relationship_to_occupancy ??= TODAY.lighting_relationship
+      if (p.relationship_to_occupancy === 'proportional_with_spill') p.daylight_factor ??= TODAY.daylight_factor
+    }
+  } else return
+  p.radiant_fraction ??= TODAY.gains_radiant_fraction
+}
 
 type Obj = Record<string, any>
 
@@ -53,16 +99,21 @@ export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
+  if (from !== '2.2') to22(doc)
+  for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
+  doc.schema_version = SCHEMA_VERSION
+  return ModelDocument.parse(doc)
+}
+
+function to22(doc: Obj): void {
   for (const s of doc.surfaces as Obj[]) {
     s.inside_solar_absorptance = s.kind === 'glazing' ? null : TODAY.inside_solar_absorptance
     const interzone = s.zone_b !== 'outside' && s.zone_b !== 'ground'
     s.inside_solar_absorptance_b = interzone ? TODAY.inside_solar_absorptance : null
     s.faces_up = null
   }
-  doc.schema_version = SCHEMA_VERSION
-  return ModelDocument.parse(doc)
 }
 
 function to21(doc: Obj): void {

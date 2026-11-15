@@ -1,0 +1,975 @@
+{
+ "runs": {
+  "r2_z": {
+   "flags": [
+    "frame_split",
+    "docmass",
+    "slab_reversed",
+    "tb_by_zone",
+    "inf_by_zone"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+    "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+    "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}"
+   ],
+   "timesteps_per_hour": 4,
+   "heating_mwh": 90.184,
+   "cooling_mwh": 13.805,
+   "zones": {
+    "Floor_1": {
+     "heating_monthly_mwh": [
+      4.8957,
+      3.7124,
+      3.3698,
+      1.2901,
+      0.2158,
+      0.0,
+      0.0,
+      0.0,
+      0.138,
+      1.8349,
+      3.6193,
+      4.6381
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.1848,
+      0.9054,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 4.7751,
+     "heating_mwh": 23.7141,
+     "cooling_mwh": 1.0902
+    },
+    "Floor_2": {
+     "heating_monthly_mwh": [
+      3.2401,
+      2.3077,
+      1.942,
+      0.3596,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8592,
+      2.3073,
+      3.1071
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.7688,
+      1.8482,
+      0.4284,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -3.4128,
+     "heating_mwh": 14.1231,
+     "cooling_mwh": 3.0454
+    },
+    "Floor_3": {
+     "heating_monthly_mwh": [
+      3.1452,
+      2.2197,
+      1.8456,
+      0.3054,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.7563,
+      2.2151,
+      3.0088
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0164,
+      1.1013,
+      2.0217,
+      0.6356,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -1.7777,
+     "heating_mwh": 13.4961,
+     "cooling_mwh": 3.775
+    },
+    "Floor_4": {
+     "heating_monthly_mwh": [
+      3.3177,
+      2.3586,
+      1.9783,
+      0.3544,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8486,
+      2.3413,
+      3.1601
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0064,
+      1.0421,
+      2.0168,
+      0.5837,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -2.9274,
+     "heating_mwh": 14.3589,
+     "cooling_mwh": 3.649
+    },
+    "Floor_5": {
+     "heating_monthly_mwh": [
+      5.2632,
+      3.9386,
+      3.5033,
+      1.1577,
+      0.1106,
+      0.0,
+      0.0,
+      0.0,
+      0.118,
+      1.7914,
+      3.7614,
+      4.8482
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.5214,
+      1.6216,
+      0.1022,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 3.435,
+     "heating_mwh": 24.4923,
+     "cooling_mwh": 2.2452
+    }
+   },
+   "severe": 0,
+   "warnings": 5
+  },
+  "r2_z_e2like": {
+   "flags": [
+    "frame_split",
+    "docmass",
+    "slab_reversed",
+    "tb_by_zone",
+    "inf_by_zone",
+    "sky_fixed",
+    "lw_area",
+    "iso_conv"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 5 zone(s)",
+    "iso_conv: fixed coefficients on 70 surfaces",
+    "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+    "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+    "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}"
+   ],
+   "timesteps_per_hour": 4,
+   "heating_mwh": 93.336,
+   "cooling_mwh": 14.423,
+   "zones": {
+    "Floor_1": {
+     "heating_monthly_mwh": [
+      5.2185,
+      3.9778,
+      3.5564,
+      1.1953,
+      0.1368,
+      0.0,
+      0.0,
+      0.0,
+      0.0908,
+      2.0454,
+      3.8441,
+      4.9463
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.3242,
+      1.1486,
+      0.0049,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 4.6507,
+     "heating_mwh": 25.0115,
+     "cooling_mwh": 1.4778
+    },
+    "Floor_2": {
+     "heating_monthly_mwh": [
+      3.2932,
+      2.3364,
+      1.8994,
+      0.2847,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8255,
+      2.3157,
+      3.1449
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.9898,
+      1.9592,
+      0.6077,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -2.3565,
+     "heating_mwh": 14.0999,
+     "cooling_mwh": 3.5568
+    },
+    "Floor_3": {
+     "heating_monthly_mwh": [
+      3.2087,
+      2.2616,
+      1.8244,
+      0.2508,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.7447,
+      2.2429,
+      3.0584
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0365,
+      1.2338,
+      2.0435,
+      0.7443,
+      0.0072,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -1.1247,
+     "heating_mwh": 13.5915,
+     "cooling_mwh": 4.0653
+    },
+    "Floor_4": {
+     "heating_monthly_mwh": [
+      3.3307,
+      2.362,
+      1.9239,
+      0.2969,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8395,
+      2.3384,
+      3.1698
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0008,
+      1.027,
+      1.9647,
+      0.631,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -2.3892,
+     "heating_mwh": 14.2611,
+     "cooling_mwh": 3.6234
+    },
+    "Floor_5": {
+     "heating_monthly_mwh": [
+      5.5064,
+      4.1755,
+      3.7256,
+      1.3767,
+      0.197,
+      0.0,
+      0.0,
+      0.0,
+      0.1637,
+      2.0875,
+      4.0271,
+      5.1123
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.4062,
+      1.2509,
+      0.0424,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 1.276,
+     "heating_mwh": 26.3718,
+     "cooling_mwh": 1.6996
+    }
+   },
+   "severe": 0,
+   "warnings": 6
+  },
+  "r2_z_e2like_ts1": {
+   "flags": [
+    "frame_split",
+    "docmass",
+    "slab_reversed",
+    "tb_by_zone",
+    "inf_by_zone",
+    "sky_fixed",
+    "lw_area",
+    "iso_conv",
+    "ts_1"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 5 zone(s)",
+    "ts_1: one time step per hour",
+    "iso_conv: fixed coefficients on 70 surfaces",
+    "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+    "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+    "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}"
+   ],
+   "timesteps_per_hour": 1,
+   "heating_mwh": 94.72,
+   "cooling_mwh": 13.087,
+   "zones": {
+    "Floor_1": {
+     "heating_monthly_mwh": [
+      5.2501,
+      3.987,
+      3.6094,
+      1.2485,
+      0.1729,
+      0.0,
+      0.0,
+      0.0,
+      0.1179,
+      2.1062,
+      3.8885,
+      4.979
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.2757,
+      1.0779,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 4.6848,
+     "heating_mwh": 25.3594,
+     "cooling_mwh": 1.3536
+    },
+    "Floor_2": {
+     "heating_monthly_mwh": [
+      3.3193,
+      2.3446,
+      1.9446,
+      0.3087,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8796,
+      2.3528,
+      3.1722
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8357,
+      1.8659,
+      0.5045,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -2.4167,
+     "heating_mwh": 14.3217,
+     "cooling_mwh": 3.2061
+    },
+    "Floor_3": {
+     "heating_monthly_mwh": [
+      3.2343,
+      2.2697,
+      1.869,
+      0.2751,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.7968,
+      2.2795,
+      3.0854
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0071,
+      1.0926,
+      1.9565,
+      0.6632,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -1.1685,
+     "heating_mwh": 13.8098,
+     "cooling_mwh": 3.7194
+    },
+    "Floor_4": {
+     "heating_monthly_mwh": [
+      3.3572,
+      2.3702,
+      1.9694,
+      0.321,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8935,
+      2.376,
+      3.1976
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8713,
+      1.8691,
+      0.5312,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -2.4506,
+     "heating_mwh": 14.485,
+     "cooling_mwh": 3.2716
+    },
+    "Floor_5": {
+     "heating_monthly_mwh": [
+      5.5413,
+      4.1857,
+      3.7807,
+      1.4286,
+      0.2438,
+      0.0,
+      0.0,
+      0.0,
+      0.1922,
+      2.147,
+      4.0757,
+      5.1491
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.3539,
+      1.1772,
+      0.0049,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 1.4013,
+     "heating_mwh": 26.7441,
+     "cooling_mwh": 1.5359
+    }
+   },
+   "severe": 0,
+   "warnings": 7
+  },
+  "r2_z_e2tarp": {
+   "flags": [
+    "frame_split",
+    "docmass",
+    "slab_reversed",
+    "tb_by_zone",
+    "inf_by_zone",
+    "sky_fixed",
+    "lw_area",
+    "out_only"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 5 zone(s)",
+    "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+    "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+    "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}",
+    "out_only: outside coefficient 20 on 61 surfaces; inside left to TARP"
+   ],
+   "timesteps_per_hour": 4,
+   "heating_mwh": 89.995,
+   "cooling_mwh": 13.52,
+   "zones": {
+    "Floor_1": {
+     "heating_monthly_mwh": [
+      4.925,
+      3.7553,
+      3.4045,
+      1.3413,
+      0.244,
+      0.0,
+      0.0,
+      0.0,
+      0.1314,
+      1.8237,
+      3.5622,
+      4.6611
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.1765,
+      0.8198,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 4.4452,
+     "heating_mwh": 23.8485,
+     "cooling_mwh": 0.9963
+    },
+    "Floor_2": {
+     "heating_monthly_mwh": [
+      3.2294,
+      2.3123,
+      1.9409,
+      0.3613,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8189,
+      2.2343,
+      3.0902
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.7456,
+      1.7974,
+      0.4784,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -3.16,
+     "heating_mwh": 13.9873,
+     "cooling_mwh": 3.0214
+    },
+    "Floor_3": {
+     "heating_monthly_mwh": [
+      3.1356,
+      2.2252,
+      1.8456,
+      0.3052,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.7126,
+      2.1461,
+      2.9948
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0163,
+      1.0864,
+      1.9662,
+      0.6926,
+      0.0053,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -1.5069,
+     "heating_mwh": 13.3649,
+     "cooling_mwh": 3.7667
+    },
+    "Floor_4": {
+     "heating_monthly_mwh": [
+      3.2868,
+      2.348,
+      1.9624,
+      0.3497,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.798,
+      2.2632,
+      3.1338
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0022,
+      1.0098,
+      1.9461,
+      0.6506,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -2.6031,
+     "heating_mwh": 14.1419,
+     "cooling_mwh": 3.6087
+    },
+    "Floor_5": {
+     "heating_monthly_mwh": [
+      5.2708,
+      3.9655,
+      3.5331,
+      1.1954,
+      0.1412,
+      0.0,
+      0.0,
+      0.0,
+      0.0897,
+      1.8011,
+      3.7524,
+      4.9032
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.4986,
+      1.4757,
+      0.1524,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 2.9189,
+     "heating_mwh": 24.6525,
+     "cooling_mwh": 2.1268
+    }
+   },
+   "severe": 0,
+   "warnings": 6
+  },
+  "r2_z_e2tarp_ts1": {
+   "flags": [
+    "frame_split",
+    "docmass",
+    "slab_reversed",
+    "tb_by_zone",
+    "inf_by_zone",
+    "sky_fixed",
+    "lw_area",
+    "out_only",
+    "ts_1"
+   ],
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "sky_fixed: sky temperature = dry bulb - 11 K",
+    "lw_area: view factors A_j / A_zone in 5 zone(s)",
+    "ts_1: one time step per hour",
+    "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+    "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+    "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}",
+    "out_only: outside coefficient 20 on 61 surfaces; inside left to TARP"
+   ],
+   "timesteps_per_hour": 1,
+   "heating_mwh": 91.363,
+   "cooling_mwh": 12.254,
+   "zones": {
+    "Floor_1": {
+     "heating_monthly_mwh": [
+      4.9575,
+      3.7638,
+      3.4532,
+      1.3865,
+      0.2827,
+      0.0,
+      0.0,
+      0.0,
+      0.1599,
+      1.8807,
+      3.6056,
+      4.6925
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.1435,
+      0.7694,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 4.5123,
+     "heating_mwh": 24.1823,
+     "cooling_mwh": 0.9129
+    },
+    "Floor_2": {
+     "heating_monthly_mwh": [
+      3.2559,
+      2.3197,
+      1.983,
+      0.3863,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8742,
+      2.2713,
+      3.1168
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.6225,
+      1.7024,
+      0.386,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -3.1941,
+     "heating_mwh": 14.2072,
+     "cooling_mwh": 2.7109
+    },
+    "Floor_3": {
+     "heating_monthly_mwh": [
+      3.1624,
+      2.233,
+      1.8865,
+      0.3306,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.7664,
+      2.1834,
+      3.0214
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.9478,
+      1.8817,
+      0.6125,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -1.5484,
+     "heating_mwh": 13.5838,
+     "cooling_mwh": 3.442
+    },
+    "Floor_4": {
+     "heating_monthly_mwh": [
+      3.3143,
+      2.3562,
+      2.0066,
+      0.3749,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8539,
+      2.3023,
+      3.1616
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.8648,
+      1.8569,
+      0.5639,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": -2.6562,
+     "heating_mwh": 14.37,
+     "cooling_mwh": 3.2856
+    },
+    "Floor_5": {
+     "heating_monthly_mwh": [
+      5.3073,
+      3.9754,
+      3.5873,
+      1.2507,
+      0.1769,
+      0.0,
+      0.0,
+      0.0,
+      0.1132,
+      1.8672,
+      3.8019,
+      4.9398
+     ],
+     "cooling_monthly_mwh": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.4248,
+      1.3881,
+      0.0895,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "slab_inside_face_conduction_mwh": 2.9694,
+     "heating_mwh": 25.0196,
+     "cooling_mwh": 1.9024
+    }
+   },
+   "severe": 0,
+   "warnings": 7
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.15 20:42",
+ "source": "validation/energyplus/105_per_floor_referee.py",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2"
+}

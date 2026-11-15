@@ -19,6 +19,8 @@ import { simpleGlazingAngular, simpleGlazingOptics } from './glazing'
 import type { Weather } from './types'
 import { runZone } from './zone'
 import type { ModelDocument } from '../schema/model'
+import { GainsError, zoneGains, type ZoneGains } from './gains'
+import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
 
 export class ModelError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'ModelError' }
@@ -30,16 +32,37 @@ export interface RunOptions {
   warmup_days: number
   /** Albedo is a run option until the document carries it (today's engine: 0.2). */
   solar: SolarOptions
-  /** Reference cases only (BESTEST's fixed gain); internal gains from profiles arrive in Brief 105. */
+  /** Reference cases only (BESTEST's fixed gain), one zone. Internal gains from the document are `internal_gains`. */
   other_gains: { w: ArrayLike<number>; convective_fraction: number } | null
+  /**
+   * Internal gains (Brief 105 Part 2). 'profiles': each zone's gains from the document profiles it refers to
+   * (gains.ts), on both solvers. Absent or 'none': no internal gains, the Building module's envelope-only state, as
+   * Briefs 103 and 104 ran.
+   */
+  internal_gains?: 'none' | 'profiles'
+  /**
+   * Mechanical and natural ventilation (Brief 105 Part 3). 'document': each zone's ventilation entries
+   * (ventilation.ts), on both solvers, added to the zone's conductance to outdoor air. Absent or 'none': infiltration
+   * and permanent vents only, as Briefs 103 and 104 ran.
+   */
+  ventilation?: 'none' | 'document'
   /**
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
    * - outside_convection 'wind': h_ce = 4 + 4·v (ISO 6946:2017 Annex C) from the weather's hourly wind speed.
    * - inside_convection 'by_heat_flow': ISO 52016-1 Table 25 by the actual direction of heat flow (previous hour).
    * - beam_on_floor: the beam part of transmitted solar lands on the floor-facing inside surfaces, by area.
+   * - inside_convection 'tarp' (Brief 105 Part 6): Walton's natural-convection correlations, EnergyPlus's TARP inside
+   *   algorithm, from each face's temperature difference with the air at the step before (network.ts). Runs on the
+   *   network solver, one zone included.
    */
-  surface_physics?: { outside_convection: 'fixed' | 'wind'; inside_convection: 'by_tilt' | 'by_heat_flow'; beam_on_floor: boolean }
+  surface_physics?: { outside_convection: 'fixed' | 'wind'; inside_convection: 'by_tilt' | 'by_heat_flow' | 'tarp'; beam_on_floor: boolean }
+  /**
+   * Brief 105 Part 6: steps per hour, and the outdoor temperature between the hour's readings ('hold' the hour's, or
+   * 'linear' from the hour before's; network.ts). Absent: one step an hour. More than one runs on the network solver,
+   * one zone included. Hourly inputs other than the outdoor temperature are held over the hour.
+   */
+  time_step?: { steps_per_hour: number; theta_e_between: 'hold' | 'linear' }
   /**
    * How solar passes through glazing (Brief 104 Part 1b). Absent or 'g_value': ISO 52016-1's g × F_W, all of it
    * transmitted into the zone and absorbed by its inside surfaces. 'optical': the window's own optics from its U and g
@@ -271,6 +294,8 @@ interface Solved {
   theta_air: Float64Array; theta_op: Float64Array; theta_mrt: Float64Array
   bridging_w: Float64Array; ventilation_w: Float64Array; solar_lost_w: Float64Array; other_gains_w: Float64Array; storage_w: Float64Array
   closure_wh: Float64Array
+  /** Heat into the zone from the others per hour, W (zeros on Engine 1's solver: one zone). */
+  interzone_w: Float64Array
   /** Per element of the model: its outside terms over the run, kWh (null when not this zone's). */
   element: (k: number) => { boundary_kwh: number; solar_absorbed_kwh: number; sky_kwh: number } | null
   /** Per element: heat into this zone across it from another zone over the run, kWh (null when not shared by this zone and another). */
@@ -290,7 +315,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const { elements, zoneA, zoneB, insideAlpha, insideAlphaB, absorbed } = built
   const sp = options.surface_physics ?? null
   const Zn = doc.zones.length
-  const network = Zn > 1 || elements.some((e) => e.boundary === 'zone')
+  // Sub-hourly steps and TARP convection run on the network solver (one zone is a network of one: multizone.test (c)).
+  const network = Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
+    || options.surface_physics?.inside_convection === 'tarp'
 
   // The window junction over several zones: 4√A per facade (all its glazing, every zone), shared out by area. On one
   // zone with one glazing surface per facade this is Engine 1's 4√A per surface; cutting a facade into storeys does
@@ -301,6 +328,17 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const A = facadeArea.get(g)!, a = Z.glazingAreas[j]
     return s + (A > 0 && a > 0 ? 4 * Math.sqrt(A) * (a / A) : 0)
   }, 0)
+
+  // Mechanical and natural ventilation per zone (Brief 105 Part 3).
+  let mech: ZoneVentilation[][] = doc.zones.map(() => [])
+  if (options.ventilation === 'document') {
+    try { mech = zoneVentilation(doc, weather.hours) } catch (e) {
+      if (e instanceof VentilationError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
+      throw e
+    }
+  } else if (options.ventilation != null && options.ventilation !== 'none') {
+    throw new ModelError(`unknown value ${JSON.stringify(options.ventilation)} ('none' or 'document')`, 'options.ventilation')
+  }
 
   // Air, bridging and ground, per zone.
   let tg = 0
@@ -313,7 +351,11 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const inf = infiltration({ q50: zone.infiltration_q50, ach: zone.infiltration_ach, envelope_area_m2: Z.envelopeArea, volume_m3: volume, path })
     const ventH = ventConductance(Z.vents.map((v) => v.m3s_per_ms), weather.hours.wind_speed, H)
     const Hve = new Float64Array(H)
-    for (let h = 0; h < H; h++) Hve[h] = inf.h_w_per_k + ventH[h]
+    for (let h = 0; h < H; h++) {
+      let m = 0
+      for (const v of mech[zi]) m += v.h_w_per_k[h]
+      Hve[h] = inf.h_w_per_k + ventH[h] + m
+    }
     // Σ U·A of the zone's envelope (the legacy α bridging mode only): elements facing outside or the ground.
     const areaUA = elements.reduce((s, e, k) => s + (zoneA[k] === zi && e.boundary !== 'zone' ? e.u_w_per_m2k * e.area_m2 : 0), 0)
     const bridging = computeBridging({
@@ -323,6 +365,22 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     })
     return { volume, inf, ventH, Hve, bridging }
   })
+
+  // Internal gains per zone (Brief 105 Part 2).
+  let gains: (ZoneGains | null)[] = doc.zones.map(() => null)
+  if (options.internal_gains === 'profiles') {
+    if (options.other_gains) throw new ModelError('give internal gains from the document or reference-case other gains, not both', 'options.other_gains')
+    try { gains = zoneGains(doc, weather.hours) } catch (e) {
+      if (e instanceof GainsError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
+      throw e
+    }
+  } else if (options.internal_gains != null && options.internal_gains !== 'none') {
+    throw new ModelError(`unknown value ${JSON.stringify(options.internal_gains)} ('none' or 'profiles')`, 'options.internal_gains')
+  }
+  const gainsIn = (zi: number) => {
+    const g = gains[zi]
+    return g ? { w: g.total_w, convective_fraction: g.convective_fraction } : null
+  }
 
   const kwhOf = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
   let solved: Solved[]
@@ -334,18 +392,18 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       bridging_w_per_k: a.bridging.total_w_per_k, hours: H, theta_e: weather.hours.dry_bulb, theta_ground: tg,
       ventilation_w_per_k: a.Hve, solar_absorbed_w_per_m2: absorbed, solar_transmitted_w: Z.solarTransmitted,
       inside_solar_absorptance: insideAlpha, solar_convective_fraction: options.solar_convective_fraction,
-      other_gains: options.other_gains, setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
+      other_gains: options.other_gains ?? gainsIn(0), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
       control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
       warmup_days: options.warmup_days,
       h_ce_w_per_m2k: sp?.outside_convection === 'wind' ? Float64Array.from(weather.hours.wind_speed, (v) => K.h_ce_wind_a + K.h_ce_wind_b * Math.max(0, v)) : null,
-      inside_convection: sp?.inside_convection ?? 'by_tilt',
+      inside_convection: (sp?.inside_convection ?? 'by_tilt') as 'by_tilt' | 'by_heat_flow',
       solar_beam_w: sp?.beam_on_floor ? Z.solarBeam : null,
     })
     const T = run.terms
     solved = [{
       heating_w: run.heating_w, cooling_w: run.cooling_w, theta_air: run.theta_air, theta_op: run.theta_op, theta_mrt: run.theta_mrt,
       bridging_w: T.bridging_w, ventilation_w: T.ventilation_w, solar_lost_w: T.solar_lost_w, other_gains_w: T.other_gains_w, storage_w: T.storage_w,
-      closure_wh: run.closure_wh,
+      closure_wh: run.closure_wh, interzone_w: new Float64Array(H),
       element: (k) => ({ boundary_kwh: kwhOf(T.boundary_w[k]), solar_absorbed_kwh: kwhOf(T.solar_absorbed_w[k]), sky_kwh: kwhOf(T.sky_w[k]) }),
       interzone: () => null,
     }]
@@ -355,13 +413,13 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     // factorisation per run in the network); refused rather than ignored.
     if (sp?.outside_convection === 'wind') throw new ModelError("wind-driven outside convection runs on one zone only", 'options.surface_physics.outside_convection')
     if (sp?.inside_convection === 'by_heat_flow') throw new ModelError("inside convection by heat flow runs on one zone only", 'options.surface_physics.inside_convection')
-    if (options.other_gains) throw new ModelError('other gains are a one-zone reference-case input', 'options.other_gains')
+    if (options.other_gains && Zn > 1) throw new ModelError('other gains are a one-zone reference-case input', 'options.other_gains')
     const run = runNetwork({
       zones: doc.zones.map((zone, zi) => ({
         air_capacity_j_per_k: K.rho_c_air * air[zi].volume + zone.internal_heat_capacity_j_per_k_m2 * zone.area_m2,
         bridging_w_per_k: air[zi].bridging.total_w_per_k, ventilation_w_per_k: air[zi].Hve,
         solar_transmitted_w: built.zones[zi].solarTransmitted, solar_beam_w: sp?.beam_on_floor ? built.zones[zi].solarBeam : null,
-        other_gains: null, setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
+        other_gains: options.other_gains ?? gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
       })),
       elements: elements.map((element, k) => ({
@@ -371,11 +429,13 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       hours: H, theta_e: weather.hours.dry_bulb, theta_ground: tg, control: options.control,
       hc_convective_fraction: options.hc_convective_fraction, solar_convective_fraction: options.solar_convective_fraction,
       warmup_days: options.warmup_days,
+      steps_per_hour: options.time_step?.steps_per_hour, theta_e_between: options.time_step?.theta_e_between,
+      inside_convection: sp?.inside_convection === 'tarp' ? 'tarp' : 'fixed',
     })
     solved = run.zones.map((z, zi) => ({
       heating_w: z.heating_w, cooling_w: z.cooling_w, theta_air: z.theta_air, theta_op: z.theta_op, theta_mrt: z.theta_mrt,
       bridging_w: z.terms.bridging_w, ventilation_w: z.terms.ventilation_w, solar_lost_w: z.terms.solar_lost_w,
-      other_gains_w: z.terms.other_gains_w, storage_w: z.terms.storage_w, closure_wh: z.closure_wh,
+      other_gains_w: z.terms.other_gains_w, storage_w: z.terms.storage_w, closure_wh: z.closure_wh, interzone_w: z.terms.interzone_w,
       // The network sums the hours in the same order as kwhOf, so the values are the same sums.
       element: (k) => {
         if (zoneA[k] !== zi || elements[k].boundary === 'zone') return null
@@ -399,10 +459,15 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     // Breakdown: annual kWh per term (Rule 9). Ventilation is split into infiltration and vents by their conductances.
     const kwh = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
     const lines: BreakdownLine[] = []
+    // Mechanical ventilation shares it too, one line per entry (Brief 105 Part 3).
     let infW = 0, ventW = 0
+    const mechW = mech[zi].map(() => 0)
     for (let h = 0; h < H; h++) {
       const v = run.ventilation_w[h], tot = a.Hve[h]
-      if (tot > 0) { infW += (v * a.inf.h_w_per_k) / tot; ventW += (v * a.ventH[h]) / tot }
+      if (tot > 0) {
+        infW += (v * a.inf.h_w_per_k) / tot; ventW += (v * a.ventH[h]) / tot
+        mech[zi].forEach((m, j) => { mechW[j] += (v * m.h_w_per_k[h]) / tot })
+      }
     }
     lines.push({ term: 'heating', surface_id: null, kwh: kwh(run.heating_w) })
     lines.push({ term: 'cooling', surface_id: null, kwh: -kwh(run.cooling_w) })
@@ -422,9 +487,12 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     lines.push({ term: 'bridging', surface_id: null, kwh: kwh(run.bridging_w) })
     lines.push({ term: 'infiltration', surface_id: null, kwh: infW / 1000 })
     lines.push({ term: 'permanent_vents', surface_id: null, kwh: ventW / 1000 })
+    mech[zi].forEach((m, j) => lines.push({ term: 'mechanical_ventilation', surface_id: null, ventilation_id: m.id, kwh: mechW[j] / 1000 }))
     for (const t of Z.transmittedBySurface) lines.push({ term: 'solar_transmitted', surface_id: t.id, kwh: kwh(t.w) })
     if (options.glazing_solar === 'optical') lines.push({ term: 'solar_lost_through_glazing', surface_id: null, kwh: kwh(run.solar_lost_w) })
     if (options.other_gains) lines.push({ term: 'other_gains', surface_id: null, kwh: kwh(run.other_gains_w) })
+    // One line per gain profile (Rule 9): their sum is the gain the solver took (the closure checks the integrand).
+    for (const g of gains[zi]?.gains ?? []) lines.push({ term: `${g.kind}_gains`, surface_id: null, profile_id: g.profile_id, kwh: kwh(g.w) })
     lines.push({ term: 'storage', surface_id: null, kwh: -kwh(run.storage_w) })
 
     let mn = Infinity, mx = -Infinity, mean = 0, maxClosure = 0
@@ -445,7 +513,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         vents: Z.vents.map((v) => ({ surface_id: v.surface_id, area_m2: v.area_m2, cd: v.cd, flow_mode: v.flow_mode, m3s_per_ms: v.m3s_per_ms })),
         bridging: a.bridging,
       },
-      hourly: { theta_air_c: run.theta_air, theta_operative_c: run.theta_op, theta_mean_radiant_c: run.theta_mrt, heating_w: run.heating_w, cooling_w: run.cooling_w },
+      hourly: { theta_air_c: run.theta_air, theta_operative_c: run.theta_op, theta_mean_radiant_c: run.theta_mrt, heating_w: run.heating_w, cooling_w: run.cooling_w, interzone_w: run.interzone_w },
       annual: {
         heating_kwh: kwh(run.heating_w), cooling_kwh: kwh(run.cooling_w),
         peak_heating_w: Math.max(...run.heating_w), peak_cooling_w: Math.max(...run.cooling_w),
