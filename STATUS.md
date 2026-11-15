@@ -26,6 +26,7 @@ reference case, fixed fixture id).
 - **P1 store fixes** ([`docs/audit/103/01_store_fixes.md`](docs/audit/103/01_store_fixes.md)).
   - M4: projects are matched by the local id; M6: library versions are immutable; M7: auxiliary has its own line and a missing figure fails loudly; L2: helpers gated; L3: Retry and Sign out; L6: `revoke_invitation`.
   - `0005` is applied to NZA Sim (dev) through the connector and read back. Tests: rig 37/37 plus 42 earlier checks, vitest 25/25, build clean.
+- **P2 engine package** ([`docs/audit/103/02_engine_package.md`](docs/audit/103/02_engine_package.md)): EPW parser equal to the backend value for value (sha c6571102…cf2); solar on any azimuth/tilt equal to today's solarCalc to Float32 on 43,800 values; schema 2.1 states today's absorptance, emissivity, frame fraction, internal heat capacity and ground method, with a 2.0 upgrade. 38 vitest pass; build clean.
 
 ## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 

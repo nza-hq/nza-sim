@@ -175,6 +175,15 @@ export const Surface = z
     shading: Shading.optional(),
     /** Walls carry the vents and openings in them. */
     openings: z.array(Opening),
+    /**
+     * Schema 2.1 (Brief 103 Part 2): outside-face short-wave absorptance, 0 to 1. Required on walls and roofs facing
+     * outside; null on glazing, ground and internal surfaces. Today's engine hard-codes 0.6 (walls) and 0.7 (roofs).
+     */
+    solar_absorptance: finite.min(0).max(1).nullable(),
+    /** Schema 2.1: outside-face long-wave emissivity, 0 to 1, on the same surfaces (ISO 52016-1 uses it for sky exchange). */
+    thermal_emissivity: finite.min(0).max(1).nullable(),
+    /** Schema 2.1: glazing only, the frame's share of the opening area, 0 to <1 (today's engine: 0.20); null otherwise. */
+    frame_fraction: finite.min(0).lt(1).nullable(),
   })
   .strict()
 export type Surface = z.infer<typeof Surface>
@@ -255,6 +264,11 @@ export const Zone = z
     infiltration_q50: finite.nullable(),
     /** The legacy direct air-change rate the engine still reads when q50 is absent. */
     infiltration_ach: finite.nullable(),
+    /**
+     * Schema 2.1 (Brief 103 Part 2): heat capacity of the zone's internal mass (furniture, partitions, contents) per
+     * m² of floor, J/K·m². Today's engine hard-codes 250,000 (instantCalc.js internal_mass_J_per_K_per_m2).
+     */
+    internal_heat_capacity_j_per_k_m2: nonNeg,
     surfaces: z.array(id).min(1, 'a zone must have at least one surface'),
   })
   .strict()
@@ -338,6 +352,11 @@ export const Building = z
         lon: finite.min(-180).max(180).nullable(),
         name: z.string().nullable(),
         exposure: z.string().nullable(),
+        /**
+         * Schema 2.1 (Brief 103 Part 2): the ground's boundary temperature. 'annual_mean_outdoor' is today's engine
+         * (a constant equal to the EPW's annual mean dry bulb); ISO 13370 methods are later options.
+         */
+        ground: z.object({ method: z.literal('annual_mean_outdoor') }).strict(),
       })
       .strict(),
     /** The box's orientation: degrees the north facade is turned clockwise from true north. */
@@ -359,7 +378,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.0' as const
+export const SCHEMA_VERSION = '2.1' as const
 
 export const ModelDocument = z
   .object({
@@ -386,6 +405,13 @@ export const ModelDocument = z
       surfaceIds.add(s.id)
       if (!zoneIds.has(s.zone_a)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'zone_a'], message: `surface "${s.id}" names zone "${s.zone_a}", which does not exist` })
+      }
+      const exteriorOpaque = (s.kind === 'wall' || s.kind === 'roof') && s.zone_b === 'outside'
+      if (exteriorOpaque && (s.solar_absorptance == null || s.thermal_emissivity == null)) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" faces outside and needs solar_absorptance and thermal_emissivity` })
+      }
+      if (s.kind === 'glazing' && s.frame_fraction == null) {
+        ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'frame_fraction'], message: `glazing "${s.id}" needs frame_fraction` })
       }
       if (s.zone_b !== 'outside' && s.zone_b !== 'ground' && !zoneIds.has(s.zone_b)) {
         ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'zone_b'], message: `surface "${s.id}" names zone "${s.zone_b}", which does not exist` })
