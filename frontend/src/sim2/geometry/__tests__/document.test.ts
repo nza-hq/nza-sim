@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { azimuthOf, emptyPlan, layoutIn, wallRuns, type Plan, type XY } from '../plan'
+import { azimuthOf, emptyPlan, layoutIn, upgradePlan, wallRuns, type Plan, type PlanSystem, type XY } from '../plan'
 import { DOOR, changeWindow, crossing, setOpeningsIn, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
 import { cutZones } from '../ported/zones'
 import { fitRooms } from '../rooms'
@@ -145,9 +145,15 @@ describe('model document', () => {
     p = { ...p, fabric_types: [...p.fabric_types, { id: 'f_wall2', element: 'wall', name: 'Extension', construction: 'cavity_wall_enhanced', u: null }, { id: 'f_roof2', element: 'roof', name: 'New roof', construction: 'flat_roof_enhanced', u: 0.1 }] }
     p = setTypeOnRooms(p, ['r2'], 'f_wall2')
     p = setTypeOnRooms(p, ['r2'], 'f_roof2')
-    // Room 1 an office (MVHR, VRF heating, no cooling); room 2 has no space type: the zone takes the office's.
-    const office = { id: 's1', name: 'Office', use: 'office', occupancy: 'office_occupancy', lighting: 'office_lighting', equipment: null, heating: 'vrf_heating', cooling: 'none_cooling', ventilation: 'mvhr_standard', dhw: null }
-    p = { ...p, spaces: [office], rooms: p.rooms.map((r) => (r.id === 'r1' ? { ...r, space: 's1' } : r)) }
+    // Room 1 an office with MVHR, VRF heating and no cooling; room 2 has no space type and no systems: the zone takes
+    // the office's.
+    const office = { id: 's1', name: 'Office', use: 'office', occupancy: 'office_occupancy', lighting: 'office_lighting', equipment: null }
+    const systems: PlanSystem[] = [
+      { id: 'y1', service: 'heating', name: 'VRF', template: 'vrf_heating' },
+      { id: 'y2', service: 'cooling', name: 'None', template: 'none_cooling' },
+      { id: 'y3', service: 'ventilation', name: 'MVHR', template: 'mvhr_standard', flow: null, schedule: null },
+    ]
+    p = { ...p, spaces: [office], systems, rooms: p.rooms.map((r) => (r.id === 'r1' ? { ...r, space: 's1', systems: { heating: 'y1', cooling: 'y2', ventilation: 'y3' } } : r)) }
     const b = buildDocument(p)
     expect(b.issues).toEqual([])
     const doc = b.doc as any
@@ -167,7 +173,7 @@ describe('model document', () => {
     expect(doc.profiles.map((x: any) => x.id)).toEqual(['s1_lighting'])
     expect(doc.profiles[0].schedule.weekday).toHaveLength(24)
     expect(doc.profiles[0].magnitude).toBeUndefined()
-    const b2 = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: 0.1, sensible_w_per_person: 75, occupancy_rate: 0.8, lighting_w_per_m2: 8, equipment_w_per_m2: 10, equipment_baseload_w_per_m2: 0, radiant_fraction: 0.3, equip_relationship: 'proportional', standby_factor: 0.1, vent_flow: 1.2, vent_schedule: 'hotel_ventilation_occupied' }] })
+    const b2 = buildDocument({ ...p, systems: systems.map((x) => (x.id === 'y3' ? { ...x, flow: 1.2, schedule: 'hotel_ventilation_occupied' } : x)), spaces: [{ ...office, people_per_m2: 0.1, sensible_w_per_person: 75, occupancy_rate: 0.8, lighting_w_per_m2: 8, equipment_w_per_m2: 10, equipment_baseload_w_per_m2: 0, radiant_fraction: 0.3, equip_relationship: 'proportional', standby_factor: 0.1 }] })
     expect(b2.issues).toEqual([])
     const d2 = b2.doc as any
     expect(d2.zones[0].profile_refs.occupancy).toBe('s1_occupancy')
@@ -183,7 +189,27 @@ describe('model document', () => {
     expect(z.ventilation[0]).toMatchObject({ kind: 'mvhr', enabled: true })
     // No mechanical cooling is no system at all; VRF heating is one group.
     expect(doc.system_groups.map((g: any) => g.template_ref)).toEqual(['vrf_heating'])
+    expect(doc.system_groups[0]).toMatchObject({ id: 'heating_y1', label: 'VRF', zones: ['z1'] })
     expect(b.notes.some((n) => /no space type/.test(n))).toBe(true)
+    // Two heating systems in one zone: the one on the most floor, with a note.
+    const mixed = buildDocument({ ...p, systems: [...systems, { id: 'y4', service: 'heating', name: 'Panels', template: 'electric_panel_heating' }], rooms: p.rooms.map((r) => (r.id === 'r2' ? { ...r, systems: { heating: 'y4' } } : r)) })
+    expect(mixed.notes.some((n) => /2 heating systems/.test(n))).toBe(true)
+    expect((mixed.doc as any).system_groups).toHaveLength(1)
+  })
+  it('a plan from before the Systems step keeps its systems', () => {
+    let p = plan([[0, 0], [10, 0], [10, 8], [0, 8]])
+    const old = { id: 's1', name: 'Office', use: 'office', occupancy: null, lighting: null, equipment: null, heating: 'vrf_heating', cooling: null, ventilation: 'mvhr_standard', dhw: null, vent_flow: 1, vent_schedule: 'always_on' }
+    p = { ...p, spaces: [old as any], rooms: p.rooms.map((r) => ({ ...r, space: 's1' })) }
+    const up = upgradePlan(p)
+    expect(up.systems).toEqual([
+      { id: 'y1', service: 'heating', name: 'Heating · Office', template: 'vrf_heating' },
+      { id: 'y2', service: 'ventilation', name: 'Ventilation · Office', template: 'mvhr_standard', flow: 1, schedule: 'always_on' },
+    ])
+    expect(up.rooms.every((r) => r.systems?.heating === 'y1' && r.systems?.ventilation === 'y2')).toBe(true)
+    expect('heating' in up.spaces[0]!).toBe(false)
+    expect(upgradePlan(up)).toEqual(up)
+    const d = buildDocument(up).doc as any
+    expect(d.zones[0].ventilation[0]).toMatchObject({ kind: 'mvhr', flow_rate: 1, control_schedule_ref: 'always_on' })
   })
   it('an L with a diagonal side validates', () => {
     const L: XY[] = [[0, 0], [20, 0], [20, 6], [14, 12], [0, 12]]
@@ -197,7 +223,7 @@ describe('model document', () => {
 describe('the two-zone test fixture', () => {
   it('builds a valid document with setpoints, air leakage, bridging and exposure stated', async () => {
     const fx = (await import('../__fixtures__/two_zones.plan.json')).default as unknown as { plan: Plan }
-    const b = buildDocument(fx.plan)
+    const b = buildDocument(upgradePlan(fx.plan))
     expect(b.issues).toEqual([])
     const doc = b.doc as any
     expect(doc.zones.map((z: any) => [z.setpoints.heat_c, z.setpoints.cool_c, z.setpoints.control_strategy, z.infiltration_q50])).toEqual([[21, 24, 'active_setpoint', 5], [16, null, 'active_setpoint', 5]])

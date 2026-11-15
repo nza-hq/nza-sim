@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { allWindows, edgesOf, facade4, type FabricElement, type Plan, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { allWindows, edgesOf, facade4, type FabricElement, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, profile, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -242,16 +242,34 @@ export function buildDocument(plan: Plan): Built {
     addProfile({ id: key, kind: 'schedule', label: pr.name, day_types: { weekday: pr.day_types.weekday, saturday: pr.day_types.saturday, sunday: pr.day_types.sunday } })
     return key
   }
-  const ventOf = (sp: SpaceType | undefined) => {
-    const t = system(sp?.ventilation)
-    if (!t || !sp) return []
+  // Systems: a zone takes, per service, the system covering most of its floor (a note says when its rooms differ).
+  const sysOf = new Map<string, PlanSystem | undefined>()
+  for (const z of used) {
+    const rs = plan.rooms.filter((r) => r.zone === z.id)
+    for (const s of SERVICES) {
+      const by = new Map<string, number>()
+      for (const r of rs) {
+        const id = r.systems?.[s.key]
+        if (id && plan.systems.some((x) => x.id === id)) by.set(id, (by.get(id) ?? 0) + ringArea(r.ring))
+      }
+      const best = [...by.entries()].sort((a, b) => b[1] - a[1])[0]
+      const sys = best ? plan.systems.find((x) => x.id === best[0]) : undefined
+      sysOf.set(`${z.id}|${s.key}`, sys)
+      if (by.size > 1 && sys) notes.push(`${z.name} has rooms with ${by.size} ${s.name.toLowerCase()} systems; the model gives the zone ${sys.name} (the most floor)`)
+    }
+  }
+  const zoneSys = (zid: string, s: Service) => sysOf.get(`${zid}|${s}`)
+  const ventOf = (zid: string) => {
+    const v = zoneSys(zid, 'ventilation')
+    const t = system(v?.template)
+    if (!t || !v) return []
     const kind = t.type === 'mvhr' || t.type === 'mev' ? t.type : 'natural'
     return [{
-      // Flow as typed on the space type: l/s per m² of floor (mechanical) or air changes per hour (natural).
-      id: `${sp.id}_vent`, label: t.name, kind, enabled: true, share_pct: 100,
-      flow_rate: sp.vent_flow ?? null, flow_rate_basis: sp.vent_flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
+      // Flow as typed on the system: l/s per m² of floor (mechanical) or air changes per hour (natural).
+      id: `${v.id}_vent`, label: v.name, kind, enabled: true, share_pct: 100,
+      flow_rate: v.flow ?? null, flow_rate_basis: v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
-      control_schedule_ref: scheduleRef(sp.vent_schedule),
+      control_schedule_ref: scheduleRef(v.schedule),
     }]
   }
 
@@ -331,26 +349,27 @@ export function buildDocument(plan: Plan): Built {
       const cool = sp?.cool_c ?? null
       return { heat_c: heat, cool_c: cool, setback_c: null, hours_ref: null, control_strategy: heat != null || cool != null ? 'active_setpoint' : null }
     })(),
-    ventilation: ventOf(spaceOf.get(z.id)),
+    ventilation: ventOf(z.id),
     infiltration_q50: bi.q50,
     infiltration_ach: null,
     ...(is21 ? { internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2 } : {}),
     surfaces: byZone.get(z.id) ?? [],
   }))
 
-  // Systems: per service, one group per library template, serving every zone whose space type names it, at 100% of
-  // that service (one system per service per zone here). A template with no fuel ("No mechanical cooling") is none.
+  // Systems: per service, one group per system the user made, serving every zone it is given to, at 100% of that
+  // service (one system per service per zone here). A template with no fuel ("No mechanical cooling") is none.
   const system_groups: Record<string, unknown>[] = []
   for (const service of ['heating', 'cooling', 'dhw'] as const) {
-    const byTemplate = new Map<string, string[]>()
+    const bySystem = new Map<string, string[]>()
     for (const z of used) {
-      const key = spaceOf.get(z.id)?.[service]
-      if (!key || !system(key)?.fuel) continue
-      byTemplate.set(key, [...(byTemplate.get(key) ?? []), z.id])
+      const sys = zoneSys(z.id, service)
+      if (!sys || !system(sys.template)?.fuel) continue
+      bySystem.set(sys.id, [...(bySystem.get(sys.id) ?? []), z.id])
     }
-    for (const [key, zs] of byTemplate) {
-      const t = system(key)!
-      system_groups.push({ id: `${service}_${key}`, service, label: t.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: key })
+    for (const [id, zs] of bySystem) {
+      const sys = plan.systems.find((x) => x.id === id)!
+      const t = system(sys.template)!
+      system_groups.push({ id: `${service}_${id}`, service, label: sys.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: t.key })
     }
   }
 
@@ -365,10 +384,11 @@ export function buildDocument(plan: Plan): Built {
     for (const sf of surfaces) pin('construction', construction((sf.construction_ref as { key: string }).key))
     for (const g of system_groups) pin('system_template', system(g.template_ref as string))
     for (const z of used) {
+      for (const sv of SERVICES) pin('system_template', system(zoneSys(z.id, sv.key)?.template))
+      const v = zoneSys(z.id, 'ventilation')
+      if (v && system(v.template) && v.schedule && v.schedule !== 'always_on') pin('profile', profile(v.schedule))
       const sp = spaceOf.get(z.id)
       if (!sp) continue
-      for (const k of ['heating', 'cooling', 'dhw', 'ventilation'] as const) pin('system_template', system(sp[k]))
-      if (sp.ventilation && sp.vent_schedule && sp.vent_schedule !== 'always_on') pin('profile', profile(sp.vent_schedule))
       for (const k of ['occupancy', 'lighting', 'equipment'] as const) if (k !== 'occupancy' || (sp.people_per_m2 ?? 0) > 0) pin('profile', profile(sp[k]))
     }
     return [...refs.values()].sort((a, b) => (a.kind + a.key < b.kind + b.key ? -1 : 1))

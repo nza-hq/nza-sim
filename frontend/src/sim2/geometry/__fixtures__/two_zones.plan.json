@@ -1,5 +1,5 @@
 {
- "_note": "Test fixture for browser checks: a 20 x 10 m box, two rooms in two zones, library fabric, two space types. Typed values (q50 5, setpoints, gains) are test inputs, not a real building. Load with window.sim2.loadPlan(fixture.plan).",
+ "_note": "Test fixture for browser checks: a 20 x 10 m box, two rooms in two zones, library fabric, two space types and their systems. Typed values (q50 5, setpoints, gains) are test inputs, not a real building. Load with window.sim2.loadPlan(fixture.plan).",
  "plan": {
   "blocks": [
    [
@@ -44,7 +44,12 @@
      ]
     ],
     "zone": "z1",
-    "space": "s1"
+    "space": "s1",
+    "systems": {
+     "heating": "y1",
+     "cooling": "y2",
+     "ventilation": "y3"
+    }
    },
    {
     "id": "r2",
@@ -68,7 +73,11 @@
      ]
     ],
     "zone": "z2",
-    "space": "s2"
+    "space": "s2",
+    "systems": {
+     "heating": "y4",
+     "cooling": "y5"
+    }
    }
   ],
   "zones": [
@@ -87,7 +96,40 @@
     "cooling": null
    }
   ],
-  "systems": [],
+  "systems": [
+   {
+    "id": "y1",
+    "service": "heating",
+    "name": "VRF heating",
+    "template": "vrf_heating"
+   },
+   {
+    "id": "y2",
+    "service": "cooling",
+    "name": "VRF cooling",
+    "template": "vrf_cooling"
+   },
+   {
+    "id": "y3",
+    "service": "ventilation",
+    "name": "MVHR",
+    "template": "mvhr_standard",
+    "flow": 1,
+    "schedule": "always_on"
+   },
+   {
+    "id": "y4",
+    "service": "heating",
+    "name": "Panel heaters",
+    "template": "electric_panel_heating"
+   },
+   {
+    "id": "y5",
+    "service": "cooling",
+    "name": "No cooling",
+    "template": "none_cooling"
+   }
+  ],
   "storey_height_m": 3,
   "windows": [
    {
@@ -241,10 +283,6 @@
     "occupancy": "office_occupancy",
     "lighting": "office_lighting",
     "equipment": null,
-    "heating": "vrf_heating",
-    "cooling": "vrf_cooling",
-    "ventilation": "mvhr_standard",
-    "dhw": null,
     "id": "s1",
     "name": "Office",
     "people_per_m2": 0.1,
@@ -252,8 +290,6 @@
     "occupancy_rate": 0.75,
     "lighting_w_per_m2": 8,
     "equipment_w_per_m2": 12,
-    "vent_flow": 1,
-    "vent_schedule": "always_on",
     "heat_c": 21,
     "cool_c": 24,
     "radiant_fraction": 0.3,
@@ -272,10 +308,6 @@
     "occupancy": null,
     "lighting": null,
     "equipment": null,
-    "heating": "electric_panel_heating",
-    "cooling": "none_cooling",
-    "ventilation": null,
-    "dhw": null,
     "id": "s2",
     "name": "Store",
     "heat_c": 16,

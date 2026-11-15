@@ -23,12 +23,14 @@
  *   - Room: drag a box; it takes its space from the rooms under it. Halve: tap a room. Join: tap two rooms that touch.
  *   - Select: tap a room (Shift: more); drag a wall between rooms to move it. The card puts rooms in a zone.
  *
- * 3. Fabric: types per element (external walls, windows, doors, roof, ground floor), each a library construction with
- *    an optional U-value over it. Apply: tap a room's part of a wall (Shift: the whole wall) or a room (all its parts,
- *    or its roof or floor).
- *
- * 4. Spaces: space types (archetypes, as in IES): a use, occupancy / lighting / equipment profiles and heating,
- *    cooling, ventilation and hot water systems, all from the library. Apply: tap rooms.
+ * 3 to 5 work one way (ApplyPanels.tsx): choose on the left or the drawing (rooms, or a room's part of a wall; Ctrl or
+ * Shift for more), pick or make a type on the right, then Apply (to what is chosen, or the whole building).
+ * 3. Fabric: types per kind (external wall, ground floor, roof, windows and doors, walls between zones), each a library
+ *    construction with an optional U-value over it; air permeability and thermal bridging are whole-building values.
+ * 4. Spaces: space types (archetypes, as in IES): a use, occupancy / lighting / equipment profiles and gains, and the
+ *    comfort band.
+ * 5. Systems: heating, cooling, ventilation and hot water systems, each a library template (ventilation with its flow
+ *    and hours), given to rooms.
  *
  * Nothing is saved, and nothing in today's tool reads this page.
  */
@@ -36,7 +38,9 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { type BuildingInputs, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, wallRuns } from './plan'
+import { type BuildingInputs, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
+import { ChooseList, GivePanel, type Item, type Kind, Sw, type Swatch } from './ApplyPanels'
+import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profilesFor, system, systemsFor } from '../library/library'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
@@ -49,12 +53,27 @@ import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, cro
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
 
-type Mode = 'outline' | 'rooms' | 'fabric' | 'spaces'
-type Tool = 'select' | 'rect' | 'tri' | 'shape' | 'cut' | 'corner' | 'pick' | 'room' | 'halve' | 'divide' | 'join' | 'paint'
+type Mode = 'outline' | 'rooms' | 'fabric' | 'spaces' | 'systems'
+/** Steps 3 to 5: choose, then give (ApplyPanels.tsx). */
+const GIVING = (m: Mode) => m === 'fabric' || m === 'spaces' || m === 'systems'
+type Tool = 'select' | 'rect' | 'tri' | 'shape' | 'cut' | 'corner' | 'pick' | 'room' | 'halve' | 'divide' | 'join'
 type WallEl = 'wall' | 'glazing' | 'door'
 const onWalls = (e: FabricElement): e is WallEl => e === 'wall' || e === 'glazing' || e === 'door'
-/** A wall: run `index`, at `t` m along it; `whole` = the whole wall, else the room piece at `t`. */
-type Sel = { kind: 'wall'; index: number; t: number; whole: boolean } | { kind: 'blocks'; idx: number[] } | { kind: 'rooms'; ids: string[] } | null
+/** A wall: run `index`, at `t` m along it; `whole` = the whole wall, else the room piece at `t`. `set`: what steps 3 to 5
+ * give to: rooms, and rooms' parts of outside walls. */
+type Sel = { kind: 'wall'; index: number; t: number; whole: boolean } | { kind: 'blocks'; idx: number[] } | { kind: 'rooms'; ids: string[] } | { kind: 'set'; rooms: string[]; pieces: Span[] } | null
+/** The kinds the Fabric step gives: an element's types, or (air, bridge) a whole-building value. */
+type FabricKind = 'wall' | 'floor' | 'roof' | 'openings' | 'air' | 'bridge' | 'partition'
+const FABRIC_KINDS: Array<Kind & { key: FabricKind }> = [
+  { key: 'wall', name: 'External wall', icon: 'wall' },
+  { key: 'floor', name: 'Ground floor', icon: 'floor' },
+  { key: 'roof', name: 'Roof', icon: 'roof' },
+  { key: 'openings', name: 'Windows & doors', icon: 'openings' },
+  { key: 'air', name: 'Air leakage', icon: 'air' },
+  { key: 'bridge', name: 'Thermal bridges', icon: 'bridge' },
+  { key: 'partition', name: 'Internal walls', icon: 'rooms' },
+]
+const SERVICE_ICON: Record<Service, IconName> = { heating: 'heating', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw' }
 type View = { cx: number; cy: number; k: number }
 type Drag =
   | { kind: 'pan'; x: number; y: number; v: View; moved: boolean }
@@ -81,19 +100,18 @@ const TOOLS: Record<Mode, Array<{ key: Tool; name: string; glyph: string; line: 
     { key: 'join', name: 'Join', glyph: '⧉', line: 'Tap two rooms that touch to make them one.' },
     { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a room (Shift: more than one) to put it in a zone. Drag a wall between rooms to move it.' },
   ],
-  fabric: [
-    { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a wall or a room (Shift: more rooms), then set its U-value or construction on the card. Esc to let go.' },
-    { key: 'paint', name: 'Apply', glyph: '◧', line: 'Tap a room\'s part of a wall to give it the chosen type (Shift: the whole wall), or tap a room for all of its parts.' },
-  ],
-  spaces: [
-    { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a room (Shift: more), then give it a space type on the card. Tap a space type on the left to see or edit it. Esc to let go.' },
-    { key: 'paint', name: 'Apply', glyph: '◧', line: 'Tap rooms to give them the chosen space type.' },
-  ],
+  fabric: [{ key: 'pick', name: 'Select', glyph: '➚', line: 'Tap rooms or walls. Ctrl or Shift: more. Double-click: a whole wall.' }],
+  spaces: [{ key: 'pick', name: 'Select', glyph: '➚', line: 'Tap rooms. Ctrl or Shift: more. Esc lets go.' }],
+  systems: [{ key: 'pick', name: 'Select', glyph: '➚', line: 'Tap rooms. Ctrl or Shift: more. Esc lets go.' }],
 }
-const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'pick', spaces: 'pick' }
-const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', spaces: 'Spaces' }
-const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, spaces: 4 }
+const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'pick', spaces: 'pick', systems: 'pick' }
+const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', spaces: 'Spaces', systems: 'Systems' }
+const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, spaces: 4, systems: 5 }
+const MODES: Mode[] = ['outline', 'rooms', 'fabric', 'spaces', 'systems']
+const STEP_ICON: Record<Mode, IconName> = { outline: 'building', rooms: 'rooms', fabric: 'wall', spaces: 'person', systems: 'heating' }
+const STEP_LINE: Record<Mode, string> = { outline: "The building's shape", rooms: 'Walls inside, and zones', fabric: 'What it is made of', spaces: 'What each room is for', systems: 'What heats, cools and ventilates it' }
 const SPACE_COLOURS = ['#E0A84E', '#5B9BD5', '#6AA84F', '#C27BA0', '#45A5A0', '#D9734E', '#8E7CC3', '#A0A04A']
+const SYSTEM_COLOURS = ['#45A5A0', '#D9734E', '#8E7CC3', '#5B9BD5', '#E0A84E', '#6AA84F', '#C27BA0', '#A0A04A']
 /** How gains enter a zone, as today's engine assumes them (TODAY): a new space type starts here, all editable. */
 const todaysGains = (): Partial<SpaceType> => ({
   occupancy_rate: TODAY.occupancy_rate,
@@ -159,9 +177,13 @@ export default function GeometryLab() {
   const [tool, setTool] = useState<Tool>('rect')
   const [joinFrom, setJoinFrom] = useState<string | null>(null)
   const [sel, setSel] = useState<Sel>(null)
-  const [elem, setElem] = useState<FabricElement>('wall')
+  const [fkind, setFkind] = useState<FabricKind>('wall')
+  const [opening, setOpening] = useState<'glazing' | 'door'>('glazing')
+  const elem: FabricElement = fkind === 'openings' ? opening : fkind === 'air' || fkind === 'bridge' ? 'wall' : fkind
+  const [service, setService] = useState<Service>('heating')
   const [active, setActive] = useState<Partial<Record<FabricElement, string>>>({})
   const [activeSpace, setActiveSpace] = useState<string | null>(null)
+  const [activeSys, setActiveSys] = useState<Partial<Record<Service, string>>>({})
   const [clip, setClip] = useState<number | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [pointer, setPointer] = useState<XY | null>(null)
@@ -190,7 +212,8 @@ export default function GeometryLab() {
   }, [say])
 
   const narrow = size[0] < 760
-  const mid: [number, number] = narrow ? [size[0] / 2, size[1] * 0.3] : [LEFT + (size[0] - LEFT) / 2, size[1] / 2 - 30]
+  const RIGHT = GIVING(mode) ? 374 : 0
+  const mid: [number, number] = narrow ? [size[0] / 2, size[1] * 0.3] : [LEFT + (size[0] - LEFT - RIGHT) / 2, size[1] / 2 - 30]
   const toPx = (p: XY): [number, number] => [mid[0] + (p[0] - view.cx) * view.k, mid[1] - (p[1] - view.cy) * view.k]
   const toM = (x: number, y: number): XY => [(x - mid[0]) / view.k + view.cx, -(y - mid[1]) / view.k + view.cy]
   const mPerPx = 1 / view.k
@@ -215,7 +238,7 @@ export default function GeometryLab() {
     ;(window as unknown as { sim2?: unknown }).sim2 = {
       getPlan: () => plan,
       loadPlan: (p: Plan) => {
-        commit({ ...emptyPlan(), ...p })
+        commit(upgradePlan(p))
         setSel(null)
         fitTo(p.blocks.flat())
       },
@@ -349,7 +372,7 @@ export default function GeometryLab() {
         return setDrag({ kind: 'move', idx, start: m, base: plan, d: [0, 0], moved: false, tapped: bi, sh: e.shiftKey })
       }
     }
-    if (tool === 'pick' && has && wallAt(x, y) == null) {
+    if (tool === 'pick' && mode === 'rooms' && has && wallAt(x, y) == null) {
       const side = innerSideAt(plan, m, GRAB * mPerPx)
       if (side) return setDrag({ kind: 'wall', side, start: m, n: sideNormal(plan, side), base: plan, by: 0 })
     }
@@ -443,9 +466,18 @@ export default function GeometryLab() {
       if (d.ring.length === before.length && d.ring.every((p, i) => dist(p, before[i]!) < 1e-9)) return
       return apply(setBlock(d.base, d.block, d.ring), m, labelAt(d.ring))
     }
-    if (d.kind === 'pan' && !d.moved) click(m, x, y, e.shiftKey)
+    if (d.kind === 'pan' && !d.moved) click(m, x, y, e.shiftKey || e.ctrlKey || e.metaKey)
   }
   const onDouble = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (mode === 'fabric' && wallsKind) {
+      // The whole wall: every room's part of it.
+      const r = (e.currentTarget as Element).getBoundingClientRect()
+      const w = wallAt(e.clientX - r.left, e.clientY - r.top)
+      if (w == null) return
+      const ps = pieces.filter((p) => p.run === w)
+      const add = e.shiftKey || e.ctrlKey || e.metaKey
+      return setSel({ kind: 'set', rooms: add ? chosenSet.rooms : [], pieces: [...(add ? chosenSet.pieces.filter((x) => x.run !== w) : []), ...ps] })
+    }
     if (tool !== 'select' || !has) return
     const r = (e.currentTarget as Element).getBoundingClientRect()
     const c = cornerAt(e.clientX - r.left, e.clientY - r.top)
@@ -499,7 +531,7 @@ export default function GeometryLab() {
       return
     }
     if (tool === 'select') return setSel(null)
-    if (tool === 'paint') return paintAt(m, x, y, sh)
+    if (GIVING(mode)) return chooseAt2(m, x, y, sh)
     if (tool === 'divide') {
       if (!plan.rooms.length) return tell(m, 'Draw the building first.', true)
       const h = wallHit(m, sh || !!cutFrom)
@@ -571,6 +603,7 @@ export default function GeometryLab() {
       setShift(e.shiftKey)
       if ((e.target as HTMLElement)?.closest?.('input, textarea, select')) return
       const ctl = e.ctrlKey || e.metaKey
+      if (ctl && e.key.toLowerCase() === 'a' && GIVING(mode)) return void (e.preventDefault(), setSel({ kind: 'set', rooms: plan.rooms.map((r) => r.id), pieces: [] }))
       if (ctl && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         if (tool === 'shape' && cs.corners.length) return void core.undo()
@@ -596,8 +629,6 @@ export default function GeometryLab() {
         setJoinFrom(null)
         setDrag(null)
         setSel(null)
-        setActiveSpace(null)
-        if (tool === 'paint') setTool('pick')
       }
       const t = TOOLS[mode][Number(e.key) - 1]
       if (t && !ctl && !e.altKey) pick(t.key)
@@ -703,83 +734,64 @@ export default function GeometryLab() {
   const chooseWall = (whole: boolean) => sel?.kind === 'wall' && setSel({ ...sel, whole })
   const choosePiece = (p: WallPiece) => setSel({ kind: 'wall', index: p.run, t: (p.t0 + p.t1) / 2, whole: false })
 
+  // ─── steps 3 to 5: what is chosen (rooms, and rooms' parts of outside walls) ─────────────────
+  const giving = GIVING(mode)
+  const wallsKind = fkind === 'wall' || fkind === 'openings'
+  const chosenSet = sel?.kind === 'set' ? sel : { kind: 'set' as const, rooms: [] as string[], pieces: [] as Span[] }
+  const samePiece = (a: Span, b: Span) => a.run === b.run && Math.abs(a.t0 - b.t0) < 1e-6 && Math.abs(a.t1 - b.t1) < 1e-6
+  const setChosen = (rooms: string[], ps: Span[]) => setSel(rooms.length || ps.length ? { kind: 'set', rooms, pieces: ps } : null)
+  /** A tap on the drawing: a room's part of a wall (Fabric: walls, windows and doors), or a room. Ctrl or Shift adds
+   * it, or takes it away; a plain tap chooses only it; a tap on empty paper lets go. */
+  const chooseAt2 = (m: XY, x: number, y: number, add: boolean) => {
+    const w = mode === 'fabric' && wallsKind ? wallAt(x, y) : null
+    if (w != null) {
+      const p = pieceAt(pieces, w, tOn(w, m))
+      if (!p) return
+      const sp: Span = { run: p.run, t0: p.t0, t1: p.t1 }
+      const has = chosenSet.pieces.some((q) => samePiece(q, sp))
+      return add ? setChosen(chosenSet.rooms, has ? chosenSet.pieces.filter((q) => !samePiece(q, sp)) : [...chosenSet.pieces, sp]) : setChosen([], [sp])
+    }
+    const ri = zoneAt(rings, m)
+    const room = ri >= 0 ? plan.rooms[ri]! : null
+    if (!room) return add ? undefined : setSel(null)
+    if (!add) return setChosen([room.id], [])
+    setChosen(chosenSet.rooms.includes(room.id) ? chosenSet.rooms.filter((r) => r !== room.id) : [...chosenSet.rooms, room.id], chosenSet.pieces)
+  }
+  /** From the list on the left: these rooms only, or (Ctrl or Shift) added, or taken away when all are in already. */
+  const chooseRooms = (ids: string[], add: boolean) => {
+    if (!add) return setChosen(ids, [])
+    const allIn = ids.every((id) => chosenSet.rooms.includes(id))
+    setChosen(allIn ? chosenSet.rooms.filter((r) => !ids.includes(r)) : [...new Set([...chosenSet.rooms, ...ids])], chosenSet.pieces)
+  }
+  /** The wall pieces chosen: those tapped, and every outside part of the rooms chosen. */
+  const chosenPieces = (): Span[] => {
+    const out: Span[] = [...chosenSet.pieces]
+    for (const p of piecesOfRooms(plan, chosenSet.rooms)) if (!out.some((x) => samePiece(x, p))) out.push({ run: p.run, t0: p.t0, t1: p.t1 })
+    return out
+  }
+  const allRooms = () => plan.rooms.map((r) => r.id)
+  const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+  /** "Now: A ×2, B ×1": what the chosen things have now. */
+  const nowOf = (names: string[]) => {
+    if (!names.length) return null
+    const by = new Map<string, number>()
+    for (const n of names) by.set(n, (by.get(n) ?? 0) + 1)
+    return `Now: ${[...by.entries()].map(([n, k]) => (by.size > 1 ? `${n} ×${k}` : n)).join(', ')}`
+  }
+
   // ─── fabric (step 3) ────────────────────────────────────────────────────────
   const activeOf = (e: FabricElement) => {
     const id = active[e]
     return id && plan.fabric_types.some((t) => t.id === id) ? id : firstType(plan, e)
   }
-  const newType = (p: Plan, e: FabricElement): { plan: Plan; id: string } => {
+  const newType = (p: Plan, e: FabricElement, from?: FabricType): { plan: Plan; id: string } => {
     const same = p.fabric_types.filter((t) => t.element === e)
     let k = same.length + 1
     while (p.fabric_types.some((t) => t.id === `f_${e}${k}`)) k++
-    const t: FabricType = { id: `f_${e}${k}`, element: e, name: `${FABRIC_ELEMENTS.find((x) => x.key === e)!.one} ${same.length + 1}`, construction: null, u: null }
+    const t: FabricType = from ? { ...from, id: `f_${e}${k}`, name: `${from.name} (copy)` } : { id: `f_${e}${k}`, element: e, name: `${FABRIC_ELEMENTS.find((x) => x.key === e)!.one} ${same.length + 1}`, construction: null, u: null }
     return { plan: { ...p, fabric_types: [...p.fabric_types, t] }, id: t.id }
   }
   const setFT = (id: string, q: Partial<FabricType>) => commit({ ...plan, fabric_types: plan.fabric_types.map((x) => (x.id === id ? { ...x, ...q } : x)) })
-  /** Give wall stretches or rooms a type of element `e` from a card's select (`__new` makes a type first). */
-  const setFabric = (e: FabricElement, to: { spans: Span[] } | { rooms: string[] }, v: string) => {
-    if (v === '__mixed') return
-    let p = plan
-    let id = v
-    if (v === '__new') {
-      const r = newType(plan, e)
-      p = r.plan
-      id = r.id
-      setActive((a) => ({ ...a, [e]: id }))
-    }
-    commit('rooms' in to ? setTypeOnRooms(p, to.rooms, id) : setTypeOn(p, to.spans, id))
-  }
-  /** The wall pieces a card's wall stretches cover. */
-  const piecesIn = (spans: Span[]) => pieces.filter((p) => spans.some((s) => s.run === p.run && (p.t0 + p.t1) / 2 >= s.t0 - 1e-6 && (p.t0 + p.t1) / 2 <= s.t1 + 1e-6))
-  const samePiece = (a: Span, b: Span) => a.run === b.run && Math.abs(a.t0 - b.t0) < 1e-6 && Math.abs(a.t1 - b.t1) < 1e-6
-  type Target = { spans: Span[] } | { rooms: string[] }
-  /** The types a card's selection has for element `e`. */
-  const typesOn = (e: FabricElement, to: Target) =>
-    onWalls(e) ? ('rooms' in to ? piecesOfRooms(plan, to.rooms) : piecesIn(to.spans)).map((p) => typeOfSpan(plan, p, e)) : 'rooms' in to ? to.rooms.map((r) => roomType(plan, r, e as 'roof' | 'floor')) : []
-  /** Change the construction or U of what is chosen. When its type is also used elsewhere, the chosen things get a
-   * type of their own (named after them) so nothing else changes; when only they use it, the type itself changes. */
-  const editFor = (e: FabricElement, to: Target, q: Partial<FabricType>, label: string) => {
-    const ids = [...new Set(typesOn(e, to))]
-    const cur = ids.length === 1 ? plan.fabric_types.find((t) => t.id === ids[0]) : undefined
-    if (cur) {
-      const mine = onWalls(e)
-        ? (() => { const ps = 'rooms' in to ? piecesOfRooms(plan, to.rooms) : piecesIn(to.spans); return pieces.filter((p) => typeOfSpan(plan, p, e) === cur.id).every((p) => ps.some((x) => samePiece(x, p))) })()
-        : 'rooms' in to && plan.rooms.filter((r) => roomType(plan, r.id, e as 'roof' | 'floor') === cur.id).every((r) => to.rooms.includes(r.id))
-      if (mine) return setFT(cur.id, q)
-    }
-    const r = newType(plan, e)
-    let p: Plan = { ...r.plan, fabric_types: r.plan.fabric_types.map((t) => (t.id === r.id ? { ...t, name: `${FABRIC_ELEMENTS.find((x) => x.key === e)!.one} · ${label}`, construction: cur?.construction ?? null, u: cur?.u ?? null, ...q } : t)) }
-    p = 'rooms' in to ? setTypeOnRooms(p, to.rooms, r.id) : setTypeOn(p, to.spans, r.id)
-    commit(p)
-  }
-  /** A card's fabric rows: per element, its type, and the construction and U of what is chosen. */
-  const fabricRows = (els: readonly FabricElement[], to: Target, label: string) =>
-    els.map((e) => {
-      const ids = [...new Set(typesOn(e, to))]
-      if (!ids.length) return null
-      const t = ids.length === 1 ? plan.fabric_types.find((x) => x.id === ids[0]) : undefined
-      const lib = constructionsFor(e)
-      const c = construction(t?.construction)
-      return (
-        <div key={e} className="gl-fabcard">
-          <div className="gl-row">
-            <span>{FABRIC_ELEMENTS.find((x) => x.key === e)!.name}</span>
-            {typeSelect(e, t ? t.id : '__mixed', (x) => setFabric(e, to, x))}
-          </div>
-          <div className="gl-fab-detail">
-            <select className="gl-sel" aria-label={`Construction of ${FABRIC_ELEMENTS.find((x) => x.key === e)!.name}`} value={t ? (t.construction ?? '') : '__mixed'} onChange={(ev) => ev.target.value !== '__mixed' && editFor(e, to, { construction: ev.target.value || null }, label)}>
-              {!t && <option value="__mixed">Several</option>}
-              <option value="">{lib.length ? 'Construction not set' : 'None in the library yet'}</option>
-              {lib.map((x) => <option key={x.key} value={x.key}>{short(x.name)}{x.u != null ? ` · U ${x.u}` : ''}</option>)}
-            </select>
-            <label className="gl-u" title="A U-value you know, W/m²K, used over the library's. Empty: the library's.">
-              U
-              <input aria-label={`U-value of ${FABRIC_ELEMENTS.find((x) => x.key === e)!.name}`} inputMode="decimal" placeholder={c?.u != null ? String(c.u) : t ? '—' : 'mixed'} defaultValue={t?.u ?? ''} key={`${e}-${t?.id ?? 'mixed'}-${t?.u}`} onBlur={(ev) => { const v = ev.target.value.trim(); const u = v === '' ? null : Number(v); if (u === null || (Number.isFinite(u) && u > 0)) { if (!t || u !== t.u) editFor(e, to, { u }, label) } else ev.target.value = t?.u == null ? '' : String(t.u) }} onKeyDown={(ev) => ev.key === 'Enter' && (ev.target as HTMLInputElement).blur()} />
-            </label>
-          </div>
-        </div>
-      )
-    })
   /** What a type is used on: wall metres, numbers of windows or doors, or roof / floor area. */
   const usage = (t: FabricType): { n: number; text: string } => {
     if (t.element === 'wall') {
@@ -788,55 +800,47 @@ export default function GeometryLab() {
     }
     if (t.element === 'glazing' || t.element === 'door') {
       const n = plan.windows.filter((w) => !!w.door === (t.element === 'door') && typeAt(plan, w.wall, w.t_m + w.width_m / 2, t.element as WallEl) === t.id).length
-      return { n, text: `${n} ${t.element === 'door' ? (n === 1 ? 'door' : 'doors') : n === 1 ? 'window' : 'windows'}` }
+      return { n, text: count(n, t.element === 'door' ? 'door' : 'window') }
     }
-    if (t.element === 'partition') return { n: 1, text: '' }
+    if (t.element === 'partition') return { n: 1, text: 'every one' }
     const a = plan.rooms.filter((r) => roomType(plan, r.id, t.element as 'roof' | 'floor') === t.id).reduce((n, r) => n + ringArea(r.ring), 0)
     return { n: a, text: `${f1(a)} m²` }
   }
-  const oneOf = (vs: string[]) => (new Set(vs).size === 1 ? vs[0]! : '__mixed')
-  const typeSelect = (e: FabricElement, value: string, onPick: (v: string) => void) => (
-    <select className="gl-sel" aria-label={FABRIC_ELEMENTS.find((x) => x.key === e)!.name} value={value} onChange={(ev) => onPick(ev.target.value)}>
-      {value === '__mixed' && <option value="__mixed">Several</option>}
-      {plan.fabric_types.filter((t) => t.element === e).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-      <option value="__new">New type…</option>
-    </select>
-  )
   const typeName = (id: string) => plan.fabric_types.find((t) => t.id === id)?.name ?? id
-  const showTypes = mode === 'fabric' && onWalls(elem)
+  const unsetType = (t: FabricType | undefined) => !t || (t.construction == null && t.u == null)
+  const fabricSwatch = (id: string): Swatch => ({ colour: typeColour(plan, id), unset: unsetType(plan.fabric_types.find((t) => t.id === id)) })
+  const fabricLine = (t: FabricType) => {
+    const c = construction(t.construction)
+    const u = t.u ?? c?.u
+    if (!c && t.u == null) return 'Not set yet'
+    return [c ? short(c.name) : 'Typed U-value', u != null ? `U ${u}${t.u != null && c ? ' (typed)' : ''}` : ''].filter(Boolean).join(' · ')
+  }
+  const showTypes = mode === 'fabric' && wallsKind
   const bandOf = (sp: Span) => typeColour(plan, typeOfSpan(plan, sp, onWalls(elem) ? elem : 'wall'))
+  /** Apply the active type of the kind in hand to what is chosen (or every room). */
+  const giveFabric = (all: boolean) => {
+    const id = activeOf(elem)
+    if (elem === 'roof' || elem === 'floor') return commit(setTypeOnRooms(plan, all ? allRooms() : chosenSet.rooms, id))
+    commit(setTypeOn(plan, all ? pieces.map((p) => ({ run: p.run, t0: p.t0, t1: p.t1 })) : chosenPieces(), id))
+  }
 
   // ─── spaces (step 4) ────────────────────────────────────────────────────────
   const spaceColour = (id: string | undefined) => {
     const i = plan.spaces.findIndex((x) => x.id === id)
     return i < 0 ? null : SPACE_COLOURS[i % SPACE_COLOURS.length]!
   }
-  const curSpace = plan.spaces.find((x) => x.id === activeSpace) ?? null
+  const curSpace = plan.spaces.find((x) => x.id === activeSpace) ?? plan.spaces[0] ?? null
   const newSpace = (from?: SpaceType) => {
     let k = plan.spaces.length + 1
     while (plan.spaces.some((x) => x.id === `s${k}`)) k++
     const sp: SpaceType = from
       ? { ...from, id: `s${k}`, name: `${from.name} (copy)` }
-      : { id: `s${k}`, name: `Space type ${plan.spaces.length + 1}`, use: null, occupancy: null, lighting: null, equipment: null, heating: null, cooling: null, ventilation: null, dhw: null, ...todaysGains() }
+      : { id: `s${k}`, name: `Space type ${plan.spaces.length + 1}`, use: null, occupancy: null, lighting: null, equipment: null, ...todaysGains() }
     commit({ ...plan, spaces: [...plan.spaces, sp] })
     setActiveSpace(sp.id)
-    return sp.id
   }
   const setSpace = (id: string, q: Partial<SpaceType>) => commit({ ...plan, spaces: plan.spaces.map((x) => (x.id === id ? { ...x, ...q } : x)) })
-  const giveSpace = (ids: string[], v: string) => {
-    if (v === '__mixed') return
-    let p = plan
-    let sid: string | undefined = v || undefined
-    if (v === '__new') {
-      let k = plan.spaces.length + 1
-      while (plan.spaces.some((x) => x.id === `s${k}`)) k++
-      const sp: SpaceType = { id: `s${k}`, name: `Space type ${plan.spaces.length + 1}`, use: null, occupancy: null, lighting: null, equipment: null, heating: null, cooling: null, ventilation: null, dhw: null, ...todaysGains() }
-      p = { ...p, spaces: [...p.spaces, sp] }
-      sid = sp.id
-      setActiveSpace(sp.id)
-    }
-    commit({ ...p, rooms: p.rooms.map((r) => (ids.includes(r.id) ? { ...r, space: sid } : r)) })
-  }
+  const giveSpaceTo = (ids: string[]) => curSpace && commit({ ...plan, rooms: plan.rooms.map((r) => (ids.includes(r.id) ? { ...r, space: curSpace.id } : r)) })
   /** Zones whose rooms have more than one space type (a zone gets one in the model). */
   const mixedZones = plan.zones.filter((z) => new Set(plan.rooms.filter((r) => r.zone === z.id).map((r) => r.space ?? '')).size > 1)
   /** Split a zone so each space type's rooms are a zone of their own (the type with the most floor keeps the zone). */
@@ -855,26 +859,31 @@ export default function GeometryLab() {
     commit(p)
   }
 
-  /** Apply (steps 3 and 4): give what was tapped the chosen fabric type or space type. */
-  const paintAt = (m: XY, x: number, y: number, sh: boolean) => {
-    const ri = zoneAt(rings, m)
-    const room = ri >= 0 ? plan.rooms[ri]! : null
-    if (mode === 'spaces') {
-      if (!room) return tell(m, 'Tap a room.', true)
-      const sid = curSpace?.id ?? (plan.spaces[0] ? (setActiveSpace(plan.spaces[0].id), plan.spaces[0].id) : null)
-      if (!sid) return tell(m, 'Make a space type on the left first.', true)
-      return commit({ ...plan, rooms: plan.rooms.map((r) => (r.id === room.id ? { ...r, space: sid } : r)) })
-    }
-    if (elem === 'partition') return tell(m, 'Walls between zones take one type for the whole building: set it on the left.', true)
-    const id = activeOf(elem)
-    const w = onWalls(elem) ? wallAt(x, y) : null
-    if (w != null) {
-      const p = pieceAt(pieces, w, tOn(w, m))
-      return commit(setTypeOn(plan, [sh || !p ? wholeWall(plan, w)! : p], id))
-    }
-    if (!room) return tell(m, onWalls(elem) ? 'Tap a wall or a room.' : 'Tap a room.', true)
-    if (onWalls(elem) && !piecesOfRooms(plan, [room.id]).length) return tell(m, 'This room has no outside wall.', true)
-    commit(setTypeOnRooms(plan, [room.id], id))
+  // ─── systems (step 5) ───────────────────────────────────────────────────────
+  const systemsOf = (sv: Service) => plan.systems.filter((x) => x.service === sv)
+  const sysColour = (id: string | undefined) => {
+    const x = plan.systems.find((y) => y.id === id)
+    return x ? SYSTEM_COLOURS[systemsOf(x.service).indexOf(x) % SYSTEM_COLOURS.length]! : null
+  }
+  const curSys = systemsOf(service).find((x) => x.id === activeSys[service]) ?? systemsOf(service)[0] ?? null
+  const newSystem = (from?: PlanSystem) => {
+    let k = plan.systems.length + 1
+    while (plan.systems.some((x) => x.id === `y${k}`)) k++
+    const one = SERVICES.find((x) => x.key === service)!.one
+    const x: PlanSystem = from ? { ...from, id: `y${k}`, name: `${from.name} (copy)` } : { id: `y${k}`, service, name: `${one} ${systemsOf(service).length + 1}`, template: null, ...(service === 'ventilation' ? { flow: null, schedule: null } : {}) }
+    commit({ ...plan, systems: [...plan.systems, x] })
+    setActiveSys((a) => ({ ...a, [service]: x.id }))
+  }
+  const setSys = (id: string, q: Partial<PlanSystem>) => commit({ ...plan, systems: plan.systems.map((x) => (x.id === id ? { ...x, ...q } : x)) })
+  const giveSystemTo = (ids: string[]) => curSys && commit({ ...plan, rooms: plan.rooms.map((r) => (ids.includes(r.id) ? { ...r, systems: { ...r.systems, [service]: curSys.id } } : r)) })
+  const removeSystem = (id: string) => commit({ ...plan, systems: plan.systems.filter((x) => x.id !== id) })
+  /** A library template's fuel and efficiency, in a line. */
+  const sysLine = (key: string | null | undefined, s: Service) => {
+    const t = system(key)
+    if (!t) return 'Not set yet'
+    if (!t.fuel) return 'None: no system in the model'
+    const eff = s === 'heating' ? (t.scop != null ? `SCOP ${t.scop}` : t.efficiency != null ? `η ${t.efficiency}` : '') : s === 'cooling' ? (t.seer != null ? `SEER ${t.seer}` : t.efficiency != null ? `EER ${t.efficiency}` : '') : s === 'ventilation' ? [t.sfp != null ? `SFP ${t.sfp}` : '', t.heat_recovery ? `recovery ${Math.round(t.heat_recovery * 100)}%` : ''].filter(Boolean).join(', ') : t.efficiency != null ? `η ${t.efficiency}` : ''
+    return [t.fuel, eff].filter(Boolean).join(' · ')
   }
 
   // ─── rooms and zones ───────────────────────────────────────────────────────
@@ -895,10 +904,12 @@ export default function GeometryLab() {
   /** A room's fill: its zone (step 2), its roof or floor type (step 3), its space type (step 4). */
   const roomFill = (r: Plan['rooms'][number]) =>
     mode === 'spaces' ? (spaceColour(r.space) ?? '#FFFFFF') + '59'
+    : mode === 'systems' ? (sysColour(r.systems?.[service]) ?? '#FFFFFF') + '59'
     : mode === 'fabric' ? (elem === 'roof' || elem === 'floor' ? typeColour(plan, roomType(plan, r.id, elem)) + '40' : '#FFFFFF')
     : tintOf(r.zone).fill
   const roomSub = (r: Plan['rooms'][number]) =>
     mode === 'spaces' ? (plan.spaces.find((x) => x.id === r.space)?.name ?? 'No space type')
+    : mode === 'systems' ? (plan.systems.find((x) => x.id === r.systems?.[service])?.name ?? 'None given')
     : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
     : `${f1(ringArea(r.ring))} m²`
 
@@ -932,8 +943,8 @@ export default function GeometryLab() {
       </text>
     )
   }
-  const hoverWall = (tool === 'select' || tool === 'pick' || tool === 'corner' || (tool === 'paint' && mode === 'fabric' && onWalls(elem))) && !drag && pointer ? wallAt(...toPx(pointer)) : null
-  const hoverInner = tool === 'pick' && !drag && pointer && hoverWall == null ? innerSideAt(plan, pointer, GRAB * mPerPx) : null
+  const hoverWall = (tool === 'select' || tool === 'corner' || (tool === 'pick' && (!giving || (mode === 'fabric' && wallsKind)))) && !drag && pointer ? wallAt(...toPx(pointer)) : null
+  const hoverInner = tool === 'pick' && mode === 'rooms' && !drag && pointer && hoverWall == null ? innerSideAt(plan, pointer, GRAB * mPerPx) : null
   const liveInner = drag?.kind === 'wall' ? (() => { const r = moveWall(drag.base, drag.side, drag.by); return 'why' in r ? null : sideEnds(r.plan, drag.side) })() : hoverInner ? sideEnds(plan, hoverInner) : null
   const pushed = drag?.kind === 'push' ? shownRuns.find((r) => r.block === drag.block && r.side === drag.side) : undefined
   const th = turnHandle()
@@ -950,7 +961,7 @@ export default function GeometryLab() {
     : drag?.kind === 'move' || drag?.kind === 'turn' ? 'grabbing'
     : drag?.kind === 'wall' || drag?.kind === 'push' || hoverInner || (tool === 'select' && hoverWall != null) ? 'col-resize'
     : tool === 'select' ? (overBlock ? 'move' : 'default')
-    : tool === 'pick' || tool === 'paint' ? 'pointer'
+    : tool === 'pick' ? 'pointer'
     : tool === 'corner' ? (hoverWall != null ? 'copy' : 'default')
     : 'crosshair'
   const tipLine =
@@ -959,18 +970,292 @@ export default function GeometryLab() {
     : drag?.kind === 'wall' || drag?.kind === 'push' ? `${drag.by >= 0 ? 'Out' : 'In'} ${f1(Math.abs(drag.by))} m${shift ? '' : ' (0.5 m steps; Shift: 0.1 m)'}`
     : drag?.kind === 'turn' ? `Turned ${Math.round((drag.rad * 180) / Math.PI)}°${shift ? '' : ' (15° steps; Shift: free)'}`
     : TOOLS[mode].find((t) => t.key === tool)?.line ?? ''
-  const chosen = new Set(sel?.kind === 'rooms' ? sel.ids : joinFrom ? [joinFrom] : [])
+  const chosen = new Set(sel?.kind === 'rooms' ? sel.ids : sel?.kind === 'set' ? sel.rooms : joinFrom ? [joinFrom] : [])
   const chosenBlocks = new Set(drag?.kind === 'move' || drag?.kind === 'turn' ? drag.idx : selBlocks)
 
+  // ─── steps 3 to 5: the two panels ───────────────────────────────────────────
+  /** What each room has of the thing in hand, for the list on the left. */
+  const hasOf = (r: Plan['rooms'][number]): { name: string; swatch: Swatch } | null => {
+    if (mode === 'spaces') {
+      const sp = plan.spaces.find((x) => x.id === r.space)
+      return sp ? { name: sp.name, swatch: { colour: spaceColour(sp.id)! } } : null
+    }
+    if (mode === 'systems') {
+      const x = plan.systems.find((y) => y.id === r.systems?.[service])
+      return x ? { name: x.name, swatch: { colour: sysColour(x.id)!, unset: !x.template } } : null
+    }
+    if (fkind === 'roof' || fkind === 'floor') {
+      const id = roomType(plan, r.id, fkind)
+      return { name: typeName(id), swatch: fabricSwatch(id) }
+    }
+    if (wallsKind) {
+      const ids = [...new Set(piecesOfRooms(plan, [r.id]).map((p) => typeOfSpan(plan, p, elem as WallEl)))]
+      if (!ids.length) return null
+      return ids.length === 1 ? { name: typeName(ids[0]!), swatch: fabricSwatch(ids[0]!) } : { name: `${ids.length} types`, swatch: { colour: '#C3CBC7' } }
+    }
+    return null
+  }
+  const chooseList = () => (
+    <ChooseList
+      rows={plan.rooms.map((r) => ({ id: r.id, name: r.name, zone: r.zone, area: `${f1(ringArea(r.ring))} m²`, has: hasOf(r) }))}
+      zones={plan.zones}
+      chosen={new Set(chosenSet.rooms)}
+      whole={{ area: `${f1(floorArea(plan.blocks))} m²` }}
+      onChoose={chooseRooms}
+      onNone={() => setSel(null)}
+      extra={
+        <>
+          {chosenSet.pieces.length > 0 && (
+            <p className="ap-pieces">
+              <span>{count(chosenSet.pieces.length, 'wall part')} from the drawing, {f1(chosenSet.pieces.reduce((t, p) => t + p.t1 - p.t0, 0))} m</span>
+              <button type="button" className="ap-link" onClick={() => setChosen(chosenSet.rooms, [])}>Clear</button>
+            </p>
+          )}
+          {mode === 'spaces' && mixedZones.map((z) => (
+            <div key={z.id} className="gl-mixed">
+              <p className="gl-warn">{z.name} has rooms of different space types. The model gives a zone one, so it takes the one with the most floor.</p>
+              <button type="button" className="gl-btn quiet" onClick={() => splitZone(z.id)}>Split {z.name} by space type</button>
+            </div>
+          ))}
+        </>
+      }
+    />
+  )
+
+  /** The Apply footer: what is chosen, what it has now, and why Apply can't run yet (if it can't). */
+  const giveFoot = (o: { name: string | null; rooms: boolean; now: string[]; onGive: (all: boolean) => void }) => {
+    const ps = mode === 'fabric' && !o.rooms ? chosenPieces() : []
+    const nRooms = chosenSet.rooms.length
+    const what = o.rooms
+      ? nRooms ? `${count(nRooms, 'room')} chosen, ${f1(plan.rooms.filter((r) => chosenSet.rooms.includes(r.id)).reduce((t, r) => t + ringArea(r.ring), 0))} m²` : chosenSet.pieces.length ? 'Wall parts are chosen: this goes on rooms.' : 'Nothing chosen yet.'
+      : ps.length ? `${count(ps.length, 'wall part')} chosen, ${f1(ps.reduce((t, p) => t + p.t1 - p.t0, 0))} m${nRooms ? ` (${count(nRooms, 'room')})` : ''}` : nRooms ? 'These rooms have no outside walls.' : 'Nothing chosen yet.'
+    const empty = o.rooms ? !nRooms : !ps.length
+    return {
+      what,
+      now: empty ? null : nowOf(o.now),
+      why: !o.name ? 'Make one first.' : empty ? 'Choose rooms on the left or on the drawing.' : null,
+      label: o.name ? `Apply ${o.name}` : 'Apply',
+      onApply: () => o.onGive(false),
+      onAll: () => o.name && o.onGive(true),
+    }
+  }
+
+  const fabricPanel = () => {
+    const kinds = FABRIC_KINDS
+    const k = FABRIC_KINDS.find((x) => x.key === fkind)!
+    const bi = plan.building ?? noBuildingInputs()
+    const setBi = (q: Partial<BuildingInputs>) => commit({ ...plan, building: { ...bi, ...q } })
+    const onKind = (x: string) => setFkind(x as FabricKind)
+    if (fkind === 'air' || fkind === 'bridge') {
+      return (
+        <GivePanel kinds={kinds} kind={fkind} onKind={onKind} title={k.name} icon={k.icon} items={[]} active={null} onActive={() => undefined}
+          body={
+            <div className="ap-whole-body">
+              {fkind === 'air' ? (
+                <>
+                  <div className="gl-row"><span>Air leakage (q50)</span><Num value={bi.q50 ?? ''} unit="m³/h·m²" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.q50) setBi({ q50: n }) }} /></div>
+                  <div className="gl-row"><span>Site exposure</span>
+                    <select className="gl-sel" value={bi.exposure ?? ''} onChange={(e) => setBi({ exposure: (e.target.value || null) as BuildingInputs['exposure'] })}>
+                      <option value="">Not set</option>
+                      <option value="sheltered">Sheltered</option>
+                      <option value="normal">Normal</option>
+                      <option value="exposed">Exposed</option>
+                    </select>
+                  </div>
+                  <p className="gl-hint">Air leakage at 50 Pa, from an air test or a target. It goes on every room, so there is nothing to apply. Empty stays unset.</p>
+                </>
+              ) : (
+                <>
+                  <div className="gl-row"><span>Thermal bridging</span><Num value={bi.tb_multiplier ?? ''} unit="× ISO 14683" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.tb_multiplier) setBi({ tb_multiplier: n }) }} /></div>
+                  <p className="gl-hint">1 = ISO 14683's default junctions for every edge of the building; 2 doubles them. It goes on the whole building. Empty stays unset.</p>
+                </>
+              )}
+            </div>
+          }
+        />
+      )
+    }
+    const types = plan.fabric_types.filter((t) => t.element === elem)
+    const act = activeOf(elem)
+    const at = plan.fabric_types.find((t) => t.id === act)
+    const lib = constructionsFor(elem)
+    const c = construction(at?.construction)
+    const items: Item[] = types.map((t, i) => {
+      const used = usage(t)
+      return { id: t.id, name: t.name, swatch: fabricSwatch(t.id), line: fabricLine(t), used: used.text, removable: i > 0 && !used.n }
+    })
+    const detail = at && (
+      <>
+        <input className="gl-title-in ap-tname" aria-label="Type name" defaultValue={at.name} key={`${at.id}-${at.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== at.name && setFT(at.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+        <div className="gl-row gl-librow"><span>Construction</span>
+          <select className="gl-sel" aria-label={`Construction of ${at.name}`} value={at.construction ?? ''} onChange={(e) => setFT(at.id, { construction: e.target.value || null })}>
+            <option value="">{lib.length ? 'Not set' : 'None in the library yet'}</option>
+            {lib.map((x) => <option key={x.key} value={x.key}>{short(x.name)}{x.u != null ? ` · U ${x.u}` : ''}</option>)}
+          </select>
+        </div>
+        <div className="gl-row"><span>U-value you know</span>
+          <label className="gl-u" title="Used over the library's. Empty: the library's.">
+            <input aria-label={`U-value of ${at.name}`} inputMode="decimal" placeholder={c?.u != null ? String(c.u) : '—'} defaultValue={at.u ?? ''} key={`${at.id}-u-${at.u}`} onBlur={(e) => { const v = e.target.value.trim(); const u = v === '' ? null : Number(v); if (u === null || (Number.isFinite(u) && u > 0)) { if (u !== at.u) setFT(at.id, { u }) } else e.target.value = at.u == null ? '' : String(at.u) }} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            W/m²K
+          </label>
+        </div>
+        <p className="gl-hint">{usage(at).n ? `Used on ${usage(at).text}: a change here changes all of it. Copy it for an exception.` : 'Not used yet.'}{elem === 'door' ? ' The library has no door constructions yet, so a door needs a typed U.' : ''}{elem === 'partition' ? " Every wall between zones takes this type. The library's internal wall is a draft (plaster, block, plaster from existing library layers) waiting for Chris to check." : ''}</p>
+      </>
+    )
+    const isRooms = elem === 'roof' || elem === 'floor'
+    return (
+      <GivePanel
+        kinds={kinds} kind={fkind} onKind={onKind}
+        title={fkind === 'openings' ? 'Windows & doors' : k.name} icon={k.icon}
+        items={items} active={act}
+        onActive={(id) => setActive((a) => ({ ...a, [elem]: id }))}
+        onNew={elem === 'partition' && types.length ? undefined : () => { const r = newType(plan, elem); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}
+        onCopy={elem === 'partition' ? undefined : (id) => { const r = newType(plan, elem, plan.fabric_types.find((t) => t.id === id)); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}
+        onRemove={(id) => commit({ ...plan, fabric_types: plan.fabric_types.filter((x) => x.id !== id), wall_spans: plan.wall_spans.filter((x) => x.type !== id) })}
+        detail={detail}
+        give={elem === 'partition' ? null : giveFoot({
+          name: at?.name ?? null,
+          rooms: isRooms,
+          now: isRooms ? chosenSet.rooms.map((id) => typeName(roomType(plan, id, elem))) : chosenPieces().map((p) => typeName(typeOfSpan(plan, p, elem as WallEl))),
+          onGive: giveFabric,
+        })}
+        top={fkind === 'openings' ? (
+          <div className="gl-chips small" role="group" aria-label="Windows or doors">
+            <button type="button" aria-pressed={opening === 'glazing'} onClick={() => setOpening('glazing')}>Windows</button>
+            <button type="button" aria-pressed={opening === 'door'} onClick={() => setOpening('door')}>Doors</button>
+          </div>
+        ) : undefined}
+      />
+    )
+  }
+
+  const spacesPanel = () => {
+    const sp = curSpace
+    const opt = (label: string, k: keyof SpaceType, items: Array<{ key: string; name: string }>) => sp && (
+      <div className="gl-row gl-librow">
+        <span>{label}</span>
+        <select className="gl-sel" aria-label={label} value={(sp[k] as string | null) ?? ''} onChange={(e) => setSpace(sp.id, { [k]: e.target.value || null })}>
+          <option value="">Not set</option>
+          {items.map((x) => <option key={x.key} value={x.key}>{short(x.name)}</option>)}
+        </select>
+      </div>
+    )
+    // A value the library has no number for: typed here; empty stays unset (the document says nothing).
+    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2'
+    const typed = (label: string, k: Gk, step: number, unit?: string, max?: number) => sp && (
+      <div className="gl-row gl-typed">
+        <span>{label}</span>
+        <Num value={sp[k] ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(v) => { const n = Number.isFinite(v) && v >= 0 && (max == null || v <= max) ? (v > 0 || k === 'equipment_baseload_w_per_m2' ? v : null) : (sp[k] ?? null); if (n !== (sp[k] ?? null)) setSpace(sp.id, { [k]: n }) }} />
+      </div>
+    )
+    const items: Item[] = plan.spaces.map((x) => {
+      const rs = plan.rooms.filter((r) => r.space === x.id)
+      return { id: x.id, name: x.name, swatch: { colour: spaceColour(x.id)! }, line: USES.find((u) => u.key === x.use)?.name ?? 'Use not set', used: rs.length ? `${count(rs.length, 'room')}` : 'not used', removable: !rs.length }
+    })
+    return (
+      <GivePanel
+        title="Space types" icon="person"
+        items={items} active={sp?.id ?? null}
+        onActive={setActiveSpace}
+        onNew={() => newSpace()} newLabel="New space type"
+        onCopy={(id) => newSpace(plan.spaces.find((x) => x.id === id))}
+        onRemove={(id) => commit({ ...plan, spaces: plan.spaces.filter((x) => x.id !== id) })}
+        detail={sp && (
+          <>
+            <input className="gl-title-in ap-tname" aria-label="Space type name" defaultValue={sp.name} key={`${sp.id}-${sp.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== sp.name && setSpace(sp.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            {opt('Use', 'use', USES as Array<{ key: string; name: string }>)}
+            <h4>People</h4>
+            {opt('Occupancy', 'occupancy', profilesFor('occupancy'))}
+            {typed('People per m²', 'people_per_m2', 0.01)}
+            {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
+            {typed('Occupancy rate', 'occupancy_rate', 0.05, undefined, 1)}
+            <h4>Lighting and equipment</h4>
+            {opt('Lighting', 'lighting', profilesFor('lighting'))}
+            {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
+            {opt('Equipment', 'equipment', profilesFor('equipment'))}
+            {typed('Equipment in use', 'equipment_w_per_m2', 0.5, 'W/m²')}
+            {typed('Equipment always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
+            <h4>Comfort</h4>
+            {typed('Heating to', 'heat_c', 0.5, '°C', 40)}
+            {typed('Cooling to', 'cool_c', 0.5, '°C', 40)}
+            <details className="gl-more">
+              <summary>How the gains enter the room</summary>
+              {typed('Radiant share', 'radiant_fraction', 0.05, undefined, 1)}
+              {opt('Lighting follows', 'light_relationship', RELATIONSHIPS)}
+              {sp.light_relationship === 'proportional_with_spill' && typed('Daylight factor', 'daylight_factor', 0.05, undefined, 1)}
+              {typed('Lit share of floor', 'light_area_share', 0.05)}
+              {typed('Lighting heat to room', 'light_gain_fraction', 0.05, undefined, 1)}
+              {opt('Equipment follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}
+              {sp.equip_relationship !== 'independent' && typed('Standby when empty', 'standby_factor', 0.05, undefined, 1)}
+              {typed('Equipped share of floor', 'equip_area_share', 0.05)}
+              {typed('Equipment heat to room', 'equip_gain_fraction', 0.05, undefined, 1)}
+              <p className="gl-hint">Shares and factors run 0 to 1. A new space type starts from today's engine values; all can be changed. Empty: not stated, and the results say so.</p>
+              <div className="gl-btns"><button type="button" className="gl-btn quiet" onClick={() => setSpace(sp.id, { ...todaysGains(), equipment_baseload_w_per_m2: sp.equipment_baseload_w_per_m2 ?? 0, occupancy_rate: sp.occupancy_rate ?? TODAY.occupancy_rate, sensible_w_per_person: sp.sensible_w_per_person ?? TODAY.sensible_w_per_person })}>Fill with today's engine values</button></div>
+            </details>
+            <p className="gl-hint">Profiles are the library's daily shapes; the numbers are typed here. A change changes every room of this type.</p>
+          </>
+        )}
+        give={giveFoot({ name: sp?.name ?? null, rooms: true, now: chosenSet.rooms.map((id) => plan.spaces.find((x) => x.id === plan.rooms.find((r) => r.id === id)?.space)?.name ?? 'none'), onGive: (all) => giveSpaceTo(all ? allRooms() : chosenSet.rooms) })}
+      />
+    )
+  }
+
+  const systemsPanel = () => {
+    const x = curSys
+    const sv = SERVICES.find((s) => s.key === service)!
+    const items: Item[] = systemsOf(service).map((y) => {
+      const rs = plan.rooms.filter((r) => r.systems?.[service] === y.id)
+      return { id: y.id, name: y.name, swatch: { colour: sysColour(y.id)!, unset: !y.template }, line: sysLine(y.template, service), used: rs.length ? count(rs.length, 'room') : 'not used', removable: !rs.length }
+    })
+    const mech = ['mvhr', 'mev'].includes(system(x?.template)?.type ?? '')
+    return (
+      <GivePanel
+        kinds={SERVICES.map((s) => ({ key: s.key, name: s.name, icon: SERVICE_ICON[s.key] }))} kind={service} onKind={(k) => setService(k as Service)}
+        title={`${sv.name} systems`} icon={SERVICE_ICON[service]}
+        items={items} active={x?.id ?? null}
+        onActive={(id) => setActiveSys((a) => ({ ...a, [service]: id }))}
+        onNew={() => newSystem()} newLabel="New system"
+        onCopy={(id) => newSystem(plan.systems.find((y) => y.id === id))}
+        onRemove={removeSystem}
+        detail={x && (
+          <>
+            <input className="gl-title-in ap-tname" aria-label="System name" defaultValue={x.name} key={`${x.id}-${x.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== x.name && setSys(x.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            <div className="gl-row gl-librow"><span>From the library</span>
+              <select className="gl-sel" aria-label={`Library system for ${x.name}`} value={x.template ?? ''} onChange={(e) => setSys(x.id, { template: e.target.value || null })}>
+                <option value="">Not set</option>
+                {systemsFor(service).map((t) => <option key={t.key} value={t.key}>{short(t.name)}</option>)}
+              </select>
+            </div>
+            <p className="ap-sysline">{sysLine(x.template, service)}</p>
+            {service === 'ventilation' && x.template && (
+              <>
+                <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div>
+                <div className="gl-row gl-librow"><span>Runs</span>
+                  <select className="gl-sel" aria-label="When it runs" value={x.schedule ?? ''} onChange={(e) => setSys(x.id, { schedule: e.target.value || null })}>
+                    <option value="">Not set</option>
+                    <option value="always_on">Always on (24/7)</option>
+                    {profilesFor('ventilation').map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+            <p className="gl-hint">Fuel and efficiency come from NZA Sim's library. A change changes every room with this system.</p>
+          </>
+        )}
+        give={giveFoot({ name: x?.name ?? null, rooms: true, now: chosenSet.rooms.map((id) => plan.systems.find((y) => y.id === plan.rooms.find((r) => r.id === id)?.systems?.[service])?.name ?? 'none'), onGive: (all) => giveSystemTo(all ? allRooms() : chosenSet.rooms) })}
+      />
+    )
+  }
+
   // A card is open on the right (wall, block, rooms or space type): the results panel sits to its left.
-  const cardOpen = !!(selWall && selSpan) || (mode === 'outline' && selBlocks.length > 0) || selRooms.length > 0 || (mode === 'spaces' && !!curSpace)
+  const cardOpen = !!(selWall && selSpan) || (mode === 'outline' && selBlocks.length > 0) || selRooms.length > 0
   return (
-    <div className="gl-root" ref={host}>
-      <ResultsPanel doc={built.doc} right={cardOpen ? 358 : 16} />
+    <div className={`gl-root${giving ? ' giving' : ''}`} ref={host}>
+      <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' })} />
+            <Plan3D plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -1005,13 +1290,15 @@ export default function GeometryLab() {
         {grid}
         {shown.blocks.map((b, i) => <polygon key={`f${i}`} className="gl-floor" points={P(b)} />)}
         {inRooms &&
-          shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) ? ' on' : ''}${mode === 'spaces' && !chosen.size && curSpace && r.space === curSpace.id ? ' mark' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
+          shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) && !giving ? ' on' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
         {liveInner && <line className="gl-wall-hover" x1={toPx(liveInner[0])[0]} y1={toPx(liveInner[0])[1]} x2={toPx(liveInner[1])[0]} y2={toPx(liveInner[1])[1]} />}
+        {giving && !drag && shown.rooms.filter((r) => chosen.has(r.id)).map((r) => <polygon key={`pk${r.id}`} className="gl-room-pick" points={P(r.ring)} />)}
         {shown.blocks.map((b, i) => <polygon key={`s${i}`} className={`gl-shell${chosenBlocks.has(i) || (drag && drag.kind === 'corner' && drag.block === i) ? ' chosen' : ''}`} points={P(b)} />)}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
           return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />
         })()}
+        {giving && !drag && !(mode === 'fabric' && wallsKind) && shown.rooms.filter((r) => chosen.has(r.id)).map((r) => <polygon key={`pl${r.id}`} className="gl-room-pick-line" points={P(r.ring)} />)}
         {pushed && <line className="gl-wall-on" x1={toPx(pushed.a)[0]} y1={toPx(pushed.a)[1]} x2={toPx(pushed.b)[0]} y2={toPx(pushed.b)[1]} />}
         {showTypes && !drag &&
           pieces.map((p, i) => {
@@ -1021,6 +1308,13 @@ export default function GeometryLab() {
             const [bx, by] = toPx(along(r, p.t1))
             return <line key={`ty${i}`} className="gl-wall-type" x1={ax} y1={ay} x2={bx} y2={by} stroke={bandOf(p)} />
           })}
+        {giving && !drag && chosenSet.pieces.map((sp, i) => {
+          const r = runs[sp.run]
+          if (!r) return null
+          const [ax, ay] = toPx(along(r, sp.t0))
+          const [bx, by] = toPx(along(r, sp.t1))
+          return <line key={`pp${i}`} className="gl-wall-on" x1={ax} y1={ay} x2={bx} y2={by} />
+        })}
         {selWall && selSpan && !drag && (() => {
           const [ax, ay] = toPx(along(selWall, selSpan.t0))
           const [bx, by] = toPx(along(selWall, selSpan.t1))
@@ -1049,8 +1343,8 @@ export default function GeometryLab() {
               if (wide < 34) return null
               return (
                 <g key={`rl${r.id}`}>
-                  <text className={`gl-zname${on ? ' on' : ''}`} x={lx} y={ly}>{r.name}</text>
-                  {wide > 56 && <text className={`gl-zarea${on ? ' on' : ''}`} x={lx} y={ly + 15}>{roomSub(r)}</text>}
+                  <text className={`gl-zname${on && !giving ? ' on' : ''}`} x={lx} y={ly}>{r.name}</text>
+                  {wide > 56 && <text className={`gl-zarea${on && !giving ? ' on' : ''}`} x={lx} y={ly + 15}>{roomSub(r)}</text>}
                 </g>
               )
             })
@@ -1126,22 +1420,12 @@ export default function GeometryLab() {
           <p>Simulate v2 prototype. Nothing here is saved.</p>
         </div>
         <div className="gl-steps" role="tablist" aria-label="Steps">
-          <button type="button" role="tab" aria-selected={mode === 'outline'} onClick={() => toMode('outline')}>
-            <i>1</i>
-            <span>Outline<small>The building's shape</small></span>
-          </button>
-          <button type="button" role="tab" aria-selected={mode === 'rooms'} disabled={!has} onClick={() => toMode('rooms')}>
-            <i>2</i>
-            <span>Rooms<small>Walls inside, and zones</small></span>
-          </button>
-          <button type="button" role="tab" aria-selected={mode === 'fabric'} disabled={!has} onClick={() => toMode('fabric')}>
-            <i>3</i>
-            <span>Fabric<small>What it is made of</small></span>
-          </button>
-          <button type="button" role="tab" aria-selected={mode === 'spaces'} disabled={!has} onClick={() => toMode('spaces')}>
-            <i>4</i>
-            <span>Spaces<small>What each room is for</small></span>
-          </button>
+          {MODES.map((m) => (
+            <button key={m} type="button" role="tab" aria-selected={mode === m} disabled={m !== 'outline' && !has} onClick={() => toMode(m)} title={STEP_LINE[m]}>
+              <Icon name={STEP_ICON[m]} size={26} />
+              <span><i>{STEP_NO[m]}</i>{STEP[m]}</span>
+            </button>
+          ))}
         </div>
         <div className="gl-body">
           {!has && (
@@ -1152,9 +1436,10 @@ export default function GeometryLab() {
               </button>
             </div>
           )}
+          {has && giving && chooseList()}
           {has && (
             <>
-              <div className="gl-sec">
+              {!giving && <div className="gl-sec">
                 <h3>Building <small>{f1(floorArea(plan.blocks))} m² · {runs.length} walls{plan.blocks.length > 1 ? ` · ${plan.blocks.length} blocks` : ''}</small></h3>
                 <div className="gl-row">
                   <span>Storey height</span>
@@ -1164,7 +1449,7 @@ export default function GeometryLab() {
                   <button type="button" className="gl-btn quiet" onClick={() => fitTo(plan.blocks.flat())}>Fit to screen</button>
                   <button type="button" className="gl-btn quiet" onClick={() => { commit({ ...emptyPlan(), storey_height_m: plan.storey_height_m }); setSel(null); toMode('outline'); setTool('rect') }}>Clear all</button>
                 </div>
-              </div>
+              </div>}
               {mode === 'outline' && (
                 <div className="gl-sec">
                   <p className="gl-say">When the outline is right, cut it into rooms by drawing walls across it.</p>
@@ -1193,110 +1478,8 @@ export default function GeometryLab() {
                   <button type="button" className="gl-btn" onClick={() => toMode('fabric')}>Next: fabric →</button>
                 </div>
               )}
-              {mode === 'fabric' && (() => {
-                const types = plan.fabric_types.filter((t) => t.element === elem)
-                if (!types.length && elem === 'partition') return <div className="gl-sec"><button type="button" className="gl-btn quiet" onClick={() => commit(newType(plan, 'partition').plan)}>Add walls between zones</button></div>
-                const act = activeOf(elem)
-                const lib = constructionsFor(elem)
-                const bi = plan.building ?? noBuildingInputs()
-                const setBi = (q: Partial<BuildingInputs>) => commit({ ...plan, building: { ...bi, ...q } })
-                return (
-                  <>
-                  <div className="gl-sec">
-                    <h3>Whole building</h3>
-                    <div className="gl-row"><span>Air leakage (q50)</span><Num value={bi.q50 ?? ''} unit="m³/h·m²" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.q50) setBi({ q50: n }) }} /></div>
-                    <div className="gl-row"><span>Thermal bridging</span><Num value={bi.tb_multiplier ?? ''} unit="× ISO 14683" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== bi.tb_multiplier) setBi({ tb_multiplier: n }) }} /></div>
-                    <div className="gl-row"><span>Site exposure</span>
-                      <select className="gl-sel" value={bi.exposure ?? ''} onChange={(e) => setBi({ exposure: (e.target.value || null) as BuildingInputs['exposure'] })}>
-                        <option value="">Not set</option>
-                        <option value="sheltered">Sheltered</option>
-                        <option value="normal">Normal</option>
-                        <option value="exposed">Exposed</option>
-                      </select>
-                    </div>
-                    <p className="gl-hint">Air leakage at 50 Pa, for every room. Thermal bridging: 1 = ISO 14683's default junctions; 2 doubles them. Empty stays unset.</p>
-                  </div>
-                  <div className="gl-sec">
-                    <div className="gl-chips" role="group" aria-label="Element">
-                      {FABRIC_ELEMENTS.map((e) => <button key={e.key} type="button" aria-pressed={elem === e.key} onClick={() => setElem(e.key)}>{e.name}</button>)}
-                    </div>
-                    <h3>{FABRIC_ELEMENTS.find((e) => e.key === elem)!.name} <small>{types.length} type{types.length === 1 ? '' : 's'}</small></h3>
-                    <div className="gl-zones">
-                      {types.map((t, i) => {
-                        const used = usage(t)
-                        const c = construction(t.construction)
-                        return (
-                          <div key={t.id} className="gl-zonerow gl-fabrow" aria-selected={t.id === act} onClick={() => setActive((a) => ({ ...a, [elem]: t.id }))}>
-                            <span className="gl-sw" style={{ background: typeColour(plan, t.id), borderColor: typeColour(plan, t.id) }} />
-                            <input aria-label="Type name" defaultValue={t.name} key={`${t.id}-${t.name}`} onClick={(e) => e.stopPropagation()} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && setFT(t.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-                            {i > 0 && !used.n ? (
-                              <button type="button" className="gl-x small" title="Remove this unused type" onClick={(e) => { e.stopPropagation(); commit({ ...plan, fabric_types: plan.fabric_types.filter((x) => x.id !== t.id), wall_spans: plan.wall_spans.filter((x) => x.type !== t.id) }) }}>×</button>
-                            ) : (
-                              <small>{used.text}</small>
-                            )}
-                            <div className="gl-fab-detail" onClick={(e) => e.stopPropagation()}>
-                              <select className="gl-sel" aria-label={`Construction of ${t.name}`} value={t.construction ?? ''} onChange={(e) => setFT(t.id, { construction: e.target.value || null })}>
-                                <option value="">{lib.length ? 'Construction not set' : 'None in the library yet'}</option>
-                                {lib.map((x) => <option key={x.key} value={x.key}>{short(x.name)}{x.u != null ? ` · U ${x.u}` : ''}</option>)}
-                              </select>
-                              <label className="gl-u" title="A U-value you know, W/m²K, used over the library's. Empty: the library's.">
-                                U
-                                <input aria-label={`U-value of ${t.name}`} inputMode="decimal" placeholder={c?.u != null ? String(c.u) : '—'} defaultValue={t.u ?? ''} key={`${t.id}-u-${t.u}`} onBlur={(e) => { const v = e.target.value.trim(); const u = v === '' ? null : Number(v); if (u === null || (Number.isFinite(u) && u > 0)) { if (u !== t.u) setFT(t.id, { u }) } else e.target.value = t.u == null ? '' : String(t.u) }} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-                              </label>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    {elem === 'partition' ? (
-                      <p className="gl-hint">One type for every wall between zones. The library's internal wall is a draft (plaster, block, plaster from existing library layers) waiting for Chris to check.</p>
-                    ) : (<>
-                    <div className="gl-btns">
-                      <button type="button" className="gl-btn quiet" onClick={() => { const r = newType(plan, elem); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}>Add a type</button>
-                      <button type="button" className="gl-btn quiet" onClick={() => commit(onWalls(elem) ? setTypeOn(plan, runs.map((r) => wholeWall(plan, r.index)!), act) : setTypeOnRooms(plan, plan.rooms.map((r) => r.id), act))}>Give everything {typeName(act)}</button>
-                    </div>
-                    <p className="gl-hint">Choose a type, then Apply: tap a room's part of a wall (Shift: the whole wall) or tap a room{onWalls(elem) ? ' for all its outside walls' : ''}. U in W/m²K; typed, it is used over the library's.{elem === 'door' ? ' The library has no door constructions yet, so a door needs a typed U.' : ''}</p>
-                    </>)}
-                    <p className="gl-hint">Library: NZA Sim's, exported {exportDate}.</p>
-                  </div>
-                  </>
-                )
-              })()}
-              {mode === 'spaces' && (
-                <div className="gl-sec">
-                  <h3>Space types <small>{plan.spaces.length}</small></h3>
-                  <div className="gl-zones">
-                    {plan.spaces.map((sp) => {
-                      const rs = plan.rooms.filter((r) => r.space === sp.id)
-                      return (
-                        <div key={sp.id} className="gl-zonerow" aria-selected={sp.id === curSpace?.id} onClick={() => { setActiveSpace(sp.id); setSel(null) }}>
-                          <span className="gl-sw" style={{ background: spaceColour(sp.id)! + '59', borderColor: spaceColour(sp.id)! }} />
-                          <input aria-label="Space type name" defaultValue={sp.name} key={`${sp.id}-${sp.name}`} onClick={(e) => e.stopPropagation()} onBlur={(e) => e.target.value.trim() && e.target.value !== sp.name && setSpace(sp.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-                          {rs.length ? <small>{rs.length} room{rs.length === 1 ? '' : 's'} · {f1(rs.reduce((t, r) => t + ringArea(r.ring), 0))} m²</small> : (
-                            <button type="button" className="gl-x small" title="Remove this unused space type" onClick={(e) => { e.stopPropagation(); commit({ ...plan, spaces: plan.spaces.filter((x) => x.id !== sp.id) }) }}>×</button>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <button type="button" className="gl-btn quiet" onClick={() => newSpace()}>New space type</button>
-                  {(() => {
-                    const none = plan.rooms.filter((r) => !r.space).length
-                    return none > 0 && plan.spaces.length > 0 ? <p className="gl-hint">{none} room{none === 1 ? '' : 's'} with no space type yet.</p> : null
-                  })()}
-                  {mixedZones.map((z) => (
-                    <div key={z.id} className="gl-mixed">
-                      <p className="gl-warn">{z.name} has rooms of different space types. The model gives a zone one, so it takes the one with the most floor.</p>
-                      <button type="button" className="gl-btn quiet" onClick={() => splitZone(z.id)}>Split {z.name} by space type</button>
-                    </div>
-                  ))}
-                  <p className="gl-hint">A space type is what a kind of room has, as in IES: its use, profiles and systems, all from the library. Choose one, then Apply: tap rooms. Copy one for a room that is an exception.</p>
-                  <p className="gl-hint">Library: NZA Sim's, exported {exportDate}.</p>
-                </div>
-              )}
-              <div className="gl-sec">
-                <h3>Model document</h3>
-                <span className={`gl-chip ${built.ok ? 'ok' : 'no'}`}>{built.ok ? `✓ Valid · schema ${(built.doc as { schema_version: string }).schema_version}` : 'Not valid'}</span>
+              <details className="gl-sec gl-doc">
+                <summary><h3>Model document <span className={`gl-chip ${built.ok ? 'ok' : 'no'}`}>{built.ok ? `✓ Valid · ${(built.doc as { schema_version: string }).schema_version}` : 'Not valid'}</span>{built.notes.length > 0 && <small>{count(built.notes.length, 'note')}</small>}</h3></summary>
                 <table className="gl-facts">
                   <tbody>
                     <tr><td>Zones · rooms</td><td className="n">{built.totals.zones} · {built.totals.rooms}</td></tr>
@@ -1311,8 +1494,8 @@ export default function GeometryLab() {
                 {built.issues.map((x, i) => <p key={i} className="gl-err">{x.path}: {x.message}</p>)}
                 <button type="button" className="gl-btn quiet" onClick={() => setShowJson((s) => !s)}>{showJson ? 'Hide' : 'Show'} the JSON</button>
                 {showJson && <pre className="gl-json">{JSON.stringify(built.doc, null, 1)}</pre>}
-                <p className="gl-hint">Anything not chosen yet stays marked unset in the document. Weather is set elsewhere.</p>
-              </div>
+                <p className="gl-hint">Anything not chosen yet stays marked unset in the document. Weather is set elsewhere. Library: NZA Sim's, exported {exportDate}.</p>
+              </details>
             </>
           )}
         </div>
@@ -1339,14 +1522,6 @@ export default function GeometryLab() {
                     <button key={i} type="button" aria-pressed={!isWhole && selPiece === p} onClick={() => choosePiece(p)}>{roomName(p.room)}</button>
                   ))}
                   <button type="button" aria-pressed={isWhole} onClick={() => chooseWall(true)}>Whole wall</button>
-                </div>
-              )}
-              {mode === 'fabric' && (
-                <div className="gl-sec">
-                  <h3>Fabric</h3>
-                  {fabricRows((['wall', 'glazing', 'door'] as const).filter((e) => e === 'wall' || (e === 'door' ? selDoors.length : selWins.length)), { spans: [selSpan] }, `wall ${selWall.index + 1}${!isWhole && selPiece ? ` (${roomName(selPiece.room)})` : ''}`)}
-                  <p className="gl-hint">Type a U-value or pick a construction for this {isWhole ? 'wall' : 'part'}. If others share its type, it gets a type of its own; the list on the left shows it.</p>
-                  {runPieces.length > 1 && !isWhole && <p className="gl-hint">Each room's part of a wall is its own element, so an extension's wall can differ from the rest.</p>}
                 </div>
               )}
               <div className="gl-sec">
@@ -1440,36 +1615,6 @@ export default function GeometryLab() {
                 </div>
                 <p className="gl-hint">A zone is a group of rooms the model treats as one space.</p>
               </div>
-              {mode === 'fabric' && (() => {
-                const ids = selRooms.map((r) => r.id)
-                const own = piecesOfRooms(plan, ids)
-                return (
-                  <div className="gl-sec">
-                    <h3>Fabric</h3>
-                    {fabricRows(FABRIC_ELEMENTS.map((x) => x.key).filter((k) => k !== 'partition'), { rooms: ids }, one ? one.name : `${ids.length} rooms`)}
-                    <p className="gl-hint">{own.length ? `${own.length} outside wall part${own.length === 1 ? '' : 's'}, ${f1(own.reduce((t, p) => t + p.length_m, 0))} m. ` : 'No outside walls: only its roof and floor. '}Type a U-value or pick a construction for {one ? 'this room' : 'these rooms'}; if other rooms share the type, {one ? 'it gets' : 'they get'} a type of {one ? 'its' : 'their'} own.</p>
-                  </div>
-                )
-              })()}
-              {mode === 'spaces' && (
-                <div className="gl-sec">
-                  <div className="gl-row">
-                    <span>Space type</span>
-                    <select className="gl-sel" value={oneOf(selRooms.map((r) => r.space ?? ''))} onChange={(e) => giveSpace(selRooms.map((r) => r.id), e.target.value)}>
-                      {oneOf(selRooms.map((r) => r.space ?? '')) === '__mixed' && <option value="__mixed">Several</option>}
-                      <option value="">Not set</option>
-                      {plan.spaces.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                      <option value="__new">New space type…</option>
-                    </select>
-                  </div>
-                  {(() => {
-                    const sid = oneOf(selRooms.map((r) => r.space ?? ''))
-                    const sp = plan.spaces.find((x) => x.id === sid)
-                    return sp ? <div className="gl-btns"><button type="button" className="gl-btn quiet" onClick={() => { setActiveSpace(sp.id); setSel(null) }}>Edit {sp.name}</button></div> : null
-                  })()}
-                  <p className="gl-hint">Editing a space type changes every room that has it.</p>
-                </div>
-              )}
               <div className="gl-sec">
                 <div className="gl-btns">
                   {selRooms.length > 1 && (
@@ -1484,109 +1629,24 @@ export default function GeometryLab() {
         )
       })()}
 
-      {mode === 'spaces' && curSpace && !selRooms.length && !selWall && (() => {
-        const sp = curSpace
-        const opt = (label: string, k: keyof SpaceType, items: Array<{ key: string; name: string }>, line?: string) => (
-          <div className="gl-row gl-librow">
-            <span>{label}</span>
-            <select className="gl-sel" aria-label={label} value={(sp[k] as string | null) ?? ''} onChange={(e) => setSpace(sp.id, { [k]: e.target.value || null })}>
-              <option value="">Not set</option>
-              {items.map((x) => <option key={x.key} value={x.key}>{short(x.name)}</option>)}
-            </select>
-            {line && <small>{line}</small>}
-          </div>
-        )
-        // A gain the library has no number for: typed here; empty stays unset (the document says nothing).
-        type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'vent_flow'
-        const typed = (label: string, k: Gk, step: number, unit?: string) => (
-          <div className="gl-row gl-typed">
-            <span>{label}</span>
-            <Num value={sp[k] ?? ''} unit={unit} step={step} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (sp[k] ?? null)) setSpace(sp.id, { [k]: n }) }} />
-          </div>
-        )
-        const sysLine = (key: string | null, s: 'heating' | 'cooling' | 'dhw' | 'ventilation') => {
-          const t = system(key)
-          if (!t) return undefined
-          if (!t.fuel) return 'None: no system in the model'
-          const eff = s === 'heating' ? (t.scop != null ? `SCOP ${t.scop}` : t.efficiency != null ? `η ${t.efficiency}` : '') : s === 'cooling' ? (t.seer != null ? `SEER ${t.seer}` : t.efficiency != null ? `EER ${t.efficiency}` : '') : s === 'ventilation' ? [t.sfp != null ? `SFP ${t.sfp} W/(l/s)` : '', t.heat_recovery ? `recovery ${Math.round(t.heat_recovery * 100)}%` : ''].filter(Boolean).join(', ') : t.efficiency != null ? `η ${t.efficiency}` : ''
-          return [t.fuel, eff].filter(Boolean).join(', ')
-        }
-        const rs = plan.rooms.filter((r) => r.space === sp.id)
+      {has && giving && shownLook === 'plan' && (() => {
+        // The key: what the drawing's colours mean for the kind in hand.
+        const seen = new Map<string, Swatch>()
+        if (mode === 'fabric' && wallsKind) for (const p of pieces) { const id = typeOfSpan(plan, p, elem as WallEl); seen.set(typeName(id), fabricSwatch(id)) }
+        else for (const r of plan.rooms) { const h = hasOf(r); if (h) seen.set(h.name, h.swatch) }
+        const none = mode !== 'fabric' && plan.rooms.some((r) => !hasOf(r))
+        if (mode === 'fabric' && (fkind === 'air' || fkind === 'bridge' || fkind === 'partition')) return null
         return (
-          <aside className="gl-panel gl-right">
-            <div className="gl-card-head">
-              <div>
-                <input className="gl-title-in" aria-label="Space type name" defaultValue={sp.name} key={`${sp.id}-${sp.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== sp.name && setSpace(sp.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-                <small>Space type · {rs.length} room{rs.length === 1 ? '' : 's'}, {f1(rs.reduce((t, r) => t + ringArea(r.ring), 0))} m²</small>
-              </div>
-              <button type="button" className="gl-x" aria-label="Close" onClick={() => setActiveSpace(null)}>×</button>
-            </div>
-            <div className="gl-body">
-              <div className="gl-sec">
-                <h3>Use and profiles</h3>
-                {opt('Use', 'use', USES as Array<{ key: string; name: string }>)}
-                {opt('Occupancy', 'occupancy', profilesFor('occupancy'))}
-                {typed('People per m²', 'people_per_m2', 0.01)}
-                {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
-                {typed('Occupancy rate', 'occupancy_rate', 0.05)}
-                {opt('Lighting', 'lighting', profilesFor('lighting'))}
-                {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
-                {opt('Equipment', 'equipment', profilesFor('equipment'))}
-                {typed('Equipment in use', 'equipment_w_per_m2', 0.5, 'W/m²')}
-                {typed('Equipment always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
-              </div>
-              <details className="gl-sec gl-more">
-                <summary><h3>How the gains enter the room</h3></summary>
-                {typed('Radiant share', 'radiant_fraction', 0.05)}
-                {opt('Lighting follows', 'light_relationship', RELATIONSHIPS)}
-                {sp.light_relationship === 'proportional_with_spill' && typed('Daylight factor', 'daylight_factor', 0.05)}
-                {typed('Lit share of floor', 'light_area_share', 0.05)}
-                {typed('Lighting heat to room', 'light_gain_fraction', 0.05)}
-                {opt('Equipment follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}
-                {sp.equip_relationship !== 'independent' && typed('Standby when empty', 'standby_factor', 0.05)}
-                {typed('Equipped share of floor', 'equip_area_share', 0.05)}
-                {typed('Equipment heat to room', 'equip_gain_fraction', 0.05)}
-                <p className="gl-hint">Shares and factors run 0 to 1. A new space type starts from today's engine values; all can be changed. Empty: not stated, and the results say so.</p>
-                <div className="gl-btns"><button type="button" className="gl-btn quiet" onClick={() => setSpace(sp.id, { ...todaysGains(), equipment_baseload_w_per_m2: sp.equipment_baseload_w_per_m2 ?? 0, occupancy_rate: sp.occupancy_rate ?? TODAY.occupancy_rate, sensible_w_per_person: sp.sensible_w_per_person ?? TODAY.sensible_w_per_person })}>Fill with today's engine values</button></div>
-              </details>
-              <div className="gl-sec">
-                <h3>Comfort</h3>
-                {typed('Heating to', 'heat_c', 0.5, '°C')}
-                {typed('Cooling to', 'cool_c', 0.5, '°C')}
-              </div>
-              <div className="gl-sec">
-                <h3>Systems</h3>
-                {opt('Heating', 'heating', systemsFor('heating'), sysLine(sp.heating, 'heating'))}
-                {opt('Cooling', 'cooling', systemsFor('cooling'), sysLine(sp.cooling, 'cooling'))}
-                {opt('Ventilation', 'ventilation', systemsFor('ventilation'), sysLine(sp.ventilation, 'ventilation'))}
-                {sp.ventilation && (['mvhr', 'mev'].includes(system(sp.ventilation)?.type ?? '') ? typed('Air flow', 'vent_flow', 0.1, 'l/s per m²') : typed('Air changes', 'vent_flow', 0.5, 'per hour'))}
-                {sp.ventilation && opt('Runs', 'vent_schedule', [{ key: 'always_on', name: 'Always on (24/7)' }, ...profilesFor('ventilation')])}
-                {opt('Hot water', 'dhw', systemsFor('dhw'), sysLine(sp.dhw, 'dhw'))}
-                <p className="gl-hint">Each from NZA Sim's library, with its own fuel and efficiency. Rooms of this type get all of these. The library's profiles are daily shapes only; the numbers (people, W) are typed here.</p>
-              </div>
-              <div className="gl-sec">
-                <div className="gl-btns">
-                  <button type="button" className="gl-btn orange" onClick={() => pick('paint')}>Give it to rooms…</button>
-                  <button type="button" className="gl-btn quiet" onClick={() => newSpace(sp)}>Copy for an exception</button>
-                  <button type="button" className="gl-btn quiet" disabled={!rs.length} onClick={() => { setTool('pick'); setSel({ kind: 'rooms', ids: rs.map((r) => r.id) }) }}>Choose its rooms</button>
-                </div>
-              </div>
-            </div>
-          </aside>
-        )
-      })()}
-
-      {tool === 'paint' && (mode === 'fabric' || mode === 'spaces') && shownLook === 'plan' && (() => {
-        const name = mode === 'spaces' ? curSpace?.name ?? plan.spaces[0]?.name : typeName(activeOf(elem))
-        const colour = mode === 'spaces' ? spaceColour(curSpace?.id ?? plan.spaces[0]?.id) : typeColour(plan, activeOf(elem))
-        return (
-          <div className="gl-applying" role="status">
-            {colour && <span className="gl-sw" style={{ background: colour, borderColor: colour }} />}
-            <span>{name ? <>Giving <b>{name}</b>: tap {mode === 'spaces' ? 'rooms' : onWalls(elem) ? 'walls or rooms' : 'rooms'}</> : 'Make a space type first'}</span>
-            <button type="button" className="gl-btn quiet" onClick={() => pick('pick')}>Done</button>
+          <div className="gl-key" aria-label="Key">
+            {[...seen.entries()].map(([n, sw]) => <span key={n}><Sw s={sw} />{n}</span>)}
+            {none && <span><Sw s={{ colour: '#FFFFFF' }} />None yet</span>}
+            {[...seen.values()].some((x) => x.unset) && <span className="gl-key-note">Striped: not set yet</span>}
           </div>
         )
       })()}
+      {has && mode === 'fabric' && fabricPanel()}
+      {has && mode === 'spaces' && spacesPanel()}
+      {has && mode === 'systems' && systemsPanel()}
 
       {/* ─── bottom: tools ─── */}
       <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m). Tap one to nudge it with the arrow keys or make it a door.' : tipLine}</p>
@@ -1618,7 +1678,7 @@ export default function GeometryLab() {
   )
 }
 
-function Num({ value, unit, auto, step, min = 0, onCommit, onChange }: { value: number | string; unit?: string; auto?: boolean; step?: number; min?: number; onCommit?: (v: number) => void; onChange?: (s: string) => void }) {
+function Num({ value, unit, auto, step, min = 0, max, onCommit, onChange }: { value: number | string; unit?: string; auto?: boolean; step?: number; min?: number; max?: number; onCommit?: (v: number) => void; onChange?: (s: string) => void }) {
   const [s, setS] = useState(String(value))
   useEffect(() => setS(String(value)), [value])
   const bump = (dir: 1 | -1) => {
@@ -1627,7 +1687,7 @@ function Num({ value, unit, auto, step, min = 0, onCommit, onChange }: { value: 
     const base = Number.isFinite(n) ? n : 0
     // Step to the next whole multiple of `step` (1.67 + 0.1 → 1.7), never below `min`.
     const k = dir > 0 ? Math.floor(base / step + 1e-9) + 1 : Math.ceil(base / step - 1e-9) - 1
-    const v = String(Math.max(min, Math.round(k * step * 1000) / 1000))
+    const v = String(Math.min(max ?? Infinity, Math.max(min, Math.round(k * step * 1000) / 1000)))
     setS(v)
     onChange?.(v)
     onCommit?.(Number(v))

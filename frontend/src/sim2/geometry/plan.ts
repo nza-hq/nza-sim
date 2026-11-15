@@ -27,11 +27,31 @@ export type PlanRoom = {
   floor?: string
   /** Spaces step: the room's space type (archetype); absent = not given one yet. */
   space?: string
+  /** Systems step: the room's system per service (a PlanSystem id); absent = none given yet. */
+  systems?: Partial<Record<Service, string>>
 }
 /** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
 export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
-/** A heating or cooling system the user has named. Its kit (fuel, efficiency) is not asked yet, so stays unset. */
-export type PlanSystem = { id: string; service: 'heating' | 'cooling'; label: string }
+/** The services the Systems step gives rooms. */
+export type Service = 'heating' | 'cooling' | 'ventilation' | 'dhw'
+export const SERVICES: ReadonlyArray<{ key: Service; name: string; one: string }> = [
+  { key: 'heating', name: 'Heating', one: 'Heating' },
+  { key: 'cooling', name: 'Cooling', one: 'Cooling' },
+  { key: 'ventilation', name: 'Ventilation', one: 'Ventilation' },
+  { key: 'dhw', name: 'Hot water', one: 'Hot water' },
+]
+/** A system the user has made for a service: a library system template (its fuel and efficiency come from there),
+ * and for ventilation the flow and when it runs, typed. Rooms are given one per service. Null: not set. */
+export type PlanSystem = {
+  id: string
+  service: Service
+  name: string
+  template: string | null
+  /** Ventilation flow, typed: l/s per m² of floor for mechanical, air changes per hour for natural. */
+  flow?: number | null
+  /** When the ventilation runs: 'always_on', or a library ventilation profile's key. */
+  schedule?: string | null
+}
 
 /** Uses a zone can be given: the zone types today's schedule editor offers (UnifiedScheduleEditor.jsx). */
 export const USES: ReadonlyArray<{ key: string; name: string }> = [
@@ -79,8 +99,8 @@ export const FABRIC_ELEMENTS: ReadonlyArray<{ key: FabricElement; name: string; 
 /** One type per element to start with, nothing chosen. */
 export const defaultFabric = (): FabricType[] => FABRIC_ELEMENTS.map((e) => ({ id: `f_${e.key}`, element: e.key, name: e.one, construction: null, u: null }))
 
-/** A space type (archetype): what a kind of room has. Rooms are given one; every value is a library key or null
- * (not set). */
+/** A space type (archetype): what a kind of room is used for, and its comfort band. Rooms are given one; every value
+ * is a library key, a typed number, or null (not set). Its systems are given separately (Systems step). */
 export type SpaceType = {
   id: string
   name: string
@@ -95,10 +115,6 @@ export type SpaceType = {
   lighting_w_per_m2?: number | null
   equipment_w_per_m2?: number | null
   equipment_baseload_w_per_m2?: number | null
-  /** Ventilation flow, typed: l/s per m² of floor for mechanical, air changes per hour for natural. */
-  vent_flow?: number | null
-  /** When the ventilation runs: 'always_on', or a library ventilation profile's key. */
-  vent_schedule?: string | null
   /** Comfort band the systems hold, °C, typed. */
   heat_c?: number | null
   cool_c?: number | null
@@ -115,10 +131,6 @@ export type SpaceType = {
   standby_factor?: number | null
   lighting: string | null
   equipment: string | null
-  heating: string | null
-  cooling: string | null
-  ventilation: string | null
-  dhw: string | null
 }
 
 /** Air leakage (q50, m³/h·m² at 50 Pa, every zone), thermal bridging (ISO 14683 default junctions × multiplier) and
@@ -141,6 +153,45 @@ export type Plan = {
   building?: BuildingInputs
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
+}
+
+/** A plan saved before systems were their own step (15 Nov 2026) kept them on its space types: each space type's
+ * systems become system types, given to the rooms of that space type. Anything else passes through. */
+export function upgradePlan(p: Plan): Plan {
+  type Old = SpaceType & Partial<Record<Service, string | null>> & { vent_flow?: number | null; vent_schedule?: string | null }
+  const olds = p.spaces as Old[]
+  const plan: Plan = { ...emptyPlan(), ...p, systems: (p.systems ?? []).filter((x) => 'template' in x) }
+  if (!olds.some((sp) => SERVICES.some((s) => s.key in sp))) return plan
+  const systems = [...plan.systems]
+  const made = new Map<string, string>()
+  for (const sp of olds) {
+    for (const s of SERVICES) {
+      const t = sp[s.key]
+      if (!t) continue
+      const flow = s.key === 'ventilation' ? sp.vent_flow ?? null : undefined
+      const schedule = s.key === 'ventilation' ? sp.vent_schedule ?? null : undefined
+      const sig = `${s.key}|${t}|${flow}|${schedule}`
+      if (made.has(`${sp.id}|${s.key}`)) continue
+      let id = [...made.entries()].find(([k]) => k.startsWith('sig:') && k.slice(4) === sig)?.[1]
+      if (!id) {
+        id = `y${systems.length + 1}`
+        systems.push({ id, service: s.key, name: `${s.one} · ${sp.name}`, template: t, ...(s.key === 'ventilation' ? { flow, schedule } : {}) })
+        made.set(`sig:${sig}`, id)
+      }
+      made.set(`${sp.id}|${s.key}`, id)
+    }
+  }
+  const spaces = olds.map(({ heating: _h, cooling: _c, ventilation: _v, dhw: _d, vent_flow: _f, vent_schedule: _s, ...rest }) => rest as SpaceType)
+  const rooms = plan.rooms.map((r) => {
+    if (!r.space) return r
+    const sys: Partial<Record<Service, string>> = { ...r.systems }
+    for (const s of SERVICES) {
+      const id = made.get(`${r.space}|${s.key}`)
+      if (id && !sys[s.key]) sys[s.key] = id
+    }
+    return Object.keys(sys).length ? { ...r, systems: sys } : r
+  })
+  return { ...plan, spaces, rooms, systems }
 }
 
 export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], fabric_types: defaultFabric(), wall_spans: [], spaces: [], building: noBuildingInputs(), next: { room: 1, zone: 1, system: 1 } })

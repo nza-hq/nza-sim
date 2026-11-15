@@ -64,8 +64,9 @@ describe('rooms in zones, in the document', () => {
     p = ok(halveRoom(p, 'r1'))
     // Three rooms along the 20 m building: 10, 5, 5 (or so). Put the last one in a new zone with its own heating.
     const last = p.rooms[p.rooms.length - 1]!
-    const plant = { id: 's1', name: 'Plant', use: 'other', occupancy: null, lighting: null, equipment: null, heating: 'gas_boiler_heating', cooling: null, ventilation: null, dhw: null }
-    p = { ...p, zones: [...p.zones, { id: 'z2', name: 'Plant', use: null, heating: null, cooling: null }], spaces: [plant], rooms: p.rooms.map((r) => (r.id === last.id ? { ...r, space: 's1' } : r)) }
+    const plant = { id: 's1', name: 'Plant', use: 'other', occupancy: null, lighting: null, equipment: null }
+    const boiler = { id: 'y1', service: 'heating' as const, name: 'Gas boiler', template: 'gas_boiler_heating' }
+    p = { ...p, zones: [...p.zones, { id: 'z2', name: 'Plant', use: null, heating: null, cooling: null }], spaces: [plant], systems: [boiler], rooms: p.rooms.map((r) => (r.id === last.id ? { ...r, space: 's1', systems: { heating: 'y1' } } : r)) }
     p = assignZone(p, [last.id], 'z2')
     const b = buildDocument(p)
     expect(b.issues).toEqual([])
