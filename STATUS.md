@@ -2,9 +2,9 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🔄 Brief 104 — Simulate v2 Engine 2 — IN PROGRESS on `chris/104-engine-2` (stacked on 103, PR #30)
+## ✅ Brief 104 — Simulate v2 Engine 2 — CLOSED 15 Nov 2026 on `chris/104-engine-2` (stacked on 103, PR #30; PR open)
 
-Brief [`docs/briefs/active/104_engine-2.md`](docs/briefs/active/104_engine-2.md). Multi-zone, starting from the open
+Brief [`docs/briefs/archive/104_engine-2_COMPLETED.md`](docs/briefs/archive/104_engine-2_COMPLETED.md). Multi-zone, starting from the open
 Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/104/00_reconnaissance.md)): referee zones and slab (0.528 m²K/W, 485 kJ/m²K); the Bridgewater referee uses FullExterior (103 said FullInteriorAndExterior; beam still on the floor).
@@ -47,6 +47,15 @@ Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
   - **Solver changes, results unchanged.** Radiant star node per zone, sparse LU factorised once, the zone air system by Cholesky in admittance form, the active set warm-started, flat chain arrays, and build caches. Engine 1's anchor output is identical to the last digit, and Engine 2's Bridgewater figures are unchanged at the recorded precision.
   - **API change.** Per-element terms are now annual sums (`element_terms[k].boundary_wh` and so on, `element_interzone_wh`).
   - **Node against browser totals.** They differ in the last binary digit, about 2e-16 relative, because Chromium's `Math.cos` and similar functions round differently from Node's. This is recorded as a qualification of "identical".
+  - **IT15 (Edge 157, Core Ultra 9 285H) passes every budget:** one zone about 18 ms, five storeys 82–98 ms, 50 rooms 576–608 ms (worker medians, three runs). The container miss was the slower cloud machine.
+- **P7 close** ([`08_final_report.md`](docs/audit/104/08_final_report.md), review [`07_independent_review.md`](docs/audit/104/07_independent_review.md)):
+  - **Review verdicts.** No tuning; closure and cancellation hold (4/4 mutations caught); P6 unchanged to 3e-13; no file of today's engine touched.
+  - **Caveats stated plainly.**
+    - The gate passes against a referee aligned to Engine 2's per-storey bridging and infiltration. Cooling is +12.3 % against the slab-fixed-only referee and +15.6 % against r1.
+    - Per-storey cooling is up to ±31 % against the full referee (all storeys within 5 % like for like, except the roof storey's slab heat at −40 %). Per-room demand is not validated to ±10 %.
+  - **Fixed.** F4: the per-storey test now also runs on committed Denver weather. F5: the cooled-room test checks the spec hash. Decision 4's referee claim corrected in the archived brief.
+  - **Carried to Brief 105.** F2 per-storey and roof-slab gap; F3 the engine's own 1 h step error (needs a sub-hourly option); the infiltration allocation design choice; the surface-physics forms; the assembler slab bug.
+  - **Safety.** `git diff 139777c..HEAD` touches no file of today's engine; `_brief93_anchor.mjs --fixture` = 133.2; 101 thermal tests pass; `npm run build` clean; no lockfile or node_modules; nothing touched NZA Decoded.
 
 ## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
 

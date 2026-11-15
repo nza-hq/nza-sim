@@ -1,5 +1,7 @@
 # Brief 104 — Simulate v2 Engine 2: several zones solved together, starting from the Bridgewater cooling gap
 
+> **CLOSED 15 Nov 2026.** Final report: [`../../audit/104/08_final_report.md`](../../audit/104/08_final_report.md). Independent review: [`../../audit/104/07_independent_review.md`](../../audit/104/07_independent_review.md).
+
 Brief 2 of the engine sequence (design note Notion `418d645e-05cc-811e-ad6b-fa8846f12148`, Rev A.6). Written
 15 Nov 2026 by Linzie's agent thread. Linzie, 18:06: "Keep going". Coordinator: start with the unexplained ~12 %
 Bridgewater cooling gap.
@@ -108,8 +110,10 @@ Engine 1.
    - Walls and glazing are split per storey by height.
    - The roof goes on the top zone and the ground floor on the bottom zone.
    - Bridging is allocated per element as in the referee: each zone takes its own walls' and roof's junction lengths.
-   - Infiltration and vents are allocated by each zone's share of envelope area, which is what the referee does. Part
-     0 confirms this.
+   - Infiltration and vents are allocated by each zone's share of envelope area. ~~This is what the referee does; Part
+     0 confirms this.~~ **Corrected at close (review F1):** Part 0 found the opposite: the referee gives every zone the
+     same rate. The Part 5 gate's referee (r2_z) was aligned to Engine 2's allocation; against the unaligned referee
+     cooling is +12.3 %. Which allocation is the better default is a design choice (design note Rev A.7).
 5. **Solver.** Each zone keeps its static condensation onto its interface nodes: air plus inside surfaces, with
    interzone elements contributing to both zones.
    - The coupled interface system is sparse and block-structured. It is factorised once per run, with a fill-reducing

@@ -6,6 +6,7 @@
  * EnergyPlus built from the same inputs (validation/energyplus/104_cooled_room_spec.json and
  * docs/audit/104/04_cooled_room_energyplus.json, both committed, so this runs from a fresh checkout).
  */
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -239,7 +240,8 @@ function cooledRoomDocument() {
 
 describe('(e) the cooled room against EnergyPlus from the same inputs', () => {
   it('per room, annual demand within ±10 % of EnergyPlus with the same surface coefficients; EnergyPlus\'s own also reported', () => {
-    expect(EP.spec_sha256).toBeDefined()
+    // The committed EnergyPlus results must be of this spec file (review F5): an edited spec makes them stale.
+    expect(EP.spec_sha256).toBe(createHash('sha256').update(fs.readFileSync(repo('validation/energyplus/104_cooled_room_spec.json'))).digest('hex'))
     const weather = readMos(fs.readFileSync(MOS))
     const { doc, lib } = cooledRoomDocument()
     const r = runModel(doc, weather, lib, REFEREE_OPTIONS)

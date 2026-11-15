@@ -17,6 +17,7 @@ import { REFEREE_OPTIONS, runModel } from '../model'
 import { parseEpw } from '../epw'
 import { readBuildingHeatingKwh } from '../results'
 import { fromBuildingConfig } from '../../schema/fromBuildingConfig'
+import { MOS, readMos } from './denver'
 
 const H = 24 * 20
 const WALL: Layer[] = [
@@ -152,8 +153,12 @@ describe('runModel on the per-storey Bridgewater document', () => {
     library_constructions: FIXTURE.library_constructions, weather: { file_name: FIXTURE.building_config.weather_file, file_hash: null },
     building_id: 'bridgewater-anchor',
   }, { zoning })).document
-  it.skipIf(!epw)('closes per zone, the slabs cancel, and the junctions add up to the single zone\'s', async () => {
-    const weather = await parseEpw(epw!)
+  // On the committed Denver weather always (review F4), and on the anchor EPW when the local data is present.
+  const cases: [string, () => Promise<any>][] = [['Denver TMY3 (committed)', async () => readMos(readFileSync(MOS))]]
+  if (epw) cases.push(['the anchor EPW', () => parseEpw(epw)])
+  else it.skip('the anchor EPW (local data, not on a fresh checkout)', () => {})
+  for (const [label, load] of cases) it(`on ${label}: closes per zone, the slabs cancel, and the junctions add up to the single zone's`, async () => {
+    const weather = await load()
     const one = runModel(await doc('single'), weather, lib, REFEREE_OPTIONS)
     const five = runModel(await doc('per_storey'), weather, lib, REFEREE_OPTIONS)
     expect(one.engine).toBe('thermal-1')
@@ -170,6 +175,6 @@ describe('runModel on the per-storey Bridgewater document', () => {
     // Not a referee check (that is Part 5): the same building split by storey stays the same order of demand.
     const ratio = readBuildingHeatingKwh(five) / readBuildingHeatingKwh(one)
     expect(ratio).toBeGreaterThan(0.8); expect(ratio).toBeLessThan(1.2)
-    console.log('per-storey Bridgewater', JSON.stringify({ zones: five.zones.length, nodes: five.solver.nodes, active_set: five.solver.active_set, run_ms: Math.round(five.run_ms), heating: five.zones.map((z) => +(z.annual.heating_kwh / 1000).toFixed(2)), cooling: five.zones.map((z) => +(z.annual.cooling_kwh / 1000).toFixed(2)), single: [one.zones[0].annual.heating_kwh / 1000, one.zones[0].annual.cooling_kwh / 1000] }))
+    console.log(`per-storey Bridgewater (${label})`, JSON.stringify({ zones: five.zones.length, nodes: five.solver.nodes, active_set: five.solver.active_set, run_ms: Math.round(five.run_ms), heating: five.zones.map((z) => +(z.annual.heating_kwh / 1000).toFixed(2)), cooling: five.zones.map((z) => +(z.annual.cooling_kwh / 1000).toFixed(2)), single: [one.zones[0].annual.heating_kwh / 1000, one.zones[0].annual.cooling_kwh / 1000] }))
   })
 })
