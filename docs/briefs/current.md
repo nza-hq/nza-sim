@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 109 — Simulate v2: heating hours and setbacks, morning warm-up, underfloor heating in the slab — RESERVED 15 Nov 2026 on `chris/109-dynamics` (stacked on 108).**
+Linzie's dynamics follow-up to 108 (heat does not arrive instantly): a zone's heating follows its hours with a setback, emitters at their limit carry the morning recovery, and underfloor heating puts its heat into the slab. Gated against EnergyPlus (scheduled thermostats; a slab-embedded radiant system). Brief [`active/109_dynamics.md`](active/109_dynamics.md). Claims: `frontend/src/thermal/` (engine, schema), `frontend/src/sim2/run/seam.ts`, `frontend/src/sim2/run/EmitterSizing.tsx`.
+
 **Brief 108 — Simulate v2: emitters per room, capped heat output, re-rated for flow temperature — CLOSED 15 Nov 2026 on `chris/108-emitters` (stacked on 107; PR open, awaiting Linzie).**
 Each zone's emitters limit its heating: EN 442 at the system's flow and return, re-rated each hour at the room's temperature at design water flow (Linzie, 15 Nov 23:24). Hours below the setpoint and the lowest temperature per zone; the peak need, shortfall and the rating at ΔT 50 that covers it; a what-if at a second flow and return pair. Gated against EnergyPlus at a fixed limit, with a radiant baseboard (annual heat) and with a hot-water baseboard on a 50 °C loop (hourly re-rating). Independent review addressed. No change to today's engine (anchor 133.2). Brief [`archive/108_emitters_COMPLETED.md`](archive/108_emitters_COMPLETED.md); final report [`../audit/108/10_final_report.md`](../audit/108/10_final_report.md). **Next:** Brief 109, dynamics and setbacks.
 
