@@ -51,3 +51,4 @@
 /* Brief 106 P2: a zone's own balance, opened under its row. */
 .rp-table tr.rp-zone-line td { font-size: 12px; background: #F4F7F6; }
 .rp-table tr.rp-zone-line td:first-child { padding-left: 1.4em; }
+.rp-eff { color: #6B7A75; font-size: 11px; }
