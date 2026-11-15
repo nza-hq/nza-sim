@@ -34,6 +34,7 @@
  *
  * Nothing is saved, and nothing in today's tool reads this page.
  */
+import { createPortal } from '../workspace/portal'
 import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
@@ -44,6 +45,8 @@ import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
 import Spark from './Spark'
+import type { Slots } from '../workspace/ModelWorkspace'
+import type { StepId } from '../workspace/steps'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
 import FacadeView from './FacadeView'
@@ -173,7 +176,15 @@ const EXAMPLE: XY[] = [[0, 0], [30, 0], [30, 10], [20, 10], [20, 24], [10, 24], 
 const f1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const f2 = (n: number) => (Math.round(n * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function GeometryLab() {
+/** The workspace step a mode belongs to, and back (Brief 110: Outline and Rooms are the one step, Shape). */
+const STEP_OF: Record<Mode, StepId> = { outline: 'shape', rooms: 'shape', fabric: 'fabric', spaces: 'spaces', systems: 'systems' }
+
+/**
+ * Standalone (`/sim2/geometry`): one full-screen canvas with floating panels. In the Model workspace (`slots` given,
+ * Brief 110): the same state and behaviour, rendered into the workspace's panes, the step coming from its rail.
+ */
+export default function GeometryLab({ slots, step: railStep, onStep }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void } = {}) {
+  const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>(emptyPlan)
   const [past, setPast] = useState<Plan[]>([])
@@ -243,9 +254,11 @@ export default function GeometryLab() {
     return () => clearTimeout(t)
   }, [say])
 
-  const narrow = size[0] < 760
-  const RIGHT = GIVING(mode) ? 374 : 0
-  const mid: [number, number] = narrow ? [size[0] / 2, size[1] * 0.3] : [LEFT + (size[0] - LEFT - RIGHT) / 2, size[1] / 2 - 30]
+  // In the workspace the panels are beside the drawing, not over it: no offsets.
+  const narrow = size[0] < (embedded ? 420 : 760)
+  const LEFTX = embedded ? 0 : LEFT
+  const RIGHT = embedded ? 0 : GIVING(mode) ? 374 : 0
+  const mid: [number, number] = narrow ? [size[0] / 2, size[1] * 0.3] : [LEFTX + (size[0] - LEFTX - RIGHT) / 2, size[1] / 2 - 30]
   const toPx = (p: XY): [number, number] => [mid[0] + (p[0] - view.cx) * view.k, mid[1] - (p[1] - view.cy) * view.k]
   const toM = (x: number, y: number): XY => [(x - mid[0]) / view.k + view.cx, -(y - mid[1]) / view.k + view.cy]
   const mPerPx = 1 / view.k
@@ -261,7 +274,7 @@ export default function GeometryLab() {
     const ys = pts.map((p) => p[1])
     const w = Math.max(...xs) - Math.min(...xs) || 1
     const h = Math.max(...ys) - Math.min(...ys) || 1
-    const room = narrow ? [size[0] - 60, size[1] * 0.45] : [size[0] - LEFT - 380, size[1] - 260]
+    const room = narrow ? [size[0] - 60, size[1] * 0.45] : [size[0] - LEFTX - (embedded ? 140 : 380), size[1] - 260]
     setView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, k: Math.max(4, Math.min(60, room[0]! / w, room[1]! / h)) })
   }
 
@@ -269,6 +282,7 @@ export default function GeometryLab() {
   useEffect(() => {
     ;(window as unknown as { sim2?: unknown }).sim2 = {
       getPlan: () => plan,
+      getDocument: () => built.doc,
       loadPlan: (p: Plan) => {
         commit(upgradePlan(p))
         setSel(null)
@@ -690,6 +704,21 @@ export default function GeometryLab() {
     setJoinFrom(null)
     core.reset()
   }
+  // The workspace's rail chooses the railStep; the editor's own "Next" buttons move the rail with it.
+  useEffect(() => {
+    if (!embedded || !railStep || railStep === 'site' || STEP_OF[mode] === railStep) return
+    if (!has && railStep !== 'shape') { onStep?.('shape'); return }
+    if (railStep === 'shape') toMode('outline')
+    else if (railStep === 'fabric' || railStep === 'spaces' || railStep === 'systems') toMode(railStep)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [railStep])
+  useEffect(() => {
+    if (embedded && railStep !== 'site' && railStep !== 'check' && railStep !== 'interventions' && STEP_OF[mode] !== railStep) onStep?.(STEP_OF[mode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+  const onSite = embedded && railStep === 'site'
+  /** Steps 6 and 7 are the workspace's empty states: the editor stays mounted (nothing is lost) with its right side empty. */
+  const offStep = embedded && (railStep === 'check' || railStep === 'interventions')
 
   // ─── the wall card: a room's piece of an outside wall, or the whole wall ─────────
   const pieces = useMemo(() => wallPieces(plan), [plan])
@@ -1078,6 +1107,30 @@ export default function GeometryLab() {
     }
   }
 
+  /** Step 1 in the workspace: where the building is. Exposure is the same whole-building value Air leakage shows. */
+  const sitePanel = () => {
+    const bi = plan.building ?? noBuildingInputs()
+    return (
+      <GivePanel title="Site" icon="building" items={[]} active={null} onActive={() => undefined}
+        body={
+          <div className="ap-whole-body">
+            <div className="gl-row"><span>Site exposure</span>
+              <select className="gl-sel" aria-label="Site exposure" value={bi.exposure ?? ''} onChange={(e) => commit({ ...plan, building: { ...bi, exposure: (e.target.value || null) as BuildingInputs['exposure'] } })}>
+                <option value="">Not set</option>
+                <option value="sheltered">Sheltered</option>
+                <option value="normal">Normal</option>
+                <option value="exposed">Exposed</option>
+              </select>
+            </div>
+            <p className="gl-hint">How much wind reaches the building: it drives air leakage and the vents. One value for the whole site.</p>
+            <h4>Weather</h4>
+            <p className="gl-hint">The weather file is chosen on the Heat flow tab for now (a file from this computer, or one your organisation has saved). It moves here with the results.</p>
+          </div>
+        }
+      />
+    )
+  }
+
   const fabricPanel = () => {
     const kinds = FABRIC_KINDS
     const k = FABRIC_KINDS.find((x) => x.key === fkind)!
@@ -1438,8 +1491,10 @@ export default function GeometryLab() {
 
   // A card is open on the right (wall, block, rooms or space type): the results panel sits to its left.
   const cardOpen = !!(selWall && selSpan) || (mode === 'outline' && selBlocks.length > 0) || selRooms.length > 0
-  return (
-    <div className={`gl-root${giving ? ' giving' : ''}`} ref={host}>
+  // In the workspace, the left and right parts go to its panes (each wrapped so the editor's scoped styles apply).
+  const toPane = (el: HTMLElement | undefined, node: React.ReactNode, key: string) => (embedded && el ? createPortal(<div className="gl-root gl-pane">{node}</div>, el, key) : node)
+  const root = (
+    <div className={`gl-root${giving ? ' giving' : ''}${embedded ? ' embedded' : ''}`} ref={host}>
       <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />
       {in3d && (
         <div className="gl-3d">
@@ -1463,7 +1518,7 @@ export default function GeometryLab() {
           crossers={crossers}
           from={from}
           setFrom={setFrom}
-          width={narrow ? size[0] : size[0] - LEFT - 330}
+          width={narrow || embedded ? size[0] : size[0] - LEFT - 330}
           height={size[1]}
           roomName={roomName}
           typeName={(sp) => typeName(typeOfSpan(plan, sp))}
@@ -1603,19 +1658,26 @@ export default function GeometryLab() {
       {say && <div className={`gl-pill${say.bad ? ' bad' : ''}`} style={{ left: say.x, top: say.y }}>{say.text}</div>}
 
       {/* ─── left: the steps and the building ─── */}
-      <aside className="gl-panel gl-left">
-        <div className="gl-head">
+      {toPane(slots?.left, <aside className="gl-panel gl-left">
+        {!embedded && <div className="gl-head">
           <h2>Building geometry</h2>
           <p>Simulate v2 prototype. Nothing here is saved.</p>
-        </div>
-        <div className="gl-steps" role="tablist" aria-label="Steps">
+        </div>}
+        {!embedded && <div className="gl-steps" role="tablist" aria-label="Steps">
           {MODES.map((m) => (
             <button key={m} type="button" role="tab" aria-selected={mode === m} disabled={m !== 'outline' && !has} onClick={() => toMode(m)} title={STEP_LINE[m]}>
               <Icon name={STEP_ICON[m]} size={26} />
               <span><i>{STEP_NO[m]}</i>{STEP[m]}</span>
             </button>
           ))}
-        </div>
+        </div>}
+        {embedded && STEP_OF[mode] === 'shape' && !onSite && (
+          <div className="gl-shape-sw" role="tablist" aria-label="Shape">
+            {(['outline', 'rooms'] as const).map((m) => (
+              <button key={m} type="button" role="tab" aria-selected={mode === m} disabled={m === 'rooms' && !has} onClick={() => toMode(m)}>{STEP[m]}</button>
+            ))}
+          </div>
+        )}
         <div className="gl-body">
           {!has && (
             <div className="gl-sec">
@@ -1625,7 +1687,7 @@ export default function GeometryLab() {
               </button>
             </div>
           )}
-          {has && giving && chooseList()}
+          {has && giving && !onSite && chooseList()}
           {has && (
             <>
               {!giving && <div className="gl-sec">
@@ -1688,9 +1750,10 @@ export default function GeometryLab() {
             </>
           )}
         </div>
-      </aside>
+      </aside>, 'left')}
 
       {/* ─── right: the thing in hand ─── */}
+      {toPane(slots?.right, offStep ? null : <>{onSite && sitePanel()}{!onSite && <>
       {selWall && selSpan && (() => {
         const L = selSpan.t1 - selSpan.t0
         const glass = selWins.reduce((t, w) => t + w.width_m * w.height_m, 0)
@@ -1818,6 +1881,7 @@ export default function GeometryLab() {
         )
       })()}
 
+      </>}</>, 'right')}
       {has && giving && shownLook === 'plan' && (() => {
         // The key: what the drawing's colours mean for the kind in hand.
         const seen = new Map<string, Swatch>()
@@ -1833,9 +1897,11 @@ export default function GeometryLab() {
           </div>
         )
       })()}
+      {toPane(slots?.right, !onSite && !offStep && <>
       {has && mode === 'fabric' && fabricPanel()}
       {has && mode === 'spaces' && spacesPanel()}
       {has && mode === 'systems' && systemsPanel()}
+      </>, 'right2')}
 
       {/* ─── bottom: tools ─── */}
       <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m). Tap one to nudge it with the arrow keys or make it a door.' : tipLine}</p>
@@ -1865,6 +1931,7 @@ export default function GeometryLab() {
       </div>}
     </div>
   )
+  return embedded && slots ? createPortal(root, slots.centre) : root
 }
 
 function Num({ value, unit, auto, step, min = 0, max, onCommit, onChange }: { value: number | string; unit?: string; auto?: boolean; step?: number; min?: number; max?: number; onCommit?: (v: number) => void; onChange?: (s: string) => void }) {

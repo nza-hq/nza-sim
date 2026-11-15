@@ -6,7 +6,8 @@
  *   right   what you give: kinds, the project's types, the detail, Apply
  *
  * Panes resize with today's handle and are remembered (layout.ts). The step is in the address (?step=fabric), so a
- * link opens the right step. The steps render into the three panes through slots (P2); this file draws no numbers.
+ * link opens the right step. The steps render into the three panes through slots and stay mounted on every step, so
+ * nothing drawn is lost by visiting steps 6 and 7. This file draws no numbers.
  */
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -84,17 +85,17 @@ export default function ModelWorkspace({ render }: { render?: (a: { step: StepId
         </div>
         <div className="mw-centre flex-1 min-h-0 relative overflow-hidden" ref={setCentreEl}>
           {later && (
-            <div className="mw-empty">
+            <div className="mw-empty-over"><div className="mw-empty">
               <h2>{later.title}</h2>
               <p>{later.text}</p>
               <p>Today's tool does this on the <Link to={later.to}>{later.page}</Link> page.</p>
-            </div>
+            </div></div>
           )}
         </div>
       </section>
       <ResizeHandle onResize={setRight} />
       <aside className="mw-right flex-shrink-0 bg-white border-l border-light-grey min-h-0 overflow-hidden" style={{ width: layout.right }} ref={setRightEl} />
-      {!later && left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: layout.centre, setCentre })}
+      {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: layout.centre, setCentre })}
     </div>
   )
 }
