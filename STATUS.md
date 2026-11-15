@@ -2,6 +2,16 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## ✅ UI — decodED type system — CLOSED 15 Nov 2026 on `ui/decoded-type-system`
+
+Brief [`docs/briefs/archive/ui-decoded-type-system_COMPLETED.md`](docs/briefs/archive/ui-decoded-type-system_COMPLETED.md) (Linzie, 15 Nov 00:38).
+Type tokens moved to `frontend/src/design-system/tokens.css` in Tailwind v4's `--text-*` namespace (the old
+`--font-size-*` names generated no utilities, so ~1,600 size classes rendered at one body size). DM Sans UI, Inter
+figures, Stolzl display; DM Sans + Inter self-hosted in `frontend/public/fonts/`. Charts Inter 10–11 px. Six module
+titles to `text-heading`. Visual only: no engine file; anchor `--fixture` 133.2, output identical; build clean; 17/17 tests.
+**Suggestions (not done):** decodED colours (Assembly palette) are available as tokens but NZA Sim's Pablo palette is
+unchanged pending Linzie's call; the many inline SVG `fontSize: 8–11` literals in charts could move to tokens.
+
 ## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 
 Brief [`docs/briefs/archive/102a_foundations-fixes_COMPLETED.md`](docs/briefs/archive/102a_foundations-fixes_COMPLETED.md). Four proven bugs

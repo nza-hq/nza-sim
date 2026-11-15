@@ -1,10 +1,11 @@
-// Pablo design system — chart styling tokens
-// Used by all Recharts charts across the application
+// Chart styling tokens, used by all Recharts charts across the application.
+// Type follows decodED (src/design-system/tokens.css): chart figures are Inter, as in decodED's
+// --size-chart-value ramp; sizes lifted from 8-9 px so ticks and tooltips stay legible.
 
-const FONT_STACK = "'Stolzl', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+const FONT_STACK = "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
 
 export const TICK_STYLE = {
-  fontSize: 8,
+  fontSize: 10,
   fontFamily: FONT_STACK,
   fill: '#95A5A6',
 }
@@ -13,14 +14,14 @@ export const TOOLTIP_STYLE = {
   backgroundColor: '#fff',
   border: '1px solid #E6E6E6',
   borderRadius: '4px',
-  fontSize: '9px',
+  fontSize: '11px',
   fontFamily: FONT_STACK,
   color: '#58595B',
   padding: '4px 6px',
 }
 
 export const LEGEND_STYLE = {
-  fontSize: '8px',
+  fontSize: '10px',
   fontFamily: FONT_STACK,
 }
 
