@@ -20,7 +20,7 @@ Script: `scripts/107_tolerances.py`, which writes [`03_tolerances.json`](03_tole
 | Lighting | 39.014 | 39.014 | | shared input | |
 | Small power | 186.136 | 186.136 | | shared input | |
 | Auxiliary | 27.699 | 27.699 | | shared input | |
-| **EUI, kWh/m²** | **131.89** | **131.86** | **0.0 %** | ±5 % | pass |
+| **EUI, kWh/m²** | **131.89** | **131.86** | **0.0 %** | none (information) | not a gate |
 
 With EnergyPlus's default outdoor air density, the demand rows miss (−11.4 % / +10.2 %, Brief 105's attributed air-density convention). The EUI is still −0.6 %.
 
@@ -29,4 +29,6 @@ With EnergyPlus's default outdoor air density, the demand rows miss (−11.4 % /
 - **Scalar efficiencies leave no new physics.** With them, a delivered row can disagree only where its demand does, so the heating and cooling electricity rows repeat the demand rows exactly.
 - **Shared rows are not independent checks.** The referee takes its gains from `gains.ts` (Brief 105 decision 2) and has no hot water or fans. So "shared input" rows agree by construction. They are listed so that every term of the EUI is on the table (Rule 9).
 - **What does check them.** Lighting, small power, auxiliary, hot water and fans are checked against today's engine path by path in Part 2. Gains heat is checked against EnergyPlus in Brief 105.
+- **The referee follows Engine 2's allocation (Brief 104 F1).** The EnergyPlus case `r2_z_gains_vent_std` copies Engine 2's per-storey split of infiltration and thermal bridging. Against a referee that allocates them itself, cooling was +12 %. The demand rows here inherit that alignment.
+- **The EUI row is information, not a gate** (review F5). The ±5 % first written here was never agreed beforehand; demand's ±10 % is Brief 105's verification item 3.
 - **The EUI's 0.0 % flatters.** About two-thirds of the EUI is shared input. Heating (−1.7 MWh) and cooling (+1.8 MWh) also happen to cancel. The demand rows are the meaningful ones, and they carry Brief 105's numbers and caveats (per storey not yet validated; Brief 104 F2).

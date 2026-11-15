@@ -16,7 +16,7 @@
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine/model'
-import { FUELS, readSystemsEui, readSystemsTotalKwh, runSystems, type EndUse, type Fuel } from '../../thermal/engine/systems'
+import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingPeakW, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
@@ -54,6 +54,10 @@ export interface Summary {
         by_fuel: { fuel: Fuel; kwh: number }[]
         end_uses: { end_use: EndUse; fuel: Fuel; kwh: number }[]
         systems: { id: string; label: string; service: EndUse; fuel: Fuel; efficiency: number | null; served_kwh: number; fuel_kwh: number }[]
+        /** Inputs stated but not used yet, in words (review F4). */
+        not_modelled: string[]
+        /** True when no hot water system or hot water use is stated, so hot water is not in the total (review F1). */
+        no_hot_water: boolean
       }
     | { ok: false; missing: Missing[] }
 }
@@ -153,7 +157,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     engine: results.engine, run_ms: results.run_ms,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
     building: {
-      floor_m2: doc.zones.reduce((s, z) => s + z.area_m2, 0),
+      floor_m2: readDocFloorM2(doc),
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
       peak_heating_w: readBuildingPeakW(results, 'heating'), peak_cooling_w: readBuildingPeakW(results, 'cooling'),
     },
@@ -180,6 +184,9 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
     if (message.startsWith('unknown source') || message.endsWith('runs on electricity')) return { path, what: `The system ${name}: ${message}.` }
     return { path, what: `The system ${name} needs ${what[g[2]] ?? g[2].replace(/_/g, ' ')}.` }
   }
+  if (path === 'services.dhw') return { path, what: 'Hot water use is stated, but no hot water system is chosen to heat it.' }
+  const z = path.match(/^zones\[(\d+)\]\.dhw$/)
+  if (z) return { path, what: `Choose a hot water system for ${zoneName(doc, z[1])}.` }
   const d = path.match(/^services\.dhw\.(\w+)$/)
   if (d) {
     const what: Record<string, string> = {
@@ -195,7 +202,12 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
 }
 
 function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
-  const a = runSystems(doc, results, weather.weather.hours)
+  let a: ReturnType<typeof runSystems>
+  try { a = runSystems(doc, results, weather.weather.hours) } catch (e) {
+    // The served-equals-demand check (Rule 9) failing is a fault in the tool, never a number to show.
+    if (e instanceof ServedError) return { ok: false, missing: [{ path: 'systems', what: `The energy check failed (${e.message}). This is a fault in the tool; please report it.` }] }
+    throw e
+  }
   if (!a.ok) return { ok: false, missing: a.missing.map((m) => explainSystems(m.path, m.message, doc)) }
   const s = a.systems
   return {
@@ -203,5 +215,12 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
     by_fuel: FUELS.filter((f) => s.by_fuel[f] > 0).map((fuel) => ({ fuel, kwh: s.by_fuel[fuel] })),
     end_uses: s.end_uses.filter((l) => l.kwh > 0),
     systems: s.groups.map((g) => ({ id: g.id, label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system`, service: g.service, fuel: g.fuel, efficiency: g.efficiency, served_kwh: g.served_kwh, fuel_kwh: g.fuel_kwh })),
+    not_modelled: s.not_modelled.map((n) => {
+      const m = n.path.match(/^system_groups\[(\d+)\]/)
+      const v = n.path.match(/^zones\[(\d+)\]\.ventilation/)
+      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : n.path
+      return `${owner}: ${n.what}`
+    }),
+    no_hot_water: s.dhw == null,
   }
 }

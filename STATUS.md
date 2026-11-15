@@ -14,6 +14,7 @@ Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
   - Engine 2's demand is within −3.9 / +9.3 % of EnergyPlus; today's is −13.8 / +61 %.
 - **P3 tolerance table** ([`03_tolerances.md`](docs/audit/107/03_tolerances.md)): heating and cooling electricity −3.9 / +9.3 % (±10 %, pass), EUI 131.89 against 131.86 (pass). Hot water, fans, lighting, small power and auxiliary are shared inputs, equal by construction, and say so.
 - **P4 panel** ([`04_panel.md`](docs/audit/107/04_panel.md)): "Energy used" with EUI, fuels, end uses and each system's served and used energy; missing systems inputs named while demand still shows. Browser-checked on the editor's plan (46 kWh/m²).
+- **Independent review** ([`05_independent_review.md`](docs/audit/107/05_independent_review.md)) and **response** ([`06_review_response.md`](docs/audit/107/06_review_response.md)): no tuning, Rule 11 clean. F1 hot water now refused where a zone with use has no system; F2 served is checked against the model's demand (throws, as closure does; mutation M3 now caught); F3–F9 fixed or stated (unused inputs listed on the panel). Gate unchanged; 176 tests pass; browser-checked (`06_panel.png`).
 
 ## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
 
