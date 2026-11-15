@@ -4,14 +4,16 @@
  * contract).
  *
  * What the plan says, the document says: one zone per zone that has rooms, its floor outline (its rooms joined), its
- * area and its number of rooms; per zone, a wall for each unbroken stretch of footprint its rooms sit on (true azimuth,
- * area = length × storey height, net of its windows), the glazing on that wall (window count and area), partitions
+ * area and its number of rooms; per zone, a wall for each room piece of the outside wall (pieces side by side in one
+ * zone with one wall type are joined; true azimuth, area = length × storey height, net of its windows), the glazing on
+ * that wall (window count and area), partitions
  * where its rooms meet another zone's (walls between rooms of the same zone are inside the zone, not surfaces), a roof
  * and a ground floor of its own area. The use given to a zone is its use_type; each named heating or cooling system
  * is a system group serving the zones it was given to, at 100% of their demand (one system per service per zone here).
  *
  * What the plan does not say yet is left visibly unset, never invented (CLAUDE.md rule 2 and 3): constructions are
- * `unassigned:<element>` keys, no profiles, a system's fuel and efficiency are null, no weather, a zone with no use is
+ * `unassigned:<element>` keys (a wall type other than the first adds its id, and carries the U-value the user typed
+ * as u_value_override when there is one), no profiles, a system's fuel and efficiency are null, no weather, a zone with no use is
  * "unassigned". The four optical numbers
  * schema 2.1 requires (absorptance 0.6 walls / 0.7 roofs, emissivity 0.9, frame fraction 0.20) and the internal heat
  * capacity (250,000 J/K·m²) are today's engine's own hard-coded values, named in the schema's comments.
@@ -22,6 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { allWindows, edgesOf, facade4, type Plan, ringArea, wallRuns } from './plan'
+import { crossing, typeOfSpan, wallPieces } from './facade'
 import { cleanRing } from './outline'
 import type { XY } from './ported/zones'
 
@@ -40,30 +43,33 @@ export type Built = {
 export function buildDocument(plan: Plan): Built {
   const notes: string[] = []
   const h = plan.storey_height_m
-  const { walls: roomWalls, shares: roomShares, open } = edgesOf(plan.blocks, plan.rooms)
+  const { shares: roomShares, open } = edgesOf(plan.blocks, plan.rooms)
   const { windows, problems } = allWindows(plan)
-  problems.forEach((p) => notes.push(`Window set ${p.set}: ${p.why}`))
+  problems.forEach((p) => notes.push(`A window is left out: ${p.why}`))
   const roomOf = new Map(plan.rooms.map((r) => [r.id, r]))
   for (const o of open) notes.push(`${roomOf.get(o.piece)?.name ?? o.piece} has ${r3(o.length_m)} m of side that is neither outside wall nor next to another room`)
   const zoneOf = (roomId: string) => roomOf.get(roomId)?.zone ?? ''
   const used = plan.zones.filter((z) => plan.rooms.some((r) => r.zone === z.id))
 
-  // A zone's walls: its rooms' stretches of each footprint run, joined where they meet (two rooms of one zone side by
-  // side along a wall make one wall).
+  // Outside walls: one wall per room piece (facade.ts), joined where neighbouring pieces on a run are in the same zone
+  // and have the same wall type. A piece with a different wall type is always its own wall.
   const runs = wallRuns(plan.blocks)
-  const walls: Array<{ zone: string; run: number; t0: number; t1: number; length_m: number; azimuth_deg: number }> = []
-  for (const z of used) {
-    for (const run of runs) {
-      const bits = roomWalls.filter((w) => w.run === run.index && zoneOf(w.piece) === z.id).map((w) => [w.t0, w.t1] as [number, number]).sort((a, b) => a[0] - b[0])
-      const joined: Array<[number, number]> = []
-      for (const b of bits) {
-        const last = joined[joined.length - 1]
-        if (last && b[0] <= last[1] + 1e-6) last[1] = Math.max(last[1], b[1])
-        else joined.push([b[0], b[1]])
-      }
-      for (const [t0, t1] of joined) walls.push({ zone: z.id, run: run.index, t0, t1, length_m: t1 - t0, azimuth_deg: run.azimuth_deg })
-    }
+  const walls: Array<{ zone: string; run: number; t0: number; t1: number; length_m: number; azimuth_deg: number; type: string }> = []
+  for (const p of wallPieces(plan)) {
+    const type = typeOfSpan(plan, p)
+    const last = walls[walls.length - 1]
+    if (last && last.run === p.run && last.zone === p.zone && last.type === type && p.t0 <= last.t1 + 1e-3) {
+      last.t1 = p.t1
+      last.length_m = last.t1 - last.t0
+    } else walls.push({ zone: p.zone, run: p.run, t0: p.t0, t1: p.t1, length_m: p.length_m, azimuth_deg: runs[p.run]!.azimuth_deg, type })
   }
+  const typeOf = new Map(plan.wall_types.map((t) => [t.id, t]))
+  const constructionOf = (type: string) => {
+    const t = typeOf.get(type)
+    const key = !t || t.id === plan.wall_types[0]?.id ? 'unassigned:external_wall' : `unassigned:external_wall:${t.id}`
+    return t?.u != null ? { key, u_value_override: t.u } : { key }
+  }
+  for (const w of crossing(plan)) notes.push(`A window on wall ${w.wall + 1} crosses into the next room; it is counted in the room its middle is in`)
   // Partitions between zones: room-to-room stretches whose rooms are in different zones, summed per pair.
   const pairs = new Map<string, { a: string; b: string; length_m: number }>()
   for (const s of roomShares) {
@@ -129,7 +135,6 @@ export function buildDocument(plan: Plan): Built {
       taken.add(i)
       return true
     })
-    for (const x of mine) if (x.offset_m < w.t0 - 1e-6 || x.offset_m + x.width_m > w.t1 + 1e-6) notes.push(`A window on wall ${w.run + 1} straddles a line between zones; it is counted in the zone its middle is in`)
     windowsPlaced += mine.length
     const gross = w.length_m * h
     const glz = mine.reduce((s, x) => s + x.width_m * x.height_m, 0)
@@ -137,7 +142,7 @@ export function buildDocument(plan: Plan): Built {
     add(w.zone, ext({
       id: wallId, kind: 'wall', zone_a: w.zone, zone_b: 'outside', facade: facade4(w.azimuth_deg),
       area_m2: r3(gross - glz), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
-      construction_ref: { key: 'unassigned:external_wall' }, g_value: null, openings: [],
+      construction_ref: constructionOf(w.type), g_value: null, openings: [],
     }, 'wall'))
     if (mine.length) {
       add(w.zone, ext({

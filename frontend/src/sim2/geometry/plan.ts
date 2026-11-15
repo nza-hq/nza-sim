@@ -33,20 +33,26 @@ export const USES: ReadonlyArray<{ key: string; name: string }> = [
   { key: 'other', name: 'Other' },
 ]
 
-/** N windows of one size, spaced equally along a wall run (equal gaps at both ends and between). */
-export type WindowSet = {
+/** One window: on wall run `wall`, its left edge `t_m` along the run (run a→b, seen from outside). Which room and which
+ * wall piece it belongs to is not stored: it is the piece its middle is on. */
+export type Win = {
   id: string
-  /** Footprint side index. */
   wall: number
-  count: number
+  t_m: number
   width_m: number
   height_m: number
   sill_m: number
-  /** Shading round each window (frame of fins and overhang), metres out from the wall; 0 or absent = none. */
-  shading_m?: number
+  /** Shading round the window (frame of fins, overhang and sill), metres out from the wall; 0 = none. */
+  shading_m: number
   /** Only while blocks are being rebuilt: the wall's ends, to find it again. */
   at?: { a: XY; b: XY }
 }
+
+/** A kind of outside wall. `u` is what the user typed (W/m²K), or null: the construction comes from the library later. */
+export type WallType = { id: string; name: string; u: number | null }
+/** A stretch [t0, t1] of run `wall` given wall type `type`. Later stretches win where they overlap. */
+export type TypeSpan = { wall: number; t0: number; t1: number; type: string; at?: { a: XY; b: XY } }
+export const DEFAULT_WALL_TYPE: WallType = { id: 'wt1', name: 'External wall', u: null }
 
 export type Plan = {
   /** Separate outlines, each anticlockwise. Blocks never touch or overlap (touching ones are joined). */
@@ -55,12 +61,14 @@ export type Plan = {
   zones: PlanZone[]
   systems: PlanSystem[]
   storey_height_m: number
-  windows: WindowSet[]
+  windows: Win[]
+  wall_types: WallType[]
+  wall_spans: TypeSpan[]
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
 
-export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], next: { room: 1, zone: 1, system: 1 } })
+export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], wall_types: [DEFAULT_WALL_TYPE], wall_spans: [], next: { room: 1, zone: 1, system: 1 } })
 
 /** A new zone with nothing assigned. */
 export const blankZone = (n: number): PlanZone => ({ id: `z${n}`, name: `Zone ${n}`, use: null, heating: null, cooling: null })
@@ -109,42 +117,43 @@ export function facade4(az: number): 'north' | 'east' | 'south' | 'west' {
 
 // ─── Windows ──────────────────────────────────────────────────────────────────────────────────────
 
-/** One placed window: distance of its left edge from the run's start (looking at the wall from outside, run a→b). */
+/** One window, checked against its wall: `offset_m` is its left edge along the run. */
 export type PlacedWindow = { set: string; wall: number; offset_m: number; width_m: number; height_m: number; sill_m: number; shading_m: number }
+
+/** A stretch of a run: a wall piece, or a whole wall. */
+export type Span = { run: number; t0: number; t1: number }
 
 export type Layout = { windows: PlacedWindow[]; gap_m: number } | { why: string }
 
-/** Equal spacing: gap = (L − N·w) / (N + 1). Refuses, in words, when they do not fit. */
-export function layoutSet(run: WallRun, s: WindowSet, storeyHeight: number): Layout {
+/** N windows of one size spaced equally over a span: gap = (L − N·w) / (N + 1). Refuses, in words, when they do not fit. */
+export function layoutIn(span: Span, s: { count: number; width_m: number; height_m: number; sill_m: number; shading_m?: number }, storeyHeight: number, id = 'w'): Layout {
+  const L = span.t1 - span.t0
   if (!(s.count >= 1) || !Number.isInteger(s.count)) return { why: 'Number of windows must be a whole number, 1 or more' }
   if (!(s.width_m > 0) || !(s.height_m > 0)) return { why: 'Window size must be more than zero' }
   if (s.sill_m < 0) return { why: 'Sill height cannot be below the floor' }
   if ((s.shading_m ?? 0) < 0) return { why: 'Shading depth cannot be less than zero' }
   if (s.sill_m + s.height_m > storeyHeight + 1e-9) return { why: `Sill + window height (${round(s.sill_m + s.height_m, 2)} m) is taller than the storey (${storeyHeight} m)` }
   const total = s.count * s.width_m
-  if (total > run.length_m + 1e-9) return { why: `${s.count} windows ${round(s.width_m, 2)} m wide need ${round(total, 2)} m; this wall is ${round(run.length_m, 2)} m` }
-  const gap = (run.length_m - total) / (s.count + 1)
+  if (total > L + 1e-9) return { why: `${s.count} windows ${round(s.width_m, 2)} m wide need ${round(total, 2)} m; this stretch is ${round(L, 2)} m` }
+  const gap = (L - total) / (s.count + 1)
   const windows: PlacedWindow[] = []
   for (let i = 0; i < s.count; i++) {
-    windows.push({ set: s.id, wall: run.index, offset_m: gap + i * (s.width_m + gap), width_m: s.width_m, height_m: s.height_m, sill_m: s.sill_m, shading_m: s.shading_m ?? 0 })
+    windows.push({ set: `${id}${i + 1}`, wall: span.run, offset_m: span.t0 + gap + i * (s.width_m + gap), width_m: s.width_m, height_m: s.height_m, sill_m: s.sill_m, shading_m: s.shading_m ?? 0 })
   }
   return { windows, gap_m: gap }
 }
 
-/** Every window on the plan (sets that no longer fit are skipped and reported). */
+/** Every window, checked: on a wall that exists, inside its length, within the storey. */
 export function allWindows(plan: Plan): { windows: PlacedWindow[]; problems: Array<{ set: string; why: string }> } {
   const runs = wallRuns(plan.blocks)
   const windows: PlacedWindow[] = []
   const problems: Array<{ set: string; why: string }> = []
-  for (const s of plan.windows) {
-    const run = runs[s.wall]
-    if (!run) {
-      problems.push({ set: s.id, why: 'Its wall is gone' })
-      continue
-    }
-    const l = layoutSet(run, s, plan.storey_height_m)
-    if ('why' in l) problems.push({ set: s.id, why: l.why })
-    else windows.push(...l.windows)
+  for (const w of plan.windows) {
+    const run = runs[w.wall]
+    if (!run) problems.push({ set: w.id, why: 'Its wall is gone' })
+    else if (w.t_m < -1e-6 || w.t_m + w.width_m > run.length_m + 1e-6) problems.push({ set: w.id, why: 'It runs off the end of its wall' })
+    else if (w.sill_m + w.height_m > plan.storey_height_m + 1e-9) problems.push({ set: w.id, why: 'It is taller than the storey' })
+    else windows.push({ set: w.id, wall: w.wall, offset_m: w.t_m, width_m: w.width_m, height_m: w.height_m, sill_m: w.sill_m, shading_m: w.shading_m })
   }
   return { windows, problems }
 }

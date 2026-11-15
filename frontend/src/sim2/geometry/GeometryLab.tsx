@@ -28,17 +28,20 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { type Plan, type WindowSet, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, layoutSet, ringArea, wallRuns } from './plan'
+import { type Plan, type Span, type WallType, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, layoutIn, ringArea, wallRuns } from './plan'
 import { type Changed, addShape, blockAt, boxRing, centreOf, copyBlock, cutShape, dropBlocks, moveBlocks, pushWall, removeBlock, setBlock, snapXY, triRing, turnBlocks } from './outline'
 import { type Side, assignZone, boxRoom, divideRoom, halveRoom, innerSideAt, joinRooms, moveWall, sideEnds, sideNormal } from './rooms'
+import FacadeView from './FacadeView'
 import { buildDocument } from './toDocument'
+import { type WallPiece, type WindowSpec, crossing, moveWindow, pieceAt, piecesOfRooms, setTypeOn, setWindowsIn, spaceByRoom, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
 
 type Mode = 'outline' | 'rooms'
 type Tool = 'select' | 'rect' | 'tri' | 'shape' | 'cut' | 'corner' | 'pick' | 'room' | 'halve' | 'divide' | 'join'
-type Sel = { kind: 'wall'; index: number } | { kind: 'blocks'; idx: number[] } | { kind: 'rooms'; ids: string[] } | null
+/** A wall: run `index`, at `t` m along it; `whole` = the whole wall, else the room piece at `t`. */
+type Sel = { kind: 'wall'; index: number; t: number; whole: boolean } | { kind: 'blocks'; idx: number[] } | { kind: 'rooms'; ids: string[] } | null
 type View = { cx: number; cy: number; k: number }
 type Drag =
   | { kind: 'pan'; x: number; y: number; v: View; moved: boolean }
@@ -105,7 +108,8 @@ export default function GeometryLab() {
   }
 
   const [mode, setMode] = useState<Mode>('outline')
-  const [in3d, setIn3d] = useState(false)
+  const [look, setLook] = useState<'plan' | '3d' | 'elev'>('plan')
+  const [from, setFrom] = useState<'out' | 'in'>('out')
   const [tool, setTool] = useState<Tool>('rect')
   const [joinFrom, setJoinFrom] = useState<string | null>(null)
   const [sel, setSel] = useState<Sel>(null)
@@ -229,6 +233,12 @@ export default function GeometryLab() {
       }
     }
     return best
+  }
+  /** How far along wall run `w` the point `m` falls. */
+  const tOn = (w: number, m: XY) => {
+    const r = runs[w]
+    if (!r) return 0
+    return Math.max(0, Math.min(r.length_m, ((m[0] - r.a[0]) * (r.b[0] - r.a[0]) + (m[1] - r.a[1]) * (r.b[1] - r.a[1])) / (r.length_m || 1)))
   }
   /** Where on wall run `w` the point `m` falls, snapped along it to the grid step. */
   const onWall = (w: number, m: XY, st: number): XY => {
@@ -359,7 +369,7 @@ export default function GeometryLab() {
       return
     }
     if (d.kind === 'push') {
-      if (Math.abs(d.by) < 1e-9) return setSel({ kind: 'wall', index: d.run })
+      if (Math.abs(d.by) < 1e-9) return setSel({ kind: 'wall', index: d.run, t: tOn(d.run, d.start), whole: true })
       return apply(pushWall(d.base, d.block, d.side, d.by), m)
     }
     if (d.kind === 'wall') {
@@ -466,7 +476,7 @@ export default function GeometryLab() {
     }
     if (tool === 'pick' || tool === 'room') {
       const w = wallAt(x, y)
-      if (w != null && tool === 'pick') return setSel({ kind: 'wall', index: w })
+      if (w != null && tool === 'pick') return setSel({ kind: 'wall', index: w, t: tOn(w, m), whole: false })
       if (!room) return setSel(null)
       if (sh && sel?.kind === 'rooms') {
         const ids = sel.ids.includes(room.id) ? sel.ids.filter((i) => i !== room.id) : [...sel.ids, room.id]
@@ -552,21 +562,34 @@ export default function GeometryLab() {
     core.reset()
   }
 
-  // ─── the wall card's form ──────────────────────────────────────────────────
+  // ─── the wall card: a room's piece of an outside wall, or the whole wall ─────────
+  const pieces = useMemo(() => wallPieces(plan), [plan])
+  const crossers = useMemo(() => new Set(crossing(plan, pieces).map((w) => w.id)), [plan, pieces])
   const selWall = sel?.kind === 'wall' ? runs[sel.index] : undefined
-  const selSet = selWall ? plan.windows.find((w) => w.wall === selWall.index) : undefined
+  const runPieces = selWall ? pieces.filter((p) => p.run === selWall.index) : []
+  const selPiece = sel?.kind === 'wall' && selWall ? pieceAt(pieces, selWall.index, Math.min(sel.t, selWall.length_m)) : undefined
+  const selSpan: Span | null = sel?.kind === 'wall' && selWall ? (sel.whole || !selPiece || runPieces.length < 2 ? wholeWall(plan, selWall.index) : selPiece) : null
+  const isWhole = !!selSpan && !!selWall && selSpan.t1 - selSpan.t0 >= selWall.length_m - 1e-6
+  const selWins = selSpan ? windowsIn(plan, selSpan) : []
+  // The elevation needs a wall; without one the plan shows.
+  const shownLook = look === 'elev' && !selWall ? 'plan' : look
+  const in3d = shownLook === '3d'
+  const roomName = (id: string) => plan.rooms.find((r) => r.id === id)?.name ?? 'a room'
+  const spanName = !selSpan ? '' : isWhole ? (runPieces.length > 1 ? `whole wall · ${runPieces.length} rooms` : runPieces[0] ? roomName(runPieces[0].room) : '') : selPiece ? `${roomName(selPiece.room)}'s part` : ''
   // Width, height and area of each window are tied (area = width × height): the two last typed stand and the third is
-  // worked out. Once a wall has windows, every valid change shows on the plan at once (no Update button).
+  // worked out. Once there are windows, every valid change shows at once (no Update button) and re-spaces them equally.
   type Dim = 'width' | 'height' | 'area'
   const editing = useRef<Sel>(null)
   const r3s = (n: number) => (Number.isFinite(n) ? String(Math.round(n * 1000) / 1000) : '')
   const [form, setForm] = useState({ count: '3', width: r3s(1 / 1.2), height: '1.2', area: '1', sill: '0.9', shade: '0', recent: ['height', 'area'] as Dim[] })
   const autoDim: Dim = (['width', 'height', 'area'] as Dim[]).find((d) => !form.recent.includes(d))!
+  const first = selWins[0]
+  const sameSize = selWins.every((w) => first && Math.abs(w.width_m - first.width_m) < 1e-6 && Math.abs(w.height_m - first.height_m) < 1e-6 && Math.abs(w.sill_m - first.sill_m) < 1e-6 && Math.abs(w.shading_m - first.shading_m) < 1e-6)
+  const spanKey = selSpan ? `${selSpan.run}:${selSpan.t0.toFixed(3)}:${selSpan.t1.toFixed(3)}` : ''
   useEffect(() => {
-    if (selSet) setForm((f) => ({ ...f, count: String(selSet.count), width: r3s(selSet.width_m), height: r3s(selSet.height_m), area: r3s(selSet.width_m * selSet.height_m), sill: r3s(selSet.sill_m), shade: r3s(selSet.shading_m ?? 0) }))
-  }, [selSet?.id, sel]) // eslint-disable-line react-hooks/exhaustive-deps
-  const toSet = (f: typeof form): WindowSet | null =>
-    selWall ? { id: selSet?.id ?? `w${Date.now().toString(36)}`, wall: selWall.index, count: Number(f.count), height_m: Number(f.height), width_m: Number(f.width), sill_m: Number(f.sill), shading_m: Number(f.shade) } : null
+    if (first) setForm((f) => ({ ...f, count: String(selWins.length), width: r3s(first.width_m), height: r3s(first.height_m), area: r3s(first.width_m * first.height_m), sill: r3s(first.sill_m), shade: r3s(first.shading_m) }))
+  }, [spanKey, sel]) // eslint-disable-line react-hooks/exhaustive-deps
+  const toSpec = (f: typeof form): WindowSpec => ({ count: Number(f.count), height_m: Number(f.height), width_m: Number(f.width), sill_m: Number(f.sill), shading_m: Number(f.shade) })
   const edit = (k: 'count' | 'sill' | 'shade' | Dim, v: string) => {
     let f = { ...form, [k]: v }
     if (k === 'width' || k === 'height' || k === 'area') {
@@ -581,19 +604,40 @@ export default function GeometryLab() {
       if (auto === 'area') f.area = r3s(W * H)
     }
     setForm(f)
-    const d = toSet(f)
-    if (selSet && selWall && d && !('why' in layoutSet(selWall, d, plan.storey_height_m))) {
-      // One Undo step per wall chosen, not one per key.
-      const next = { ...plan, windows: plan.windows.map((w) => (w.id === selSet.id ? d : w)) }
-      if (editing.current === sel) setPlan(next)
-      else {
-        editing.current = sel
-        commit(next)
-      }
+    if (!selWins.length || !selSpan) return
+    const r = setWindowsIn(plan, selSpan, toSpec(f))
+    if ('why' in r) return
+    // One Undo step per wall chosen, not one per key.
+    if (editing.current === sel) setPlan(r.plan)
+    else {
+      editing.current = sel
+      commit(r.plan)
     }
   }
-  const draft = toSet(form)
-  const lay = selWall && draft ? layoutSet(selWall, draft, plan.storey_height_m) : null
+  const spec = toSpec(form)
+  const lay = selSpan ? layoutIn(selSpan, spec, plan.storey_height_m) : null
+  const chooseWall = (whole: boolean) => sel?.kind === 'wall' && setSel({ ...sel, whole })
+  const choosePiece = (p: WallPiece) => setSel({ kind: 'wall', index: p.run, t: (p.t0 + p.t1) / 2, whole: false })
+
+  // ─── wall types ────────────────────────────────────────────────────────────
+  const newWallType = (p: Plan): { plan: Plan; id: string } => {
+    const n = p.wall_types.length + 1
+    let k = n
+    while (p.wall_types.some((t) => t.id === `wt${k}`)) k++
+    const t: WallType = { id: `wt${k}`, name: `Wall type ${n}`, u: null }
+    return { plan: { ...p, wall_types: [...p.wall_types, t] }, id: t.id }
+  }
+  const setTypeFor = (spans: Span[], v: string) => {
+    if (!spans.length || v === '__mixed') return
+    if (v === '__new') {
+      const r = newWallType(plan)
+      return commit(setTypeOn(r.plan, spans, r.id))
+    }
+    commit(setTypeOn(plan, spans, v))
+  }
+  const typeName = (id: string) => plan.wall_types.find((t) => t.id === id)?.name ?? id
+  const usedTypes = new Set(pieces.map((p) => typeOfSpan(plan, p)))
+  const showTypes = usedTypes.size > 1
 
   // ─── rooms and zones ───────────────────────────────────────────────────────
   const selRooms = sel?.kind === 'rooms' ? plan.rooms.filter((r) => sel.ids.includes(r.id)) : []
@@ -676,15 +720,35 @@ export default function GeometryLab() {
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D plan={plan} runs={runs} placed={placed} chosenWall={sel?.kind === 'wall' ? sel.index : null} onPickWall={(i) => setSel({ kind: 'wall', index: i })} />
+            <Plan3D plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: typeColour(plan, typeOfSpan(plan, p)) })) : []} onPickWall={(i, t) => setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' })} />
           </Suspense>
         </div>
       )}
       <div className="gl-viewswitch" role="group" aria-label="View">
-        <button type="button" aria-pressed={!in3d} onClick={() => setIn3d(false)}>Plan</button>
-        <button type="button" aria-pressed={in3d} onClick={() => setIn3d(true)} disabled={!plan.blocks.length}>3D</button>
+        <button type="button" aria-pressed={shownLook === 'plan'} onClick={() => setLook('plan')}>Plan</button>
+        <button type="button" aria-pressed={in3d} onClick={() => setLook('3d')} disabled={!plan.blocks.length}>3D</button>
+        <button type="button" aria-pressed={shownLook === 'elev'} onClick={() => setLook('elev')} disabled={!selWall} title={selWall ? undefined : 'Choose a wall first'}>Elevation</button>
       </div>
-      <svg className="gl-svg" width={size[0]} height={size[1]} style={{ cursor, display: in3d ? "none" : undefined }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setPointer(null)} onDoubleClick={onDouble} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()}>
+      {shownLook === 'elev' && selWall && selSpan && (
+        <FacadeView
+          plan={plan}
+          run={selWall}
+          pieces={runPieces}
+          span={selSpan}
+          whole={isWhole}
+          crossers={crossers}
+          from={from}
+          setFrom={setFrom}
+          width={narrow ? size[0] : size[0] - LEFT - 330}
+          height={size[1]}
+          roomName={roomName}
+          typeName={(sp) => typeName(typeOfSpan(plan, sp))}
+          typeColour={(sp) => (showTypes ? typeColour(plan, typeOfSpan(plan, sp)) : null)}
+          onPick={(p) => p && choosePiece(p)}
+          onMoved={(id, t) => commit(moveWindow(plan, id, t))}
+        />
+      )}
+      <svg className="gl-svg" width={size[0]} height={size[1]} style={{ cursor, display: shownLook !== 'plan' ? 'none' : undefined }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setPointer(null)} onDoubleClick={onDouble} onWheel={onWheel} onContextMenu={(e) => e.preventDefault()}>
         {grid}
         {shown.blocks.map((b, i) => <polygon key={`f${i}`} className="gl-floor" points={P(b)} />)}
         {inRooms &&
@@ -696,7 +760,19 @@ export default function GeometryLab() {
           return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />
         })()}
         {pushed && <line className="gl-wall-on" x1={toPx(pushed.a)[0]} y1={toPx(pushed.a)[1]} x2={toPx(pushed.b)[0]} y2={toPx(pushed.b)[1]} />}
-        {selWall && !drag && <line className="gl-wall-on" x1={toPx(selWall.a)[0]} y1={toPx(selWall.a)[1]} x2={toPx(selWall.b)[0]} y2={toPx(selWall.b)[1]} />}
+        {showTypes && !drag &&
+          pieces.map((p, i) => {
+            const r = runs[p.run]
+            if (!r) return null
+            const [ax, ay] = toPx(along(r, p.t0))
+            const [bx, by] = toPx(along(r, p.t1))
+            return <line key={`ty${i}`} className="gl-wall-type" x1={ax} y1={ay} x2={bx} y2={by} stroke={typeColour(plan, typeOfSpan(plan, p))} />
+          })}
+        {selWall && selSpan && !drag && (() => {
+          const [ax, ay] = toPx(along(selWall, selSpan.t0))
+          const [bx, by] = toPx(along(selWall, selSpan.t1))
+          return <line className="gl-wall-on" x1={ax} y1={ay} x2={bx} y2={by} />
+        })()}
         {!drag &&
           placed.map((w, i) => {
             const r = runs[w.wall]
@@ -705,7 +781,7 @@ export default function GeometryLab() {
             const [bx, by] = toPx(along(r, w.offset_m + w.width_m))
             return (
               <g key={`w${i}`}>
-                <line className="gl-win" x1={ax} y1={ay} x2={bx} y2={by} />
+                <line className={`gl-win${crossers.has(w.set) ? ' bad' : ''}`} x1={ax} y1={ay} x2={bx} y2={by} />
                 <line className="gl-win-glass" x1={ax} y1={ay} x2={bx} y2={by} />
               </g>
             )
@@ -855,6 +931,34 @@ export default function GeometryLab() {
                   <p className="gl-hint">Every room starts in Zone 1. Choose rooms (Select, Shift for more) to put them in another zone. Tap a zone to choose all its rooms.</p>
                 </div>
               )}
+              {has && (
+                <div className="gl-sec">
+                  <h3>Wall types <small>{plan.wall_types.length}</small></h3>
+                  <div className="gl-zones">
+                    {plan.wall_types.map((t, i) => {
+                      const ps = pieces.filter((p) => typeOfSpan(plan, p) === t.id)
+                      const setT = (q: Partial<WallType>) => commit({ ...plan, wall_types: plan.wall_types.map((x) => (x.id === t.id ? { ...x, ...q } : x)) })
+                      return (
+                        <div key={t.id} className="gl-zonerow gl-typerow">
+                          <span className="gl-sw" style={{ background: showTypes || i > 0 ? typeColour(plan, t.id) : '#fff', borderColor: typeColour(plan, t.id) }} />
+                          <input aria-label="Wall type name" defaultValue={t.name} key={`${t.id}-${t.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && setT({ name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+                          <label className="gl-u" title="U-value you know, W/m²K. Empty: from the library later.">
+                            U
+                            <input aria-label={`U-value of ${t.name}`} inputMode="decimal" placeholder="—" defaultValue={t.u ?? ''} key={`${t.id}-u-${t.u}`} onBlur={(e) => { const v = e.target.value.trim(); const u = v === '' ? null : Number(v); if (u === null || (Number.isFinite(u) && u > 0)) { if (u !== t.u) setT({ u }) } else e.target.value = t.u == null ? '' : String(t.u) }} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+                          </label>
+                          {i > 0 && !ps.length ? (
+                            <button type="button" className="gl-x small" title="Remove this unused wall type" onClick={() => commit({ ...plan, wall_types: plan.wall_types.filter((x) => x.id !== t.id), wall_spans: plan.wall_spans.filter((x) => x.type !== t.id) })}>×</button>
+                          ) : (
+                            <small>{f1(ps.reduce((n, p) => n + p.length_m, 0))} m</small>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <button type="button" className="gl-btn quiet" onClick={() => commit(newWallType(plan).plan)}>Add a wall type</button>
+                  <p className="gl-hint">Each room's part of an outside wall can have its own type. Tap a wall or choose rooms to set it. U in W/m²K; leave it empty to take the construction from the library later.</p>
+                </div>
+              )}
               <div className="gl-sec">
                 <h3>Model document</h3>
                 <span className={`gl-chip ${built.ok ? 'ok' : 'no'}`}>{built.ok ? `✓ Valid · schema ${(built.doc as { schema_version: string }).schema_version}` : 'Not valid'}</span>
@@ -879,47 +983,76 @@ export default function GeometryLab() {
       </aside>
 
       {/* ─── right: the thing in hand ─── */}
-      {selWall && (
-        <aside className="gl-panel gl-right">
-          <div className="gl-card-head">
-            <div>
-              <b>Wall {selWall.index + 1}</b>
-              <small>{f2(selWall.length_m)} m · faces {compass16(selWall.azimuth_deg)} ({Math.round(selWall.azimuth_deg)}°)</small>
-            </div>
-            <button type="button" className="gl-x" aria-label="Close" onClick={() => setSel(null)}>×</button>
-          </div>
-          <div className="gl-body">
-            <div className="gl-sec">
-              <h3>Windows <small>spaced equally</small></h3>
-              <div className="gl-row"><span>How many</span><Num value={form.count} step={1} min={1} onChange={(s) => edit('count', s)} /></div>
-              <div className="gl-row"><span>Area of each</span><Num value={form.area} unit="m²" step={0.1} auto={autoDim === 'area'} onChange={(s) => edit('area', s)} /></div>
-              <div className="gl-row"><span>Width</span><Num value={form.width} unit="m" step={0.1} auto={autoDim === 'width'} onChange={(s) => edit('width', s)} /></div>
-              <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" step={0.1} auto={autoDim === 'height'} onChange={(s) => edit('height', s)} /></div>
-              <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" step={0.1} onChange={(s) => edit('sill', s)} /></div>
-              <div className="gl-row"><span>Shading depth</span><Num value={form.shade} unit="m" step={0.1} min={0} onChange={(s) => edit('shade', s)} /></div>
-              <p className="gl-hint">Type any two of area, width and height; the one marked <i className="gl-auto-tag">auto</i> is worked out.{selSet ? ' Changes show straight away.' : ''}</p>
-              {lay && 'why' in lay && <p className="gl-err">{lay.why}</p>}
-              {draft && lay && !('why' in lay) && (
-                <>
-                  <p className="gl-hint">
-                    {f2(lay.gap_m)} m apart. {f2(draft.count * draft.width_m * draft.height_m)} m² of glass, {Math.round((100 * draft.count * draft.width_m * draft.height_m) / (selWall.length_m * plan.storey_height_m))}% of this wall.
-                  </p>
-                  <Elevation length={selWall.length_m} height={plan.storey_height_m} windows={lay.windows} />
-                </>
-              )}
-              <div className="gl-btns">
-                {!selSet && (
-                  <button type="button" className="gl-btn orange" disabled={!lay || 'why' in lay} onClick={() => draft && lay && !('why' in lay) && commit({ ...plan, windows: [...plan.windows.filter((w) => w.wall !== draft.wall), draft] })}>
-                    Add windows
-                  </button>
-                )}
-                {selSet && <button type="button" className="gl-btn quiet" onClick={() => commit({ ...plan, windows: plan.windows.filter((w) => w.wall !== selWall.index) })}>Remove</button>}
+      {selWall && selSpan && (() => {
+        const L = selSpan.t1 - selSpan.t0
+        const tv = typeOfSpan(plan, selSpan)
+        const mixedType = isWhole && runPieces.some((p) => typeOfSpan(plan, p) !== tv)
+        const glass = selWins.reduce((t, w) => t + w.width_m * w.height_m, 0)
+        const cross = selWins.filter((w) => crossers.has(w.id)).length + (isWhole ? 0 : plan.windows.filter((w) => w.wall === selWall.index && crossers.has(w.id) && !selWins.includes(w) && w.t_m < selSpan.t1 && w.t_m + w.width_m > selSpan.t0).length)
+        return (
+          <aside className="gl-panel gl-right">
+            <div className="gl-card-head">
+              <div>
+                <b>Wall {selWall.index + 1}{spanName ? ` · ${spanName}` : ''}</b>
+                <small>{f2(L)} m{isWhole ? '' : ` of ${f2(selWall.length_m)} m`} · faces {compass16(selWall.azimuth_deg)} ({Math.round(selWall.azimuth_deg)}°)</small>
               </div>
-              {mode === 'outline' && <p className="gl-hint">Drag a wall to push it straight out or in.</p>}
+              <button type="button" className="gl-x" aria-label="Close" onClick={() => setSel(null)}>×</button>
             </div>
-          </div>
-        </aside>
-      )}
+            <div className="gl-body">
+              {runPieces.length > 1 && (
+                <div className="gl-chips" role="group" aria-label="Which part">
+                  {runPieces.map((p, i) => (
+                    <button key={i} type="button" aria-pressed={!isWhole && selPiece === p} onClick={() => choosePiece(p)}>{roomName(p.room)}</button>
+                  ))}
+                  <button type="button" aria-pressed={isWhole} onClick={() => chooseWall(true)}>Whole wall</button>
+                </div>
+              )}
+              <div className="gl-sec">
+                <h3>Wall type</h3>
+                <div className="gl-row">
+                  <span>{isWhole ? 'This wall' : 'This part'}</span>
+                  <select className="gl-sel" value={mixedType ? '__mixed' : tv} onChange={(e) => setTypeFor(isWhole ? [selSpan] : [selSpan], e.target.value)}>
+                    {mixedType && <option value="__mixed">Several</option>}
+                    {plan.wall_types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    <option value="__new">New wall type…</option>
+                  </select>
+                </div>
+                {runPieces.length > 1 && !isWhole && <p className="gl-hint">Each room's part of a wall is its own element, so an extension's wall can differ from the rest.</p>}
+              </div>
+              <div className="gl-sec">
+                <h3>Windows <small>{selWins.length ? (sameSize ? `${selWins.length} here` : `${selWins.length} here, mixed sizes`) : 'spaced equally'}</small></h3>
+                <div className="gl-row"><span>How many</span><Num value={form.count} step={1} min={1} onChange={(v) => edit('count', v)} /></div>
+                <div className="gl-row"><span>Area of each</span><Num value={form.area} unit="m²" step={0.1} auto={autoDim === 'area'} onChange={(v) => edit('area', v)} /></div>
+                <div className="gl-row"><span>Width</span><Num value={form.width} unit="m" step={0.1} auto={autoDim === 'width'} onChange={(v) => edit('width', v)} /></div>
+                <div className="gl-row"><span>Height</span><Num value={form.height} unit="m" step={0.1} auto={autoDim === 'height'} onChange={(v) => edit('height', v)} /></div>
+                <div className="gl-row"><span>Sill height</span><Num value={form.sill} unit="m" step={0.1} onChange={(v) => edit('sill', v)} /></div>
+                <div className="gl-row"><span>Shading depth</span><Num value={form.shade} unit="m" step={0.1} min={0} onChange={(v) => edit('shade', v)} /></div>
+                <p className="gl-hint">Type any two of area, width and height; the one marked <i className="gl-auto-tag">auto</i> is worked out.{selWins.length ? ' A change re-spaces these windows equally.' : ''}</p>
+                {lay && 'why' in lay && <p className="gl-err">{lay.why}</p>}
+                {selWins.length > 0 && <p className="gl-hint">{f2(glass)} m² of glass, {Math.round((100 * glass) / (L * plan.storey_height_m))}% of {isWhole ? 'this wall' : 'this part'}.</p>}
+                {cross > 0 && (
+                  <p className="gl-err">
+                    {cross === 1 ? 'A window crosses' : `${cross} windows cross`} the line between rooms. Drag {cross === 1 ? 'it' : 'them'} in the elevation, or space each room's windows.
+                  </p>
+                )}
+                <div className="gl-btns">
+                  {!selWins.length && (
+                    <button type="button" className="gl-btn orange" disabled={!lay || 'why' in lay} onClick={() => { const r = setWindowsIn(plan, selSpan, spec); if (!('why' in r)) { editing.current = sel; commit(r.plan) } }}>
+                      Add windows
+                    </button>
+                  )}
+                  {selWins.length > 0 && <button type="button" className="gl-btn quiet" onClick={() => { const r = setWindowsIn(plan, selSpan, null); if (!('why' in r)) commit(r.plan) }}>Remove</button>}
+                  {plan.windows.some((w) => w.wall === selWall.index && crossers.has(w.id)) && (
+                    <button type="button" className="gl-btn quiet" onClick={() => commit(spaceByRoom(plan, selWall.index))}>Space each room's windows</button>
+                  )}
+                  {look !== 'elev' && <button type="button" className="gl-btn quiet" onClick={() => setLook('elev')}>Elevation</button>}
+                </div>
+                {mode === 'outline' && <p className="gl-hint">Drag a wall to push it straight out or in.</p>}
+              </div>
+            </div>
+          </aside>
+        )
+      })()}
       {mode === 'outline' && selBlocks.length > 0 && !drag && (
         <aside className="gl-panel gl-right">
           <div className="gl-card-head">
@@ -969,6 +1102,25 @@ export default function GeometryLab() {
                 </div>
                 <p className="gl-hint">A zone is a group of rooms the model treats as one space. Systems and profiles are given to zones on their own pages.</p>
               </div>
+              {(() => {
+                const own = piecesOfRooms(plan, selRooms.map((r) => r.id))
+                if (!own.length) return null
+                const ts = new Set(own.map((p) => typeOfSpan(plan, p)))
+                const tv = ts.size === 1 ? [...ts][0]! : '__mixed'
+                return (
+                  <div className="gl-sec">
+                    <div className="gl-row">
+                      <span>Outside walls</span>
+                      <select className="gl-sel" value={tv} onChange={(e) => setTypeFor(own, e.target.value)}>
+                        {tv === '__mixed' && <option value="__mixed">Several</option>}
+                        {plan.wall_types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        <option value="__new">New wall type…</option>
+                      </select>
+                    </div>
+                    <p className="gl-hint">{own.length} outside wall part{own.length === 1 ? '' : 's'}, {f1(own.reduce((t, p) => t + p.length_m, 0))} m. Tap a wall to change one part on its own.</p>
+                  </div>
+                )
+              })()}
               <div className="gl-sec">
                 <div className="gl-btns">
                   {selRooms.length > 1 && (
@@ -984,8 +1136,8 @@ export default function GeometryLab() {
       })()}
 
       {/* ─── bottom: tools ─── */}
-      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : tipLine}</p>
-      {!in3d && <div className="gl-bar" role="toolbar" aria-label={mode === 'outline' ? 'Outline tools' : 'Room tools'}>
+      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window along the wall (0.1 m steps; Shift: 0.01 m). Tap a room\'s part to choose it.' : tipLine}</p>
+      {shownLook === 'plan' && <div className="gl-bar" role="toolbar" aria-label={mode === 'outline' ? 'Outline tools' : 'Room tools'}>
         <span className="gl-step-tag">{mode === 'outline' ? '1 Outline' : '2 Rooms'}</span>
         {TOOLS[mode].map((t, i) => (
           <button key={t.key} type="button" className={`gl-tool${t.key === 'corner' ? ' optional' : ''}`} aria-pressed={tool === t.key} title={`${t.name} (${i + 1})`} onClick={() => pick(t.key)} disabled={(t.key === 'cut' || t.key === 'select' || t.key === 'corner') && !has}>
@@ -997,7 +1149,7 @@ export default function GeometryLab() {
         <button type="button" className="gl-tool" onClick={undo} disabled={!past.length}><span>↶</span>Undo</button>
         <button type="button" className="gl-tool" onClick={redo} disabled={!future.length}><span>↷</span>Redo</button>
       </div>}
-      {!in3d && <div className="gl-compass">
+      {shownLook === 'plan' && <div className="gl-compass">
         <svg width="34" height="40" viewBox="-17 -20 34 40" aria-label="North is up">
           <circle r="15" fill="#fff" stroke="#DCE2DF" />
           <path d="M0 -11 L5 2 L0 -1 L-5 2 Z" fill="#235546" />
@@ -1050,23 +1202,5 @@ function Num({ value, unit, auto, step, min = 0, onCommit, onChange }: { value: 
       {step && <button type="button" className="gl-step" aria-label="More" onClick={() => bump(1)}>+</button>}
       {unit && <small>{unit}</small>}
     </span>
-  )
-}
-
-/** The wall seen from outside: length × storey height, its windows, equally spaced. */
-function Elevation({ length, height, windows }: { length: number; height: number; windows: Array<{ offset_m: number; width_m: number; height_m: number; sill_m: number }> }) {
-  const W = 258
-  const s = Math.min(W / length, 80 / height)
-  const w = length * s
-  const h = height * s
-  const x0 = (W - w) / 2
-  return (
-    <svg className="gl-elev" viewBox={`0 0 ${W} ${h + 20}`}>
-      <rect x={x0} y={2} width={w} height={h} fill="#F2EEE9" stroke="#B7AEA5" />
-      {windows.map((x, i) => (
-        <rect key={i} x={x0 + x.offset_m * s} y={2 + h - (x.sill_m + x.height_m) * s} width={x.width_m * s} height={x.height_m * s} fill="#BFDDEC" stroke="#1F2D27" strokeWidth={1} />
-      ))}
-      <text x={W / 2} y={h + 16} textAnchor="middle" style={{ font: '500 11px var(--gl-detail)', fill: '#5E6B65' }}>Seen from outside · {f2(length)} × {f2(height)} m</text>
-    </svg>
   )
 }

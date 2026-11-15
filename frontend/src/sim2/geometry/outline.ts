@@ -19,7 +19,7 @@
 import pc from 'polygon-clipping'
 import { ringCrossings } from './ported/drawCore'
 import { area, ccw, inside, labelAt, type XY } from './ported/zones'
-import { type Plan, type PlanRoom, type WindowSet, wallRuns } from './plan'
+import { type Plan, type PlanRoom, type WallRun, wallRuns } from './plan'
 import { fitRooms } from './rooms'
 
 export type Changed = { plan: Plan; said?: string } | { why: string }
@@ -80,13 +80,13 @@ function settle(blocks: XY[][]): XY[][] | { why: string } {
   return out
 }
 
-/** The plan with new blocks: rooms fitted to them, windows kept on walls that did not change. */
-export function withBlocks(plan: Plan, blocks: XY[][], what: string, extraWindows: WindowSet[] = []): { plan: Plan; said?: string } {
-  const before = wallRuns(plan.blocks)
-  const after = wallRuns(blocks)
+type OnWall = { wall: number; at?: { a: XY; b: XY } }
+/** Things on walls (windows, wall-type stretches) moved to the same wall in a new set of runs, found by its ends; those
+ * whose wall changed are dropped and counted. */
+function keepOnWalls<T extends OnWall>(list: readonly T[], before: WallRun[], after: WallRun[]): { kept: T[]; lost: number } {
   const same = (a: XY, b: XY) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-6
   let lost = 0
-  const windows = [...plan.windows, ...extraWindows].flatMap((w) => {
+  const kept = list.flatMap((w) => {
     const old = w.at ?? (before[w.wall] ? { a: before[w.wall]!.a, b: before[w.wall]!.b } : undefined)
     const now = old && after.find((r) => same(r.a, old.a) && same(r.b, old.b))
     if (!now) {
@@ -94,11 +94,27 @@ export function withBlocks(plan: Plan, blocks: XY[][], what: string, extraWindow
       return []
     }
     const { at: _at, ...rest } = w
-    return [{ ...rest, wall: now.index }]
+    return [{ ...rest, wall: now.index } as T]
   })
+  return { kept, lost }
+}
+
+/** Windows and wall-type stretches pinned to their walls' ends (before blocks are rebuilt). */
+export const pinToWalls = (plan: Plan) => {
+  const runs = wallRuns(plan.blocks)
+  const pin = <T extends OnWall>(w: T): T => (runs[w.wall] ? { ...w, at: { a: runs[w.wall]!.a, b: runs[w.wall]!.b } } : w)
+  return { ...plan, windows: plan.windows.map(pin), wall_spans: plan.wall_spans.map(pin) }
+}
+
+/** The plan with new blocks: rooms fitted to them, windows and wall types kept on walls that did not change. */
+export function withBlocks(plan: Plan, blocks: XY[][], what: string): { plan: Plan; said?: string } {
+  const before = wallRuns(plan.blocks)
+  const after = wallRuns(blocks)
+  const w = keepOnWalls(plan.windows, before, after)
+  const t = keepOnWalls(plan.wall_spans, before, after)
   const fitted = fitRooms(plan, blocks)
-  const notes = [fitted.said ?? '', lost ? `${lost} window set${lost > 1 ? 's' : ''} removed (the wall changed)` : ''].filter(Boolean)
-  return { plan: { ...fitted.plan, windows }, said: notes.length ? `${what}: ${notes.join('; ')}` : undefined }
+  const notes = [fitted.said ?? '', w.lost ? `${w.lost} window${w.lost > 1 ? 's' : ''} removed (the wall changed)` : ''].filter(Boolean)
+  return { plan: { ...fitted.plan, windows: w.kept, wall_spans: t.kept }, said: notes.length ? `${what}: ${notes.join('; ')}` : undefined }
 }
 
 function settled(plan: Plan, blocks: XY[][], what: string): Changed {
@@ -150,8 +166,13 @@ export function pushWall(plan: Plan, i: number, side: number, by: number): Chang
   const L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1
   // Outward is on the right of an anticlockwise ring.
   const n: XY = [(c[1] - a[1]) / L, -(c[0] - a[0]) / L]
-  const ring = b.map((p, k) => (k === side || k === (side + 1) % b.length ? ([p[0] + n[0] * by, p[1] + n[1] * by] as XY) : p))
-  return setBlock(plan, i, ring)
+  const shift = (p: XY): XY => [p[0] + n[0] * by, p[1] + n[1] * by]
+  const ring = b.map((p, k) => (k === side || k === (side + 1) % b.length ? shift(p) : p))
+  // The pushed wall keeps its windows and wall types: they are pinned to where its ends move to.
+  const pinned = pinToWalls(plan)
+  const near = (p: XY, q: XY) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1e-6
+  const follow = <T extends { at?: { a: XY; b: XY } }>(w: T): T => (w.at && near(w.at.a, a) && near(w.at.b, c) ? { ...w, at: { a: shift(a), b: shift(c) } } : w)
+  return setBlock({ ...pinned, windows: pinned.windows.map(follow), wall_spans: pinned.wall_spans.map(follow) }, i, ring)
 }
 
 /** Which block a point is in (-1 for none). */
@@ -193,9 +214,7 @@ export function dropBlocks(moved: Plan, what: string): Changed {
   if ('why' in s) return s
   if (s.length === moved.blocks.length) return { plan: moved }
   // The windows' walls are found by their ends, as they were after the move.
-  const runs = wallRuns(moved.blocks)
-  const pinned = moved.windows.map((w) => ({ ...w, at: { a: runs[w.wall]!.a, b: runs[w.wall]!.b } }))
-  const r = withBlocks({ ...moved, windows: [] }, s, what, pinned)
+  const r = withBlocks(pinToWalls(moved), s, what)
   return { plan: r.plan, said: [`${what}: joined to the block it touches`, r.said?.replace(`${what}: `, '')].filter(Boolean).join('; ') }
 }
 
@@ -212,14 +231,16 @@ export function copyBlock(plan: Plan, i: number): Changed {
   const runs = wallRuns(plan.blocks)
   const ring = b.map(f)
   const newRuns = wallRuns([...plan.blocks, ring]).filter((r) => r.block === plan.blocks.length)
-  const windows = plan.windows.flatMap((w) => {
+  const copy = <T extends { wall: number }>(w: T): T[] => {
     const r = runs[w.wall]
     if (!r || r.block !== i) return []
     const to = newRuns.find((q) => q.side === r.side)
-    return to ? [{ ...w, id: `${w.id}c${n}`, wall: to.index }] : []
-  })
+    return to ? [{ ...w, wall: to.index }] : []
+  }
+  const windows = plan.windows.flatMap(copy).map((w) => ({ ...w, id: `${w.id}c${n}` }))
+  const spans = plan.wall_spans.flatMap(copy)
   return {
-    plan: { ...plan, blocks: [...plan.blocks, ring], rooms: [...plan.rooms, ...rooms], windows: [...plan.windows, ...windows], next: { ...plan.next, room: n } },
+    plan: { ...plan, blocks: [...plan.blocks, ring], rooms: [...plan.rooms, ...rooms], windows: [...plan.windows, ...windows], wall_spans: [...plan.wall_spans, ...spans], next: { ...plan.next, room: n } },
     said: 'Copied. Drag it against the building to join it on.',
   }
 }
@@ -230,11 +251,11 @@ export function removeBlock(plan: Plan, i: number): Plan {
   const runs = wallRuns(plan.blocks)
   const keep = plan.blocks.filter((_, j) => j !== i)
   const after = wallRuns(keep)
-  const windows = plan.windows.flatMap((w) => {
+  const move = <T extends { wall: number }>(w: T): T[] => {
     const r = runs[w.wall]
     if (!r || r.block === i) return []
     const to = after.find((q) => q.block === (r.block > i ? r.block - 1 : r.block) && q.side === r.side)
     return to ? [{ ...w, wall: to.index }] : []
-  })
-  return { ...plan, blocks: keep, rooms: plan.rooms.filter((r) => !gone.has(r.id)), windows }
+  }
+  return { ...plan, blocks: keep, rooms: plan.rooms.filter((r) => !gone.has(r.id)), windows: plan.windows.flatMap(move), wall_spans: plan.wall_spans.flatMap(move) }
 }

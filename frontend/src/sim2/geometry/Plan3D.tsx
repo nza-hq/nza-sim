@@ -11,20 +11,32 @@ import { Html, OrbitControls } from '@react-three/drei'
 import { Canvas, type ThreeEvent } from '@react-three/fiber'
 import { type ReactElement, useMemo, useState } from 'react'
 import * as THREE from 'three'
-import { type Plan, type PlacedWindow, type WallRun, type XY, edgesOf } from './plan'
+import { type Plan, type PlacedWindow, type Span, type WallRun, type XY, edgesOf } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
 
 // Colours from BuildingViewer3D, so the two read as one tool.
-const C = { wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7' }
+const C = { wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B' }
 const WALL_T = 0.25 // outside wall thickness, inward from the outside face
 const PART_T = 0.1
 const FD = 0.08 // reveal frame depth, out from the wall face (as today)
 const SHADE_T = 0.04 // shading slab thickness (as today)
 const SLAB = 0.3
 
-type Props = { plan: Plan; runs: WallRun[]; placed: PlacedWindow[]; chosenWall: number | null; onPickWall: (i: number) => void }
+type Band = Span & { colour: string }
+type Props = {
+  plan: Plan
+  runs: WallRun[]
+  placed: PlacedWindow[]
+  /** The chosen wall piece (or whole wall), outlined. */
+  chosen: Span | null
+  /** Windows crossing into the next room, drawn red. */
+  crossers: Set<string>
+  /** Wall-type colour bands along the foot of the walls (only when there is more than one type). */
+  bands: Band[]
+  onPickWall: (i: number, t: number) => void
+}
 
-export default function Plan3D({ plan, runs, placed, chosenWall, onPickWall }: Props) {
+export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall }: Props) {
   const H = plan.storey_height_m
   // The camera starts on the building as it was when 3D opened; edits after that do not move it.
   const [start] = useState(() => {
@@ -92,7 +104,7 @@ export default function Plan3D({ plan, runs, placed, chosenWall, onPickWall }: P
       })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {runs.map((run) => (
-        <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosenWall === run.index} onPick={() => onPickWall(run.index)} />
+        <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
       ))}
 
       <OrbitControls target={target} enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI / 2 - 0.05} minDistance={3} maxDistance={start.r * 6} makeDefault />
@@ -155,16 +167,20 @@ function Box({ x0, x1, y0, y1, z0, z1, colour, rough = 0.9 }: { x0: number; x1: 
   )
 }
 
-function Wall({ run, H, windows, chosen, onPick }: { run: WallRun; H: number; windows: PlacedWindow[]; chosen: boolean; onPick: () => void }) {
+function Wall({ run, H, windows, chosen, crossers, bands, onPick }: { run: WallRun; H: number; windows: PlacedWindow[]; chosen: Span | null; crossers: Set<string>; bands: Band[]; onPick: (t: number) => void }) {
   const { L, pos, rot } = along(run.a, run.b)
   const ws = [...windows].sort((p, q) => p.offset_m - q.offset_m)
-  const colour = chosen ? C.chosen : C.wall
+  const colour = C.wall
   const wall = { z0: -WALL_T, z1: 0, colour }
   const click = (e: ThreeEvent<MouseEvent>) => {
     // A click, not the end of an orbit drag.
     if (e.delta > 4) return
     e.stopPropagation()
-    onPick()
+    // Where along the wall: the hit point back in plan (x, −z), onto the run.
+    const ux = (run.b[0] - run.a[0]) / (L || 1)
+    const uy = (run.b[1] - run.a[1]) / (L || 1)
+    const t = (e.point.x - run.a[0]) * ux + (-e.point.z - run.a[1]) * uy
+    onPick(Math.max(0, Math.min(L, t)))
   }
   const pieces: ReactElement[] = []
   let x = 0
@@ -182,19 +198,29 @@ function Wall({ run, H, windows, chosen, onPick }: { run: WallRun; H: number; wi
   return (
     <group position={pos} rotation={rot} onClick={click} onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }} onPointerOut={() => { document.body.style.cursor = '' }}>
       {pieces}
-      {ws.map((w, i) => <Window key={i} w={w} />)}
+      {ws.map((w, i) => <Window key={i} w={w} bad={crossers.has(w.set)} />)}
+      {bands.map((b, i) => <Box key={`band${i}`} x0={b.t0} x1={b.t1} y0={0} y1={0.25} z0={0} z1={0.012} colour={b.colour} />)}
+      {chosen && (
+        <>
+          {/* The chosen piece outlined on the outside face. */}
+          <Box x0={chosen.t0} x1={chosen.t1} y0={H - 0.06} y1={H} z0={0} z1={0.03} colour={C.select} rough={0.6} />
+          <Box x0={chosen.t0} x1={chosen.t1} y0={0} y1={0.06} z0={0} z1={0.03} colour={C.select} rough={0.6} />
+          <Box x0={chosen.t0} x1={chosen.t0 + 0.06} y0={0} y1={H} z0={0} z1={0.03} colour={C.select} rough={0.6} />
+          <Box x0={chosen.t1 - 0.06} x1={chosen.t1} y0={0} y1={H} z0={0} z1={0.03} colour={C.select} rough={0.6} />
+        </>
+      )}
     </group>
   )
 }
 
 /** Glass set back in the opening, a reveal frame round it on the wall face, and the shading frame if it has one. */
-function Window({ w }: { w: PlacedWindow }) {
+function Window({ w, bad }: { w: PlacedWindow; bad: boolean }) {
   const x0 = w.offset_m
   const x1 = w.offset_m + w.width_m
   const y0 = w.sill_m
   const y1 = w.sill_m + w.height_m
   const FW = Math.max(0.04, Math.min(0.08, w.width_m * 0.12)) // frame strip 40–80 mm, as today
-  const f = { z0: 0, z1: FD, colour: C.frame, rough: 0.55 }
+  const f = { z0: 0, z1: FD, colour: bad ? C.bad : C.frame, rough: 0.55 }
   const d = w.shading_m
   const s = { z0: 0, z1: d, colour: C.shading, rough: 0.85 }
   const o = FW // the shading frame sits just outside the reveal frame
