@@ -2,9 +2,9 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🔄 Brief 103 — Simulate v2 Engine 1 — IN PROGRESS on `chris/103-engine-1`
+## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
 
-Brief [`docs/briefs/active/103_engine-1.md`](docs/briefs/active/103_engine-1.md), written by this project's agent at
+Brief [`docs/briefs/archive/103_engine-1_COMPLETED.md`](docs/briefs/archive/103_engine-1_COMPLETED.md), written by this project's agent at
 Linzie's request (14 Nov, in place of the architect chat). Pure single-zone ISO 52016-1 engine, envelope only; QA
 store fixes. Five decisions flagged for Chris's review (anchor gate on envelope demand, ±5 % tolerance, location,
 reference case, fixed fixture id).
@@ -34,6 +34,7 @@ reference case, fixed fixture id).
 - **P6a BESTEST in EnergyPlus** ([`07_bestest_referee.md`](docs/audit/103/07_bestest_referee.md), `validation/energyplus/103_bestest_twin.py`): from Engine 1's inputs EnergyPlus puts 600/900/600FF/900FF in range (600 4.289 / 6.016, 900 1.652 / 2.507 MWh). Engine 1's three ISO simplifications put into EnergyPlus take 600 to 4.683 (Engine 1 4.698) and explain about two thirds of the 900 heating gap.
 - **P6b surface physics** (same note): run options for the beam on floors, wind-driven outside convection (ISO 6946) and inside convection by heat-flow direction (Table 25). `REFEREE_OPTIONS` uses the beam on the floor only, because both referees do; the two convection forms stay off (not the referee's correlations; the wind form costs 170 ms). Re-recorded: BESTEST 600 4.547 / 5.628, 900 2.186 / 2.755 (900 heating still +0.37 above range, escalated); Bridgewater gate (b) 89.98 (−0.5 %) / 15.32 (+12.2 %, miss, interior slabs). Interior partitions deferred to Brief 104. Speed 35 ms Node, 25 ms worker.
 - **P6c independent review** ([`08_independent_review.md`](docs/audit/103/08_independent_review.md), response [`09_review_response.md`](docs/audit/103/09_review_response.md)): no tuning found; closure confirmed real by mutation. Fixed: `runZoneModel` refuses an unbalanced result (hourly > 1 Wh, or breakdown lines not summing to zero); library y-factors other than 1 refused (were applied to glazing only); bridging multiplier required, stated by the converter and upgrade; Denver BESTEST weather committed, anchor-EPW skip now loud (`NZA_REQUIRE_REFERENCE_DATA=1` fails it). Recorded as open for 104: the cooling-miss attribution (slabs consistent with it, BESTEST 900 one-zone residual +0.10 / +0.39 MWh same sign), inside convection (neither ISO form is TARP), unvalidated shared inputs (ground 3.7 MWh, wind 5.0 MWh). Gates unchanged: Bridgewater 89.98 / 15.32.
+- **P7 close** ([`10_final_report.md`](docs/audit/103/10_final_report.md)): brief archived, current.md updated, design note updated. **Next:** Brief 104 (multi-zone), carrying the open items in the final report (interior slabs and the cooling miss, BESTEST 900 residual, TARP-form inside convection, y-factor carriage, ground and wind inputs). **Safety:** today's engine files untouched (`git diff main...HEAD` shows none); anchor `_brief93_anchor.mjs --fixture` = 133.2; no lockfile or node_modules; nothing touched NZA Decoded.
 
 ## ✅ Brief 102a — Simulate v2 foundations: the QA fixes — CLOSED 14 Nov 2026 on `chris/102a-foundations-fixes` *0004 applied and verified on NZA Sim (dev); merged to `main` (PR #27)*
 
