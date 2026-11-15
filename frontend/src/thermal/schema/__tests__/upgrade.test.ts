@@ -28,7 +28,7 @@ async function anchor() {
 function to21(d: any) {
   const o = structuredClone(d)
   o.schema_version = '2.1'
-  for (const s of o.surfaces) delete s.inside_solar_absorptance
+  for (const s of o.surfaces) { delete s.inside_solar_absorptance; delete s.inside_solar_absorptance_b; delete s.faces_up }
   return o
 }
 

@@ -82,7 +82,7 @@ function doc(wall: string, floor: string) {
   LIB.window600 = { u_value_W_per_m2K: win.U, g_value: win.g, layers: [] }
   const s = (id: string, kind: string, area: number, az: number | null, tilt: number, key: string, x: Record<string, unknown> = {}) => ({
     id, kind, zone_a: 'z', zone_b: 'outside', facade: null, area_m2: area, azimuth_deg: az, tilt_deg: tilt,
-    construction_ref: { key }, g_value: null, openings: [], solar_absorptance: 0.6, thermal_emissivity: 0.9, frame_fraction: null, inside_solar_absorptance: 0.6, ...x,
+    construction_ref: { key }, g_value: null, openings: [], solar_absorptance: 0.6, thermal_emissivity: 0.9, frame_fraction: null, inside_solar_absorptance: 0.6, inside_solar_absorptance_b: null, faces_up: null, ...x,
   })
   const surfaces = [
     s('south', 'wall', 8 * 2.7 - 12, 180, 90, wall), s('east', 'wall', 6 * 2.7, 90, 90, wall), s('west', 'wall', 6 * 2.7, 270, 90, wall),

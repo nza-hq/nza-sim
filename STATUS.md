@@ -20,6 +20,11 @@ Bridgewater cooling gap (Linzie 15 Nov 18:06: "Keep going").
   - **Against the five-zone referee r1** (89.35 / 12.88), Engine 1 is +4 % / −18 %. That is because Engine 1's building has no slabs: EnergyPlus gives 89.30 / 10.04 for the same single zone. Part 5 closes it.
   - **BESTEST re-recorded:** 600 4.574 / 5.510, 900 2.048 / 2.424. Cooling is in range for both; heating is above, as EnergyPlus with the same ISO simplifications is.
   - **Open:** the no-sun (+4.7) and opaque-solar (−4.6) terms that cancel; the ISO simplifications (+4 % / +5 %).
+- **P2 schema 2.2 zones:**
+  - **What the schema now holds.** `internal_mass` (zone_b = zone_a, `faces_up`, tilt 180 or 90), and surfaces between zones (`partition` / `floor` / `ceiling` with zone_b a zone). Each is listed by both of its zones, and only by them. There are no outside-face fields or openings on them. Their second face's `inside_solar_absorptance_b` is required. Layers run from zone_b's face to zone_a's.
+  - **Per-storey conversion.** `fromBuildingConfig(..., { zoning: 'per_storey' })` gives Bridgewater as five storeys joined by four `ceiling` slabs (`interior_floor_ceiling`, the construction today's EnergyPlus path uses, read from `TODAY`). Walls, glazing and vents are split evenly, with the roof on z5 and the ground on z1. Areas sum to the single-zone document's.
+  - **What stays whole-building.** The ventilation entries and room count stay on z1, undivided. Engine 2 does not read them; splitting them is Brief 105's.
+  - **Single zoning is unchanged.** Its output and hash are as before.
 
 ## ✅ Brief 103 — Simulate v2 Engine 1 — CLOSED 15 Nov 2026 on `chris/103-engine-1` *(PR open)*
 

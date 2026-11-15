@@ -11,6 +11,8 @@
  * 2.1 → 2.2 (Brief 104 Part 1b) adds each opaque surface's inside solar absorptance, filled with the value today's
  * EnergyPlus simulation path uses (it states none, so EnergyPlus's default applies). Today's instant engine has no
  * such input: it puts all transmitted solar into the zone, which is absorptance 1 with no window losses.
+ * It also adds `inside_solar_absorptance_b` and `faces_up` (Brief 104 Part 2): null, except the second face of a
+ * surface between two zones (which 2.1 allowed in the document but no engine ran), filled the same way.
  */
 import { ModelDocument, SCHEMA_VERSION } from './model'
 
@@ -37,6 +39,11 @@ export const TODAY = {
    * solar_absorptance on any inside layer, so EnergyPlus's Material default (0.7, Input Output Reference) applies.
    */
   inside_solar_absorptance: 0.7,
+  /**
+   * The construction between storeys: nza_engine/generators/epjson_assembler.py `_INTERIOR_CONSTRUCTION` ("Interior
+   * floor/ceiling always uses the same library construction"). Read by the per-storey converter (Brief 104 Part 2).
+   */
+  interior_floor_construction: 'interior_floor_ceiling',
 } as const
 
 type Obj = Record<string, any>
@@ -48,7 +55,12 @@ export function upgradeDocument(input: unknown): ModelDocument {
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
   if (from !== '2.0' && from !== '2.1') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
-  for (const s of doc.surfaces as Obj[]) s.inside_solar_absorptance = s.kind === 'glazing' ? null : TODAY.inside_solar_absorptance
+  for (const s of doc.surfaces as Obj[]) {
+    s.inside_solar_absorptance = s.kind === 'glazing' ? null : TODAY.inside_solar_absorptance
+    const interzone = s.zone_b !== 'outside' && s.zone_b !== 'ground'
+    s.inside_solar_absorptance_b = interzone ? TODAY.inside_solar_absorptance : null
+    s.faces_up = null
+  }
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
 }
