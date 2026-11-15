@@ -6,7 +6,7 @@
  * Windows are single items on a wall run (left edge `t_m`); a window belongs to the piece its middle is on. Wall types
  * are stretches of a run; a piece's type is the one at its middle (the default type where none is set).
  */
-import { DEFAULT_WALL_TYPE, type Plan, type Span, type Win, edgesOf, layoutIn, wallRuns } from './plan'
+import { type FabricElement, type Plan, type Span, type Win, edgesOf, layoutIn, wallRuns } from './plan'
 
 /** A room's stretch of an outside wall. */
 export type WallPiece = Span & { room: string; zone: string; length_m: number }
@@ -145,19 +145,37 @@ export function spaceByRoom(plan: Plan, run: number): Plan {
 
 // ─── Wall types ───────────────────────────────────────────────────────────────────────────────────
 
-export const typeAt = (plan: Plan, run: number, t: number): string => {
+type WallElement = 'wall' | 'glazing' | 'door'
+/** The first (default) type of an element. */
+export const firstType = (plan: Plan, e: FabricElement) => plan.fabric_types.find((t) => t.element === e)?.id ?? `f_${e}`
+
+export const typeAt = (plan: Plan, run: number, t: number, e: WallElement = 'wall'): string => {
   for (let i = plan.wall_spans.length - 1; i >= 0; i--) {
     const s = plan.wall_spans[i]!
-    if (s.wall === run && t >= s.t0 - EPS && t <= s.t1 + EPS) return s.type
+    if (s.wall === run && (s.element ?? 'wall') === e && t >= s.t0 - EPS && t <= s.t1 + EPS) return s.type
   }
-  return plan.wall_types[0]?.id ?? DEFAULT_WALL_TYPE.id
+  return firstType(plan, e)
 }
-export const typeOfSpan = (plan: Plan, s: Span) => typeAt(plan, s.run, (s.t0 + s.t1) / 2)
+export const typeOfSpan = (plan: Plan, s: Span, e: WallElement = 'wall') => typeAt(plan, s.run, (s.t0 + s.t1) / 2, e)
 
-/** Give spans `ss` wall type `type` (stretches it now hides are dropped). */
+/** Give spans `ss` fabric type `type` (of its element; stretches it now hides are dropped). */
 export function setTypeOn(plan: Plan, ss: readonly Span[], type: string): Plan {
-  const hidden = (x: { wall: number; t0: number; t1: number }) => ss.some((s) => s.run === x.wall && x.t0 >= s.t0 - EPS && x.t1 <= s.t1 + EPS)
-  return { ...plan, wall_spans: [...plan.wall_spans.filter((x) => !hidden(x)), ...ss.map((s) => ({ wall: s.run, t0: s.t0, t1: s.t1, type }))] }
+  const e = (plan.fabric_types.find((t) => t.id === type)?.element ?? 'wall') as FabricElement
+  if (e === 'roof' || e === 'floor') return plan
+  const same = (x: { element?: string }) => (x.element ?? 'wall') === e
+  const hidden = (x: { wall: number; t0: number; t1: number; element?: string }) => same(x) && ss.some((s) => s.run === x.wall && x.t0 >= s.t0 - EPS && x.t1 <= s.t1 + EPS)
+  return { ...plan, wall_spans: [...plan.wall_spans.filter((x) => !hidden(x)), ...ss.map((s) => ({ wall: s.run, t0: s.t0, t1: s.t1, type, element: e as WallElement }))] }
+}
+
+/** A room's roof or ground floor type. */
+export const roomType = (plan: Plan, roomId: string, e: 'roof' | 'floor') => plan.rooms.find((r) => r.id === roomId)?.[e] ?? firstType(plan, e)
+
+/** Give rooms a fabric type: their roof or floor, or every outside wall part of theirs (walls, windows, doors). */
+export function setTypeOnRooms(plan: Plan, ids: readonly string[], type: string): Plan {
+  const e = plan.fabric_types.find((t) => t.id === type)?.element
+  if (!e) return plan
+  if (e === 'roof' || e === 'floor') return { ...plan, rooms: plan.rooms.map((r) => (ids.includes(r.id) ? { ...r, [e]: type } : r)) }
+  return setTypeOn(plan, piecesOfRooms(plan, ids), type)
 }
 
 /** The outside wall pieces of some rooms. */
@@ -165,4 +183,9 @@ export const piecesOfRooms = (plan: Plan, ids: readonly string[]) => wallPieces(
 
 /** The colours wall types are drawn in (the first, the default, stays plain). */
 export const TYPE_COLOURS = ['#9AA3A0', '#3F7FB0', '#7D5BA6', '#4E9A62', '#B65B73', '#8E7A3F']
-export const typeColour = (plan: Plan, id: string) => TYPE_COLOURS[Math.max(0, plan.wall_types.findIndex((t) => t.id === id)) % TYPE_COLOURS.length]!
+/** A type's colour: by its place among its element's types (the first stays plain grey). */
+export const typeColour = (plan: Plan, id: string) => {
+  const t = plan.fabric_types.find((x) => x.id === id)
+  const i = t ? plan.fabric_types.filter((x) => x.element === t.element).indexOf(t) : 0
+  return TYPE_COLOURS[Math.max(0, i) % TYPE_COLOURS.length]!
+}

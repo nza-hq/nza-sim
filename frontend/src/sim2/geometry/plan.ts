@@ -17,7 +17,17 @@ import { area, ccw, type XY } from './ported/zones'
 export type { XY }
 
 /** A room: drawn, always inside a block, in exactly one zone. */
-export type PlanRoom = { id: string; name: string; ring: XY[]; zone: string }
+export type PlanRoom = {
+  id: string
+  name: string
+  ring: XY[]
+  zone: string
+  /** Fabric step: this room's roof and ground floor types (absent: the element's first type). */
+  roof?: string
+  floor?: string
+  /** Spaces step: the room's space type (archetype); absent = not given one yet. */
+  space?: string
+}
 /** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
 export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
 /** A heating or cooling system the user has named. Its kit (fuel, efficiency) is not asked yet, so stays unset. */
@@ -50,11 +60,41 @@ export type Win = {
   at?: { a: XY; b: XY }
 }
 
-/** A kind of outside wall. `u` is what the user typed (W/m²K), or null: the construction comes from the library later. */
-export type WallType = { id: string; name: string; u: number | null }
-/** A stretch [t0, t1] of run `wall` given wall type `type`. Later stretches win where they overlap. */
-export type TypeSpan = { wall: number; t0: number; t1: number; type: string; at?: { a: XY; b: XY } }
-export const DEFAULT_WALL_TYPE: WallType = { id: 'wt1', name: 'External wall', u: null }
+/** The fabric elements the Fabric step gives types to. */
+export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor'
+/** A fabric type: a library construction (by key) and, optionally, a U-value the user typed over it (W/m²K). Both
+ * null: not set yet, and the model document says so (`unassigned:…`). */
+export type FabricType = { id: string; element: FabricElement; name: string; construction: string | null; u: number | null }
+/** A stretch [t0, t1] of run `wall` given fabric type `type` for an element on walls (walls, windows, doors; absent
+ * element = wall). Later stretches win where they overlap. */
+export type TypeSpan = { wall: number; t0: number; t1: number; type: string; element?: 'wall' | 'glazing' | 'door'; at?: { a: XY; b: XY } }
+export const FABRIC_ELEMENTS: ReadonlyArray<{ key: FabricElement; name: string; one: string }> = [
+  { key: 'wall', name: 'External walls', one: 'External wall' },
+  { key: 'glazing', name: 'Windows', one: 'Windows' },
+  { key: 'door', name: 'Doors', one: 'Doors' },
+  { key: 'roof', name: 'Roof', one: 'Roof' },
+  { key: 'floor', name: 'Ground floor', one: 'Ground floor' },
+]
+/** One type per element to start with, nothing chosen. */
+export const defaultFabric = (): FabricType[] => FABRIC_ELEMENTS.map((e) => ({ id: `f_${e.key}`, element: e.key, name: e.one, construction: null, u: null }))
+
+/** A space type (archetype): what a kind of room has. Rooms are given one; every value is a library key or null
+ * (not set). */
+export type SpaceType = {
+  id: string
+  name: string
+  /** The zone use written to the model (USES). */
+  use: string | null
+  occupancy: string | null
+  /** People per m² of floor, typed: the library's occupancy profiles are shapes only, with no density. */
+  people_per_m2?: number | null
+  lighting: string | null
+  equipment: string | null
+  heating: string | null
+  cooling: string | null
+  ventilation: string | null
+  dhw: string | null
+}
 
 export type Plan = {
   /** Separate outlines, each anticlockwise. Blocks never touch or overlap (touching ones are joined). */
@@ -64,13 +104,14 @@ export type Plan = {
   systems: PlanSystem[]
   storey_height_m: number
   windows: Win[]
-  wall_types: WallType[]
+  fabric_types: FabricType[]
   wall_spans: TypeSpan[]
+  spaces: SpaceType[]
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
 
-export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], wall_types: [DEFAULT_WALL_TYPE], wall_spans: [], next: { room: 1, zone: 1, system: 1 } })
+export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], fabric_types: defaultFabric(), wall_spans: [], spaces: [], next: { room: 1, zone: 1, system: 1 } })
 
 /** A new zone with nothing assigned. */
 export const blankZone = (n: number): PlanZone => ({ id: `z${n}`, name: `Zone ${n}`, use: null, heating: null, cooling: null })

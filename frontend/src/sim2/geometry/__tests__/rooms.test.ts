@@ -64,7 +64,8 @@ describe('rooms in zones, in the document', () => {
     p = ok(halveRoom(p, 'r1'))
     // Three rooms along the 20 m building: 10, 5, 5 (or so). Put the last one in a new zone with its own heating.
     const last = p.rooms[p.rooms.length - 1]!
-    p = { ...p, zones: [...p.zones, { id: 'z2', name: 'Plant', use: 'other', heating: 'h1', cooling: null }], systems: [{ id: 'h1', service: 'heating', label: 'Boiler' }] }
+    const plant = { id: 's1', name: 'Plant', use: 'other', occupancy: null, lighting: null, equipment: null, heating: 'gas_boiler_heating', cooling: null, ventilation: null, dhw: null }
+    p = { ...p, zones: [...p.zones, { id: 'z2', name: 'Plant', use: null, heating: null, cooling: null }], spaces: [plant], rooms: p.rooms.map((r) => (r.id === last.id ? { ...r, space: 's1' } : r)) }
     p = assignZone(p, [last.id], 'z2')
     const b = buildDocument(p)
     expect(b.issues).toEqual([])
@@ -76,7 +77,9 @@ describe('rooms in zones, in the document', () => {
     expect(z1.rooms).toBe(2)
     expect(z1.use_type).toBe('unassigned')
     expect(doc.zones.find((z: any) => z.id === 'z2').use_type).toBe('other')
-    expect(doc.system_groups).toEqual([{ id: 'h1', service: 'heating', label: 'Boiler', zones: ['z2'], enabled: true, share_pct: 100, source: null, efficiency_metric: null }])
+    expect(doc.system_groups).toHaveLength(1)
+    expect(doc.system_groups[0]).toMatchObject({ service: 'heating', zones: ['z2'], enabled: true, share_pct: 100, source: 'gas', template_ref: 'gas_boiler_heating' })
+    expect(doc.system_groups[0].efficiency_metric).toBeGreaterThan(0.8)
     // Zone 1's south wall is one wall across both its rooms.
     const south = doc.surfaces.filter((s: any) => s.zone_a === 'z1' && s.kind === 'wall' && s.azimuth_deg === 180)
     expect(south).toHaveLength(1)

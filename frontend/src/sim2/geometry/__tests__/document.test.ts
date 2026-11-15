@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { azimuthOf, emptyPlan, layoutIn, wallRuns, type Plan, type XY } from '../plan'
-import { DOOR, changeWindow, crossing, setOpeningsIn, setTypeOn, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
+import { DOOR, changeWindow, crossing, setOpeningsIn, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
 import { cutZones } from '../ported/zones'
 import { fitRooms } from '../rooms'
 import { buildDocument } from '../toDocument'
@@ -91,13 +91,13 @@ describe('model document', () => {
     p = r.plan
     expect(windowsIn(p, south[1]!).map((w) => w.width_m)).toEqual([1.2, 1.2])
     // An extension's wall type with its own U-value: the same zone now has two south walls.
-    p = { ...p, wall_types: [...p.wall_types, { id: 'wt2', name: 'Extension wall', u: 0.18 }] }
-    p = setTypeOn(p, [south[1]!], 'wt2')
+    p = { ...p, fabric_types: [...p.fabric_types, { id: 'f_wall2', element: 'wall', name: 'Extension wall', construction: null, u: 0.18 }] }
+    p = setTypeOn(p, [south[1]!], 'f_wall2')
     const b = buildDocument(p)
     expect(b.ok).toBe(true)
     const walls = (b.doc as any).surfaces.filter((s: any) => s.kind === 'wall' && s.azimuth_deg === 180)
     expect(walls.length).toBe(2)
-    expect(walls.map((w: any) => w.construction_ref)).toEqual([{ key: 'unassigned:external_wall' }, { key: 'unassigned:external_wall:wt2', u_value_override: 0.18 }])
+    expect(walls.map((w: any) => w.construction_ref)).toEqual([{ key: 'unassigned:external_wall' }, { key: 'unassigned:external_wall:f_wall2', u_value_override: 0.18 }])
     // Glazing follows its wall piece: 2 windows on the extension's wall.
     const glz = (b.doc as any).surfaces.filter((s: any) => s.kind === 'glazing' && s.azimuth_deg === 180)
     expect(glz.length).toBe(2)
@@ -131,6 +131,55 @@ describe('model document', () => {
     expect(d0.t_m + d0.width_m / 2).toBeCloseTo(w0.t_m + w0.width_m / 2, 9)
     const p3 = changeWindow(r.plan, ws[1]!.id, { sill_m: 5 })
     expect(p3.windows.find((w) => w.id === ws[1]!.id)!.sill_m).toBeCloseTo(3 - 1.2, 9)
+  })
+  it('fabric types are library constructions, per room; space types give zones their use, profiles and systems', () => {
+    let p = withWindows(plan(box), 0, { count: 3, width_m: 1, height_m: 1, sill_m: 1 })
+    const cut = cutZones([box], [6, 0], [6, 8])
+    if ('why' in cut) throw new Error(cut.why)
+    p = { ...p, rooms: cut.zones.map((ring, i) => ({ id: `r${i + 1}`, name: `Room ${i + 1}`, ring, zone: 'z1' })), zones: [{ id: 'z1', name: 'Zone 1', use: null, heating: null, cooling: null }] }
+    p = spaceByRoom(p, 0)
+    // Library constructions for the whole building, an enhanced wall and roof on room 2 only.
+    const set = (id: string, construction: string) => p.fabric_types.map((t) => (t.id === id ? { ...t, construction } : t))
+    p = { ...p, fabric_types: set('f_wall', 'cavity_wall_standard') }
+    p = { ...p, fabric_types: set('f_glazing', 'triple_glazing') }
+    p = { ...p, fabric_types: [...p.fabric_types, { id: 'f_wall2', element: 'wall', name: 'Extension', construction: 'cavity_wall_enhanced', u: null }, { id: 'f_roof2', element: 'roof', name: 'New roof', construction: 'flat_roof_enhanced', u: 0.1 }] }
+    p = setTypeOnRooms(p, ['r2'], 'f_wall2')
+    p = setTypeOnRooms(p, ['r2'], 'f_roof2')
+    // Room 1 an office (MVHR, VRF heating, no cooling); room 2 has no space type: the zone takes the office's.
+    const office = { id: 's1', name: 'Office', use: 'office', occupancy: 'office_occupancy', lighting: 'office_lighting', equipment: null, heating: 'vrf_heating', cooling: 'none_cooling', ventilation: 'mvhr_standard', dhw: null }
+    p = { ...p, spaces: [office], rooms: p.rooms.map((r) => (r.id === 'r1' ? { ...r, space: 's1' } : r)) }
+    const b = buildDocument(p)
+    expect(b.issues).toEqual([])
+    const doc = b.doc as any
+    const keys = (kind: string) => doc.surfaces.filter((s: any) => s.kind === kind).map((s: any) => s.construction_ref)
+    expect(keys('wall')).toContainEqual({ key: 'cavity_wall_standard' })
+    expect(keys('wall')).toContainEqual({ key: 'cavity_wall_enhanced' })
+    expect(keys('roof')).toEqual(expect.arrayContaining([{ key: 'unassigned:roof' }, { key: 'flat_roof_enhanced', u_value_override: 0.1 }]))
+    expect(keys('roof')).toHaveLength(2)
+    expect(doc.surfaces.filter((s: any) => s.kind === 'roof').reduce((n: number, s: any) => n + s.area_m2, 0)).toBeCloseTo(96, 6)
+    const glz = doc.surfaces.filter((s: any) => s.kind === 'glazing')
+    expect(glz.every((g: any) => g.construction_ref.key === 'triple_glazing' && g.g_value === 0.35)).toBe(true)
+    const z = doc.zones[0]
+    expect(z.use_type).toBe('office')
+    // Occupancy needs people per m² (the library profile is a shape only); without it, it waits, with a note.
+    expect(z.profile_refs).toEqual({ occupancy: null, lighting: ['office_lighting'], equipment: [], auxiliary: [] })
+    expect(b.notes.some((n) => /people per m²/.test(n))).toBe(true)
+    expect(doc.profiles.map((x: any) => x.id)).toEqual(['office_lighting'])
+    expect(doc.profiles[0].schedule.weekday).toHaveLength(24)
+    expect(doc.profiles[0].magnitude).toBeUndefined()
+    const b2 = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: 0.1 }] })
+    expect(b2.issues).toEqual([])
+    const d2 = b2.doc as any
+    expect(d2.zones[0].profile_refs.occupancy).toBe('s1_occupancy')
+    expect(d2.profiles.find((x: any) => x.id === 's1_occupancy').density).toEqual({ value: 0.1, basis: 'per_m2' })
+    // Every library item used is pinned with its body hash.
+    expect(d2.library_refs.map((r: any) => `${r.kind}:${r.key}`)).toEqual(expect.arrayContaining(['construction:cavity_wall_standard', 'construction:triple_glazing', 'profile:office_occupancy', 'system_template:vrf_heating', 'system_template:mvhr_standard']))
+    expect(d2.library_refs.every((r: any) => /^[0-9a-f]{64}$/.test(r.body_hash))).toBe(true)
+    expect(z.ventilation).toHaveLength(1)
+    expect(z.ventilation[0]).toMatchObject({ kind: 'mvhr', enabled: true })
+    // No mechanical cooling is no system at all; VRF heating is one group.
+    expect(doc.system_groups.map((g: any) => g.template_ref)).toEqual(['vrf_heating'])
+    expect(b.notes.some((n) => /no space type/.test(n))).toBe(true)
   })
   it('an L with a diagonal side validates', () => {
     const L: XY[] = [[0, 0], [20, 0], [20, 6], [14, 12], [0, 12]]

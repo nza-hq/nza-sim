@@ -23,8 +23,9 @@
  */
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
-import { allWindows, edgesOf, facade4, type Plan, ringArea, wallRuns } from './plan'
-import { crossing, typeOfSpan, wallPieces } from './facade'
+import { allWindows, edgesOf, facade4, type FabricElement, type Plan, type SpaceType, ringArea, wallRuns } from './plan'
+import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
+import { construction, efficiencyFor, profile, system } from '../library/library'
 import { cleanRing } from './outline'
 import type { XY } from './ported/zones'
 
@@ -54,21 +55,29 @@ export function buildDocument(plan: Plan): Built {
   // Outside walls: one wall per room piece (facade.ts), joined where neighbouring pieces on a run are in the same zone
   // and have the same wall type. A piece with a different wall type is always its own wall.
   const runs = wallRuns(plan.blocks)
-  const walls: Array<{ zone: string; run: number; t0: number; t1: number; length_m: number; azimuth_deg: number; type: string }> = []
+  // Walls are also split where the window or door type changes, so each surface has one construction.
+  const walls: Array<{ zone: string; run: number; t0: number; t1: number; length_m: number; azimuth_deg: number; type: string; glazing: string; door: string }> = []
   for (const p of wallPieces(plan)) {
     const type = typeOfSpan(plan, p)
+    const glazing = typeOfSpan(plan, p, 'glazing')
+    const door = typeOfSpan(plan, p, 'door')
     const last = walls[walls.length - 1]
-    if (last && last.run === p.run && last.zone === p.zone && last.type === type && p.t0 <= last.t1 + 1e-3) {
+    if (last && last.run === p.run && last.zone === p.zone && last.type === type && last.glazing === glazing && last.door === door && p.t0 <= last.t1 + 1e-3) {
       last.t1 = p.t1
       last.length_m = last.t1 - last.t0
-    } else walls.push({ zone: p.zone, run: p.run, t0: p.t0, t1: p.t1, length_m: p.length_m, azimuth_deg: runs[p.run]!.azimuth_deg, type })
+    } else walls.push({ zone: p.zone, run: p.run, t0: p.t0, t1: p.t1, length_m: p.length_m, azimuth_deg: runs[p.run]!.azimuth_deg, type, glazing, door })
   }
-  const typeOf = new Map(plan.wall_types.map((t) => [t.id, t]))
+  // A fabric type's construction: its library key, or `unassigned:<element>` while none is chosen (a type other than
+  // the element's first adds its id, so the types stay apart); a U-value the user typed rides on it as an override.
+  const typeOf = new Map(plan.fabric_types.map((t) => [t.id, t]))
+  const UNSET: Record<FabricElement, string> = { wall: 'external_wall', glazing: 'glazing', door: 'external_door', roof: 'roof', floor: 'ground_floor' }
   const constructionOf = (type: string) => {
     const t = typeOf.get(type)
-    const key = !t || t.id === plan.wall_types[0]?.id ? 'unassigned:external_wall' : `unassigned:external_wall:${t.id}`
-    return t?.u != null ? { key, u_value_override: t.u } : { key }
+    if (!t) return { key: 'unassigned:external_wall' }
+    const key = t.construction ?? (t.id === firstType(plan, t.element) ? `unassigned:${UNSET[t.element]}` : `unassigned:${UNSET[t.element]}:${t.id}`)
+    return t.u != null ? { key, u_value_override: t.u } : { key }
   }
+  const gOf = (type: string) => construction(typeOf.get(type)?.construction)?.g ?? null
   for (const w of crossing(plan)) notes.push(`A window on wall ${w.wall + 1} crosses into the next room; it is counted in the room its middle is in`)
   // Partitions between zones: room-to-room stretches whose rooms are in different zones, summed per pair.
   const pairs = new Map<string, { a: string; b: string; length_m: number }>()
@@ -156,14 +165,14 @@ export function buildDocument(plan: Plan): Built {
       add(w.zone, ext({
         id, kind: 'wall', zone_a: w.zone, zone_b: 'outside', facade: facade4(w.azimuth_deg),
         area_m2: r3(doorM2), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
-        construction_ref: { key: 'unassigned:external_door' }, g_value: null, openings: [],
+        construction_ref: constructionOf(w.door), g_value: null, openings: [],
       }, 'wall'))
     }
     if (wins.length) {
       add(w.zone, ext({
         id: uid(`${w.zone}_glazing_${w.run + 1}`), kind: 'glazing', zone_a: w.zone, zone_b: 'outside', facade: facade4(w.azimuth_deg),
         area_m2: r3(glz), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
-        construction_ref: { key: 'unassigned:glazing' }, g_value: null,
+        construction_ref: constructionOf(w.glazing), g_value: gOf(w.glazing),
         wwr: r3(glz / gross), window_count: wins.length, openings: [],
         // Same mapping as today's tool (building.shading_overhang → overhang, offset 0); one depth per glazing surface,
         // so it is written only when every window on it has the same depth.
@@ -184,10 +193,68 @@ export function buildDocument(plan: Plan): Built {
     byZone.set(s.b, [...(byZone.get(s.b) ?? []), id])
   }
   const floorOf = new Map(used.map((z) => [z.id, plan.rooms.filter((r) => r.zone === z.id).reduce((t, r) => t + ringArea(r.ring), 0)]))
+  // Roof and ground floor: one of each per zone, or one per type when the zone's rooms have different types.
   for (const z of used) {
-    const a = r3(floorOf.get(z.id)!)
-    add(z.id, ext({ id: uid(`${z.id}_roof`), kind: 'roof', zone_a: z.id, zone_b: 'outside', facade: null, area_m2: a, azimuth_deg: null, tilt_deg: 0, construction_ref: { key: 'unassigned:roof' }, g_value: null, openings: [] }, 'roof'))
-    add(z.id, ext({ id: uid(`${z.id}_ground`), kind: 'ground', zone_a: z.id, zone_b: 'ground', facade: null, area_m2: a, azimuth_deg: null, tilt_deg: 180, construction_ref: { key: 'unassigned:ground_floor' }, g_value: null, openings: [] }, 'other'))
+    const rs = plan.rooms.filter((r) => r.zone === z.id)
+    for (const e of ['roof', 'floor'] as const) {
+      const byType = new Map<string, number>()
+      for (const r of rs) byType.set(roomType(plan, r.id, e), (byType.get(roomType(plan, r.id, e)) ?? 0) + ringArea(r.ring))
+      for (const [type, a] of byType) {
+        if (e === 'roof') add(z.id, ext({ id: uid(`${z.id}_roof`), kind: 'roof', zone_a: z.id, zone_b: 'outside', facade: null, area_m2: r3(a), azimuth_deg: null, tilt_deg: 0, construction_ref: constructionOf(type), g_value: null, openings: [] }, 'roof'))
+        else add(z.id, ext({ id: uid(`${z.id}_ground`), kind: 'ground', zone_a: z.id, zone_b: 'ground', facade: null, area_m2: r3(a), azimuth_deg: null, tilt_deg: 180, construction_ref: constructionOf(type), g_value: null, openings: [] }, 'other'))
+      }
+    }
+  }
+
+  // Space types: a zone takes the space type covering most of its floor (a note says when its rooms differ).
+  const spaceOf = new Map<string, SpaceType | undefined>()
+  for (const z of used) {
+    const rs = plan.rooms.filter((r) => r.zone === z.id)
+    const by = new Map<string, number>()
+    for (const r of rs) if (r.space) by.set(r.space, (by.get(r.space) ?? 0) + ringArea(r.ring))
+    const best = [...by.entries()].sort((a, b) => b[1] - a[1])[0]
+    const sp = best ? plan.spaces.find((x) => x.id === best[0]) : undefined
+    spaceOf.set(z.id, sp)
+    if (by.size > 1 && sp) notes.push(`${z.name} has rooms of ${by.size} space types; the model gives the zone ${sp.name}'s (the most floor)`)
+    if (sp && rs.some((r) => !r.space)) notes.push(`${z.name} has rooms with no space type; the zone takes ${sp.name}'s`)
+  }
+  const ventOf = (sp: SpaceType | undefined) => {
+    const t = system(sp?.ventilation)
+    if (!t || !sp) return []
+    const kind = t.type === 'mvhr' || t.type === 'mev' ? t.type : 'natural'
+    return [{
+      id: `${sp.id}_vent`, label: t.name, kind, enabled: true, share_pct: 100, flow_rate: null, flow_rate_basis: null,
+      sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
+    }]
+  }
+
+  // Profiles: the library's are shapes (hourly fractions by day type); the magnitudes are not in the library, so
+  // lighting and equipment carry none yet, and occupancy is written only with the people per m² typed on its space type.
+  const profiles: Record<string, unknown>[] = []
+  const shapeOf = (key: string) => {
+    const pr = profile(key)!
+    const d = pr.day_types!
+    return { weekday: d.weekday, saturday: d.saturday, sunday: d.sunday, ...(pr.monthly_multipliers ? { monthly_multipliers: pr.monthly_multipliers } : {}) }
+  }
+  const addProfile = (pr: Record<string, unknown>) => {
+    if (!profiles.some((x) => x.id === pr.id)) profiles.push(pr)
+  }
+  const refsOf = (zid: string) => {
+    const sp = spaceOf.get(zid)
+    const gain = (k: 'lighting' | 'equipment') => {
+      const key = sp?.[k]
+      if (!key || !profile(key)?.day_types) return []
+      addProfile({ id: key, kind: k, label: profile(key)!.name, schedule: shapeOf(key) })
+      return [key]
+    }
+    let occupancy: string | null = null
+    if (sp?.occupancy && profile(sp.occupancy)?.day_types) {
+      if (sp.people_per_m2 != null && sp.people_per_m2 > 0) {
+        occupancy = `${sp.id}_occupancy`
+        addProfile({ id: occupancy, kind: 'occupancy', label: `${profile(sp.occupancy)!.name} (${sp.name})`, schedule: shapeOf(sp.occupancy), density: { value: sp.people_per_m2, basis: 'per_m2' } })
+      } else notes.push(`${sp.name}: occupancy needs people per m² before it goes in the model`)
+    }
+    return { occupancy, lighting: gain('lighting'), equipment: gain('equipment'), auxiliary: [] }
   }
 
   const zones = used.map((z) => ({
@@ -198,25 +265,47 @@ export function buildDocument(plan: Plan): Built {
     polygon: outlineOf(z.id).map(([x, y]) => [r3(x), r3(y)]),
     area_m2: r3(floorOf.get(z.id)!),
     height_m: h,
-    use_type: z.use ?? 'unassigned',
+    use_type: spaceOf.get(z.id)?.use ?? 'unassigned',
     rooms: plan.rooms.filter((r) => r.zone === z.id).length,
-    profile_refs: { occupancy: null, lighting: [], equipment: [], auxiliary: [] },
+    profile_refs: refsOf(z.id),
     setpoints: { heat_c: null, cool_c: null, setback_c: null, hours_ref: null, control_strategy: null },
-    ventilation: [],
+    ventilation: ventOf(spaceOf.get(z.id)),
     infiltration_q50: null,
     infiltration_ach: null,
     ...(is21 ? { internal_heat_capacity_j_per_k_m2: 250000 } : {}),
     surfaces: byZone.get(z.id) ?? [],
   }))
 
-  const system_groups = plan.systems.flatMap((sys) => {
-    const served = used.filter((z) => z[sys.service] === sys.id).map((z) => z.id)
-    if (!served.length) {
-      notes.push(`${sys.label} serves no zone yet, so it is not in the document`)
-      return []
+  // Systems: per service, one group per library template, serving every zone whose space type names it, at 100% of
+  // that service (one system per service per zone here). A template with no fuel ("No mechanical cooling") is none.
+  const system_groups: Record<string, unknown>[] = []
+  for (const service of ['heating', 'cooling', 'dhw'] as const) {
+    const byTemplate = new Map<string, string[]>()
+    for (const z of used) {
+      const key = spaceOf.get(z.id)?.[service]
+      if (!key || !system(key)?.fuel) continue
+      byTemplate.set(key, [...(byTemplate.get(key) ?? []), z.id])
     }
-    return [{ id: sys.id, service: sys.service, label: sys.label, zones: served, enabled: true, share_pct: 100, source: null, efficiency_metric: null }]
-  })
+    for (const [key, zs] of byTemplate) {
+      const t = system(key)!
+      system_groups.push({ id: `${service}_${key}`, service, label: t.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: key })
+    }
+  }
+
+  // Every library item the document uses, pinned by its body hash (from the snapshot), so a run says what it read.
+  function libraryRefs() {
+    const refs = new Map<string, { kind: string; key: string; version: null; body_hash: string }>()
+    const pin = (kind: string, item: { key: string; body_hash: string } | undefined) => item && refs.set(`${kind}:${item.key}`, { kind, key: item.key, version: null, body_hash: item.body_hash })
+    for (const sf of surfaces) pin('construction', construction((sf.construction_ref as { key: string }).key))
+    for (const g of system_groups) pin('system_template', system(g.template_ref as string))
+    for (const z of used) {
+      const sp = spaceOf.get(z.id)
+      if (!sp) continue
+      for (const k of ['heating', 'cooling', 'dhw', 'ventilation'] as const) pin('system_template', system(sp[k]))
+      for (const k of ['occupancy', 'lighting', 'equipment'] as const) if (k !== 'occupancy' || (sp.people_per_m2 ?? 0) > 0) pin('profile', profile(sp[k]))
+    }
+    return [...refs.values()].sort((a, b) => (a.kind + a.key < b.kind + b.key ? -1 : 1))
+  }
 
   const doc = {
     schema_version: SCHEMA_VERSION,
@@ -239,9 +328,9 @@ export function buildDocument(plan: Plan): Built {
       cooling: { setpoint_mode: 'follow_comfort', setpoint_c: null },
       dhw: { storage_setpoint_c: null, tap_outlet_temp_c: null, cold_supply_temp_c: null, demand_basis: null, litres_per_person_per_day: null, litres_per_m2_per_day: null, load_shape: null, circulation_pump_w: null },
     },
-    profiles: [],
+    profiles,
     weather_ref: { kind: 'legacy', id: 'unassigned' },
-    library_refs: [],
+    library_refs: libraryRefs(),
   }
 
   const res = ModelDocument.safeParse(doc)
