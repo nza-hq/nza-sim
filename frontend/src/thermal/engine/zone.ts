@@ -49,6 +49,12 @@ export interface ZoneInputs {
    * heating needed to hold the setpoint is more, the zone gets this and floats below its setpoint.
    */
   heating_cap_w?: number | null
+  /**
+   * Brief 108 review F1 (Linzie, 15 Nov): the emitters' output with the room at a given temperature, W. When given, in
+   * place of heating_cap_w, each hour's limit is this at the zone's control temperature at the end of the hour before:
+   * a colder room draws more from the same radiators. Null or absent: heating_cap_w, fixed.
+   */
+  heating_cap_at?: ((room_c: number) => number) | null
   /** Brief 108: heating's share to the air when it differs from cooling's (the emitters' convective share). Absent: hc_convective_fraction. */
   heating_convective_fraction?: number | null
   /**
@@ -92,6 +98,8 @@ export interface ZoneRun {
   heating_w: Float64Array
   /** Cooling delivered, W (≥ 0, heat removed). */
   cooling_w: Float64Array
+  /** Review F1: each hour's heating limit, W, when it follows the room's temperature (heating_cap_at); otherwise absent. */
+  heating_cap_w?: Float64Array
   /** Every term of the zone's balance per hour, W, positive into the zone (air + all element nodes). */
   terms: {
     /** Per element: convection and long-wave with outdoor air at the outside face, or conduction to the ground. */
@@ -135,6 +143,8 @@ function check(inp: ZoneInputs) {
   if (!(inp.hc_convective_fraction >= 0 && inp.hc_convective_fraction <= 1)) throw new ZoneError('must be 0 to 1', 'hc_convective_fraction')
   if (inp.heating_convective_fraction != null && !(inp.heating_convective_fraction >= 0 && inp.heating_convective_fraction <= 1)) throw new ZoneError('must be 0 to 1', 'heating_convective_fraction')
   if (inp.heating_cap_w != null && !(inp.heating_cap_w >= 0)) throw new ZoneError('must be ≥ 0', 'heating_cap_w')
+  if (inp.heating_cap_at != null && inp.heating_cap_w != null) throw new ZoneError('give a fixed limit or one that follows the room, not both', 'heating_cap_at')
+  if (inp.heating_cap_at != null && typeof inp.heating_cap_at !== 'function') throw new ZoneError('must be a function of the room temperature', 'heating_cap_at')
   if (!Number.isFinite(inp.initial_c)) throw new ZoneError('required', 'initial_c')
   if (!(Number.isInteger(inp.warmup_days) && inp.warmup_days >= 0)) throw new ZoneError('a whole number ≥ 0', 'warmup_days')
   if (inp.control !== 'air' && inp.control !== 'operative') throw new ZoneError('air or operative', 'control')
@@ -228,6 +238,8 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   const hcfH = inp.heating_convective_fraction ?? inp.hc_convective_fraction
   const eH = hcfH === inp.hc_convective_fraction ? eHC : spread(hcfH)
   const capH = inp.heating_cap_w ?? Infinity
+  const capAt = inp.heating_cap_at ?? null
+  let ctlPrev = inp.initial_c  // the control temperature at the end of the step before (review F1)
   const ctl = new Float64Array(F)
   if (inp.control === 'air') ctl[0] = 1
   else { ctl[0] = 0.5; for (let k = 0; k < E; k++) ctl[k + 1] += (0.5 * els[k].area_m2) / A_tot }
@@ -283,6 +295,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
       solar_transmitted_w: new Float64Array(H), solar_lost_w: new Float64Array(H), other_gains_w: new Float64Array(H), storage_w: new Float64Array(H),
     },
     closure_wh: new Float64Array(H),
+    ...(inp.heating_cap_at ? { heating_cap_w: new Float64Array(H) } : {}),
   }
 
   const xF = new Float64Array(F).fill(inp.initial_c)
@@ -363,10 +376,11 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     const zA = (hv * z[0]) / den
     const ctl0 = dot(ctl, z) - ctl_uAir * zA
     let phi = 0
+    const capNow = capAt ? capAt(ctlPrev) : capH
     let w = wHC, wA = (hv * wHC[0]) / den
     if (heat_c != null && ctl0 < heat_c) {
       w = wH; wA = (hv * wH[0]) / den
-      phi = Math.min((heat_c - ctl0) / (ctl_wH - ctl_uAir * wA), capH)  // Brief 108: at most the emitters' output
+      phi = Math.min((heat_c - ctl0) / (ctl_wH - ctl_uAir * wA), capNow)  // Brief 108: at most the emitters' output
     } else if (cool_c != null && ctl0 > cool_c) phi = (cool_c - ctl0) / (ctl_wHC - ctl_uAir * wA)
     let stored = 0
     for (let i = 0; i < F; i++) {
@@ -382,7 +396,9 @@ export function runZone(inp: ZoneInputs): ZoneRun {
         x[j] = xj
       }
     }
+    if (capAt) ctlPrev = dot(ctl, xF)
     if (!record) return
+    if (out.heating_cap_w) out.heating_cap_w[h] = capNow
     const T = out.terms
     const ta = xF[0]
     let sum = phi + (T.bridging_w[h] = inp.bridging_w_per_k * (te - ta)) + (T.ventilation_w[h] = hv * (te - ta))

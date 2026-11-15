@@ -17,10 +17,14 @@
       "at_50_40": {
         "output_w": 10389.623748285925,
         "shortfall_w": 12768.095265790758,
-        "unmet_hours": 634,
-        "min_c": 17.996057386021768,
-        "hours_at_cap": 1340,
+        "unmet_hours": 574,
+        "min_c": 18.377455664212683,
+        "hours_at_cap": 1320,
         "needed_rated_w": 61026.43775330891
+      },
+      "at_50_40_rated_at_setpoint": {
+        "unmet_hours": 634,
+        "min_c": 17.996057386021768
       },
       "at_70_60": {
         "output_w": 23157.719014076683,
@@ -38,10 +42,14 @@
       "at_50_40": {
         "output_w": 8500.69449330494,
         "shortfall_w": 10446.737990276777,
-        "unmet_hours": 500,
-        "min_c": 18.250962138072115,
-        "hours_at_cap": 1099,
+        "unmet_hours": 412,
+        "min_c": 18.60097698526057,
+        "hours_at_cap": 1069,
         "needed_rated_w": 49931.26949771936
+      },
+      "at_50_40_rated_at_setpoint": {
+        "unmet_hours": 500,
+        "min_c": 18.250962138072115
       },
       "at_70_60": {
         "output_w": 18947.432483581717,
@@ -59,10 +67,14 @@
       "at_50_40": {
         "output_w": 8520.084230889619,
         "shortfall_w": 10470.566573742153,
-        "unmet_hours": 481,
-        "min_c": 18.24642757626566,
-        "hours_at_cap": 1089,
+        "unmet_hours": 408,
+        "min_c": 18.598830029071845,
+        "hours_at_cap": 1062,
         "needed_rated_w": 50045.16068785603
+      },
+      "at_50_40_rated_at_setpoint": {
+        "unmet_hours": 481,
+        "min_c": 18.24642757626566
       },
       "at_70_60": {
         "output_w": 18990.650804631772,
@@ -80,10 +92,14 @@
       "at_50_40": {
         "output_w": 8534.54144285283,
         "shortfall_w": 10488.333440386812,
-        "unmet_hours": 517,
-        "min_c": 18.058350374365197,
-        "hours_at_cap": 1109,
+        "unmet_hours": 449,
+        "min_c": 18.45745285814494,
+        "hours_at_cap": 1077,
         "needed_rated_w": 50130.07927271862
+      },
+      "at_50_40_rated_at_setpoint": {
+        "unmet_hours": 517,
+        "min_c": 18.058350374365197
       },
       "at_70_60": {
         "output_w": 19022.87488323964,
@@ -101,10 +117,14 @@
       "at_50_40": {
         "output_w": 11184.567582598365,
         "shortfall_w": 13745.023675650524,
-        "unmet_hours": 713,
-        "min_c": 17.321003213264923,
-        "hours_at_cap": 1375,
+        "unmet_hours": 658,
+        "min_c": 17.866017253039995,
+        "hours_at_cap": 1346,
         "needed_rated_w": 65695.76857773346
+      },
+      "at_50_40_rated_at_setpoint": {
+        "unmet_hours": 713,
+        "min_c": 17.321003213264923
       },
       "at_70_60": {
         "output_w": 24929.59125824889,
@@ -117,11 +137,14 @@
     }
   ],
   "building": {
+    "at_50_40_rated_at_setpoint": {
+      "unmet_hours": 2845
+    },
     "at_50_40": {
-      "heating_kwh": 111760.12552173593,
-      "unmet_hours": 2845,
-      "energy_kwh": 555005.3673961357,
-      "eui_kwh_per_m2": 131.64388831870693
+      "heating_kwh": 112566.59595881609,
+      "unmet_hours": 2501,
+      "energy_kwh": 555301.0738517587,
+      "eui_kwh_per_m2": 131.71402808654702
     },
     "at_70_60": {
       "heating_kwh": 116702.92621509965,

@@ -1,0 +1,141 @@
+{
+ "source": "scripts/108_hotwater.mts",
+ "flow_c": 50,
+ "return_c": 40,
+ "exponent_n": 1,
+ "radiant_fraction": 0,
+ "cases": {
+  "tight": {
+   "design_output_w": {
+    "west": 800,
+    "east": 800
+   },
+   "rooms": {
+    "west": {
+     "energyplus": {
+      "heat_mwh": 1.892,
+      "unmet_hours": 464,
+      "min_c": 15.106,
+      "peak_w": 931.7,
+      "k_w_per_k": 26.723
+     },
+     "engine2_room": {
+      "heat_mwh": 1.825,
+      "unmet_hours": 413,
+      "min_c": 15.32,
+      "peak_w": 924.8,
+      "heating_pct": -3.5,
+      "unmet_diff_h": -51,
+      "min_diff_k": 0.21,
+      "closure_max_wh": 3.7061909097246826e-11
+     },
+     "engine2_setpoint": {
+      "heat_mwh": 1.815,
+      "unmet_hours": 460,
+      "min_c": 14.228,
+      "peak_w": 800,
+      "heating_pct": -4,
+      "unmet_diff_h": -4,
+      "min_diff_k": -0.88,
+      "closure_max_wh": 3.7061909097246826e-11
+     }
+    },
+    "east": {
+     "energyplus": {
+      "heat_mwh": 1.889,
+      "unmet_hours": 458,
+      "min_c": 15.102,
+      "peak_w": 931.8,
+      "k_w_per_k": 26.723
+     },
+     "engine2_room": {
+      "heat_mwh": 1.825,
+      "unmet_hours": 416,
+      "min_c": 15.295,
+      "peak_w": 925.5,
+      "heating_pct": -3.4,
+      "unmet_diff_h": -42,
+      "min_diff_k": 0.19,
+      "closure_max_wh": 3.5427660804998595e-11
+     },
+     "engine2_setpoint": {
+      "heat_mwh": 1.815,
+      "unmet_hours": 461,
+      "min_c": 14.193,
+      "peak_w": 800,
+      "heating_pct": -3.9,
+      "unmet_diff_h": 3,
+      "min_diff_k": -0.91,
+      "closure_max_wh": 3.5427660804998595e-11
+     }
+    }
+   }
+  },
+  "mild": {
+   "design_output_w": {
+    "west": 1100,
+    "east": 1100
+   },
+   "rooms": {
+    "west": {
+     "energyplus": {
+      "heat_mwh": 1.931,
+      "unmet_hours": 27,
+      "min_c": 17.81,
+      "peak_w": 1181.9,
+      "k_w_per_k": 36.723
+     },
+     "engine2_room": {
+      "heat_mwh": 1.859,
+      "unmet_hours": 23,
+      "min_c": 18.033,
+      "peak_w": 1172.1,
+      "heating_pct": -3.7,
+      "unmet_diff_h": -4,
+      "min_diff_k": 0.22,
+      "closure_max_wh": 3.7061909097246826e-11
+     },
+     "engine2_setpoint": {
+      "heat_mwh": 1.859,
+      "unmet_hours": 26,
+      "min_c": 17.536,
+      "peak_w": 1100,
+      "heating_pct": -3.7,
+      "unmet_diff_h": -1,
+      "min_diff_k": -0.27,
+      "closure_max_wh": 3.7061909097246826e-11
+     }
+    },
+    "east": {
+     "energyplus": {
+      "heat_mwh": 1.928,
+      "unmet_hours": 26,
+      "min_c": 17.808,
+      "peak_w": 1182,
+      "k_w_per_k": 36.723
+     },
+     "engine2_room": {
+      "heat_mwh": 1.86,
+      "unmet_hours": 24,
+      "min_c": 18.015,
+      "peak_w": 1172.8,
+      "heating_pct": -3.5,
+      "unmet_diff_h": -2,
+      "min_diff_k": 0.21,
+      "closure_max_wh": 3.5427660804998595e-11
+     },
+     "engine2_setpoint": {
+      "heat_mwh": 1.859,
+      "unmet_hours": 26,
+      "min_c": 17.511,
+      "peak_w": 1100,
+      "heating_pct": -3.5,
+      "unmet_diff_h": 0,
+      "min_diff_k": -0.3,
+      "closure_max_wh": 3.5427660804998595e-11
+     }
+    }
+   }
+  }
+ }
+}

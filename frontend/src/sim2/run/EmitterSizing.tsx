@@ -97,8 +97,9 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
           its heating setpoint. The peak need is the zone's highest hourly heat with its emitters unlimited. Where the
           emitters give less, the zone runs colder and the hours more than 0.5 °C below the setpoint are counted. The
           rating needed is what would cover the peak at those temperatures, given at 75/65/20 °C as catalogues list it.
-          The output is taken with the room at its setpoint; a colder room draws more from the same emitters, so the
-          hours below are an upper bound. The peak is the coldest hour of the chosen weather file, not a design-day
+          Each hour, wet emitters are re-rated at how warm the room is, at their design water flow: a colder room draws
+          more from the same radiators. That is checked against EnergyPlus's hot-water radiator (the coldest hour within
+          0.2 K, and the same rise over a fixed output). The peak is the coldest hour of the chosen weather file, not a design-day
           calculation (BS EN 12831). The emitters' radiant share changes the heat needed: its annual heat is checked against
           EnergyPlus (within 4 %), its hours below are not yet. A heat pump's efficiency does not yet change with the flow temperature.
         </p>

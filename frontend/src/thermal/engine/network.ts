@@ -43,6 +43,11 @@ export interface NetworkZone {
   setpoints: { heat_c: number | null; cool_c: number | null }
   /** Brief 108: the most heat the zone's emitters can give, W (null or absent: unlimited, ideal loads). */
   heating_cap_w?: number | null
+  /**
+   * Brief 108 review F1: the emitters' output with the room at a given temperature, W. When given, in place of
+   * heating_cap_w, each step's limit is this at the zone's control temperature at the end of the step before.
+   */
+  heating_cap_at?: ((room_c: number) => number) | null
   /** Brief 108: heating's share to the air when it differs from cooling's (the emitters'). Absent: hc_convective_fraction. */
   heating_convective_fraction?: number | null
   /** Every node of the zone starts here before the warm-up, °C. */
@@ -103,6 +108,8 @@ export interface NetworkZoneRun {
   theta_op: Float64Array
   heating_w: Float64Array
   cooling_w: Float64Array
+  /** Review F1: each hour's heating limit, W, when it follows the room's temperature (heating_cap_at); otherwise absent. */
+  heating_cap_w?: Float64Array
   terms: {
     bridging_w: Float64Array
     ventilation_w: Float64Array
@@ -159,6 +166,8 @@ function check(inp: NetworkInputs) {
     if (heat_c != null && cool_c != null && heat_c > cool_c) throw new NetworkError(`heating ${heat_c} above cooling ${cool_c}`, `${p}.setpoints`)
     if (!Number.isFinite(z.initial_c)) throw new NetworkError('required', `${p}.initial_c`)
     if (z.heating_cap_w != null && !(z.heating_cap_w >= 0)) throw new NetworkError('must be ≥ 0', `${p}.heating_cap_w`)
+    if (z.heating_cap_at != null && z.heating_cap_w != null) throw new NetworkError('give a fixed limit or one that follows the room, not both', `${p}.heating_cap_at`)
+    if (z.heating_cap_at != null && typeof z.heating_cap_at !== 'function') throw new NetworkError('must be a function of the room temperature', `${p}.heating_cap_at`)
     if (z.heating_convective_fraction != null && !(z.heating_convective_fraction >= 0 && z.heating_convective_fraction <= 1)) throw new NetworkError('must be 0 to 1', `${p}.heating_convective_fraction`)
     if (z.other_gains !== null) {
       arr(z.other_gains.w, `${p}.other_gains.w`)
@@ -350,6 +359,11 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const hcf = inp.hc_convective_fraction
   const hcfH = Float64Array.from(inp.zones, (z) => z.heating_convective_fraction ?? hcf)
   const capW = Float64Array.from(inp.zones, (z) => z.heating_cap_w ?? Infinity)
+  // Review F1: a limit that follows the room is set each step from the control temperature at the end of the step before.
+  const capAt = inp.zones.map((z) => z.heating_cap_at ?? null)
+  const anyCapAt = capAt.some((f) => f != null)
+  const ctlPrev = Float64Array.from(inp.zones, (z) => z.initial_c)
+  const capRec = inp.zones.map((z) => (z.heating_cap_at ? new Float64Array(inp.hours) : null))
   const ehNodes: Int32Array[] = [], ehW: Float64Array[] = [], ecW: Float64Array[] = []
   const split = (z: number, f: number) => Float64Array.from([f, ...faces[z].map((x) => ((1 - f) * x.area) / Atot[z])])
   for (let z = 0; z < Z; z++) {
@@ -604,6 +618,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   /** One step of hour h at outdoor temperature te; recorded outputs add w (1 / steps per hour) of their value. */
   const sub = (h: number, te: number, record: boolean, w: number) => {
     if (tarp) tarpCoefficients()
+    if (anyCapAt) for (let z = 0; z < Z; z++) { const f = capAt[z]; if (f) { capW[z] = f(ctlPrev[z]); if (record) capRec[z]![h] += w * capW[z] } }
     for (let i = 0; i < n; i++) bF[i] = capDT[i] * xF[i]
     const zi0 = h * Z * 3
     for (let z = 0; z < Z; z++) {
@@ -691,6 +706,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
         }
       } else for (let j = cO[k]; j < o1; j++) CX[j] = CY[j] - CWA[j] * xfa - CWB[j] * xfb
     }
+    if (anyCapAt) for (let z = 0; z < Z; z++) if (capAt[z]) ctlPrev[z] = operative ? 0.5 * (xF[z] + xF[rad[z]]) : xF[z]
     if (!record) return
 
     // ── Terms and closure, per zone ────────────────────────────────────────────────────────────────────────────
@@ -756,6 +772,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const col = (z: number, f: number) => cols[z * NO + f]
   const zr: NetworkZoneRun[] = inp.zones.map((_, z) => ({
     theta_air: col(z, 0), theta_mrt: col(z, 1), theta_op: col(z, 2), heating_w: col(z, 3), cooling_w: col(z, 4),
+    ...(capRec[z] ? { heating_cap_w: capRec[z]! } : {}),
     terms: {
       bridging_w: col(z, 5), ventilation_w: col(z, 6), solar_transmitted_w: col(z, 7), solar_lost_w: col(z, 8),
       other_gains_w: col(z, 9), interzone_w: col(z, 10), storage_w: col(z, 11),

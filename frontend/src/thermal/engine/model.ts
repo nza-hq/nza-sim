@@ -54,6 +54,13 @@ export interface RunOptions {
    */
   emitter_limit?: 'cap' | 'none'
   /**
+   * Brief 108 review F1 (Linzie, 15 Nov: "work it out each hour"). 'room' (default): each hour's limit is the
+   * emitters' output at the room's control temperature at the end of the hour before, so a colder room draws more.
+   * 'setpoint': the output with the room at its setpoint, fixed all year, as EnergyPlus's LimitCapacity takes it (the
+   * Part 3 referee runs on this).
+   */
+  emitter_rating?: 'room' | 'setpoint'
+  /**
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
    * - outside_convection 'wind': h_ce = 4 + 4·v (ISO 6946:2017 Annex C) from the weather's hourly wind speed.
@@ -297,6 +304,8 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
 
 /** One zone's run in a common shape, from either solver. */
 interface Solved {
+  /** Review F1: each hour's heating limit when it follows the room (absent otherwise). */
+  heating_cap_w?: Float64Array
   heating_w: Float64Array; cooling_w: Float64Array
   theta_air: Float64Array; theta_op: Float64Array; theta_mrt: Float64Array
   bridging_w: Float64Array; ventilation_w: Float64Array; solar_lost_w: Float64Array; other_gains_w: Float64Array; storage_w: Float64Array
@@ -398,7 +407,11 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   }
   // Review F8: a mode parameter that is not one of its values is refused, never read as the default (CLAUDE.md lesson 11).
   if (options.emitter_limit != null && options.emitter_limit !== 'cap' && options.emitter_limit !== 'none') throw new ModelError(`unknown emitter_limit "${String(options.emitter_limit)}"`, 'options.emitter_limit')
-  const capOf = (zi: number) => (options.emitter_limit === 'none' ? null : emit[zi]?.cap_w ?? null)
+  if (options.emitter_rating != null && options.emitter_rating !== 'room' && options.emitter_rating !== 'setpoint') throw new ModelError(`unknown emitter_rating "${String(options.emitter_rating)}"`, 'options.emitter_rating')
+  const byRoom = options.emitter_rating !== 'setpoint'
+  const limited = (zi: number) => options.emitter_limit !== 'none' && emit[zi] != null
+  const capOf = (zi: number) => (limited(zi) && !byRoom ? emit[zi]!.cap_w : null)
+  const capAtOf = (zi: number) => (limited(zi) && byRoom ? emit[zi]!.at : null)
   const hcfHeatOf = (zi: number) => (emit[zi] ? 1 - emit[zi]!.radiant_fraction : null)
   const gainsIn = (zi: number) => {
     const g = gains[zi]
@@ -417,7 +430,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       inside_solar_absorptance: insideAlpha, solar_convective_fraction: options.solar_convective_fraction,
       other_gains: options.other_gains ?? gainsIn(0), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
       control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
-      heating_cap_w: capOf(0), heating_convective_fraction: hcfHeatOf(0),
+      heating_cap_w: capOf(0), heating_cap_at: capAtOf(0), heating_convective_fraction: hcfHeatOf(0),
       warmup_days: options.warmup_days,
       h_ce_w_per_m2k: sp?.outside_convection === 'wind' ? Float64Array.from(weather.hours.wind_speed, (v) => K.h_ce_wind_a + K.h_ce_wind_b * Math.max(0, v)) : null,
       inside_convection: (sp?.inside_convection ?? 'by_tilt') as 'by_tilt' | 'by_heat_flow',
@@ -425,6 +438,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     })
     const T = run.terms
     solved = [{
+      heating_cap_w: run.heating_cap_w,
       heating_w: run.heating_w, cooling_w: run.cooling_w, theta_air: run.theta_air, theta_op: run.theta_op, theta_mrt: run.theta_mrt,
       bridging_w: T.bridging_w, ventilation_w: T.ventilation_w, solar_lost_w: T.solar_lost_w, other_gains_w: T.other_gains_w, storage_w: T.storage_w,
       closure_wh: run.closure_wh, interzone_w: new Float64Array(H),
@@ -445,7 +459,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         solar_transmitted_w: built.zones[zi].solarTransmitted, solar_beam_w: sp?.beam_on_floor ? built.zones[zi].solarBeam : null,
         other_gains: options.other_gains ?? gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
-        heating_cap_w: capOf(zi), heating_convective_fraction: hcfHeatOf(zi),
+        heating_cap_w: capOf(zi), heating_cap_at: capAtOf(zi), heating_convective_fraction: hcfHeatOf(zi),
       })),
       elements: elements.map((element, k) => ({
         element, zone_a: zoneA[k], zone_b: zoneB[k], solar_absorbed_w_per_m2: absorbed[k],
@@ -458,6 +472,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       inside_convection: sp?.inside_convection === 'tarp' ? 'tarp' : 'fixed',
     })
     solved = run.zones.map((z, zi) => ({
+      heating_cap_w: z.heating_cap_w,
       heating_w: z.heating_w, cooling_w: z.cooling_w, theta_air: z.theta_air, theta_op: z.theta_op, theta_mrt: z.theta_mrt,
       bridging_w: z.terms.bridging_w, ventilation_w: z.terms.ventilation_w, solar_lost_w: z.terms.solar_lost_w,
       other_gains_w: z.terms.other_gains_w, storage_w: z.terms.storage_w, closure_wh: z.closure_wh, interzone_w: z.terms.interzone_w,
@@ -533,7 +548,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     for (let h = 0; h < H; h++) {
       minCtl = Math.min(minCtl, ctlT[h])
       if (hsp != null && ctlT[h] < hsp - UNMET_K) unmet++
-      if (em && run.heating_w[h] >= em.cap_w * (1 - 1e-9) && (em.cap_w > 0 || (hsp != null && ctlT[h] < hsp - 1e-6))) atCap++
+      const capH = run.heating_cap_w ? run.heating_cap_w[h] : em?.cap_w ?? Infinity  // review F1: the hour's own limit
+      if (em && run.heating_w[h] >= capH * (1 - 1e-9) && (capH > 0 || (hsp != null && ctlT[h] < hsp - 1e-6))) atCap++
     }
     let closure
     try { closure = checkClosure(lines, maxClosure) } catch (e) {

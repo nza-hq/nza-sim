@@ -36,6 +36,13 @@ export interface ZoneEmitters {
   radiant_fraction: number
   /** Each emitter entry's total output (count × one unit) at the design temperatures, W. */
   emitters: { id: string; kind: string; output_w: number; rated_w: number; exponent_n: number | null }[]
+  /**
+   * Review F1 (Linzie, 15 Nov): the emitters' output with the room at `room_c`, W. A wet emitter keeps its design water
+   * flow and its system's flow temperature; the return falls as the room cools, and the output is EN 442's at that
+   * flow, return and room. Fixed-output units give their stated output. A room above its setpoint is taken at the
+   * setpoint (it is not being heated), so at the setpoint and above this is `cap_w`.
+   */
+  at: (room_c: number) => number
 }
 
 /** Each zone's emitters, or null for a zone that states none. Throws EmitterError for a missing or impossible value. */
@@ -46,7 +53,8 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
     const room = zone.setpoints.heat_c
     if (room == null) throw new EmitterError('a zone with emitters needs a heating setpoint to rate them at', `${zp}.setpoints.heat_c`)
     const out: ZoneEmitters['emitters'] = []
-    let cap = 0, rad = 0
+    const wet: { units: number; unit_w: number; n: number; rated: { flow_c: number; return_c: number; room_c: number }; flow_c: number; return_c: number }[] = []
+    let cap = 0, rad = 0, fixed = 0
     zone.emitters.forEach((e, j) => {
       const p = `${zp}.emitters[${j}]`
       const need = (v: number | null, k: string) => { if (v == null) throw new EmitterError('required', `${p}.${k}`); return v }
@@ -54,7 +62,7 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
       if (!(rf >= 0 && rf <= 1)) throw new EmitterError('must be 0 to 1', `${p}.radiant_fraction`)
       let w: number
       let n: number | null = null
-      if (FIXED_OUTPUT_KINDS.includes(e.kind)) w = count * unit
+      if (FIXED_OUTPUT_KINDS.includes(e.kind)) { w = count * unit; fixed += w }
       else {
         const gid = e.system_group_id
         if (gid == null) throw new EmitterError('required: the heating system that feeds it', `${p}.system_group_id`)
@@ -71,11 +79,29 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
         if (Number.isNaN(logMeanDeltaT(rated.flow_c, rated.return_c, rated.room_c))) throw new EmitterError('the rated return must be above the rated room temperature, and the flow at or above the return', `${p}.rated_return_c`)
         if (Number.isNaN(logMeanDeltaT(flow, ret, room))) throw new EmitterError(`the return (${ret} °C) must be above ${zone.name || zone.id}'s heating setpoint (${room} °C), and the flow at or above the return`, `${gp}.design_return_c`)
         w = count * ratedOutputAt(unit, n, rated, { flow_c: flow, return_c: ret, room_c: room })
+        wet.push({ units: count, unit_w: unit, n, rated, flow_c: flow, return_c: ret })
       }
       out.push({ id: e.id, kind: e.kind, output_w: w, rated_w: count * unit, exponent_n: n })
       cap += w; rad += w * rf
     })
-    return { cap_w: cap, radiant_fraction: cap > 0 ? rad / cap : 0, emitters: out }
+    // Review F1: the water flow through each wet emitter is the one that carries its design output at the design flow
+    // and return; at the cap the valve is open and that flow holds. In a colder room the emitter gives more, so the
+    // water comes back cooler: the return is where the water's heat, flow × (T_flow − T_return), equals the emitter's
+    // EN 442 output at that flow, return and room (one root between room and flow, found by bisection).
+    const at = (room_c: number) => {
+      const r = Math.min(room_c, room)
+      let q = fixed
+      for (const x of wet) {
+        const out = (ret: number) => x.units * ratedOutputAt(x.unit_w, x.n, x.rated, { flow_c: x.flow_c, return_c: ret, room_c: r })
+        if (x.flow_c === x.return_c || r === room) { q += out(x.return_c); continue }
+        const mcp = x.units * ratedOutputAt(x.unit_w, x.n, x.rated, { flow_c: x.flow_c, return_c: x.return_c, room_c: room }) / (x.flow_c - x.return_c)  // W/K
+        let lo = r + 1e-9, hi = x.flow_c
+        for (let i = 0; i < 60; i++) { const m = 0.5 * (lo + hi); if (mcp * (x.flow_c - m) > out(m)) lo = m; else hi = m }
+        q += mcp * (x.flow_c - 0.5 * (lo + hi))
+      }
+      return q
+    }
+    return { cap_w: cap, radiant_fraction: cap > 0 ? rad / cap : 0, emitters: out, at }
   })
 }
 
@@ -115,7 +141,7 @@ export interface ZoneSizing {
  * emitters must share one heating system and one exponent for the needed rating to be one number; otherwise it is
  * null and `note` says why. Nothing is defaulted.
  */
-export function zoneSizing(doc: ModelDocument, zi: number, em: ZoneEmitters, peak_w: number): ZoneSizing {
+export function zoneSizing(doc: ModelDocument, zi: number, em: Pick<ZoneEmitters, 'cap_w' | 'emitters'>, peak_w: number): ZoneSizing {
   const zone = doc.zones[zi]
   const room = zone.setpoints.heat_c!
   let fixed = 0
