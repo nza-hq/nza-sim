@@ -8,6 +8,10 @@ Brief [`docs/briefs/active/107_systems.md`](docs/briefs/active/107_systems.md).
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/107/00_reconnaissance.md)): today's 133.2 decomposed by end use. Electricity 404.144 MWh is heating 37.657 + cooling 30.8 + hot water heat pump 41.174 + pump 1.051 + fans 40.613 + lighting 39.014 + small power 186.136 + auxiliary 27.699; gas 157.428 is the hot water boiler. Every input is in the converted document.
 - **P1 systems** ([`01_systems.md`](docs/audit/107/01_systems.md)): `engine/systems.ts`. Each group's draw from the zones' demand (proportional split, scalar efficiencies), hot water tap-mix per zone, the pump, fans by schedule, and lighting, small power and auxiliary from the gains' electricity. Today's fallbacks are refusals. Served equals demand and the end uses sum to the totals by fuel (tested by hand).
+- **P2 gate** ([`02_gate.md`](docs/audit/107/02_gate.md)):
+  - Fed today's demand, every end use equals today's to its 1 kWh rounding (electricity 404.144, gas 157.428, EUI 133.2).
+  - On Engine 2's own demand (five storeys), the EUI is 131.9. The whole −1.3 is demand: heating +1.03, cooling −2.35.
+  - Engine 2's demand is within −3.9 / +9.3 % of EnergyPlus; today's is −13.8 / +61 %.
 
 ## ✅ Brief 106 — Simulate v2: room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie)
 
