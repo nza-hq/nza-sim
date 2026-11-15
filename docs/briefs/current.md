@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 108 — Simulate v2: emitters per room, capped heat output, re-rated for flow temperature — RESERVED 15 Nov 2026 on `chris/108-emitters` (stacked on 107).**
+Linzie's sizing tool (15 Nov 21:28): each zone's emitters (e.g. two 500 W radiators) cap its heating; output re-rated (EN 442) at the system's flow and return temperatures, so a boiler-to-heat-pump switch shows which rooms fall short, by how much, and what rated output they would need. Engines 1 and 2 gain a heating cap; EnergyPlus referee with capacity-limited ideal loads. Brief [`active/108_emitters.md`](active/108_emitters.md). Claims: `frontend/src/thermal/` (engine, schema), `frontend/src/sim2/run/`.
+
 **Brief 107 — Simulate v2 Engine 4: systems by zone group, delivered energy by end use and fuel — ACTIVE 15 Nov 2026 on `chris/107-systems` (stacked on 106).**
 Delivered energy per system group from the zones' demand (proportional split, scalar efficiencies, DHW tap-mix, lighting and small power from the gains, fans), gated path by path against today's `computeSystemsDelivered`, a tolerance table against EnergyPlus, and delivered energy and EUI in the results panel. No change to today's engine. Brief [`active/107_systems.md`](active/107_systems.md). Claims: `frontend/src/thermal/engine/systems.ts`, `frontend/src/sim2/run/`.
 
