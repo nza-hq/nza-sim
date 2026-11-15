@@ -236,3 +236,72 @@ describe('(f) against EnergyPlus: ideal loads at LimitCapacity (Brief 108 Part 3
     }
   })
 })
+
+// ── Review responses (docs/audit/108/06_independent_review.md) ─────────────────────────────────────────────────────
+describe('review F2 / M4: Engine 1 carries the radiant share', () => {
+  it('half radiant: Engine 1 equals Engine 2 to rounding, and needs more than all convective', () => {
+    const els = [wall('a', 60), wall('b', 40)]
+    const e1 = (hcf: number) => last(runZone(zone1(els, { heating_convective_fraction: hcf })).heating_w)
+    const e2 = (hcf: number) => last(runNetwork({
+      zones: [{ air_capacity_j_per_k: 1e6, bridging_w_per_k: 40, ventilation_w_per_k: flat(60), solar_transmitted_w: flat(0), solar_beam_w: null, other_gains: null, setpoints: { heat_c: 20, cool_c: 26 }, initial_c: 20, heating_convective_fraction: hcf }],
+      elements: els.map((element) => ({ element, zone_a: 0, zone_b: null, solar_absorbed_w_per_m2: flat(0), inside_solar_absorptance: 0.6, inside_solar_absorptance_b: null })),
+      hours: H, theta_e: flat(0), theta_ground: 10, control: 'air', hc_convective_fraction: 1, solar_convective_fraction: 0, warmup_days: 60,
+    }).zones[0].heating_w)
+    expect(e1(0.5)).toBeCloseTo(e2(0.5), 6)
+    expect(e1(0.5) / e1(1)).toBeGreaterThan(1.05)  // under air control, heat put into the walls is partly lost through them
+  })
+})
+
+describe('review F5: held zones beside capped ones, and emitters with cooling', () => {
+  const OP: RunOptions = { ...REFEREE_OPTIONS, control: 'operative' }
+  it('M1: operative control, the middle room heated and held beside a capped room: its operative temperature is its setpoint', () => {
+    const mid = (d: any) => { d.zones[1].setpoints.heat_c = 21; d.system_groups[0].zones.push(d.zones[1].id) }
+    const a = withEmitters(1e9, 0.3, mid), base = runModel(a.doc, W, a.lib, OP)
+    const cap = 0.6 * base.zones[0].annual.peak_heating_w
+    const b = withEmitters(cap, 0.3, mid), r = runModel(b.doc, W, b.lib, OP)
+    expect(r.zones[0].emitters!.hours_at_cap).toBeGreaterThan(0)
+    expect(r.zones[1].emitters).toBeNull()
+    let held = 0
+    for (let h = 0; h < r.zones[1].hourly.heating_w.length; h++) {
+      if (r.zones[1].hourly.heating_w[h] > 1 && r.zones[0].hourly.heating_w[h] >= cap * (1 - 1e-9)) {
+        expect(Math.abs(r.zones[1].hourly.theta_operative_c[h] - 21)).toBeLessThan(1e-6)
+        held++
+      }
+    }
+    expect(held).toBeGreaterThan(0)
+  })
+  it('M5: a room with emitters and a cooling setpoint: cooled hours hold the operative temperature at the cooling setpoint', () => {
+    // The middle room in a narrow band beside it, so its free-or-held choice depends on the cooled room's response.
+    const cool = (d: any) => { d.zones[0].setpoints.cool_c = 23; d.zones[1].setpoints.heat_c = 22; d.zones[1].setpoints.cool_c = 22.5; d.system_groups[0].zones.push(d.zones[1].id) }
+    const b = withEmitters(800, 1, cool), r = runModel(b.doc, W, b.lib, OP)
+    const z = r.zones[0]
+    let cooled = 0
+    for (let h = 0; h < z.hourly.cooling_w.length; h++) {
+      if (z.hourly.cooling_w[h] > 1) { expect(Math.abs(z.hourly.theta_operative_c[h] - 23)).toBeLessThan(1e-6); cooled++ }
+    }
+    expect(cooled).toBeGreaterThan(0)
+    expect(z.emitters!.hours_at_cap).toBeGreaterThan(0)
+    expect(z.closure.max_wh).toBeLessThanOrEqual(1)
+    // Every room left free in an hour sits inside its own band: the free rooms' control temperatures are taken with
+    // the cooled room's cooling response, not its heating response.
+    r.zones.forEach((q, zi) => {
+      const sp = b.doc.zones[zi].setpoints
+      for (let h = 0; h < q.hourly.heating_w.length; h++) {
+        if (q.hourly.heating_w[h] !== 0 || q.hourly.cooling_w[h] !== 0) continue
+        if (sp.cool_c != null) expect(q.hourly.theta_operative_c[h]).toBeLessThanOrEqual(sp.cool_c + 1e-6)
+        if (sp.heat_c != null && !(q.emitters && zi === 0)) expect(q.hourly.theta_operative_c[h]).toBeGreaterThanOrEqual(sp.heat_c - 1e-6)
+      }
+    })
+  })
+})
+
+describe('review F8 and F11: refusals in words', () => {
+  it('an unknown emitter_limit is refused, not read as the cap', () => {
+    const b = withEmitters(800)
+    expect(() => runModel(b.doc, W, b.lib, { ...REFEREE_OPTIONS, emitter_limit: 'off' as any })).toThrow('options.emitter_limit: unknown emitter_limit "off"')
+  })
+  it('a setback says what it is, not a brief number', () => {
+    const b = withEmitters(800, 0, (d) => { d.zones[0].setpoints.setback_c = 16 })
+    expect(() => runModel(b.doc, W, b.lib, REFEREE_OPTIONS)).toThrow('zones[0].setpoints.setback_c: setbacks (a lower night setpoint) are not modelled yet')
+  })
+})

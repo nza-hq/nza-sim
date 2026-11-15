@@ -9,7 +9,7 @@ import type { EmitterZone, Summary } from '../seam'
 
 const zone = (over: Partial<EmitterZone> = {}): EmitterZone => ({
   id: 'z1', name: 'Storey 1', cap_w: 10400, peak_w: 23200, shortfall_w: 12800, design: { flow_c: 50, return_c: 40, room_c: 21 },
-  rated_now_w: 27400, needed_rated_w: 61000, note: null, unmet_hours: 634, min_c: 18.04, hours_at_cap: 1200, ...over,
+  rated_now_w: 27400, needed_rated_w: 61000, note: null, unlisted_systems: [], unmet_hours: 634, min_c: 18.04, hours_at_cap: 1200, ...over,
 })
 const summary = (emitters: Summary['emitters']): Summary => ({
   engine: 'thermal-2', run_ms: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
@@ -41,6 +41,22 @@ describe('EmitterSizing', () => {
     expect(h).toContain('<td>Heating delivered</td><td>111.8 MWh</td><td>116.7 MWh</td>')
     expect(h).toContain('<td>Hours below</td><td>634</td><td>0</td>')
     expect(h).not.toContain('Emitters give 10.4 kW at')
+    // Review F3: the colder pair's lower energy is said not to be a saving; the form says only temperatures change.
+    expect(h).toContain('50/40 °C: less heat')  // only the pair with hours below
+    expect(h).toContain('Lower energy there is not a saving.')
+    expect(h).toContain('the systems and their efficiency stay as they are')
+  })
+  it('review F6 and F7: zones at different pairs are headed "As designed"; an unlisted system is named', () => {
+    const other = zone({ id: 'z2', name: 'Storey 2', design: { flow_c: 45, return_c: 35, room_c: 21 }, unlisted_systems: ['Panel heaters'] })
+    const h = html(summary({ zones: [zone(), other], what_if: { ok: true, flow_c: 70, return_c: 60, heating_kwh: 1, zones: [zone({ unmet_hours: 0 }), zone({ id: 'z2', unmet_hours: 0 })], energy: { ok: false, missing: [] } } }))
+    expect(h).toContain('<th>Building</th><th>As designed</th><th>70/60 °C</th>')
+    expect(h).toContain('Also heated by &quot;Panel heaters&quot;, with no emitters listed here')
+    expect(h).toContain('As designed: less heat')
+  })
+  it('a few watts short reads "under 0.1 kW", never "0.0 kW" (browser check on the editor, 15 Nov)', () => {
+    const h = html(summary({ zones: [zone({ shortfall_w: 9.6, peak_w: 1215, cap_w: 1205.4, unmet_hours: 0 })], what_if: null }))
+    expect(h).toContain('under 0.1 kW short')
+    expect(h).not.toContain('0.0 kW')
   })
   it('a what-if that cannot run says why', () => {
     const h = html(summary({ zones: [zone()], what_if: { ok: false, flow_c: 30, return_c: 20, missing: [{ path: 'p', what: 'The return must be above the room.' }] } }))

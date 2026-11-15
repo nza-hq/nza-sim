@@ -17,3 +17,5 @@
 .es-muted { color: #6B7A75; }
 .es-compare { margin-top: 6px; }
 .es-building { margin-bottom: 8px; }
+.es-hint { flex-basis: 100%; font-size: 11px; line-height: 15px; color: #6B7A75; }
+.es-warn { margin: 0 0 8px; color: #A0522D; }

@@ -54,10 +54,15 @@ export interface ZoneResults {
     cooling_kwh: number
     peak_heating_w: number
     peak_cooling_w: number
+    /** The air node's statistics. Not the lowest temperature to report: that is the control temperature, read through readZoneMinControlC. */
     theta_air_c: { min: number; max: number; mean: number }
     /** Brief 108: hours the control temperature is more than 0.5 K below the heating setpoint (null: not heated). */
     unmet_heating_hours: number | null
-    /** Brief 108: the lowest control temperature (air or operative, as the run's control), °C. */
+    /**
+     * Brief 108: the lowest control temperature (air or operative, as the run's control), °C. The one exposure of
+     * "the lowest temperature the zone fell to" (Rule 11, review F9); under air control it equals theta_air_c.min,
+     * which is the air node's statistic and is not read for this anywhere.
+     */
     min_control_c: number
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
@@ -89,6 +94,8 @@ export const readZoneHeatingKwh = (r: ZoneResults) => r.annual.heating_kwh
 export const readZoneCoolingKwh = (r: ZoneResults) => r.annual.cooling_kwh
 export const readZonePeakHeatingW = (r: ZoneResults) => r.annual.peak_heating_w
 export const readZonePeakCoolingW = (r: ZoneResults) => r.annual.peak_cooling_w
+/** The lowest control temperature of the year (Rule 11: the one read path). */
+export const readZoneMinControlC = (r: ZoneResults) => r.annual.min_control_c
 export const readZoneAirTemperature = (r: ZoneResults) => r.hourly.theta_air_c
 export const readZoneOperativeTemperature = (r: ZoneResults) => r.hourly.theta_operative_c
 export const readZoneHourlyHeatingW = (r: ZoneResults) => r.hourly.heating_w

@@ -73,6 +73,20 @@ describe('sizing by hand', () => {
   })
 })
 
+describe('review F7: a system with no emitters listed in the room is named', () => {
+  it('an electric system serving the room with no heater listed; a fixed unit listed clears it', () => {
+    const extra = (withHeater: boolean) => (d: any) => {
+      d.system_groups.push({ id: 'el', label: 'Panel heaters', service: 'heating', zones: ['west'], enabled: true, share_pct: 0, source: 'electricity', efficiency_metric: 1 })
+      if (withHeater) d.zones[0].emitters.push({ id: 'ph', kind: 'electric', count: 1, rated_output_w: 500, radiant_fraction: 0.4, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null })
+    }
+    const a = rooms(1000, { over: extra(false) })
+    expect(zoneSizing(a.doc, 0, zoneEmitters(a.doc)[0]!, 3000).unlisted_systems).toEqual(['Panel heaters'])
+    expect(zoneSizing(a.doc, 2, zoneEmitters(a.doc)[2]!, 3000).unlisted_systems).toEqual([])
+    const b = rooms(1000, { over: extra(true) })
+    expect(zoneSizing(b.doc, 0, zoneEmitters(b.doc)[0]!, 3000).unlisted_systems).toEqual([])
+  })
+})
+
 describe('no one number, said why', () => {
   const sizeOf = (over: (d: any) => void) => {
     const a = rooms(1000, { over })
