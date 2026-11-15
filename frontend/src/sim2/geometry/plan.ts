@@ -29,6 +29,8 @@ export type PlanRoom = {
   space?: string
   /** Systems step: the room's system per service (a PlanSystem id); absent = none given yet. */
   systems?: Partial<Record<Service, string>>
+  /** Systems step: the room's emitters, how many of each emitter type. */
+  emitters?: Array<{ type: string; count: number }>
 }
 /** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
 export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
@@ -51,7 +53,35 @@ export type PlanSystem = {
   flow?: number | null
   /** When the ventilation runs: 'always_on', or a library ventilation profile's key. */
   schedule?: string | null
+  /** Heating: the design flow and return temperatures, °C, its emitters are re-rated at (schema 2.4). */
+  design_flow_c?: number | null
+  design_return_c?: number | null
 }
+
+/** Emitter kinds (schema 2.4). Wet kinds are fed by the room's heating system and rated (EN 442); VRF indoor units and
+ * electric heaters have a fixed output. */
+export const EMITTER_KINDS = [
+  { key: 'radiator', name: 'Radiator', wet: true },
+  { key: 'underfloor', name: 'Underfloor heating', wet: true },
+  { key: 'fan_coil', name: 'Fan coil', wet: true },
+  { key: 'vrf_indoor', name: 'VRF indoor unit', wet: false },
+  { key: 'electric', name: 'Electric heater', wet: false },
+  { key: 'other', name: 'Other', wet: true },
+] as const
+export type EmitterKind = (typeof EMITTER_KINDS)[number]['key']
+/** An emitter type the user has made: one unit's rated output and rating, given to rooms with a count. Null: not set. */
+export type EmitterType = {
+  id: string
+  name: string
+  kind: EmitterKind
+  rated_output_w: number | null
+  radiant_fraction: number | null
+  rated_flow_c: number | null
+  rated_return_c: number | null
+  rated_room_c: number | null
+  exponent_n: number | null
+}
+export const isWet = (k: EmitterKind) => EMITTER_KINDS.find((x) => x.key === k)!.wet
 
 /** Uses a zone can be given: the zone types today's schedule editor offers (UnifiedScheduleEditor.jsx). */
 export const USES: ReadonlyArray<{ key: string; name: string }> = [
@@ -155,6 +185,8 @@ export type Plan = {
   spaces: SpaceType[]
   /** Whole-building fabric inputs, typed (null: not stated). */
   building?: BuildingInputs
+  /** Emitter types (Systems step), given to rooms with a count. */
+  emitter_types?: EmitterType[]
   /** Hot water for the whole building, typed (Systems step). */
   dhw?: DhwInputs
   /** Next numbers, so names and ids are never reused within a plan. */

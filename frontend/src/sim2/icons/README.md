@@ -21,3 +21,4 @@ restyle each other. Draw over an icon here only by re-copying it from the set.
 | `rooms.svg` | `hartpury-dt-icons_spaces.svg` | `62847c694f3a` |
 | `building.svg` | `hartpury-dt-icons_building.svg` | `eafde5e3813a` |
 | `person.svg` | `hartpury-dt-icons_person.svg` | `eb5e18901bac` |
+| `system-boiler.svg` | `hartpury-dt-icons_hvac-boiler.svg` | `f0aca9795544` |

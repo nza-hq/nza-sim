@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { allWindows, edgesOf, facade4, type FabricElement, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { allWindows, edgesOf, facade4, type FabricElement, isWet, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, profile, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -34,6 +34,7 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000
 const is21 = (SCHEMA_VERSION as string) !== '2.0'
 const is22 = is21 && (SCHEMA_VERSION as string) !== '2.1'
 const is23 = is22 && (SCHEMA_VERSION as string) !== '2.2'
+const is24 = is23 && (SCHEMA_VERSION as string) !== '2.3'
 
 export type Built = {
   doc: unknown
@@ -273,6 +274,26 @@ export function buildDocument(plan: Plan): Built {
     }]
   }
 
+  // Emitters (schema 2.4): per zone, one entry per emitter type in its rooms, the counts added up. A wet one is fed by
+  // the zone's heating system (its group id); a fixed-output one names none and carries no rating temperatures.
+  const emittersOf = (zid: string) => {
+    const by = new Map<string, number>()
+    for (const r of plan.rooms.filter((x) => x.zone === zid)) for (const e of r.emitters ?? []) if (e.count > 0) by.set(e.type, (by.get(e.type) ?? 0) + e.count)
+    const heat = zoneSys(zid, 'heating')
+    const feeds = heat && system(heat.template)?.fuel ? `heating_${heat.id}` : null
+    return [...by.entries()].flatMap(([tid, count]) => {
+      const t = (plan.emitter_types ?? []).find((x) => x.id === tid)
+      if (!t) return []
+      const wet = isWet(t.kind)
+      if (wet && !feeds) notes.push(`${t.name}: fed by a heating system, but its zone has none given`)
+      return [{
+        id: `${zid}_${t.id}`, label: t.name, kind: t.kind, count, rated_output_w: t.rated_output_w, radiant_fraction: t.radiant_fraction,
+        system_group_id: wet ? feeds : null,
+        rated_flow_c: wet ? t.rated_flow_c : null, rated_return_c: wet ? t.rated_return_c : null, rated_room_c: wet ? t.rated_room_c : null, exponent_n: wet ? t.exponent_n : null,
+      }]
+    })
+  }
+
   // Profiles: the library's are shapes (hourly fractions by day type); the magnitudes are not in the library, so
   // lighting and equipment carry none yet, and occupancy is written only with the people per m² typed on its space type.
   const profiles: Record<string, unknown>[] = []
@@ -356,6 +377,7 @@ export function buildDocument(plan: Plan): Built {
     infiltration_ach: null,
     ...(is21 ? { internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2 } : {}),
     surfaces: byZone.get(z.id) ?? [],
+    ...(is24 ? { emitters: emittersOf(z.id) } : {}),
   }))
 
   // Systems: per service, one group per system the user made, serving every zone it is given to, at 100% of that
@@ -371,7 +393,7 @@ export function buildDocument(plan: Plan): Built {
     for (const [id, zs] of bySystem) {
       const sys = plan.systems.find((x) => x.id === id)!
       const t = system(sys.template)!
-      system_groups.push({ id: `${service}_${id}`, service, label: sys.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: t.key })
+      system_groups.push({ id: `${service}_${id}`, service, label: sys.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: t.key, ...(is24 && service === 'heating' ? { design_flow_c: sys.design_flow_c ?? null, design_return_c: sys.design_return_c ?? null } : {}) })
     }
   }
 

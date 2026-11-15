@@ -38,7 +38,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { type BuildingInputs, type DhwInputs, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
+import { type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profilesFor, system, systemsFor } from '../library/library'
@@ -73,7 +73,15 @@ const FABRIC_KINDS: Array<Kind & { key: FabricKind }> = [
   { key: 'bridge', name: 'Thermal bridges', icon: 'bridge' },
   { key: 'partition', name: 'Internal walls', icon: 'rooms' },
 ]
-const SERVICE_ICON: Record<Service, IconName> = { heating: 'heating', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw' }
+const SERVICE_ICON: Record<Service, IconName> = { heating: 'boiler', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw' }
+type SysKind = Service | 'emitters'
+const SYSTEM_KINDS: Kind[] = [
+  { key: 'heating', name: 'Heating', icon: 'boiler' },
+  { key: 'emitters', name: 'Emitters', icon: 'heating' },
+  { key: 'cooling', name: 'Cooling', icon: 'cooling' },
+  { key: 'ventilation', name: 'Ventilation', icon: 'ventilation' },
+  { key: 'dhw', name: 'Hot water', icon: 'dhw' },
+]
 type View = { cx: number; cy: number; k: number }
 type Drag =
   | { kind: 'pan'; x: number; y: number; v: View; moved: boolean }
@@ -180,7 +188,10 @@ export default function GeometryLab() {
   const [fkind, setFkind] = useState<FabricKind>('wall')
   const [opening, setOpening] = useState<'glazing' | 'door'>('glazing')
   const elem: FabricElement = fkind === 'openings' ? opening : fkind === 'air' || fkind === 'bridge' ? 'wall' : fkind
-  const [service, setService] = useState<Service>('heating')
+  const [sysKind, setSysKind] = useState<SysKind>('heating')
+  const service: Service = sysKind === 'emitters' ? 'heating' : sysKind
+  const [activeEmit, setActiveEmit] = useState<string | null>(null)
+  const [emitCount, setEmitCount] = useState(1)
   const [active, setActive] = useState<Partial<Record<FabricElement, string>>>({})
   const [activeSpace, setActiveSpace] = useState<string | null>(null)
   const [activeSys, setActiveSys] = useState<Partial<Record<Service, string>>>({})
@@ -904,11 +915,13 @@ export default function GeometryLab() {
   /** A room's fill: its zone (step 2), its roof or floor type (step 3), its space type (step 4). */
   const roomFill = (r: Plan['rooms'][number]) =>
     mode === 'spaces' ? (spaceColour(r.space) ?? '#FFFFFF') + '59'
+    : mode === 'systems' && sysKind === 'emitters' ? (emitColour(roomEmitters(r)[0]?.type) ?? '#FFFFFF') + '59'
     : mode === 'systems' ? (sysColour(r.systems?.[service]) ?? '#FFFFFF') + '59'
     : mode === 'fabric' ? (elem === 'roof' || elem === 'floor' ? typeColour(plan, roomType(plan, r.id, elem)) + '40' : '#FFFFFF')
     : tintOf(r.zone).fill
   const roomSub = (r: Plan['rooms'][number]) =>
     mode === 'spaces' ? (plan.spaces.find((x) => x.id === r.space)?.name ?? 'No space type')
+    : mode === 'systems' && sysKind === 'emitters' ? (emitName(r) || 'No emitters')
     : mode === 'systems' ? (plan.systems.find((x) => x.id === r.systems?.[service])?.name ?? 'None given')
     : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
     : `${f1(ringArea(r.ring))} m²`
@@ -979,6 +992,10 @@ export default function GeometryLab() {
     if (mode === 'spaces') {
       const sp = plan.spaces.find((x) => x.id === r.space)
       return sp ? { name: sp.name, swatch: { colour: spaceColour(sp.id)! } } : null
+    }
+    if (mode === 'systems' && sysKind === 'emitters') {
+      const es = roomEmitters(r)
+      return es.length ? { name: emitName(r), swatch: { colour: emitColour(es[0]!.type)!, unset: es.some((e) => emitUnset(emitterTypes.find((t) => t.id === e.type)!)) } } : null
     }
     if (mode === 'systems') {
       const x = plan.systems.find((y) => y.id === r.systems?.[service])
@@ -1200,7 +1217,78 @@ export default function GeometryLab() {
     )
   }
 
+  // ─── emitters (step 5): types made once, given to rooms with a count ─────────
+  const emitterTypes = plan.emitter_types ?? []
+  const emitColour = (id: string | undefined) => {
+    const i = emitterTypes.findIndex((x) => x.id === id)
+    return i < 0 ? null : SYSTEM_COLOURS[(i + 3) % SYSTEM_COLOURS.length]!
+  }
+  const curEmit = emitterTypes.find((x) => x.id === activeEmit) ?? emitterTypes[0] ?? null
+  const emitUnset = (t: EmitterType) => t.rated_output_w == null || t.radiant_fraction == null || (isWet(t.kind) && [t.rated_flow_c, t.rated_return_c, t.rated_room_c, t.exponent_n].some((v) => v == null))
+  const roomEmitters = (r: Plan['rooms'][number]) => (r.emitters ?? []).filter((e) => e.count > 0 && emitterTypes.some((t) => t.id === e.type))
+  const emitName = (r: Plan['rooms'][number]) => roomEmitters(r).map((e) => `${e.count} × ${emitterTypes.find((t) => t.id === e.type)!.name}`).join(', ')
+  const newEmitter = (from?: EmitterType) => {
+    let k = emitterTypes.length + 1
+    while (emitterTypes.some((x) => x.id === `e${k}`)) k++
+    const x: EmitterType = from ? { ...from, id: `e${k}`, name: `${from.name} (copy)` } : { id: `e${k}`, name: `Radiator ${emitterTypes.length + 1}`, kind: 'radiator', rated_output_w: null, radiant_fraction: null, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: null }
+    commit({ ...plan, emitter_types: [...emitterTypes, x] })
+    setActiveEmit(x.id)
+  }
+  const setEmit = (id: string, q: Partial<EmitterType>) => commit({ ...plan, emitter_types: emitterTypes.map((x) => (x.id === id ? { ...x, ...q } : x)) })
+  const giveEmitterTo = (ids: string[]) => curEmit && commit({ ...plan, rooms: plan.rooms.map((r) => (ids.includes(r.id) ? { ...r, emitters: [...(r.emitters ?? []).filter((e) => e.type !== curEmit.id), ...(emitCount > 0 ? [{ type: curEmit.id, count: emitCount }] : [])] } : r)) })
+
+  const emittersPanel = () => {
+    const x = curEmit
+    const items: Item[] = emitterTypes.map((t) => {
+      const n = plan.rooms.reduce((s2, r) => s2 + (r.emitters ?? []).filter((e) => e.type === t.id).reduce((a, e) => a + e.count, 0), 0)
+      const kind = EMITTER_KINDS.find((k) => k.key === t.kind)!.name
+      return { id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, line: [kind, t.rated_output_w != null ? `${t.rated_output_w} W each` : 'output not set'].join(' · '), used: n ? `${n} in rooms` : 'not used', removable: !n }
+    })
+    const wet = x ? isWet(x.kind) : false
+    const num = (label: string, k: 'rated_output_w' | 'radiant_fraction' | 'rated_flow_c' | 'rated_return_c' | 'rated_room_c' | 'exponent_n', step: number, unit?: string, max?: number) => x && (
+      <div className="gl-row gl-typed"><span>{label}</span><Num value={x[k] ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 && (max == null || v <= max) ? v : k === 'radiant_fraction' && v === 0 ? 0 : x[k]; if (n !== x[k]) setEmit(x.id, { [k]: n }) }} /></div>
+    )
+    return (
+      <GivePanel
+        kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
+        title="Emitters" icon="heating"
+        items={items} active={x?.id ?? null}
+        onActive={setActiveEmit}
+        onNew={() => newEmitter()} newLabel="New emitter"
+        onCopy={(id) => newEmitter(emitterTypes.find((t) => t.id === id))}
+        onRemove={(id) => commit({ ...plan, emitter_types: emitterTypes.filter((t) => t.id !== id) })}
+        detail={x && (
+          <>
+            <input className="gl-title-in ap-tname" aria-label="Emitter name" defaultValue={x.name} key={`${x.id}-${x.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== x.name && setEmit(x.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            <div className="gl-row gl-librow"><span>Kind</span>
+              <select className="gl-sel" aria-label="Emitter kind" value={x.kind} onChange={(e) => setEmit(x.id, { kind: e.target.value as EmitterKind })}>
+                {EMITTER_KINDS.map((k) => <option key={k.key} value={k.key}>{k.name}</option>)}
+              </select>
+            </div>
+            {num(wet ? 'Output of one, rated' : 'Output of one', 'rated_output_w', 50, 'W')}
+            {num('Radiant share', 'radiant_fraction', 0.05, undefined, 1)}
+            {wet && (
+              <>
+                <h4>Rated at (EN 442)</h4>
+                {num('Flow', 'rated_flow_c', 1, '°C')}
+                {num('Return', 'rated_return_c', 1, '°C')}
+                {num('Room', 'rated_room_c', 1, '°C')}
+                {num('Exponent n', 'exponent_n', 0.05)}
+                <p className="gl-hint">From the maker's data. A new radiator starts at the EN 442 rating, 75/65/20 °C. n is about 1.3 for panel radiators, 1.1 underfloor, 1.0 fan coils. Its output is re-rated at the heating system's design flow and return.</p>
+              </>
+            )}
+            {!wet && <p className="gl-hint">A fixed output, not fed by the heating system's water.</p>}
+            <div className="gl-row gl-typed ap-count"><span>How many in each room</span><Num value={emitCount} step={1} min={0} onCommit={(v) => setEmitCount(Number.isFinite(v) && v >= 0 ? Math.round(v) : 1)} /></div>
+            <p className="gl-hint">Apply puts this many in each chosen room (0 takes them out). A room's emitters cap the heat it can get; a room with none is not capped.</p>
+          </>
+        )}
+        give={giveFoot({ name: x ? `${emitCount} × ${x.name}` : null, rooms: true, now: chosenSet.rooms.map((id) => emitName(plan.rooms.find((r) => r.id === id)!) || 'none'), onGive: (all) => giveEmitterTo(all ? allRooms() : chosenSet.rooms) })}
+      />
+    )
+  }
+
   const systemsPanel = () => {
+    if (sysKind === 'emitters') return emittersPanel()
     const x = curSys
     const sv = SERVICES.find((s) => s.key === service)!
     const items: Item[] = systemsOf(service).map((y) => {
@@ -1210,7 +1298,7 @@ export default function GeometryLab() {
     const mech = ['mvhr', 'mev'].includes(system(x?.template)?.type ?? '')
     return (
       <GivePanel
-        kinds={SERVICES.map((s) => ({ key: s.key, name: s.name, icon: SERVICE_ICON[s.key] }))} kind={service} onKind={(k) => setService(k as Service)}
+        kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
         title={`${sv.name} systems`} icon={SERVICE_ICON[service]}
         top={service === 'dhw' ? (() => {
           const hw = plan.dhw ?? noDhw()
@@ -1269,6 +1357,15 @@ export default function GeometryLab() {
                     {profilesFor('ventilation').map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
                   </select>
                 </div>
+              </>
+            )}
+            {service === 'heating' && x.template && (
+              <>
+                <h4>Design water temperatures</h4>
+                {(['design_flow_c', 'design_return_c'] as const).map((k) => (
+                  <div key={k} className="gl-row gl-typed"><span>{k === 'design_flow_c' ? 'Flow' : 'Return'}</span><Num value={x[k] ?? ''} unit="°C" step={1} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x[k] ?? null)) setSys(x.id, { [k]: n }) }} /></div>
+                ))}
+                <p className="gl-hint">What the water leaves and comes back at on a design day. Radiators and underfloor fed by this system are re-rated to these (a heat pump at 45/40 gets much less from a radiator rated at 75/65). Empty stays unset.</p>
               </>
             )}
             <p className="gl-hint">Fuel and efficiency come from NZA Sim's library. A change changes every room with this system.</p>

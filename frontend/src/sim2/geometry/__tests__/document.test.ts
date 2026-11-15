@@ -249,3 +249,28 @@ describe('hot water for the whole building', () => {
     expect(b.notes.some((n) => /Hot water/.test(n))).toBe(false)
   })
 })
+
+describe('emitters in rooms (schema 2.4)', () => {
+  it('sums each type over a zone, feeds wet ones from the heating system, and writes design temperatures', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    p = {
+      ...p,
+      systems: [{ id: 'y1', service: 'heating', name: 'Heat pump', template: 'gas_boiler_heating', design_flow_c: 45, design_return_c: 40 }],
+      emitter_types: [
+        { id: 'e1', name: 'Radiator', kind: 'radiator', rated_output_w: 500, radiant_fraction: 0.3, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 },
+        { id: 'e2', name: 'Panel heater', kind: 'electric', rated_output_w: 1000, radiant_fraction: 0.1, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 },
+      ],
+      rooms: p.rooms.map((r) => ({ ...r, systems: { heating: 'y1' }, emitters: [{ type: 'e1', count: 2 }, { type: 'e2', count: 1 }] })),
+    }
+    const b = buildDocument(p)
+    expect(b.issues).toEqual([])
+    const doc = b.doc as any
+    const n = p.rooms.length
+    expect(doc.zones[0].emitters).toEqual([
+      { id: `${doc.zones[0].id}_e1`, label: 'Radiator', kind: 'radiator', count: 2 * n, rated_output_w: 500, radiant_fraction: 0.3, system_group_id: 'heating_y1', rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 },
+      { id: `${doc.zones[0].id}_e2`, label: 'Panel heater', kind: 'electric', count: n, rated_output_w: 1000, radiant_fraction: 0.1, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null },
+    ])
+    expect(doc.system_groups.find((g: any) => g.id === 'heating_y1')).toMatchObject({ design_flow_c: 45, design_return_c: 40 })
+  })
+})
