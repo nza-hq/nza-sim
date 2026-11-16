@@ -12,6 +12,7 @@ import {
   Cloud,
   Route as RouteIcon,
   Layers,
+  Boxes,
 } from 'lucide-react'
 import { accentForPath } from '../../data/moduleThemes.js'
 
@@ -39,6 +40,7 @@ const INPUT_ITEMS = [
   { to: '/gains',       icon: Flame,           label: 'Internal Gains' },
   { to: '/operation',   icon: Wind,            label: 'Operation' },
   { to: '/systems',     icon: Thermometer,     label: 'Systems' },
+  { to: '/model',       icon: Boxes,           label: 'Model (new)' },
   { to: '/consumption', icon: FileSpreadsheet, label: 'Consumption' },
 ]
 
