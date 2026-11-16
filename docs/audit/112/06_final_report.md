@@ -18,7 +18,7 @@
 | P3 levels | 95ebc4f | "+ Spaces" removes lighting (Rule 8); closure holds at all three levels (Rule 9) |
 | P4 gates | e76dd3e | Bridgewater restated as 100 lux × 2.0 gives every end use exactly (0 kWh difference; lighting 39.014 MWh, v2 EUI 131.89); the two-zone fixture closes at all three levels; 107 gate byte for byte |
 | P5 workspace (editor) | 1ff8849 | Spaces and Systems steps, the inspector line, the Lighting system kind, old plans' litres onto space types |
-| P5 review | e7d2cb5 | F1–F8 answered ([`05_review_response.md`](05_review_response.md)); F1 (2.7 upgrade filled gain fallbacks) fixed |
+| P5 review | e7d2cb5, 8312f6d (editor, F8) | F1–F8 answered ([`05_review_response.md`](05_review_response.md)); F1 (2.7 upgrade filled gain fallbacks) fixed; F8 per m² hot water in a space with no people now carried on a no-people occupancy profile |
 
 ## Tested against a real project
 
@@ -33,6 +33,5 @@ Anchor 133.2, re-run in the cloud container on 16 Nov after the review fixes. 40
 
 - Lighting controls (daylight, presence) stay on the space's lighting profile until Brief 114's Controls step (review F3).
 - Two lighting systems with different efficacies in one lux zone are refused for now.
-- A space type with no people and per m² hot water is named on the page and left out of the model (review F8, the editor's call).
 - Fresh air stays on the ventilation system (editor's P5 note).
 - The anchor re-run on IT15 the brief asks for was done in the cloud container instead; today's engine is untouched.
