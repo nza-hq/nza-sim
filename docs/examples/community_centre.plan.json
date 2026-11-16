@@ -1,0 +1,1400 @@
+{
+ "_note": "Worked example (16 Nov 2026): an L-shaped single-storey community centre, nine rooms in nine zones, drawn with the editor's own plan shape. Every typed value is an example input chosen for the demonstration, not a real building. Load with window.sim2.loadPlan(fixture.plan).",
+ "plan": {
+  "blocks": [
+   [
+    [
+     0,
+     0
+    ],
+    [
+     36,
+     0
+    ],
+    [
+     36,
+     12
+    ],
+    [
+     14,
+     12
+    ],
+    [
+     14,
+     30
+    ],
+    [
+     0,
+     30
+    ]
+   ]
+  ],
+  "rooms": [
+   {
+    "id": "r1",
+    "name": "Café",
+    "ring": [
+     [
+      0,
+      0
+     ],
+     [
+      14,
+      0
+     ],
+     [
+      14,
+      8
+     ],
+     [
+      0,
+      8
+     ]
+    ],
+    "zone": "z1",
+    "space": "s_cafe",
+    "systems": {
+     "dhw": "y_dhw",
+     "heating": "y_boiler"
+    },
+    "emitters": [
+     {
+      "type": "et_rad_b",
+      "count": 4
+     }
+    ],
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r2",
+    "name": "Kitchen",
+    "ring": [
+     [
+      0,
+      8
+     ],
+     [
+      14,
+      8
+     ],
+     [
+      14,
+      12
+     ],
+     [
+      0,
+      12
+     ]
+    ],
+    "zone": "z2",
+    "space": "s_kitchen",
+    "systems": {
+     "dhw": "y_dhw",
+     "heating": "y_boiler",
+     "ventilation": "y_mev_k"
+    },
+    "emitters": [
+     {
+      "type": "et_rad_b",
+      "count": 2
+     }
+    ],
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r3",
+    "name": "Reception",
+    "ring": [
+     [
+      14,
+      0
+     ],
+     [
+      20,
+      0
+     ],
+     [
+      20,
+      12
+     ],
+     [
+      14,
+      12
+     ]
+    ],
+    "zone": "z3",
+    "space": "s_reception",
+    "systems": {
+     "dhw": "y_dhw",
+     "heating": "y_ashp",
+     "ventilation": "y_mvhr"
+    },
+    "emitters": [
+     {
+      "type": "et_rad_hp",
+      "count": 3
+     }
+    ],
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r4",
+    "name": "Open-plan office",
+    "ring": [
+     [
+      20,
+      0
+     ],
+     [
+      31,
+      0
+     ],
+     [
+      31,
+      12
+     ],
+     [
+      20,
+      12
+     ]
+    ],
+    "zone": "z4",
+    "space": "s_office",
+    "systems": {
+     "dhw": "y_dhw",
+     "heating": "y_ashp",
+     "cooling": "y_split",
+     "ventilation": "y_mvhr"
+    },
+    "emitters": [
+     {
+      "type": "et_rad_hp",
+      "count": 8
+     }
+    ],
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r5",
+    "name": "Meeting room",
+    "ring": [
+     [
+      31,
+      0
+     ],
+     [
+      36,
+      0
+     ],
+     [
+      36,
+      9
+     ],
+     [
+      31,
+      9
+     ]
+    ],
+    "zone": "z5",
+    "space": "s_meeting",
+    "systems": {
+     "dhw": "y_dhw",
+     "heating": "y_vrf",
+     "cooling": "y_vrf_c",
+     "ventilation": "y_mvhr"
+    },
+    "emitters": [
+     {
+      "type": "et_vrf",
+      "count": 2
+     }
+    ],
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r6",
+    "name": "Comms room",
+    "ring": [
+     [
+      31,
+      9
+     ],
+     [
+      36,
+      9
+     ],
+     [
+      36,
+      12
+     ],
+     [
+      31,
+      12
+     ]
+    ],
+    "zone": "z6",
+    "space": "s_comms",
+    "systems": {
+     "dhw": "y_dhw",
+     "cooling": "y_vrf_c"
+    },
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r7",
+    "name": "Store",
+    "ring": [
+     [
+      0,
+      12
+     ],
+     [
+      7,
+      12
+     ],
+     [
+      7,
+      16
+     ],
+     [
+      0,
+      16
+     ]
+    ],
+    "zone": "z7",
+    "space": "s_store",
+    "systems": {
+     "heating": "y_panel"
+    },
+    "emitters": [
+     {
+      "type": "et_panel",
+      "count": 2
+     }
+    ],
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r8",
+    "name": "WCs",
+    "ring": [
+     [
+      7,
+      12
+     ],
+     [
+      14,
+      12
+     ],
+     [
+      14,
+      16
+     ],
+     [
+      7,
+      16
+     ]
+    ],
+    "zone": "z8",
+    "space": "s_wc",
+    "systems": {
+     "dhw": "y_dhw",
+     "heating": "y_boiler",
+     "ventilation": "y_mev_w"
+    },
+    "emitters": [
+     {
+      "type": "et_rad_b",
+      "count": 2
+     }
+    ],
+    "roof": "f_roof2",
+    "floor": "f_floor2"
+   },
+   {
+    "id": "r9",
+    "name": "Main hall",
+    "ring": [
+     [
+      0,
+      16
+     ],
+     [
+      14,
+      16
+     ],
+     [
+      14,
+      30
+     ],
+     [
+      0,
+      30
+     ]
+    ],
+    "zone": "z9",
+    "space": "s_hall",
+    "systems": {
+     "dhw": "y_dhw",
+     "heating": "y_boiler"
+    },
+    "emitters": [
+     {
+      "type": "et_rad_b",
+      "count": 8
+     }
+    ],
+    "roof": "f_roof3",
+    "floor": "f_floor3"
+   }
+  ],
+  "zones": [
+   {
+    "id": "z1",
+    "name": "Café",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z2",
+    "name": "Kitchen",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z3",
+    "name": "Reception",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z4",
+    "name": "Open-plan office",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z5",
+    "name": "Meeting room",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z6",
+    "name": "Comms room",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z7",
+    "name": "Store",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z8",
+    "name": "WCs",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z9",
+    "name": "Main hall",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   }
+  ],
+  "systems": [
+   {
+    "id": "y_boiler",
+    "service": "heating",
+    "name": "Gas boiler 1",
+    "template": "gas_boiler_heating",
+    "design_flow_c": 70,
+    "design_return_c": 50
+   },
+   {
+    "id": "y_ashp",
+    "service": "heating",
+    "name": "Air source heat pump",
+    "template": "ashp_heating",
+    "design_flow_c": 45,
+    "design_return_c": 35
+   },
+   {
+    "id": "y_vrf",
+    "service": "heating",
+    "name": "VRF (meeting room)",
+    "template": "vrf_standard"
+   },
+   {
+    "id": "y_panel",
+    "service": "heating",
+    "name": "Electric panel heaters",
+    "template": "electric_panel_heating"
+   },
+   {
+    "id": "y_split",
+    "service": "cooling",
+    "name": "Split cooling (office)",
+    "template": "split_system_cooling"
+   },
+   {
+    "id": "y_vrf_c",
+    "service": "cooling",
+    "name": "VRF cooling",
+    "template": "vrf_standard"
+   },
+   {
+    "id": "y_mvhr",
+    "service": "ventilation",
+    "name": "MVHR (office wing)",
+    "template": "mvhr_standard",
+    "flow": 1,
+    "schedule": "hotel_ventilation_occupied"
+   },
+   {
+    "id": "y_mev_k",
+    "service": "ventilation",
+    "name": "Kitchen extract",
+    "template": "mev_standard",
+    "flow": 3,
+    "schedule": "hotel_ventilation_timer"
+   },
+   {
+    "id": "y_mev_w",
+    "service": "ventilation",
+    "name": "WC extract",
+    "template": "mev_standard",
+    "flow": 1.5,
+    "schedule": "hotel_ventilation_timer"
+   },
+   {
+    "id": "y_dhw",
+    "service": "dhw",
+    "name": "Gas boiler 1 (hot water)",
+    "template": "gas_boiler_dhw"
+   }
+  ],
+  "storey_height_m": 3.2,
+  "windows": [
+   {
+    "id": "w1",
+    "wall": 0,
+    "t_m": 1,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.4
+   },
+   {
+    "id": "w2",
+    "wall": 0,
+    "t_m": 4.6,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.4
+   },
+   {
+    "id": "w3",
+    "wall": 0,
+    "t_m": 8.2,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.4
+   },
+   {
+    "id": "w4",
+    "wall": 0,
+    "t_m": 11.6,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.4
+   },
+   {
+    "id": "w5",
+    "wall": 0,
+    "t_m": 14.5,
+    "width_m": 1.2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w6",
+    "wall": 0,
+    "t_m": 16.5,
+    "width_m": 1.8,
+    "height_m": 2.1,
+    "sill_m": 0.05,
+    "shading_m": 0
+   },
+   {
+    "id": "w7",
+    "wall": 0,
+    "t_m": 20.8,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w8",
+    "wall": 0,
+    "t_m": 23.4,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w9",
+    "wall": 0,
+    "t_m": 26,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w10",
+    "wall": 0,
+    "t_m": 28.6,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w11",
+    "wall": 0,
+    "t_m": 32.3,
+    "width_m": 2.4,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w12",
+    "wall": 1,
+    "t_m": 3.5,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w13",
+    "wall": 2,
+    "t_m": 6.5,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w14",
+    "wall": 2,
+    "t_m": 9.5,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w15",
+    "wall": 2,
+    "t_m": 12.5,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w16",
+    "wall": 2,
+    "t_m": 18,
+    "width_m": 1.5,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w17",
+    "wall": 3,
+    "t_m": 1.7,
+    "width_m": 0.6,
+    "height_m": 0.6,
+    "sill_m": 1.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w18",
+    "wall": 3,
+    "t_m": 5,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w19",
+    "wall": 3,
+    "t_m": 8.5,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w20",
+    "wall": 3,
+    "t_m": 12,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w21",
+    "wall": 3,
+    "t_m": 15.5,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w22",
+    "wall": 4,
+    "t_m": 2,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w23",
+    "wall": 4,
+    "t_m": 6,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w24",
+    "wall": 4,
+    "t_m": 10,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w25",
+    "wall": 5,
+    "t_m": 2,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w26",
+    "wall": 5,
+    "t_m": 6,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w27",
+    "wall": 5,
+    "t_m": 10,
+    "width_m": 2,
+    "height_m": 1.8,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w28",
+    "wall": 5,
+    "t_m": 15.4,
+    "width_m": 1.2,
+    "height_m": 2.1,
+    "sill_m": 0.05,
+    "shading_m": 0
+   },
+   {
+    "id": "w29",
+    "wall": 5,
+    "t_m": 19.4,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1.1,
+    "shading_m": 0
+   },
+   {
+    "id": "w30",
+    "wall": 5,
+    "t_m": 23.2,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w31",
+    "wall": 5,
+    "t_m": 26.8,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.9,
+    "shading_m": 0
+   }
+  ],
+  "fabric_types": [
+   {
+    "id": "f_wall",
+    "element": "wall",
+    "name": "External wall",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_glazing",
+    "element": "glazing",
+    "name": "Windows",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_door",
+    "element": "door",
+    "name": "Doors",
+    "construction": null,
+    "u": 1.8
+   },
+   {
+    "id": "f_roof",
+    "element": "roof",
+    "name": "Roof",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_floor",
+    "element": "floor",
+    "name": "Ground floor",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_partition",
+    "element": "partition",
+    "name": "Block partition",
+    "construction": "interior_wall_block_plastered",
+    "u": null
+   },
+   {
+    "id": "f_wall2",
+    "element": "wall",
+    "name": "Enhanced fabric: outside walls",
+    "construction": "cavity_wall_enhanced",
+    "u": null,
+    "template": "set_enhanced"
+   },
+   {
+    "id": "f_glazing2",
+    "element": "glazing",
+    "name": "Enhanced fabric: windows",
+    "construction": "triple_glazing",
+    "u": null,
+    "template": "set_enhanced"
+   },
+   {
+    "id": "f_roof2",
+    "element": "roof",
+    "name": "Enhanced fabric: roofs",
+    "construction": "flat_roof_enhanced",
+    "u": null,
+    "template": "set_enhanced"
+   },
+   {
+    "id": "f_floor2",
+    "element": "floor",
+    "name": "Enhanced fabric: ground floors",
+    "construction": "ground_floor_enhanced",
+    "u": null,
+    "template": "set_enhanced"
+   },
+   {
+    "id": "f_wall3",
+    "element": "wall",
+    "name": "Timber frame, pitched roof: outside walls",
+    "construction": "timber_frame_standard",
+    "u": null,
+    "template": "set_timber"
+   },
+   {
+    "id": "f_glazing3",
+    "element": "glazing",
+    "name": "Timber frame, pitched roof: windows",
+    "construction": "double_low_e",
+    "u": null,
+    "template": "set_timber"
+   },
+   {
+    "id": "f_roof3",
+    "element": "roof",
+    "name": "Timber frame, pitched roof: roofs",
+    "construction": "pitched_roof_standard",
+    "u": null,
+    "template": "set_timber"
+   },
+   {
+    "id": "f_floor3",
+    "element": "floor",
+    "name": "Timber frame, pitched roof: ground floors",
+    "construction": "ground_floor_slab",
+    "u": null,
+    "template": "set_timber"
+   }
+  ],
+  "wall_spans": [
+   {
+    "wall": 0,
+    "t0": 0,
+    "t1": 14,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 14,
+    "t1": 20,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 20,
+    "t1": 31,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 31,
+    "t1": 36,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 1,
+    "t0": 0,
+    "t1": 9,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 1,
+    "t0": 9,
+    "t1": 12,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 2,
+    "t0": 0,
+    "t1": 5,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 2,
+    "t0": 5,
+    "t1": 16,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 2,
+    "t0": 16,
+    "t1": 22,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 3,
+    "t0": 0,
+    "t1": 4,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 5,
+    "t0": 14,
+    "t1": 18,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 5,
+    "t0": 18,
+    "t1": 22,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 5,
+    "t0": 22,
+    "t1": 30,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 0,
+    "t1": 14,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 14,
+    "t1": 20,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 20,
+    "t1": 31,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 31,
+    "t1": 36,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 1,
+    "t0": 0,
+    "t1": 9,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 1,
+    "t0": 9,
+    "t1": 12,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 2,
+    "t0": 0,
+    "t1": 5,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 2,
+    "t0": 5,
+    "t1": 16,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 2,
+    "t0": 16,
+    "t1": 22,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 3,
+    "t0": 0,
+    "t1": 4,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 5,
+    "t0": 14,
+    "t1": 18,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 5,
+    "t0": 18,
+    "t1": 22,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 5,
+    "t0": 22,
+    "t1": 30,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 3,
+    "t0": 4,
+    "t1": 18,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 4,
+    "t0": 0,
+    "t1": 14,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 5,
+    "t0": 0,
+    "t1": 14,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 3,
+    "t0": 4,
+    "t1": 18,
+    "type": "f_glazing3",
+    "element": "glazing"
+   },
+   {
+    "wall": 4,
+    "t0": 0,
+    "t1": 14,
+    "type": "f_glazing3",
+    "element": "glazing"
+   },
+   {
+    "wall": 5,
+    "t0": 0,
+    "t1": 14,
+    "type": "f_glazing3",
+    "element": "glazing"
+   }
+  ],
+  "spaces": [
+   {
+    "id": "s_office",
+    "name": "Open-plan office",
+    "use": "office",
+    "occupancy": "office_occupancy",
+    "people_per_m2": 0.1,
+    "occupancy_rate": 0.8,
+    "sensible_w_per_person": 75,
+    "lighting": "office_lighting",
+    "equipment": null,
+    "lighting_w_per_m2": 8,
+    "equipment_w_per_m2": 12,
+    "equipment_baseload_w_per_m2": 1,
+    "heat_c": 21,
+    "cool_c": 24,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_meeting",
+    "name": "Meeting room",
+    "use": "office",
+    "occupancy": "office_occupancy",
+    "people_per_m2": 0.5,
+    "occupancy_rate": 0.4,
+    "sensible_w_per_person": 75,
+    "lighting": "office_lighting",
+    "equipment": null,
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 4,
+    "equipment_baseload_w_per_m2": 0.5,
+    "heat_c": 21,
+    "cool_c": 23,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_reception",
+    "name": "Reception",
+    "use": "public",
+    "occupancy": "hotel_reception_occupancy",
+    "people_per_m2": 0.05,
+    "occupancy_rate": 0.8,
+    "sensible_w_per_person": 75,
+    "lighting": "hotel_corridor_lighting",
+    "equipment": null,
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 3,
+    "equipment_baseload_w_per_m2": 0.5,
+    "heat_c": 20,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_cafe",
+    "name": "Café",
+    "use": "retail",
+    "occupancy": "retail_occupancy",
+    "people_per_m2": 0.3,
+    "occupancy_rate": 0.5,
+    "sensible_w_per_person": 75,
+    "lighting": null,
+    "equipment": null,
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 5,
+    "equipment_baseload_w_per_m2": 1,
+    "heat_c": 20,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_kitchen",
+    "name": "Café kitchen",
+    "use": "other",
+    "occupancy": "retail_occupancy",
+    "people_per_m2": 0.08,
+    "occupancy_rate": 0.8,
+    "sensible_w_per_person": 75,
+    "lighting": null,
+    "equipment": null,
+    "lighting_w_per_m2": 12,
+    "equipment_w_per_m2": 40,
+    "equipment_baseload_w_per_m2": 5,
+    "heat_c": 18,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_hall",
+    "name": "Community hall",
+    "use": "public",
+    "occupancy": "hotel_reception_occupancy",
+    "people_per_m2": 0.4,
+    "occupancy_rate": 0.35,
+    "sensible_w_per_person": 75,
+    "lighting": null,
+    "equipment": null,
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 2,
+    "equipment_baseload_w_per_m2": 0.5,
+    "heat_c": 19,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_comms",
+    "name": "Comms room",
+    "use": "other",
+    "occupancy": "always_on",
+    "people_per_m2": 0.001,
+    "occupancy_rate": 1,
+    "sensible_w_per_person": 75,
+    "lighting": null,
+    "equipment": null,
+    "equipment_w_per_m2": 120,
+    "equipment_baseload_w_per_m2": 0,
+    "cool_c": 24,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_store",
+    "name": "Store",
+    "use": "other",
+    "occupancy": null,
+    "lighting": null,
+    "equipment": null,
+    "heat_c": 12,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   },
+   {
+    "id": "s_wc",
+    "name": "WCs",
+    "use": "other",
+    "occupancy": "office_occupancy",
+    "people_per_m2": 0.05,
+    "occupancy_rate": 0.8,
+    "sensible_w_per_person": 75,
+    "lighting": "office_lighting",
+    "equipment": null,
+    "lighting_w_per_m2": 6,
+    "equipment_w_per_m2": 0,
+    "equipment_baseload_w_per_m2": 0,
+    "heat_c": 18,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   }
+  ],
+  "building": {
+   "q50": 5,
+   "tb_multiplier": 1,
+   "exposure": "normal"
+  },
+  "next": {
+   "room": 10,
+   "zone": 10,
+   "system": 11
+  },
+  "profiles": [
+   "office_occupancy",
+   "office_lighting",
+   "retail_occupancy",
+   "hotel_reception_occupancy",
+   "hotel_corridor_lighting",
+   "hotel_ventilation_occupied",
+   "hotel_ventilation_timer"
+  ],
+  "emitter_types": [
+   {
+    "id": "et_rad_b",
+    "name": "Radiator K2 600×1400 (boiler)",
+    "kind": "radiator",
+    "rated_output_w": 2350,
+    "radiant_fraction": 0.3,
+    "rated_flow_c": 75,
+    "rated_return_c": 65,
+    "rated_room_c": 20,
+    "exponent_n": 1.33
+   },
+   {
+    "id": "et_rad_hp",
+    "name": "Radiator K2 600×2000 (heat pump)",
+    "kind": "radiator",
+    "rated_output_w": 3360,
+    "radiant_fraction": 0.3,
+    "rated_flow_c": 75,
+    "rated_return_c": 65,
+    "rated_room_c": 20,
+    "exponent_n": 1.33
+   },
+   {
+    "id": "et_vrf",
+    "name": "VRF cassette 3.6 kW",
+    "kind": "vrf_indoor",
+    "rated_output_w": 3600,
+    "radiant_fraction": 0,
+    "rated_flow_c": null,
+    "rated_return_c": null,
+    "rated_room_c": null,
+    "exponent_n": null
+   },
+   {
+    "id": "et_panel",
+    "name": "Panel heater 1 kW",
+    "kind": "electric",
+    "rated_output_w": 1000,
+    "radiant_fraction": 0.2,
+    "rated_flow_c": null,
+    "rated_return_c": null,
+    "rated_room_c": null,
+    "exponent_n": null
+   }
+  ],
+  "dhw": {
+   "storage_c": 60,
+   "tap_c": 43,
+   "cold_c": 10,
+   "basis": "per_person",
+   "litres": 4,
+   "pump_w": 60,
+   "shape": "follow_occupancy"
+  },
+  "fabric_set": "set_enhanced"
+ }
+}
