@@ -80,7 +80,7 @@ type State =
  * The run for one document: a worker, rerun about a quarter of a second after each change, plus the weather it runs
  * on. One per editor; the floating panel, the workspace's strip, Heat flow tab and Site weather all read the same one.
  */
-export function useRun(doc: unknown) {
+export function useRun(doc: unknown, previewDoc: unknown = null) {
   const auth = useAuth()
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
@@ -120,8 +120,50 @@ export function useRun(doc: unknown) {
       return
     }
     client.current = c
-    return () => c.dispose()
+    // Preview, then apply (Linzie, 16 Nov 00:22): a second worker runs the change being previewed, on the same weather,
+    // so the strip can show where the numbers stand now and where they would go. It is not started until asked for.
+    return () => { c.dispose(); preview.current?.dispose(); preview.current = null }
   }, [])
+
+  const preview = useRef<RunClient | null>(null)
+  const [previewState, setPreviewState] = useState<State>({ kind: 'idle' })
+  const latestPreview = useRef(previewDoc)
+  latestPreview.current = previewDoc
+  const weatherBytes = useRef<{ bytes: Uint8Array; name: string; source: 'local' | 'organisation' } | null>(null)
+  const previewClient = () => {
+    if (preview.current) return preview.current
+    try {
+      const p = new RunClient(
+        (a: RunAnswer) => {
+          const r = a.result
+          if (r.ok) setPreviewState({ kind: 'done', summary: r.summary, ms: a.ms })
+          else if ('missing' in r) setPreviewState({ kind: 'missing', items: r.missing })
+          else setPreviewState({ kind: 'error', message: r.error })
+        },
+        (w: WeatherAnswer) => { if (w.ok && latestPreview.current) p.run(latestPreview.current, 0, { what_if: latestWhatIf.current }) },
+        (why) => setPreviewState({ kind: 'error', message: why }),
+      )
+      preview.current = p
+      const wb = weatherBytes.current
+      if (wb) p.setWeather(wb.bytes.slice(), wb.name, wb.source)
+      return p
+    } catch (e) {
+      setPreviewState({ kind: 'error', message: (e as Error).message || 'the browser blocked the background worker' })
+      return null
+    }
+  }
+  const sendWeather = (bytes: Uint8Array, name: string, source: 'local' | 'organisation') => {
+    weatherBytes.current = { bytes, name, source }
+    client.current?.setWeather(bytes.slice(), name, source)
+    preview.current?.setWeather(bytes.slice(), name, source)
+  }
+  useEffect(() => {
+    if (!previewDoc) { setPreviewState({ kind: 'idle' }); return }
+    const p = previewClient()
+    if (!p) return
+    setPreviewState({ kind: 'running' })
+    if (weatherBytes.current) p.run(previewDoc, 0, { what_if: whatIf })
+  }, [previewDoc, whatIf])
 
   useEffect(() => {
     if (!client.current) return
@@ -141,7 +183,7 @@ export function useRun(doc: unknown) {
     const bytes = new Uint8Array(await f.arrayBuffer())
     localFile.current = { bytes, name: f.name }
     setSaveNote(null)
-    client.current.setWeather(bytes.slice(), f.name, 'local')
+    sendWeather(bytes, f.name, 'local')
     e.target.value = ''
   }
   const onOrg = async (name: string) => {
@@ -150,7 +192,7 @@ export function useRun(doc: unknown) {
     if (error || !data) { setWeatherError(error?.message ?? 'The weather file could not be downloaded.'); return }
     localFile.current = null
     setSaveNote(null)
-    client.current.setWeather(new Uint8Array(await data.arrayBuffer()), name, 'organisation')
+    sendWeather(new Uint8Array(await data.arrayBuffer()), name, 'organisation')
   }
   const canSave = !!auth && (auth.org.role === 'admin' || auth.org.role === 'editor')
   const onSave = async () => {
@@ -165,7 +207,7 @@ export function useRun(doc: unknown) {
     } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
-  return { auth, state, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+  return { auth, state, previewState, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
 }
 export type Run = ReturnType<typeof useRun>
 
@@ -217,13 +259,43 @@ function stripItems(s: Summary, unit: 'kwh' | 'kwh_per_m2') {
   ]
 }
 
+/** One decimal, so a small change still shows. */
+const one = (x: number) => x.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+/** The previewed change: each figure now → if applied, and by how much (Linzie, 16 Nov 00:22: "show what's happening"). */
+export function previewItems(a: Summary, b: Summary, unit: 'kwh' | 'kwh_per_m2') {
+  const per = (s: Summary, kwh: number) => (unit === 'kwh_per_m2' ? (s.building.floor_m2 > 0 ? kwh / s.building.floor_m2 : NaN) : kwh / 1000)
+  const u = unit === 'kwh_per_m2' ? 'kWh/m²' : 'MWh'
+  const move = (label: string, x: number, y: number, accent: string) => {
+    const d = Math.round((y - x) * 10) / 10
+    return { label, value: `${one(x)} → ${one(y)}`, unit: u, sub: d === 0 ? 'no change' : `${d > 0 ? '+' : '−'}${one(Math.abs(d))} ${u}`, accent }
+  }
+  const items = [
+    move('Heating', per(a, a.building.heating_kwh), per(b, b.building.heating_kwh), HEATING_COLOUR),
+    move('Cooling', per(a, a.building.cooling_kwh), per(b, b.building.cooling_kwh), COOLING_COLOUR),
+  ]
+  if (a.energy?.ok && b.energy?.ok) items.push(move('Energy used', per(a, a.energy.total_kwh), per(b, b.energy.total_kwh), SYSTEMS_ACCENT))
+  return items
+}
+
 export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void }) {
-  const { state, weather } = run
+  const { state, weather, previewState } = run
   const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
   const s = state.kind === 'done' ? state.summary : null
   const last = useRef<Summary | null>(null)
   if (s) last.current = s
   const shown = s ?? (state.kind === 'running' ? last.current : null)
+  if (previewState.kind !== 'idle' && shown) {
+    const p = previewState.kind === 'done' ? previewState.summary : null
+    return (
+      <div className={`rp-strip rp-strip-pv${p ? '' : ' rp-stale'}`} role="status" aria-label="Preview">
+        <div className="rp-strip-live">
+          {p ? <LiveResultsStrip items={previewItems(shown, p, unit)} />
+            : <span className="rp-strip-msg">{previewState.kind === 'missing' ? 'This change leaves inputs unset: no figures for it yet.' : previewState.kind === 'error' ? `The preview could not run: ${previewState.message}` : 'Working out the change…'}</span>}
+        </div>
+        <span className="rp-strip-pvtag">Preview · not applied yet</span>
+      </div>
+    )
+  }
   return (
     <div className={`rp-strip${state.kind === 'running' ? ' rp-stale' : ''}`} role="status" aria-label="Results">
       {shown ? (

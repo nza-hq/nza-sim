@@ -8,16 +8,21 @@
  *
  * Numbers come only from the run (CLAUDE.md rules 2 and 3).
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 // @ts-expect-error untyped JS component from today's app (Brief 110b: reused, not redrawn)
 import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 import { createPortal } from '../workspace/portal'
 import { balanceLines } from './balanceLines'
 import { ResultsBody, ResultsStrip, WeatherPick, useRun } from './ResultsPanel'
+import type { Summary } from './seam'
 import './run.css'
 
-export default function EmbeddedResults({ doc, strip, centre, showBody, focusZone, weatherEl, onOpen }: {
+export default function EmbeddedResults({ doc, previewDoc = null, onFigures, strip, centre, showBody, focusZone, weatherEl, onOpen }: {
   doc: unknown
+  /** The document with the previewed change made (preview, then apply); null when nothing is previewed. */
+  previewDoc?: unknown
+  /** Hears the run's summary now and the previewed one, for the apply card. */
+  onFigures?: (now: Summary | null, preview: Summary | null) => void
   strip: HTMLElement
   centre: HTMLElement
   showBody: boolean
@@ -25,8 +30,10 @@ export default function EmbeddedResults({ doc, strip, centre, showBody, focusZon
   weatherEl: HTMLElement | null
   onOpen: () => void
 }) {
-  const run = useRun(doc)
+  const run = useRun(doc, previewDoc)
   const s = run.state.kind === 'done' ? run.state.summary : null
+  const ps = run.previewState.kind === 'done' ? run.previewState.summary : null
+  useEffect(() => { onFigures?.(s, ps) }, [s, ps])
   // The chosen zone's balance (heat from other zones included), or the building's.
   const zone = s && focusZone ? s.zones.find((z) => z.id === focusZone) ?? null : null
   const lines = useMemo(() => (s ? (zone ? balanceLines(zone.breakdown, zone.floor_m2) : balanceLines(s.breakdown, s.building.floor_m2)) : null), [s, zone])

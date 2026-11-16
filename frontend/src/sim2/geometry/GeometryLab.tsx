@@ -56,6 +56,10 @@ import ResultsPanel from '../run/ResultsPanel'
 import EmbeddedResults from '../run/EmbeddedResults'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { buildDocument } from './toDocument'
+import { previewItems } from '../run/ResultsPanel'
+import type { Summary } from '../run/seam'
+// @ts-expect-error untyped JS from today's app
+import { useUISettings } from '../../context/UISettingsContext.jsx'
 // @ts-expect-error untyped JS from today's app (Brief 110b P2: today's inspectors, reused)
 import ConstructionInspector from '../../components/library/ConstructionInspector.jsx'
 // @ts-expect-error untyped JS from today's app
@@ -199,13 +203,21 @@ const STEP_OF: Record<Mode, StepId> = { outline: 'shape', rooms: 'shape', fabric
  * Standalone (`/sim2/geometry`): one full-screen canvas with floating panels. In the Model workspace (`slots` given,
  * Brief 110): the same state and behaviour, rendered into the workspace's panes, the step coming from its rail.
  */
+/** A previewed give: the plan it would make, said in words. */
+type Pending = { plan: Plan; who: string; name: string; change: string; ask: string; rooms: string[]; pieces: Span[]; colour: string; same: boolean }
+/** The give on screen now (its footer), recorded each render so the preview can run it. */
+type Giver = { name: string | null; rooms: boolean; now: string[]; onGive: (all: boolean) => void; colour: string }
+
 export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab, api, onPlan }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void; api?: React.MutableRefObject<EditorApi | null>; onPlan?: (p: Plan) => void } = {}) {
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>(emptyPlan)
   const [past, setPast] = useState<Plan[]>([])
   const [future, setFuture] = useState<Plan[]>([])
+  /** While a preview is worked out, a give writes here instead of to the plan (preview, then apply). */
+  const capture = useRef<{ plan: Plan | null } | null>(null)
   const commit = (next: Plan) => {
+    if (capture.current) { capture.current.plan = next; return }
     setPast((p) => [...p.slice(-100), plan])
     setFuture([])
     setPlan(next)
@@ -233,6 +245,23 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [tool, setTool] = useState<Tool>('rect')
   const [joinFrom, setJoinFrom] = useState<string | null>(null)
   const [sel, setSel] = useState<Sel>(null)
+  // ─── preview, then apply (Linzie, 16 Nov 00:22) ─────────────────────────────
+  // Picking a type with something chosen previews it: the rooms or wall parts that would change are hatched in its
+  // colour and marked Preview, the strip shows each figure now → if applied, and the right shows a card asking to
+  // make it so. Apply (or Enter) commits it as one Undo step; Cancel (or Esc) drops it. After Apply the rooms flash
+  // "Applied", a note says what changed, and it goes on the list of changes this session.
+  const [pvAsk, setPvAsk] = useState<{ all: boolean } | null>(null)
+  const [pending, setPending] = useState<Pending | null>(null)
+  const giverRef = useRef<Giver | null>(null)
+  giverRef.current = null
+  const pvKey = useRef('')
+  const planIds = useRef(new WeakMap<Plan, number>())
+  const planSeq = useRef(0)
+  const [figs, setFigs] = useState<{ now: Summary | null; preview: Summary | null }>({ now: null, preview: null })
+  const [flash, setFlash] = useState<string[]>([])
+  const [note, setNote] = useState<string | null>(null)
+  const [changes, setChanges] = useState<{ text: string; effect: string | null; depth: number }[]>([])
+  const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
   const [fkind, setFkind] = useState<FabricKind>('wall')
   const [opening, setOpening] = useState<'glazing' | 'door'>('glazing')
   const elem: FabricElement = fkind === 'openings' ? opening : fkind === 'air' || fkind === 'bridge' ? 'wall' : fkind
@@ -670,6 +699,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       setShift(e.shiftKey)
       if ((e.target as HTMLElement)?.closest?.('input, textarea, select')) return
       const ctl = e.ctrlKey || e.metaKey
+      if (pending && e.key === 'Enter') return void (e.preventDefault(), pending.same ? setPvAsk(null) : applyPending())
+      if (pending && e.key === 'Escape') return void setPvAsk(null)
       if (ctl && e.key.toLowerCase() === 'a' && GIVING(mode)) return void (e.preventDefault(), setSel({ kind: 'set', rooms: plan.rooms.map((r) => r.id), pieces: [] }))
       if (ctl && e.key.toLowerCase() === 'z') {
         e.preventDefault()
@@ -1017,6 +1048,57 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
     : `${f1(ringArea(r.ring))} m²`
 
+  useEffect(() => { setPvAsk(null) }, [sel, mode, fkind, sysKind, opening])
+  useEffect(() => {
+    const g = giverRef.current
+    if (!pvAsk || !g || !g.name) { if (pending) { setPending(null); pvKey.current = '' } return }
+    if (!planIds.current.has(plan)) planIds.current.set(plan, ++planSeq.current)
+    const key = JSON.stringify([pvAsk.all, g.name, g.colour, planIds.current.get(plan), chosenSet.rooms, chosenSet.pieces])
+    if (key === pvKey.current) return
+    pvKey.current = key
+    capture.current = { plan: null }
+    try { g.onGive(pvAsk.all) } finally { /* the give only wrote to capture */ }
+    const next = capture.current.plan
+    capture.current = null
+    if (!next) { setPending(null); return }
+    const same = JSON.stringify(next) === JSON.stringify(plan)
+    const roomNames = (ids: string[]) => {
+      const ns = ids.map((id) => plan.rooms.find((r) => r.id === id)?.name ?? id)
+      return ns.length > 3 ? count(ns.length, 'room') : ns.length > 1 ? `${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}` : ns[0] ?? ''
+    }
+    const changedRooms = next.rooms.filter((r) => JSON.stringify(r) !== JSON.stringify(plan.rooms.find((q) => q.id === r.id))).map((r) => r.id)
+    const targetRooms = pvAsk.all ? allRooms() : chosenSet.rooms
+    let pieces: Span[] = []
+    let who: string
+    let change: string
+    let rooms: string[]
+    if (g.rooms) {
+      rooms = changedRooms.length || same ? changedRooms : targetRooms
+      who = pvAsk.all ? 'the whole building' : roomNames(chosenSet.rooms)
+      change = `${count(rooms.length, 'room')} ${rooms.length === 1 ? 'changes' : 'change'}`
+    } else {
+      pieces = pvAsk.all ? wallPieces(plan).map((q) => ({ run: q.run, t0: q.t0, t1: q.t1 })) : chosenPieces()
+      const moved = pvAsk.all ? pieces.length : g.now.filter((n) => n !== g.name).length
+      rooms = pvAsk.all ? allRooms() : chosenSet.rooms
+      who = pvAsk.all ? 'the whole building' : `${count(pieces.length, 'wall part')}${chosenSet.rooms.length ? ` of ${roomNames(chosenSet.rooms)}` : ''}`
+      change = `${count(moved, 'wall part')} ${moved === 1 ? 'changes' : 'change'}`
+    }
+    const ask = `Make ${who} ${g.name}?`
+    setPending({ plan: next, who, name: g.name, change, ask, rooms, pieces, colour: g.colour, same })
+  })
+  useEffect(() => {
+    if (!flash.length) return
+    const t = setTimeout(() => setFlash([]), 1600)
+    return () => clearTimeout(t)
+  }, [flash])
+  useEffect(() => {
+    if (!note) return
+    const t = setTimeout(() => setNote(null), 3200)
+    return () => clearTimeout(t)
+  }, [note])
+  useEffect(() => { setChanges((c) => (c.some((x) => x.depth > past.length) ? c.filter((x) => x.depth <= past.length) : c)) }, [past.length])
+  const previewDoc = useMemo(() => (pending && !pending.same ? buildDocument(pending.plan).doc : null), [pending])
+
   // ─── paint ─────────────────────────────────────────────────────────────────
   const P = (r: readonly XY[]) => r.map((p) => toPx(p).map((n) => n.toFixed(1)).join(',')).join(' ')
   const grid = (() => {
@@ -1132,6 +1214,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
 
   /** The Apply footer: what is chosen, what it has now, and why Apply can't run yet (if it can't). */
   const giveFoot = (o: { name: string | null; rooms: boolean; now: string[]; onGive: (all: boolean) => void }) => {
+    giverRef.current = { ...o, colour: giveColour() }
     const ps = mode === 'fabric' && !o.rooms ? chosenPieces() : []
     const nRooms = chosenSet.rooms.length
     const what = o.rooms
@@ -1142,10 +1225,47 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       what,
       now: empty ? null : nowOf(o.now),
       why: !o.name ? 'Make one first.' : empty ? 'Choose rooms on the left or on the drawing.' : null,
-      label: o.name ? `Apply ${o.name}` : 'Apply',
-      onApply: () => o.onGive(false),
-      onAll: () => o.name && o.onGive(true),
+      label: o.name ? `Preview ${o.name}` : 'Preview',
+      onApply: () => setPvAsk({ all: false }),
+      onAll: () => o.name && setPvAsk({ all: true }),
+      preview: pending ? {
+        same: pending.same,
+        ask: pending.ask,
+        change: pending.change,
+        effect: pendingEffect(),
+        onApply: applyPending,
+        onCancel: () => setPvAsk(null),
+      } : null,
     }
+  }
+  /** The colour of the type in hand: what the preview hatches in. */
+  const giveColour = () =>
+    mode === 'fabric' ? typeColour(plan, activeOf(elem))
+    : mode === 'spaces' ? spaceColour(curSpace?.id) ?? '#6B7280'
+    : mode === 'systems' && sysKind === 'emitters' ? emitColour(curEmit?.id) ?? '#6B7280'
+    : mode === 'systems' ? sysColour(curSys?.id) ?? '#6B7280'
+    : '#6B7280'
+  /** The previewed figure for the card: heating now → if applied, in the top bar's unit. */
+  const pendingEffect = () => {
+    if (!pending || pending.same) return null
+    if (!figs.now) return null
+    if (!figs.preview) return 'Working out the change…'
+    const h = previewItems(figs.now, figs.preview, unit)[0]!
+    return `Heating ${h.value} ${h.unit} (${h.sub})`
+  }
+  const applyPending = () => {
+    if (!pending || pending.same) return
+    const effect = pendingEffect()
+    commit(pending.plan)
+    setChanges((c) => [{ text: `${pending.who} → ${pending.name}`, effect: effect && !effect.startsWith('Working') ? effect : null, depth: past.length + 1 }, ...c].slice(0, 30))
+    setFlash(pending.rooms)
+    setNote(`Applied: ${pending.name} to ${pending.who}. ${pending.change}.`)
+    setPvAsk(null)
+  }
+  /** With something chosen, picking a type previews it on what is chosen. */
+  const previewOnPick = <T,>(f: (id: T) => void) => (id: T) => {
+    f(id)
+    if (chosenSet.rooms.length || chosenSet.pieces.length) setPvAsk({ all: false })
   }
 
   /** Step 1 in the workspace: where the building is. Exposure is the same whole-building value Air leakage shows. */
@@ -1258,7 +1378,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         kinds={kinds} kind={fkind} onKind={onKind}
         title={fkind === 'openings' ? 'Windows & doors' : k.name} icon={k.icon}
         items={items} active={act}
-        onActive={(id) => setActive((a) => ({ ...a, [elem]: id }))}
+        onActive={previewOnPick((id) => setActive((a) => ({ ...a, [elem]: id })))}
         onNew={elem === 'partition' && types.length ? undefined : () => { const r = newType(plan, elem); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}
         onCopy={elem === 'partition' ? undefined : (id) => { const r = newType(plan, elem, plan.fabric_types.find((t) => t.id === id)); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}
         onRemove={(id) => commit({ ...plan, fabric_types: plan.fabric_types.filter((x) => x.id !== id), wall_spans: plan.wall_spans.filter((x) => x.type !== id) })}
@@ -1374,7 +1494,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       <GivePanel
         title="Space types" icon="person"
         items={items} active={sp?.id ?? null}
-        onActive={setActiveSpace}
+        onActive={previewOnPick(setActiveSpace)}
         onNew={() => newSpace()} newLabel="New space type"
         onCopy={(id) => newSpace(plan.spaces.find((x) => x.id === id))}
         onRemove={(id) => commit({ ...plan, spaces: plan.spaces.filter((x) => x.id !== id) })}
@@ -1477,7 +1597,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
         title="Emitters" icon="heating"
         items={items} active={x?.id ?? null}
-        onActive={setActiveEmit}
+        onActive={previewOnPick(setActiveEmit)}
         onNew={() => newEmitter()} newLabel="New emitter"
         onCopy={(id) => newEmitter(emitterTypes.find((t) => t.id === id))}
         onRemove={(id) => commit({ ...plan, emitter_types: emitterTypes.filter((t) => t.id !== id) })}
@@ -1557,7 +1677,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           )
         })() : undefined}
         items={items} active={x?.id ?? null}
-        onActive={(id) => setActiveSys((a) => ({ ...a, [service]: id }))}
+        onActive={previewOnPick((id) => setActiveSys((a) => ({ ...a, [service]: id })))}
         onNew={() => newSystem()} newLabel="New system"
         onCopy={(id) => newSystem(plan.systems.find((y) => y.id === id))}
         onRemove={removeSystem}
@@ -1609,7 +1729,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
-      {embedded && slots && <EmbeddedResults doc={built.doc} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {embedded && slots && <EmbeddedResults doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview) => setFigs((f) => (f.now === now && f.preview === preview ? f : { now, preview }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
@@ -1617,6 +1737,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </Suspense>
         </div>
       )}
+      {note && <div className="gl-note" role="status">{note}</div>}
       <div className="gl-viewswitch" role="group" aria-label="View">
         <button type="button" aria-pressed={shownLook === 'plan'} onClick={() => setLook('plan')}>Plan</button>
         <button type="button" aria-pressed={in3d} onClick={() => setLook('3d')} disabled={!plan.blocks.length}>3D</button>
@@ -1651,12 +1772,31 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) && !giving ? ' on' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
         {liveInner && <line className="gl-wall-hover" x1={toPx(liveInner[0])[0]} y1={toPx(liveInner[0])[1]} x2={toPx(liveInner[1])[0]} y2={toPx(liveInner[1])[1]} />}
         {giving && !drag && shown.rooms.filter((r) => chosen.has(r.id)).map((r) => <polygon key={`pk${r.id}`} className="gl-room-pick" points={P(r.ring)} />)}
+        {pending && !pending.same && !drag && (
+          <>
+            <defs>
+              <pattern id="gl-pv-hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="9" height="9" fill={`${pending.colour}33`} />
+                <line x1="0" y1="0" x2="0" y2="9" stroke={pending.colour} strokeWidth="3" />
+              </pattern>
+            </defs>
+            {pending.pieces.length === 0 && shown.rooms.filter((r) => pending.rooms.includes(r.id)).map((r) => <polygon key={`pv${r.id}`} className="gl-room-pv" points={P(r.ring)} fill="url(#gl-pv-hatch)" />)}
+          </>
+        )}
+        {flash.length > 0 && shown.rooms.filter((r) => flash.includes(r.id)).map((r) => <polygon key={`fl${r.id}`} className="gl-room-flash" points={P(r.ring)} />)}
         {shown.blocks.map((b, i) => <polygon key={`s${i}`} className={`gl-shell${chosenBlocks.has(i) || (drag && drag.kind === 'corner' && drag.block === i) ? ' chosen' : ''}`} points={P(b)} />)}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
           return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />
         })()}
         {giving && !drag && !(mode === 'fabric' && wallsKind) && shown.rooms.filter((r) => chosen.has(r.id)).map((r) => <polygon key={`pl${r.id}`} className="gl-room-pick-line" points={P(r.ring)} />)}
+        {pending && !pending.same && !drag && pending.pieces.map((sp, i) => {
+          const r = runs[sp.run]
+          if (!r) return null
+          const [ax, ay] = toPx(along(r, sp.t0))
+          const [bx, by] = toPx(along(r, sp.t1))
+          return <line key={`pvw${i}`} className="gl-wall-pv" x1={ax} y1={ay} x2={bx} y2={by} stroke={pending.colour} />
+        })}
         {pushed && <line className="gl-wall-on" x1={toPx(pushed.a)[0]} y1={toPx(pushed.a)[1]} x2={toPx(pushed.b)[0]} y2={toPx(pushed.b)[1]} />}
         {showTypes && !drag &&
           pieces.map((p, i) => {
@@ -1703,6 +1843,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <g key={`rl${r.id}`}>
                   <text className={`gl-zname${on && !giving ? ' on' : ''}`} x={lx} y={ly}>{r.name}</text>
                   {wide > 56 && <text className={`gl-zarea${on && !giving ? ' on' : ''}`} x={lx} y={ly + 15}>{roomSub(r)}</text>}
+                  {pending && !pending.same && pending.rooms.includes(r.id) && <text className="gl-pvtag" x={lx} y={ly + 31}>Preview</text>}
+                  {flash.includes(r.id) && <text className="gl-pvtag done" x={lx} y={ly + 31}>✓ Applied</text>}
                 </g>
               )
             })
@@ -1850,6 +1992,21 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   </div>
                   <p className="gl-hint">Every room starts in Zone 1. Choose rooms (Select, Shift for more) to put them in another zone. Tap a zone to choose all its rooms.</p>
                   <button type="button" className="gl-btn" onClick={() => toMode('fabric')}>Next: fabric →</button>
+                </div>
+              )}
+              {embedded && GIVING(mode) && (
+                <div className="gl-sec gl-changes">
+                  <h3>Changes this session</h3>
+                  {changes.length ? (
+                    <ol>
+                      {changes.map((c, i) => (
+                        <li key={`${c.depth}-${i}`}>
+                          <span>{c.text}{c.effect && <small>{c.effect}</small>}</span>
+                          {c.depth === past.length && <button type="button" className="gl-btn quiet" onClick={undo} title="Undo (Ctrl+Z)">Undo</button>}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : <p className="gl-hint">Nothing applied yet. Choose rooms or walls, pick a type on the right, and Apply.</p>}
                 </div>
               )}
               <details className="gl-sec gl-doc">

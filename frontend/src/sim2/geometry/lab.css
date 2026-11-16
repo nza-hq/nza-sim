@@ -383,3 +383,24 @@
 /* Brief 110b: the Profiles step. */
 .ap-pname { font-size: 14px; font-weight: 600; margin: 4px 0 8px; }
 .ap-pnone { padding: 12px 16px; }
+
+/* Preview, then apply (Linzie, 16 Nov 00:22). */
+.gl-room-pv { stroke: none; pointer-events: none; }
+.gl-wall-pv { stroke-width: 7; stroke-dasharray: 6 4; stroke-linecap: butt; pointer-events: none; }
+.gl-room-flash { fill: rgba(35, 85, 70, .14); stroke: #235546; stroke-width: 4; pointer-events: none; animation: gl-flash 1.6s ease-out forwards; }
+@keyframes gl-flash { 0% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }
+.gl-pvtag { font: 700 10px var(--gl-detail, sans-serif); letter-spacing: .06em; text-transform: uppercase; fill: #B45309; text-anchor: middle; pointer-events: none; }
+.gl-pvtag.done { fill: #235546; }
+.gl-note { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 20; max-width: 70%; padding: 7px 14px; border-radius: 6px; background: #2B2A4C; color: #fff; font-size: 12.5px; box-shadow: 0 6px 20px rgba(0,0,0,.18); pointer-events: none; }
+.ap-card { border-top: 2px solid #E28F2C; background: #FFF8EE; }
+.ap-ask { margin: 0 0 4px; font-size: 13.5px; font-weight: 600; color: #1F2937; }
+.ap-eff { margin: 0 0 10px; font-size: 12.5px; color: #4B5563; font-variant-numeric: tabular-nums; }
+.ap-card-btns { display: flex; gap: 8px; }
+.ap-card-btns .ap-apply { flex: 1; }
+.ap-keys { margin: 8px 0 0; font-size: 11px; color: #6B7280; }
+.ap-keys kbd { font: 10.5px ui-monospace, monospace; border: 1px solid #D1D5DB; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #fff; }
+.gl-changes ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.gl-changes li { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-left: 2px solid #235546; background: #F7F8F8; font-size: 12px; }
+.gl-changes li span { flex: 1; min-width: 0; }
+.gl-changes li small { display: block; color: #6B7280; font-variant-numeric: tabular-nums; }
+.gl-changes .gl-btn { padding: 2px 8px; font-size: 11.5px; }

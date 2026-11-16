@@ -93,7 +93,11 @@ export function GivePanel(props: {
   top?: ReactNode
   /** Instead of types: a note (a whole-building value has nothing to apply). */
   body?: ReactNode
-  give?: { what: string; now: string | null; why: string | null; label: string; onApply: () => void; onAll: () => void } | null
+  give?: {
+    what: string; now: string | null; why: string | null; label: string; onApply: () => void; onAll: () => void
+    /** Preview, then apply: the card asking to make the previewed change. */
+    preview?: { same: boolean; ask: string; change: string; effect: string | null; onApply: () => void; onCancel: () => void } | null
+  } | null
 }) {
   const active = props.items.find((x) => x.id === props.active)
   return (
@@ -136,13 +140,32 @@ export function GivePanel(props: {
         </div>
         {active && props.detail && <div className="gl-sec ap-detail">{props.detail}</div>}
       </div>
-      {props.give && (
+      {props.give?.preview ? (
+        <div className="ap-foot ap-card" role="dialog" aria-label="Apply this change?">
+          {props.give.preview.same ? (
+            <>
+              <p className="ap-what">These already have it: nothing would change.</p>
+              <button type="button" className="gl-btn quiet" onClick={props.give.preview.onCancel}>Close</button>
+            </>
+          ) : (
+            <>
+              <p className="ap-ask">{props.give.preview.ask}</p>
+              <p className="ap-eff">{props.give.preview.change}{props.give.preview.effect && <><br />{props.give.preview.effect}</>}</p>
+              <div className="ap-card-btns">
+                <button type="button" className="gl-btn ap-apply" onClick={props.give.preview.onApply} autoFocus>Apply</button>
+                <button type="button" className="gl-btn quiet" onClick={props.give.preview.onCancel}>Cancel</button>
+              </div>
+              <p className="ap-keys"><kbd>Enter</kbd> applies · <kbd>Esc</kbd> cancels</p>
+            </>
+          )}
+        </div>
+      ) : props.give && (
         <div className="ap-foot">
           <p className="ap-what">{props.give.what}</p>
           {props.give.now && <p className="ap-now">{props.give.now}</p>}
           <button type="button" className="gl-btn ap-apply" disabled={!!props.give.why} onClick={props.give.onApply}>{props.give.label}</button>
           {props.give.why && <p className="ap-why">{props.give.why}</p>}
-          <button type="button" className="ap-link" onClick={props.give.onAll}>Apply to the whole building</button>
+          <button type="button" className="ap-link" onClick={props.give.onAll}>Preview on the whole building</button>
         </div>
       )}
     </aside>

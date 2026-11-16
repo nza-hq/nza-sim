@@ -74,3 +74,8 @@ button.rp-strip-msg { cursor: pointer; text-decoration: underline; text-underlin
 .rp-hb-for { font-size: 12px; color: #6B7280; padding: 8px 20px 0; margin: 0; }
 .rp-strip-live { flex: 1; min-width: 0; cursor: pointer; }
 .rp-strip-live > div { border-top: 0; min-height: 0 !important; background: #fff; height: 100%; }
+
+/* Preview, then apply (Linzie, 16 Nov 00:22): the strip while a change is previewed. */
+.rp-strip-pv { background: #FFF8EE; box-shadow: inset 0 -2px 0 #E28F2C; }
+.rp-strip-pv .rp-strip-live > div { background: #FFF8EE; }
+.rp-strip-pvtag { margin-left: auto; align-self: center; padding: 0 14px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #B45309; white-space: nowrap; }
