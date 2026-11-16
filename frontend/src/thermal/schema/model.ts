@@ -418,9 +418,16 @@ export const SystemGroup = z
     control_factor: finite.nullable().optional(),
     /**
      * The system's output, kW. Brief 120: on a heating or cooling system, a limit: in any hour the zones it serves draw
-     * at most this from it (its share of each). Null or absent: not limited. Not used on other services.
+     * at most this from it (its share of each). On a hot water system, its water heater's output (with
+     * `storage_litres`, the store it refills). Null or absent: not limited. Not used on other services.
      */
     capacity_kw: finite.nullable().optional(),
+    /**
+     * Schema 2.9 (Brief 120, Linzie 16 Nov 19:19): a hot water system's stored hot water, litres, at the store
+     * temperature. With `capacity_kw`, the store covers what the taps draw above the heater's output and the heater
+     * refills it. Null: no store stated (with a capacity, the heater alone meets each hour). Hot water only.
+     */
+    storage_litres: nonNeg.nullable().default(null),
     /**
      * Schema 2.9 (Brief 120): a heating system that also heats the water of this hot water system, first (a system
      * boiler with a priority valve): each hour its rooms get its capacity less that hot water. Null: no hot water on it.
@@ -679,6 +686,18 @@ export const ModelDocument = z
         else if (!d) ctx.addIssue({ code: 'custom', path: at, message: `"${g.id}" heats hot water system "${g.dhw_priority_group_id}" first, which does not exist` })
         else if (d.service !== 'dhw') ctx.addIssue({ code: 'custom', path: at, message: `"${d.id}" is a ${d.service} system, not hot water` })
         else if (g.capacity_kw == null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'capacity_kw'], message: `"${g.id}" heats hot water first, so it needs its capacity (kW)` })
+      }
+      // Brief 120: a water heater's store is a hot water system's, and needs the heater's output to refill it.
+      if (g.storage_litres != null) {
+        const at = ['system_groups', i, 'storage_litres']
+        const by = doc.system_groups.find((x) => x.dhw_priority_group_id === g.id)
+        if (g.service !== 'dhw') ctx.addIssue({ code: 'custom', path: at, message: `a ${g.service} system stores no hot water; leave empty` })
+        else if (by) ctx.addIssue({ code: 'custom', path: at, message: `"${g.id}" is heated first by "${by.id}": a store on a boiler's priority circuit is not modelled yet (its hot water is taken from the boiler hour by hour); leave empty` })
+        else if (g.capacity_kw == null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'capacity_kw'], message: `"${g.id}" stores ${g.storage_litres} litres, so it needs its water heater's output (kW) to refill it` })
+      }
+      if (g.service === 'dhw' && g.capacity_kw != null) {
+        const by = doc.system_groups.find((x) => x.dhw_priority_group_id === g.id)
+        if (by) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'capacity_kw'], message: `"${g.id}" is heated first by "${by.id}", whose capacity is its limit; leave this empty, or give it its own water heater` })
       }
       if (g.service !== 'lighting' && g.efficacy_w_m2_per_100lux != null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'efficacy_w_m2_per_100lux'], message: `a ${g.service} system has no luminaire efficacy; leave empty` })
     })

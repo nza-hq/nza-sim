@@ -126,9 +126,9 @@ export function upgradeDocument(input: unknown): ModelDocument {
   return ModelDocument.parse(doc)
 }
 
-/** 2.8 → 2.9 (Brief 120): no heating system heats hot water first. Capacities already stated now limit (Linzie's decision 3). */
+/** 2.8 → 2.9 (Brief 120): no heating system heats hot water first and no hot water store is stated. Capacities already stated now limit (Linzie's decision 3), a hot water system's included. */
 function to29(doc: Obj): void {
-  for (const g of doc.system_groups as Obj[]) g.dhw_priority_group_id ??= null
+  for (const g of doc.system_groups as Obj[]) { g.dhw_priority_group_id ??= null; g.storage_litres ??= null }
 }
 
 /**

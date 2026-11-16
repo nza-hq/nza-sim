@@ -11,6 +11,7 @@ import { ModelDocument } from '../../schema/model'
 import { calendar } from '../gains'
 import type { ModelResults } from '../results'
 import { checkServed, readEndUseKwh, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, WATER_KWH_PER_L_K, type SystemsResults } from '../systems'
+import { waterHeater } from '../hotWater'
 import { cooledRoomDocument } from './cooledRoom'
 import { MOS, readMos } from './denver'
 
@@ -196,16 +197,18 @@ describe('systems: review responses (Brief 107 F1–F8)', () => {
   })
   it('F4: inputs not modelled yet are listed, not silently dropped', () => {
     const d = setup()
-    // Brief 120: a heating system's capacity is modelled (in the run), so it is no longer listed; a hot water one's is.
+    // Brief 120: a heating system's capacity is modelled (in the run), and a hot water system's (its water heater), so
+    // neither is listed.
     d.system_groups[0].capacity_kw = 0.1
     d.system_groups[3].capacity_kw = 30
     d.system_groups[1].control_schedule_ref = 'nowhere'
     d.zones[0].ventilation[0].defrost_penalty_kwh = 5
-    expect(ok(d).not_modelled).toEqual([
+    const r = ok(d)
+    expect(r.not_modelled).toEqual([
       { path: 'system_groups[1].control_schedule_ref', what: 'control schedule "nowhere" (not in this building)' },
-      { path: 'system_groups[3].capacity_kw', what: 'capacity' },
       { path: 'zones[0].ventilation[0].defrost_penalty_kwh', what: 'defrost penalty' },
     ])
+    expect(r.water_heaters.map((x) => [x.id, x.hours_short])).toEqual([[d.system_groups[3].id, 0]])
   })
   it('F6: hourly shapes: one hot hour of heating lands in that hour of electricity; hot water follows occupancy', () => {
     const d = setup()
@@ -244,3 +247,56 @@ const ok2 = (doc: any, r: ModelResults) => {
   if (!a.ok) throw new Error(JSON.stringify(a.missing))
   return a.systems
 }
+
+describe('Brief 120: a dedicated water heater, its kW and its store (Linzie, 16 Nov 19:19)', () => {
+  it('by hand: a 10 kW hour on a 4 kW heater with 100 litres at 60 °C over 10 °C cold', () => {
+    const usable = 100 * 50 * WATER_KWH_PER_L_K  // 5.806 kWh
+    const draw = [0, 10000, 0, 0, 0]
+    const r = waterHeater(draw, 4000, 100, 60, 10)
+    expect(r.usable_kwh).toBeCloseTo(usable, 12)
+    expect(Array.from(r.heater_w)).toEqual([0, 4000, 4000, (usable - 4) * 1000, 0].map((x, i) => (i === 3 ? expect.closeTo(x, 6) : x)))
+    expect(r.short_w[1]).toBeCloseTo(6000 - usable * 1000, 6)
+    expect([r.stored_kwh[1], r.stored_kwh[2]]).toEqual([0, 4])
+    expect(r.stored_kwh[3]).toBeCloseTo(usable, 9)
+    // No store: whatever is above the heater is short, every hour.
+    const bare = waterHeater(draw, 4000, 0, 60, 10)
+    expect(Array.from(bare.short_w)).toEqual([0, 6000, 0, 0, 0])
+  })
+
+  it('in Systems: a heater at half the draw gives half; energy used and served follow what the taps got (Rule 9 holds)', () => {
+    const d = setup()
+    const full = ok(d)
+    const drawW = g(full, 'dhw_boiler').served_kwh * 1000 / H  // flat load shape: the same every hour
+    d.system_groups[3].capacity_kw = drawW / 2 / 1000
+    const s = ok(d)
+    const wh = s.water_heaters[0]
+    expect(wh.id).toBe('dhw_boiler')
+    expect(wh.peak_draw_w).toBeCloseTo(drawW, 6)
+    expect(wh.hours_short).toBe(H)
+    expect(wh.short_kwh).toBeCloseTo((drawW / 2) * H / 1000, 6)
+    expect(g(s, 'dhw_boiler').served_kwh).toBeCloseTo(wh.delivered_kwh, 9)
+    expect(g(s, 'dhw_boiler').fuel_kwh).toBeCloseTo(wh.delivered_kwh / 0.8, 6)
+    expect(s.dhw!.demand_kwh).toBeCloseTo(g(full, 'dhw_boiler').served_kwh, 6)  // what the taps asked stays shown
+  })
+
+  it('a store carries a heater through the hours its draw is above the output, and runs out only when it is empty', () => {
+    const d = setup()
+    const drawW = g(ok(d), 'dhw_boiler').served_kwh * 1000 / H
+    d.system_groups[3].capacity_kw = (drawW * 0.9) / 1000
+    d.system_groups[3].storage_litres = 300
+    const wh = ok(d).water_heaters[0]
+    const usable = 300 * 50 * WATER_KWH_PER_L_K
+    expect(wh.usable_kwh).toBeCloseTo(usable, 9)
+    expect(wh.hours_short).toBe(H - Math.floor(usable * 1000 / (drawW * 0.1)))  // full at the start, 10 % a hour from it
+    expect(wh.min_stored_kwh).toBe(0)
+  })
+
+  it('refused by name: a store on another service, a store with no heater output, and a store or a capacity on a boiler\'s priority circuit', () => {
+    const msg = (f: (d: any) => void) => { const d = setup(); f(d); return ModelDocument.safeParse(d).error?.issues[0].message }
+    expect(msg((d) => { d.system_groups[0].storage_litres = 100 })).toBe('a heating system stores no hot water; leave empty')
+    expect(msg((d) => { d.system_groups[3].storage_litres = 100 })).toMatch(/needs its water heater's output \(kW\)/)
+    expect(msg((d) => { d.system_groups[1].capacity_kw = 30; d.system_groups[1].dhw_priority_group_id = 'dhw_boiler'; d.system_groups[3].storage_litres = 100 })).toMatch(/not modelled yet/)
+    expect(msg((d) => { d.system_groups[1].capacity_kw = 30; d.system_groups[1].dhw_priority_group_id = 'dhw_boiler'; d.system_groups[3].capacity_kw = 10 })).toMatch(/whose capacity is its limit/)
+    expect(msg((d) => { d.system_groups[3].capacity_kw = 10; d.system_groups[3].storage_litres = 100 })).toBeUndefined()
+  })
+})
