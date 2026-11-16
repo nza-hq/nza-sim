@@ -295,3 +295,12 @@ describe('spaces borrow from today\'s profiles', () => {
     expect(doc.library_refs.some((r: any) => r.key === ALWAYS)).toBe(false)
   })
 })
+
+describe('the Profiles step (Brief 110b)', () => {
+  it("a project's chosen profiles do not change the document: only a profile something uses reaches the engine", async () => {
+    const fx = (await import('../__fixtures__/two_zones.plan.json')).default as unknown as { plan: Plan }
+    const p = upgradePlan(JSON.parse(JSON.stringify(fx.plan)))
+    const a = buildDocument(p), b = buildDocument({ ...p, profiles: ['hotel_bedroom_occupancy', 'hotel_ventilation_timer'] })
+    expect(JSON.stringify(b.doc)).toBe(JSON.stringify(a.doc))
+  })
+})

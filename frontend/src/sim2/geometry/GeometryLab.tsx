@@ -65,7 +65,7 @@ import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, cro
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
 
-type Mode = 'outline' | 'rooms' | 'fabric' | 'spaces' | 'systems'
+type Mode = 'outline' | 'rooms' | 'fabric' | 'profiles' | 'spaces' | 'systems'
 /** Steps 3 to 5: choose, then give (ApplyPanels.tsx). */
 const GIVING = (m: Mode) => m === 'fabric' || m === 'spaces' || m === 'systems'
 type Tool = 'select' | 'rect' | 'tri' | 'shape' | 'cut' | 'corner' | 'pick' | 'room' | 'halve' | 'divide' | 'join'
@@ -140,15 +140,24 @@ const TOOLS: Record<Mode, Array<{ key: Tool; name: string; glyph: string; line: 
     { key: 'pick', name: 'Select', glyph: '➚', line: 'Tap a room (Shift: more than one) to put it in a zone. Drag a wall between rooms to move it.' },
   ],
   fabric: [{ key: 'pick', name: 'Select', glyph: '➚', line: 'Tap rooms or walls. Ctrl or Shift: more. Double-click: a whole wall.' }],
+  profiles: [{ key: 'pick', name: 'Select', glyph: '➚', line: 'Choose a profile on the right: the rooms that use it are coloured.' }],
   spaces: [{ key: 'pick', name: 'Select', glyph: '➚', line: 'Tap rooms. Ctrl or Shift: more. Esc lets go.' }],
   systems: [{ key: 'pick', name: 'Select', glyph: '➚', line: 'Tap rooms. Ctrl or Shift: more. Esc lets go.' }],
 }
-const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'pick', spaces: 'pick', systems: 'pick' }
-const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', spaces: 'Spaces', systems: 'Systems' }
-const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, spaces: 4, systems: 5 }
-const MODES: Mode[] = ['outline', 'rooms', 'fabric', 'spaces', 'systems']
-const STEP_ICON: Record<Mode, IconName> = { outline: 'building', rooms: 'rooms', fabric: 'wall', spaces: 'person', systems: 'heating' }
-const STEP_LINE: Record<Mode, string> = { outline: "The building's shape", rooms: 'Walls inside, and zones', fabric: 'What it is made of', spaces: 'What each room is for', systems: 'What heats, cools and ventilates it' }
+const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'pick', profiles: 'pick', spaces: 'pick', systems: 'pick' }
+const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', profiles: 'Profiles', spaces: 'Spaces', systems: 'Systems' }
+const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, profiles: 4, spaces: 5, systems: 6 }
+const MODES: Mode[] = ['outline', 'rooms', 'fabric', 'profiles', 'spaces', 'systems']
+const STEP_ICON: Record<Mode, IconName> = { outline: 'building', rooms: 'rooms', fabric: 'wall', profiles: 'profile', spaces: 'person', systems: 'heating' }
+const STEP_LINE: Record<Mode, string> = { outline: "The building's shape", rooms: 'Walls inside, and zones', fabric: 'What it is made of', profiles: 'When things happen, hour by hour', spaces: 'What each room is for', systems: 'What heats, cools and ventilates it' }
+type ProfileKind = 'occupancy' | 'lighting' | 'equipment' | 'ventilation'
+/** The kinds the engine reads today. Heating hours and setback join when Brief 109 lands. */
+const PROFILE_KINDS: ReadonlyArray<{ key: ProfileKind; name: string; spark: string; icon: IconName; where: string }> = [
+  { key: 'occupancy', name: 'Occupancy', spark: 'Occupancy', icon: 'person', where: 'a space type points at it on Spaces' },
+  { key: 'lighting', name: 'Lighting', spark: 'Lighting', icon: 'profile', where: 'a space type with its own lighting profile points at it on Spaces' },
+  { key: 'equipment', name: 'Equipment', spark: 'Equipment', icon: 'profile', where: 'a space type with its own equipment profile points at it on Spaces' },
+  { key: 'ventilation', name: 'Ventilation', spark: 'Ventilation', icon: 'ventilation', where: 'a ventilation system points at it on Systems' },
+]
 const SPACE_COLOURS = ['#E0A84E', '#5B9BD5', '#6AA84F', '#C27BA0', '#45A5A0', '#D9734E', '#8E7CC3', '#A0A04A']
 const SYSTEM_COLOURS = ['#45A5A0', '#D9734E', '#8E7CC3', '#5B9BD5', '#E0A84E', '#6AA84F', '#C27BA0', '#A0A04A']
 /** How gains enter a zone, as today's engine assumes them (TODAY): a new space type starts here, all editable. */
@@ -184,7 +193,7 @@ const f1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-GB', { mi
 const f2 = (n: number) => (Math.round(n * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** The workspace step a mode belongs to, and back (Brief 110: Outline and Rooms are the one step, Shape). */
-const STEP_OF: Record<Mode, StepId> = { outline: 'shape', rooms: 'shape', fabric: 'fabric', spaces: 'spaces', systems: 'systems' }
+const STEP_OF: Record<Mode, StepId> = { outline: 'shape', rooms: 'shape', fabric: 'fabric', profiles: 'profiles', spaces: 'spaces', systems: 'systems' }
 
 /**
  * Standalone (`/sim2/geometry`): one full-screen canvas with floating panels. In the Model workspace (`slots` given,
@@ -720,13 +729,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   useEffect(() => {
     if (!embedded || !railStep || railStep === 'site' || STEP_OF[mode] === railStep) return
     // With nothing drawn, steps 3 to 5 stay chosen and say what they need (needsShape), instead of bouncing to Shape.
+    if (railStep === 'profiles') { toMode('profiles'); return }
     if (!has && railStep !== 'shape') return
     if (railStep === 'shape') toMode('outline')
     else if (railStep === 'fabric' || railStep === 'spaces' || railStep === 'systems') toMode(railStep)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [railStep, has])
   useEffect(() => {
-    if (embedded && railStep !== 'site' && railStep !== 'check' && railStep !== 'interventions' && !(railStep !== 'shape' && !has) && STEP_OF[mode] !== railStep) onStep?.(STEP_OF[mode])
+    if (embedded && railStep !== 'site' && railStep !== 'check' && railStep !== 'interventions' && !(railStep !== 'shape' && railStep !== 'profiles' && !has) && STEP_OF[mode] !== railStep) onStep?.(STEP_OF[mode])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
   const onSite = embedded && railStep === 'site'
@@ -737,6 +747,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const startExample = () => { const r = addShape(plan, EXAMPLE); if (!('why' in r)) { commit(r.plan); fitTo(EXAMPLE); pick('select'); setSel({ kind: 'blocks', idx: [0] }) } }
   /** Where Site puts the weather choice (the run's own picker, rendered there). */
   const [weatherEl, setWeatherEl] = useState<HTMLElement | null>(null)
+  /** Profiles step: the kind shown and the profile chosen (Brief 110b). */
+  const [profKind, setProfKind] = useState<ProfileKind>('occupancy')
+  const [profSel, setProfSel] = useState<string | null>(null)
   /** Today's library inspector, opened from a fabric type's ⓘ (Brief 110b P2). */
   const [inspect, setInspect] = useState<{ name: string; glazing: boolean } | null>(null)
 
@@ -990,13 +1003,15 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const tintOf = (zid: string) => zoneTint(Math.max(0, plan.zones.findIndex((z) => z.id === zid)))
   /** A room's fill: its zone (step 2), its roof or floor type (step 3), its space type (step 4). */
   const roomFill = (r: Plan['rooms'][number]) =>
-    mode === 'spaces' ? (spaceColour(r.space) ?? '#FFFFFF') + '59'
+    mode === 'profiles' ? (profSel && roomUses(r).includes(profSel) ? '#EA580C59' : '#FFFFFF')
+    : mode === 'spaces' ? (spaceColour(r.space) ?? '#FFFFFF') + '59'
     : mode === 'systems' && sysKind === 'emitters' ? (emitColour(roomEmitters(r)[0]?.type) ?? '#FFFFFF') + '59'
     : mode === 'systems' ? (sysColour(r.systems?.[service]) ?? '#FFFFFF') + '59'
     : mode === 'fabric' ? (elem === 'roof' || elem === 'floor' ? typeColour(plan, roomType(plan, r.id, elem)) + '40' : '#FFFFFF')
     : tintOf(r.zone).fill
   const roomSub = (r: Plan['rooms'][number]) =>
-    mode === 'spaces' ? (plan.spaces.find((x) => x.id === r.space)?.name ?? 'No space type')
+    mode === 'profiles' ? (profSel ? (roomUses(r).includes(profSel) ? 'uses it' : '') : `${f1(ringArea(r.ring))} m²`)
+    : mode === 'spaces' ? (plan.spaces.find((x) => x.id === r.space)?.name ?? 'No space type')
     : mode === 'systems' && sysKind === 'emitters' ? (emitName(r) || 'No emitters')
     : mode === 'systems' ? (plan.systems.find((x) => x.id === r.systems?.[service])?.name ?? 'None given')
     : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
@@ -1264,6 +1279,74 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     )
   }
 
+  // ─── Profiles (Brief 110b): the project's hour-by-hour patterns, pointed at by space types and systems ─────────
+  /** What a space type points at, by profile key (a "with occupancy" relationship reads the occupancy profile). */
+  const spaceUses = (sp: SpaceType): string[] => {
+    const out: string[] = []
+    if (sp.occupancy && sp.occupancy !== ALWAYS) out.push(sp.occupancy)
+    if (sp.lighting && (sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill')) out.push(sp.lighting)
+    if (sp.equipment && sp.equip_relationship === 'independent') out.push(sp.equipment)
+    return out
+  }
+  const roomUses = (r: Plan['rooms'][number]): string[] => {
+    const sp = plan.spaces.find((x) => x.id === r.space)
+    const sys = Object.values(r.systems ?? {}).map((id) => plan.systems.find((x) => x.id === id)?.schedule).filter((k): k is string => !!k && k !== 'always_on')
+    return [...(sp ? spaceUses(sp) : []), ...sys]
+  }
+  const usersOf = (key: string): string[] => [
+    ...plan.spaces.filter((sp) => spaceUses(sp).includes(key)).map((sp) => `${sp.name} (space type)`),
+    ...plan.systems.filter((x) => x.schedule === key).map((x) => `${x.name} (system)`),
+  ]
+  const projectProfiles = (): string[] => {
+    const used = [...plan.spaces.flatMap(spaceUses), ...plan.systems.map((x) => x.schedule).filter((k): k is string => !!k && k !== 'always_on')]
+    return [...new Set([...(plan.profiles ?? []), ...used])].filter((k) => !!profile(k))
+  }
+  /** A profile choice on Spaces or Systems: the project's own profiles first (the Profiles step), then the library. */
+  const profOptions = (items: Array<{ key: string; name: string }>) => {
+    const mine = new Set(projectProfiles())
+    const a = items.filter((x) => mine.has(x.key) || !profile(x.key)), b = items.filter((x) => !mine.has(x.key) && profile(x.key))
+    const o = (x: { key: string; name: string }) => <option key={x.key} value={x.key}>{short(x.name)}</option>
+    return !a.length || !b.length ? items.map(o) : <><optgroup label="This project's profiles">{a.map(o)}</optgroup><optgroup label="More in the library">{b.map(o)}</optgroup></>
+  }
+  const profilesPanel = () => {
+    const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
+    const mine = projectProfiles().filter((k) => profile(k)!.schedule_type === kind.key)
+    const others = profilesFor(kind.key).filter((p) => !mine.includes(p.key))
+    const sel = profSel && mine.includes(profSel) ? profile(profSel)! : null
+    const items: Item[] = mine.map((k) => {
+      const p = profile(k)!, u = usersOf(k)
+      return { id: k, name: short(p.name), swatch: { colour: '#EA580C' }, line: 'From the library', used: u.length ? count(u.length, 'user') : 'not used', removable: !u.length }
+    })
+    return (
+      <GivePanel
+        kinds={PROFILE_KINDS.map((k) => ({ key: k.key, name: k.name, icon: k.icon }))} kind={profKind} onKind={(k) => { setProfKind(k as ProfileKind); setProfSel(null) }}
+        title={`${kind.name} profiles`} icon="profile"
+        items={items} active={sel?.key ?? null}
+        onActive={setProfSel}
+        onRemove={(id) => { commit({ ...plan, profiles: (plan.profiles ?? []).filter((k) => k !== id) }); if (profSel === id) setProfSel(null) }}
+        top={
+          <div className="gl-row gl-librow"><span>Add from the library</span>
+            <select className="gl-sel" aria-label={`Add a ${kind.name.toLowerCase()} profile`} value="" onChange={(e) => { const k = e.target.value; if (k) { commit({ ...plan, profiles: [...(plan.profiles ?? []), k] }); setProfSel(k) } }}>
+              <option value="">{others.length ? 'Choose one…' : 'None left in the library'}</option>
+              {others.map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
+            </select>
+          </div>
+        }
+        detail={sel ? (
+          <>
+            <h3 className="ap-pname">{sel.name}</h3>
+            <Spark label={kind.spark} days={sel.day_types ?? null} />
+            <p className="gl-hint">{usersOf(sel.key).length ? `Used by ${usersOf(sel.key).join(', ')}.` : `Not used yet: ${kind.where}.`}</p>
+            <p className="gl-hint">From today's NZA Sim library, as it is there. To change its hours, use today's <a href="/gains">Profiles page</a>; making a project's own profile here comes next.</p>
+          </>
+        ) : (
+          <p className="gl-hint ap-pnone">{mine.length ? 'Choose one to see its day and what uses it.' : `None in this project yet. Add one from the library; ${kind.where}.`}</p>
+        )}
+        give={null}
+      />
+    )
+  }
+
   const spacesPanel = () => {
     const sp = curSpace
     const opt = (label: string, k: keyof SpaceType, items: Array<{ key: string; name: string }>) => sp && (
@@ -1271,7 +1354,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         <span>{label}</span>
         <select className="gl-sel" aria-label={label} value={(sp[k] as string | null) ?? ''} onChange={(e) => setSpace(sp.id, { [k]: e.target.value || null })}>
           <option value="">Not set</option>
-          {items.map((x) => <option key={x.key} value={x.key}>{short(x.name)}</option>)}
+          {profOptions(items)}
         </select>
       </div>
     )
@@ -1495,7 +1578,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   <select className="gl-sel" aria-label="When it runs" value={x.schedule ?? ''} onChange={(e) => setSys(x.id, { schedule: e.target.value || null })}>
                     <option value="">Not set</option>
                     <option value="always_on">Always on (24/7)</option>
-                    {profilesFor('ventilation').map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
+                    {profOptions(profilesFor('ventilation'))}
                   </select>
                 </div>
               </>
@@ -1696,7 +1779,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         </div>}
         {!embedded && <div className="gl-steps" role="tablist" aria-label="Steps">
           {MODES.map((m) => (
-            <button key={m} type="button" role="tab" aria-selected={mode === m} disabled={m !== 'outline' && !has} onClick={() => toMode(m)} title={STEP_LINE[m]}>
+            <button key={m} type="button" role="tab" aria-selected={mode === m} disabled={m !== 'outline' && m !== 'profiles' && !has} onClick={() => toMode(m)} title={STEP_LINE[m]}>
               <Icon name={STEP_ICON[m]} size={26} />
               <span><i>{STEP_NO[m]}</i>{STEP[m]}</span>
             </button>
@@ -1710,7 +1793,16 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </div>
         )}
         <div className="gl-body">
-          {!has && (
+          {mode === 'profiles' && (
+            <div className="gl-sec">
+              <p className="gl-say">Profiles are the project's hour-by-hour patterns: when people are in, when lights and equipment are on, when ventilation runs. Space types (step 5) and systems (step 6) point at them, so one profile can drive both.</p>
+              {profSel && has && (() => {
+                const rs = plan.rooms.filter((r) => roomUses(r).includes(profSel))
+                return <p className="gl-say">{rs.length ? `Used in ${rs.length === 1 ? '1 room' : `${rs.length} rooms`} (coloured in the drawing): ${rs.map((r) => r.name).join(', ')}.` : 'No room uses it yet.'}</p>
+              })()}
+            </div>
+          )}
+          {!has && mode !== 'profiles' && (
             <div className="gl-sec">
               <p className="gl-say">Press and drag a rectangle for the building. Add more rectangles or triangles to make an L or a T, or tap corners with Shape.</p>
               <button type="button" className="gl-btn quiet" onClick={startExample}>
@@ -1721,7 +1813,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           {has && giving && !onSite && chooseList()}
           {has && (
             <>
-              {!giving && <div className="gl-sec">
+              {!giving && mode !== 'profiles' && <div className="gl-sec">
                 <h3>Building <small>{f1(floorArea(plan.blocks))} m² · {runs.length} walls{plan.blocks.length > 1 ? ` · ${plan.blocks.length} blocks` : ''}</small></h3>
                 <div className="gl-row">
                   <span>Storey height</span>
@@ -1938,6 +2030,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       })()}
       {toPane(slots?.right, !onSite && !offStep && <>
       {has && mode === 'fabric' && fabricPanel()}
+      {mode === 'profiles' && profilesPanel()}
       {has && mode === 'spaces' && spacesPanel()}
       {has && mode === 'systems' && systemsPanel()}
       </>, 'right2')}

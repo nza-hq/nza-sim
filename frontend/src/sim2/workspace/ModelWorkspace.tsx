@@ -21,7 +21,7 @@ import './workspace.css'
 /** Brief 110b row 1: each step wears the accent of today's module it stands for. */
 const ACCENT: Record<StepId, string> = {
   site: MODULE_THEMES.weather.accent, shape: MODULE_THEMES.building.accent, fabric: MODULE_THEMES.building.accent,
-  spaces: MODULE_THEMES.gains.accent, systems: MODULE_THEMES.systems.accent, check: MODULE_THEMES.consumption.accent,
+  profiles: MODULE_THEMES.profiles.accent, spaces: MODULE_THEMES.gains.accent, systems: MODULE_THEMES.systems.accent, check: MODULE_THEMES.consumption.accent,
   interventions: MODULE_THEMES.interventions.accent,
 }
 

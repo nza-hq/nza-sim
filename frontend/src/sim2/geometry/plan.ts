@@ -191,6 +191,10 @@ export type Plan = {
   fabric_types: FabricType[]
   wall_spans: TypeSpan[]
   spaces: SpaceType[]
+  /** The project's profiles (Brief 110b, Profiles step): library profile keys chosen for this project. Profiles a
+   * space type or system points at are the project's too, listed or not. Not part of the document: only a profile
+   * something uses reaches the engine. */
+  profiles?: string[]
   /** Whole-building fabric inputs, typed (null: not stated). */
   building?: BuildingInputs
   /** Emitter types (Systems step), given to rooms with a count. */
