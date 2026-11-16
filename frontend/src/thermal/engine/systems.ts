@@ -185,41 +185,43 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   let pumpW = 0
   let dhwNeeded = 0  // the tap-mix over every zone, independent of which zones are served (review F2)
   const d0 = doc.services.dhw
-  // Hot water use stated with no system to serve it is named, not dropped (review F1).
-  if (dhwGroups.length === 0 && d0.demand_basis != null) miss('services.dhw', 'hot water use is stated but no hot water system serves it')
+  // Brief 112: hot water use is the spaces' (each occupancy profile's `dhw`), the heater's temperatures the building's.
+  const useOf = (zi: number) => {
+    const ref = doc.zones[zi].profile_refs.occupancy
+    const pi = ref == null ? -1 : doc.profiles.findIndex((p) => p.id === ref)
+    const p = pi < 0 ? null : doc.profiles[pi]
+    return p && p.kind === 'occupancy' && p.dhw ? { ...p.dhw, path: `profiles[${pi}].dhw` } : null
+  }
+  const anyUse = doc.zones.some((_, zi) => useOf(zi) != null)
+  // Hot water use stated with no system to serve it is named, not dropped (review F1), and a system with no use is named.
+  if (dhwGroups.length === 0 && anyUse) miss('services.dhw', 'hot water use is stated on a space but no hot water system serves it')
+  if (dhwGroups.length > 0 && !anyUse) miss('services.dhw', 'a hot water system is installed but no space states its hot water use (litres a day per person or per m²)')
   if (dhwGroups.length > 0) {
     const d = d0
     const need = (v: number | string | null, k: string) => { if (v == null) miss(`services.dhw.${k}`, 'required: a hot water system is installed'); return v }
     const store = need(d.storage_setpoint_c, 'storage_setpoint_c') as number | null
     const tap = need(d.tap_outlet_temp_c, 'tap_outlet_temp_c') as number | null
     const cold = need(d.cold_supply_temp_c, 'cold_supply_temp_c') as number | null
-    const basis = need(d.demand_basis, 'demand_basis') as string | null
     const shape = need(d.load_shape, 'load_shape') as string | null
     const pump = need(d.circulation_pump_w, 'circulation_pump_w') as number | null
     if (pump != null && !(pump >= 0)) miss('services.dhw.circulation_pump_w', 'must be ≥ 0')
     if (shape != null && shape !== 'flat' && shape !== 'follow_occupancy') miss('services.dhw.load_shape', `unknown shape "${shape}" (flat or follow_occupancy)`)
-    let litres: number | null = null
-    if (basis === 'per_person') litres = need(d.litres_per_person_per_day, 'litres_per_person_per_day') as number | null
-    else if (basis === 'per_m2') litres = need(d.litres_per_m2_per_day, 'litres_per_m2_per_day') as number | null
-    else if (basis != null) miss('services.dhw.demand_basis', `unknown basis "${basis}" (per_person or per_m2)`)
-    if (litres != null && !(litres >= 0)) miss(`services.dhw.${basis === 'per_person' ? 'litres_per_person_per_day' : 'litres_per_m2_per_day'}`, 'must be ≥ 0')
     if (store != null && cold != null && !(store > cold)) miss('services.dhw.storage_setpoint_c', 'must be above the cold supply temperature')
     if (store != null && cold != null && tap != null && !(tap >= cold && tap <= store)) miss('services.dhw.tap_outlet_temp_c', 'must be between the cold supply and the store temperatures')
-    if (store != null && cold != null && tap != null && litres != null && basis != null && shape != null && store > cold) {
+    if (store != null && cold != null && tap != null && shape != null && store > cold) {
       const hot = (tap - cold) / (store - cold)
       let total = 0
       doc.zones.forEach((zone, zi) => {
         // Every zone with hot water use must be served (review F1): per m², every zone with floor; per person, every
-        // zone with occupants. A zone with no occupancy uses no hot water per person, unless a system names it.
+        // zone with occupants.
+        const use = useOf(zi)
+        if (!use) return
         let tapLitres: number
-        if (basis === 'per_person') {
+        if (use.basis === 'per_person') {
           const occ = gains[zi]?.occupancy
-          if (!occ) {
-            if (covering('dhw', zi).length > 0) miss(`zones[${zi}].profile_refs.occupancy`, `hot water per person needs ${zone.name || zone.id}'s occupancy`)
-            return
-          }
-          tapLitres = occ.people * litres
-        } else tapLitres = litres * zone.area_m2
+          if (!occ) return  // the gains already named why there is no occupancy
+          tapLitres = occ.people * use.litres_per_day
+        } else tapLitres = use.litres_per_day * zone.area_m2
         const kwh = tapLitres * hot * (store - cold) * WATER_KWH_PER_L_K * 365  // a year of days, as today
         if (!(kwh > 0)) return
         dhwNeeded += kwh

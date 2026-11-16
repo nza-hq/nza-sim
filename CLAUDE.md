@@ -214,6 +214,14 @@ which of these scope items they affect.
 - Electrical end-use accounting for lighting and small power (thin
   entries that read the heat gain from Internal Gains and apply any
   controls; no double-counting in the heat balance)
+- Lighting energy from the space's lux and the lighting system's
+  luminaire efficacy (Brief 112): W/m² = lux ÷ 100 × efficacy
+  (W/m² per 100 lux), worked out only in
+  `thermal/engine/lighting.ts` (`lightingWm2`). The space states the
+  lux (demand); the system states the efficacy (energy). A W/m²
+  stated directly stays as "stated, not from lux". Hot water use
+  (litres a day) is stated on the space; the heater stays on
+  Systems. Simulate v2 only.
 - Fuel split, carbon, total EUI roll-ups across all systems
 - Conversion from envelope/internal-gains demand → delivered energy
   → source energy → carbon

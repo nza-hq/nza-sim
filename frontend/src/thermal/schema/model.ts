@@ -56,6 +56,16 @@ export const OccupancyProfile = z
     latent_w_per_person: finite.optional(),
     /** Schema 2.3 (Brief 105 Part 1): the share of the sensible gain given off as long-wave radiation. Null until stated. */
     radiant_fraction: fraction.nullable(),
+    /**
+     * Schema 2.8 (Brief 112): the hot water these people use, litres a day, per person present at full occupancy (or per
+     * m² of the zones that refer to the profile). Demand, so it sits with the space (Linzie 16 Nov: "Spaces is demand,
+     * Systems is energy"); the heater and its temperatures are `services.dhw`. Null: no hot water.
+     */
+    dhw: z
+      .object({ basis: z.enum(['per_person', 'per_m2']), litres_per_day: nonNeg })
+      .strict()
+      .nullable()
+      .default(null),
   })
   .strict()
 
@@ -74,7 +84,18 @@ const GainProfileFields = {
   /** Schema 2.3 (Brief 105 Part 1): the share of the heat gain given off as long-wave radiation. Null until stated. */
   radiant_fraction: fraction.nullable(),
 }
-export const LightingProfile = z.object({ ...GainProfileFields, kind: z.literal('lighting') }).strict()
+export const LightingProfile = z
+  .object({
+    ...GainProfileFields,
+    kind: z.literal('lighting'),
+    /**
+     * Schema 2.8 (Brief 112): the light the space needs while lit, lux. Demand; the W/m² comes from the lighting
+     * system's efficacy, worked out only by `lightingWm2` (thermal/engine/lighting.ts) and never stored. A profile
+     * states either `lux` or `magnitude` (a W/m² stated directly, not from lux), not both.
+     */
+    lux: nonNeg.nullable().default(null),
+  })
+  .strict()
 export const EquipmentProfile = z.object({ ...GainProfileFields, kind: z.literal('equipment') }).strict()
 export const AuxiliaryProfile = z.object({ ...GainProfileFields, kind: z.literal('auxiliary') }).strict()
 
@@ -401,6 +422,8 @@ export const SystemGroup = z
     /** Schema 2.4 (Brief 108): a wet heating system's design flow and return, °C, at which its emitters are rated. */
     design_flow_c: finite.nullable().optional(),
     design_return_c: finite.nullable().optional(),
+    /** Schema 2.8 (Brief 112): a lighting system's luminaires, W/m² for each 100 lux delivered. Lighting only. */
+    efficacy_w_m2_per_100lux: nonNeg.nullable().default(null),
   })
   .strict()
 export type SystemGroup = z.infer<typeof SystemGroup>
@@ -409,7 +432,11 @@ const SetpointService = z
   .object({ setpoint_mode: z.enum(['follow_comfort', 'custom']), setpoint_c: finite.nullable() })
   .strict()
 
-/** Service-level fields (CLAUDE.md "Service-level vs system-level fields", Brief 42): one value per building. */
+/**
+ * Service-level fields (CLAUDE.md "Service-level vs system-level fields", Brief 42): one value per building. Schema 2.8
+ * (Brief 112): hot water use moved to the occupancy profiles (`dhw`); `services.dhw` keeps the temperatures, the load
+ * shape and the pump.
+ */
 export const Services = z
   .object({
     heating: SetpointService,
@@ -419,9 +446,6 @@ export const Services = z
         storage_setpoint_c: finite.nullable(),
         tap_outlet_temp_c: finite.nullable(),
         cold_supply_temp_c: finite.nullable(),
-        demand_basis: z.string().nullable(),
-        litres_per_person_per_day: finite.nullable(),
-        litres_per_m2_per_day: finite.nullable(),
         load_shape: z.string().nullable(),
         /** DHW secondary-circulation pump, W. Moves the anchor (+2.2 EUI at 1,200 W); see the audit doc. */
         circulation_pump_w: finite.nullable(),
@@ -509,7 +533,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.7' as const
+export const SCHEMA_VERSION = '2.8' as const
 
 export const ModelDocument = z
   .object({
@@ -635,6 +659,13 @@ export const ModelDocument = z
         else if (g.service !== 'heating') ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: `emitter "${e.id}" names "${g.id}", a ${g.service} system, not heating` })
         else if (!g.zones.includes(z0.id)) ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: `emitter "${e.id}" is in zone "${z0.id}", which its system "${g.id}" does not serve` })
       })
+    })
+    // Brief 112: efficacy is a lighting system's; a lighting profile states lux or a W/m², not both.
+    doc.system_groups.forEach((g, i) => {
+      if (g.service !== 'lighting' && g.efficacy_w_m2_per_100lux != null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'efficacy_w_m2_per_100lux'], message: `a ${g.service} system has no luminaire efficacy; leave empty` })
+    })
+    doc.profiles.forEach((p, i) => {
+      if (p.kind === 'lighting' && p.lux != null && p.magnitude != null) ctx.addIssue({ code: 'custom', path: ['profiles', i], message: `lighting "${p.id}" states both lux and a W/m²: keep one` })
     })
     const profileIds = new Set(doc.profiles.map((p) => p.id))
     doc.zones.forEach((z0, i) => {

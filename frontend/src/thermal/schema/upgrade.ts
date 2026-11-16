@@ -111,16 +111,45 @@ export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
   if (from === '2.0' || from === '2.1') to22(doc)
-  if (from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
+  // Review F1 (Brief 112): from 2.3 on, a null gain input means "not stated" and stays null (the engine names it).
+  if (from === '2.0' || from === '2.1' || from === '2.2') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
   to24(doc)
   to25(doc)
   to26(doc)
-  to27(doc)
+  if (from !== '2.7') to27(doc)
+  to28(doc)
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
+}
+
+/**
+ * 2.7 → 2.8 (Brief 112): hot water use moves from the building (`services.dhw`) to the occupancy profiles, the same
+ * litres on every one, so every zone uses what it did. Lighting stays as stated W/m²; no lux and no efficacy is guessed.
+ * A per-m² use on a building whose zones without occupancy would lose their hot water is refused, naming them.
+ */
+export function to28(doc: Obj): void {
+  const d = doc.services?.dhw as Obj | undefined
+  if (d) {
+    const basis = d.demand_basis ?? null
+    const litres = basis === 'per_person' ? d.litres_per_person_per_day : basis === 'per_m2' ? d.litres_per_m2_per_day : null
+    if (basis != null && basis !== 'per_person' && basis !== 'per_m2') throw new Error(`services.dhw.demand_basis: unknown basis "${basis}" (per_person or per_m2)`)
+    if (basis != null && litres != null) {
+      if (basis === 'per_m2') {
+        const bare = (doc.zones as Obj[]).filter((z) => z.profile_refs?.occupancy == null)
+        if (bare.length) throw new Error(`hot water is ${litres} litres per m² a day, and ${bare.map((z) => z.name || z.id).join(', ')} has no occupancy to carry it: state hot water on its space`)
+      }
+      for (const p of doc.profiles as Obj[]) if (p.kind === 'occupancy') p.dhw = { basis, litres_per_day: litres }
+    }
+    delete d.demand_basis; delete d.litres_per_person_per_day; delete d.litres_per_m2_per_day
+  }
+  for (const p of doc.profiles as Obj[]) {
+    if (p.kind === 'occupancy') p.dhw ??= null
+    if (p.kind === 'lighting') p.lux ??= null
+  }
+  for (const g of doc.system_groups as Obj[]) g.efficacy_w_m2_per_100lux ??= null
 }
 
 /** 2.6 → 2.7 (Brief 119): no emitter cools or names a catalogue item; every emitter heats, as it did. Nothing is filled. */

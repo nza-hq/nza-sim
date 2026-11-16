@@ -54,7 +54,7 @@ function downgrade(d: any) {
 describe('schema 2.1 to 2.6', () => {
   it('the converter writes today\'s constants into the document', async () => {
     const d = await anchor()
-    expect(d.schema_version).toBe('2.7')
+    expect(d.schema_version).toBe('2.8')
     for (const s of d.surfaces) {
       if (s.kind === 'wall') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.6, 0.9, null])
       if (s.kind === 'roof') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.7, 0.9, null])
@@ -104,6 +104,24 @@ describe('schema 2.1 to 2.6', () => {
     expect(up).toEqual(d)
     expect(await modelHash(up)).toBe(await modelHash(d))
   })
+  it('a 2.7 document upgrades to the 2.8 one, and its unstated gain inputs stay unstated (Brief 112 review F1)', async () => {
+    const d: any = await anchor()
+    for (const p of d.profiles) {
+      if (p.kind === 'occupancy') { delete p.occupancy_rate; delete p.sensible_w_per_person }
+      if (p.kind === 'lighting') { delete p.area_share; delete p.gain_fraction; delete p.daylight_factor }
+    }
+    const occ = d.profiles.filter((p: any) => p.kind === 'occupancy')
+    expect(occ.length).toBeGreaterThan(0)
+    const old: any = structuredClone(d)
+    old.schema_version = '2.7'
+    const hw = occ[0].dhw
+    if (hw) Object.assign(old.services.dhw, { demand_basis: hw.basis, [hw.basis === 'per_person' ? 'litres_per_person_per_day' : 'litres_per_m2_per_day']: hw.litres_per_day })
+    for (const p of old.profiles) { delete p.dhw; delete p.lux }
+    for (const g of old.system_groups) delete g.efficacy_w_m2_per_100lux
+    const up: any = upgradeDocument(old)
+    expect(up).toEqual(d)
+    for (const p of up.profiles.filter((q: any) => q.kind === 'occupancy')) expect([p.occupancy_rate, p.sensible_w_per_person]).toEqual([undefined, undefined])
+  })
   it('fills only today\'s fallbacks a profile leaves out, and only those today\'s engine reads for it', () => {
     const occ: any = { id: 'o', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' } }
     stateTodaysGainInputs(occ)
@@ -148,7 +166,7 @@ describe('schema 2.1 to 2.6', () => {
     const e = structuredClone(d); e.surfaces[glz].inside_solar_absorptance = 0.5
     expect(() => ModelDocument.parse(e)).toThrow('not inside_solar_absorptance')
     expect(() => upgradeDocument({ ...d, schema_version: '1.0' })).toThrow('schema version "1.0"')
-    expect(SCHEMA_VERSION).toBe('2.7')
+    expect(SCHEMA_VERSION).toBe('2.8')
     expect(TODAY.inside_solar_absorptance).toBe(0.7)
     expect(TODAY.internal_heat_capacity_j_per_k_m2).toBe(250_000)
   })

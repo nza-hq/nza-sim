@@ -96,7 +96,9 @@ export type Level = (typeof LEVELS)[number]
  *   vents are on the zone and its surfaces, and stay), emitters and system groups removed; each zone heated to
  *   `heatC` with no cooling and no setback.
  * - spaces: mechanical ventilation entries (mvhr, mev), emitters and system groups removed; the zones' own setpoints,
- *   gains and natural ventilation stay.
+ *   people, equipment and natural ventilation stay. Lighting is removed with its profiles and references (Brief 112 P3):
+ *   its heat depends on the luminaires (lux × efficacy, or a W/m² stated for them), a Systems object, so it arrives at
+ *   'systems'.
  * - systems: the document unchanged.
  */
 export function levelDocument(doc: ModelDocument, level: Level, heatC: number | null = null): ModelDocument {
@@ -106,7 +108,9 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
   for (const z of d.zones) {
     z.emitters = []
     z.ventilation = level === 'fabric' ? [] : z.ventilation.filter((v) => v.kind === 'natural')
+    z.profile_refs.lighting = []
   }
+  d.profiles = d.profiles.filter((p) => p.kind !== 'lighting')
   if (level === 'fabric') {
     if (heatC == null || !Number.isFinite(heatC)) throw new Error('fabric level needs the heating setpoint')
     d.profiles = d.profiles.filter((p) => p.kind === 'schedule')
@@ -284,7 +288,7 @@ export type SimulateResult =
   | { ok: true; results: ModelResults; summary: Summary }
   | { ok: false; missing: Missing[] }
 
-const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null) => string][] = [
+const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null, message: string) => string][] = [
   [/^zones$/, () => 'Draw the building and put its rooms in at least one zone.'],
   [/^zones\[(\d+)\]\.setpoints\.heat_c$/, (m, d) => `Set the heating setpoint for ${zoneName(d, m[1])}.`],
   [/^zones\[(\d+)\]\.setpoints\.cool_c$/, (m, d) => `Set the cooling setpoint for ${zoneName(d, m[1])}.`],
@@ -295,11 +299,15 @@ const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null) => string
   [/^zones\[(\d+)\]\.ventilation\[(\d+)\]\.recovery_sensible_pct$/, (m, d) => `Set the MVHR heat recovery for ${zoneName(d, m[1])}.`],
   [/^building\.thermal_bridging\./, () => 'Set the thermal bridging for the building.'],
   [/^building\.site\.exposure$/, () => 'Set the site exposure (sheltered, normal or exposed).'],
+  [/^zones\[(\d+)\]\.profile_refs\.lighting$/, (m, d) => `Lighting in ${zoneName(d, m[1])} is stated in lux, so it needs a lighting system with its efficacy (W/m² per 100 lux).`],
+  [/^system_groups\[(\d+)\]\.efficacy_w_m2_per_100lux$/, (m, d, msg) => msg.startsWith('required: ')
+    ? `The lighting system "${d?.system_groups[Number(m[1])]?.label || d?.system_groups[Number(m[1])]?.id}" needs its efficacy (W/m² per 100 lux): ${msg.slice(10).split(',')[0]}.`
+    : `${msg.charAt(0).toUpperCase()}${msg.slice(1)}.`],
   [/^profiles\[(\d+)\]\.(\w+)/, (m, d) => `The space type "${profileLabel(d, m[1])}" needs ${FIELD[m[2]] ?? m[2].replace(/_/g, ' ')}.`],
 ]
 const FIELD: Record<string, string> = {
   radiant_fraction: 'a radiant fraction', sensible_w_per_person: 'heat per person', occupancy_rate: 'an occupancy rate',
-  magnitude: 'a lighting power (W/m²)', active: 'an equipment power (W/m²)', baseload: 'an always-on equipment power (W/m²)',
+  magnitude: 'its lighting level (lux), or a lighting power stated in W/m²', active: 'an equipment power (W/m²)', baseload: 'an always-on equipment power (W/m²)',
   relationship_to_occupancy: 'how it follows occupancy', gain_fraction: 'a gain fraction', area_share: 'an area share',
   daylight_factor: 'a daylight factor', standby_factor: 'a standby factor', schedule: 'a schedule', density: 'a density',
 }
@@ -330,7 +338,7 @@ export function explain(path: string, message: string, doc: ModelDocument | null
   if (dt) return { path, what: `The schedule "${profileLabel(doc, dt[1])}", ${message.replace(/^\w+ hour/, (x) => `${x.split(' ')[0]}, hour`)}.` }
   for (const [re, f] of WORDS) {
     const m = path.match(re)
-    if (m) return { path, what: f(m, doc) }
+    if (m) return { path, what: f(m, doc, message) }
   }
   // Brief 108: emitters and their system's design temperatures, in words; the engine's reason kept when it is not "required".
   const sentence = (head: string, field: string) => ({ path, what: message.startsWith('required') ? `Set ${field} for ${head}.` : `${head.charAt(0).toUpperCase()}${head.slice(1)}: ${message.replace(/^required: /, '')}.` })
@@ -401,7 +409,7 @@ export function simulate(
     const v = (input as { schema_version?: unknown })?.schema_version
     const parsed = ModelDocument.safeParse(input)
     if (parsed.success) doc = parsed.data
-    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119); nothing is filled
+    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2); nothing is filled
     else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
       // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
       // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
@@ -718,14 +726,13 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
     if (message.startsWith('unknown source') || message.endsWith('runs on electricity')) return { path, what: `The system ${name}: ${message}.` }
     return { path, what: `The system ${name} needs ${what[g[2]] ?? g[2].replace(/_/g, ' ')}.` }
   }
-  if (path === 'services.dhw') return { path, what: 'Hot water use is stated, but no hot water system is chosen to heat it.' }
+  if (path === 'services.dhw') return { path, what: message.startsWith('a hot water system') ? 'A hot water system is chosen, but no space states how much hot water it uses.' : 'Hot water use is stated on a space, but no hot water system is chosen to heat it.' }
   const z = path.match(/^zones\[(\d+)\]\.dhw$/)
   if (z) return { path, what: `Choose a hot water system for ${zoneName(doc, z[1])}.` }
   const d = path.match(/^services\.dhw\.(\w+)$/)
   if (d) {
     const what: Record<string, string> = {
       storage_setpoint_c: 'the hot water store temperature', tap_outlet_temp_c: 'the tap outlet temperature', cold_supply_temp_c: 'the cold supply temperature',
-      demand_basis: 'how hot water use is counted (per person or per m²)', litres_per_person_per_day: 'litres per person a day', litres_per_m2_per_day: 'litres per m² a day',
       load_shape: 'when hot water is used (flat, or following occupancy)', circulation_pump_w: 'the circulation pump power (0 if none)',
     }
     return { path, what: message.startsWith('required') ? `Hot water needs ${what[d[1]] ?? d[1]}.` : `Hot water: ${what[d[1]] ?? d[1]} ${message}.` }

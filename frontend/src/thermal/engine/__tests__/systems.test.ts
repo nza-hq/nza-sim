@@ -28,7 +28,10 @@ function setup() {
     group('dhw_boiler', 'dhw', ['west', 'middle', 'east'], 100, 'gas', 0.8),
     group('lights', 'lighting', ['west', 'middle', 'east'], 100, 'electricity', null, { control_factor: 0.5 }),
   ]
-  d.services.dhw = { storage_setpoint_c: 60, tap_outlet_temp_c: 40, cold_supply_temp_c: 10, demand_basis: 'per_m2', litres_per_person_per_day: null, litres_per_m2_per_day: 2, load_shape: 'flat', circulation_pump_w: 100 }
+  d.services.dhw = { storage_setpoint_c: 60, tap_outlet_temp_c: 40, cold_supply_temp_c: 10, load_shape: 'flat', circulation_pump_w: 100 }
+  // Brief 112: hot water use is the space's, on an occupancy profile with no people (per m², so none are needed).
+  d.profiles.push({ id: 'hw', kind: 'occupancy', density: { value: 0, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: Array(24).fill(1), saturday: Array(24).fill(1), sunday: Array(24).fill(1) }, dhw: { basis: 'per_m2', litres_per_day: 2 } })
+  for (const z of d.zones) z.profile_refs.occupancy = 'hw'
   d.profiles.push({ id: 'light', kind: 'lighting', relationship_to_occupancy: 'always_on', area_share: 1, gain_fraction: 0.5, magnitude: { value: 5, unit: 'w_per_m2' }, radiant_fraction: 0.3 })
   for (const z of d.zones) z.profile_refs.lighting = ['light']
   d.zones[0].ventilation = [{ id: 'fan', kind: 'mev', enabled: true, flow_rate: 100, flow_rate_basis: 'constant', sfp_w_per_l_s: 1, recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
@@ -161,9 +164,14 @@ describe('systems: review responses (Brief 107 F1–F8)', () => {
   it('F1: hot water use stated with no hot water system is named; with neither, there is no hot water', () => {
     const d = setup()
     d.system_groups = d.system_groups.filter((x: any) => x.service !== 'dhw')
-    expect(missing(d)).toEqual([{ path: 'services.dhw', message: 'hot water use is stated but no hot water system serves it' }])
-    d.services.dhw.demand_basis = null
+    expect(missing(d)).toEqual([{ path: 'services.dhw', message: 'hot water use is stated on a space but no hot water system serves it' }])
+    d.profiles.find((p: any) => p.id === 'hw').dhw = null
     expect(readEndUseKwh(ok(d), 'dhw')).toBe(0)
+  })
+  it('Brief 112: a hot water system with no space stating its use is named', () => {
+    const d = setup()
+    d.profiles.find((p: any) => p.id === 'hw').dhw = null
+    expect(missing(d)).toEqual([{ path: 'services.dhw', message: 'a hot water system is installed but no space states its hot water use (litres a day per person or per m²)' }])
   })
   it('F2: served is checked against the demand computed apart from serving, per service', () => {
     const s = ok(setup())
@@ -212,7 +220,7 @@ describe('systems: review responses (Brief 107 F1–F8)', () => {
     expect(s.electricity_w[1000]).toBeCloseTo(hp.fuel_w[1000] + 800 / 2.5 + 100 + 100 + lightW, 6)
     // hot water following occupancy: zero in unoccupied hours, the same annual total
     const o = setup()
-    o.profiles.push({ id: 'occ', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: Array(24).fill(0).map((_, h) => (h >= 8 && h < 18 ? 1 : 0)), saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+    o.profiles.push({ id: 'occ', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: Array(24).fill(0).map((_, h) => (h >= 8 && h < 18 ? 1 : 0)), saturday: Array(24).fill(0), sunday: Array(24).fill(0) }, dhw: { basis: 'per_m2', litres_per_day: 2 } })
     for (const z of o.zones) z.profile_refs.occupancy = 'occ'
     const flat = ok(o)
     o.services.dhw.load_shape = 'follow_occupancy'
