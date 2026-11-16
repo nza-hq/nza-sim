@@ -41,3 +41,20 @@ describe('construction sets (Brief 118 P3)', () => {
     expect(b.fabric_types.length).toBe(a.fabric_types.length)
   })
 })
+
+import { BUILDING_USES, applyUse, roomKindsOf } from '../applyUse'
+
+describe('building uses (Brief 118 P3)', () => {
+  it('each use the library can fill brings a space type per kind of room, filled from the library', () => {
+    expect(BUILDING_USES.map((u) => u.name)).toEqual(expect.arrayContaining(['Hotel', 'Office']))
+    const hotel = BUILDING_USES.find((u) => u.name === 'Hotel')!
+    const p = applyUse(two(), hotel, ['r1', 'r2'], () => ({}))
+    expect(p.building_use).toBe(hotel.id)
+    expect(p.spaces.map((s) => s.borrowed).sort()).toEqual(roomKindsOf(hotel).map((b) => b.key).sort())
+    const main = p.spaces.find((s) => s.borrowed === hotel.main)!
+    expect(p.rooms.every((r) => r.space === main.id)).toBe(true)
+    expect(main.occupancy).toBeTruthy()
+    expect(applyUse(p, hotel, ['r1', 'r2'], () => ({})).spaces).toHaveLength(p.spaces.length)
+    expect(buildDocument(p).doc).toBeTruthy()
+  })
+})

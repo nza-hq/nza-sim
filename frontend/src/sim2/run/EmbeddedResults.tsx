@@ -30,7 +30,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   /** The document with the previewed change made (preview, then apply); null when nothing is previewed. */
   previewDoc?: unknown
   /** Hears the run's summary now and the previewed one, for the apply card. */
-  onFigures?: (now: Summary | null, preview: Summary | null) => void
+  /** The run's figures and the previewed change's; `why` says why the preview has none (inputs unset, or it failed). */
+  onFigures?: (now: Summary | null, preview: Summary | null, why?: string | null) => void
   strip: HTMLElement
   centre: HTMLElement
   showBody: boolean
@@ -41,7 +42,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   const run = useRun(doc, previewDoc)
   const s = run.state.kind === 'done' ? run.state.summary : null
   const ps = run.previewState.kind === 'done' ? run.previewState.summary : null
-  useEffect(() => { onFigures?.(s, ps) }, [s, ps])
+  const pwhy = run.previewState.kind === 'missing' ? 'This change leaves inputs unset: no figures for it yet.' : run.previewState.kind === 'error' ? 'The preview could not run.' : null
+  useEffect(() => { onFigures?.(s, ps, pwhy) }, [s, ps, pwhy])
   useEffect(() => { if (step) run.setLevel(NATURAL[step]) }, [step])
   // Brief 110b row 2: the Pop Out window shows this run.
   const latest = useRef<ModelShare | null>(null)

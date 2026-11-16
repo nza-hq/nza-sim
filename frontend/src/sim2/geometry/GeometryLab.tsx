@@ -46,6 +46,7 @@ import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, 
 import { BORROWS, borrow, borrowedFrom } from './borrow'
 import { CONSTRUCTION_SETS, SET_ELEMENTS } from '../library/sets'
 import { applySet, setById } from './applySet'
+import { BUILDING_USES, applyUse, roomKindsOf, useById } from './applyUse'
 import Spark from './Spark'
 import type { Slots } from '../workspace/ModelWorkspace'
 import type { StepId } from '../workspace/steps'
@@ -260,7 +261,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const pvKey = useRef('')
   const planIds = useRef(new WeakMap<Plan, number>())
   const planSeq = useRef(0)
-  const [figs, setFigs] = useState<{ now: Summary | null; preview: Summary | null }>({ now: null, preview: null })
+  const [figs, setFigs] = useState<{ now: Summary | null; preview: Summary | null; why?: string | null }>({ now: null, preview: null })
   const [flash, setFlash] = useState<string[]>([])
   const [note, setNote] = useState<string | null>(null)
   const [changes, setChanges] = useState<{ text: string; effect: string | null; depth: number }[]>([])
@@ -276,6 +277,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [activeSpace, setActiveSpace] = useState<string | null>(null)
   const [activeSys, setActiveSys] = useState<Partial<Record<Service, string>>>({})
   const [activeSet, setActiveSet] = useState<string | null>(null)
+  const [spaceKind, setSpaceKind] = useState<'types' | 'use'>('types')
+  const [activeUse, setActiveUse] = useState<string | null>(null)
   /** Brief 118: what the left navigates by; null follows the step (Fabric on Fabric, Systems on Systems…). */
   const [navBy, setNavBy] = useState<string | null>(null)
   useEffect(() => setNavBy(null), [mode])
@@ -1056,7 +1059,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
     : `${f1(ringArea(r.ring))} m²`
 
-  useEffect(() => { setPvAsk(null) }, [sel, mode, fkind, sysKind, opening])
+  useEffect(() => { setPvAsk(null) }, [sel, mode, fkind, sysKind, opening, spaceKind])
   useEffect(() => {
     const g = giverRef.current
     if (!pvAsk || !g || !g.name) { if (pending) { setPending(null); pvKey.current = '' } return }
@@ -1241,12 +1244,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       }))]
     }
     if (by === 'spaces') {
-      return [{
+      const bu = useById(plan.building_use)
+      return [{ title: 'Building use', items: bu ? [{ id: bu.id, name: bu.name, swatch: { colour: '#EA580C' }, rooms: allRooms(), active: mode === 'spaces' && spaceKind === 'use', onPick: mode === 'spaces' ? () => { setSpaceKind('use'); setActiveUse(bu.id) } : undefined }] : [], onNew: mode === 'spaces' ? { label: bu ? 'Change the use' : '+ Choose a building use', run: () => setSpaceKind('use') } : undefined }, {
+        title: 'Space types',
         items: [
-          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), active: mode === 'spaces' && curSpace?.id === sp.id, onPick: mode === 'spaces' ? () => setActiveSpace(sp.id) : undefined, onRename: (name: string) => setSpace(sp.id, { name }) })),
+          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), active: mode === 'spaces' && curSpace?.id === sp.id, onPick: mode === 'spaces' ? () => { setSpaceKind('types'); setActiveSpace(sp.id) } : undefined, onRename: (name: string) => setSpace(sp.id, { name }) })),
           ...noneItem('none-space', 'No space type', roomsWhere((r) => !plan.spaces.some((sp) => sp.id === r.space))),
         ],
-        onNew: { label: '+ New space type', run: () => newSpace() },
+        onNew: { label: '+ New space type', run: () => { newSpace(); setSpaceKind('types') } },
       }]
     }
     if (by === 'systems') {
@@ -1347,7 +1352,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const pendingEffect = () => {
     if (!pending || pending.same) return null
     if (!figs.now) return null
-    if (!figs.preview) return 'Working out the change…'
+    if (!figs.preview) return figs.why ?? 'Working out the change…'
     const h = previewItems(figs.now, figs.preview, unit)[0]!
     return `Heating ${h.value} ${h.unit} (${h.sub})`
   }
@@ -1355,7 +1360,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     if (!pending || pending.same) return
     const effect = pendingEffect()
     commit(pending.plan)
-    setChanges((c) => [{ text: `${pending.who} → ${pending.name}`, effect: effect && !effect.startsWith('Working') ? effect : null, depth: past.length + 1 }, ...c].slice(0, 30))
+    setChanges((c) => [{ text: `${pending.who} → ${pending.name}`, effect: figs.preview && effect ? effect : null, depth: past.length + 1 }, ...c].slice(0, 30))
     setFlash(pending.rooms)
     setNote(`Applied: ${pending.name} to ${pending.who}. ${pending.change}.`)
     setPvAsk(null)
@@ -1608,8 +1613,28 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       const rs = plan.rooms.filter((r) => r.space === x.id)
       return { id: x.id, name: x.name, swatch: { colour: spaceColour(x.id)! }, line: USES.find((u) => u.key === x.use)?.name ?? 'Use not set', used: rs.length ? `${count(rs.length, 'room')}` : 'not used', removable: !rs.length }
     })
+    const SPACE_KINDS: Kind[] = [{ key: 'use', name: 'Building use', icon: 'building' }, { key: 'types', name: 'Space types', icon: 'person' }]
+    if (spaceKind === 'use') {
+      const cur = useById(activeUse) ?? useById(plan.building_use) ?? null
+      const uses: Item[] = BUILDING_USES.map((u) => ({ id: u.id, name: u.name, swatch: { colour: '#EA580C' }, line: roomKindsOf(u).map((b) => b.name).join(', '), used: plan.building_use === u.id ? 'whole building' : '', removable: false }))
+      return (
+        <GivePanel kinds={SPACE_KINDS} kind="use" onKind={(k) => setSpaceKind(k as 'types' | 'use')} title="Building uses" icon="building"
+          items={uses} active={cur?.id ?? null} onActive={previewOnPick(setActiveUse)}
+          detail={cur && (
+            <>
+              <h4>{cur.name}</h4>
+              <p className="gl-hint">Brings these space types, each filled from NZA Sim's profiles and today's Internal Gains templates (occupancy, lighting, equipment and comfort temperatures). Apply gives the rooms chosen the {roomKindsOf(cur).find((b) => b.key === cur.main)!.name.toLowerCase()} type; give the others to their rooms on Space types.</p>
+              {roomKindsOf(cur).map((b) => <div key={b.key} className="gl-row"><span>{b.name}</span><span className="ap-setc">{b.key === cur.main ? 'on the rooms chosen' : 'made, ready to give'}</span></div>)}
+              <p className="gl-hint">People per m² is not in the library, so it stays unset until typed. Schools and other uses need their profiles added to the library first, for Chris to check.</p>
+            </>
+          )}
+          give={giveFoot({ name: cur?.name ?? null, rooms: true, now: chosenSet.rooms.map((id) => plan.spaces.find((x) => x.id === plan.rooms.find((r) => r.id === id)?.space)?.name ?? 'none'), onGive: (all) => cur && commit(applyUse(plan, cur, all ? allRooms() : chosenSet.rooms, todaysGains)) })}
+        />
+      )
+    }
     return (
       <GivePanel
+        kinds={SPACE_KINDS} kind="types" onKind={(k) => setSpaceKind(k as 'types' | 'use')}
         title="Space types" icon="person"
         items={items} active={sp?.id ?? null}
         onActive={previewOnPick(setActiveSpace)}
@@ -1847,7 +1872,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
-      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview) => setFigs((f) => (f.now === now && f.preview === preview ? f : { now, preview }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>

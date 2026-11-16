@@ -191,6 +191,8 @@ export type Plan = {
   fabric_types: FabricType[]
   /** Brief 118: the construction set last given to the whole building (shown on the left). */
   fabric_set?: string | null
+  /** Brief 118: the building use last given to the whole building (Hotel, Office, Shop). */
+  building_use?: string | null
   wall_spans: TypeSpan[]
   spaces: SpaceType[]
   /** The project's profiles (Brief 110b, Profiles step): library profile keys chosen for this project. Profiles a
