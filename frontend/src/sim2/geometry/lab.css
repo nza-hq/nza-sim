@@ -331,7 +331,7 @@
 .ap-what { margin: 0; font-weight: 600; }
 .ap-now { margin: 0; font-size: 12px; color: var(--gl-soft); }
 .ap-why { margin: 0; font-size: 12px; color: var(--gl-soft); }
-.ap-apply { width: 100%; justify-self: stretch; justify-content: center; padding: 10px 12px; font-size: 14px; }
+.ap-apply { width: 100%; justify-self: stretch; justify-content: center; padding: 7px 12px; font-size: 13px; }
 .ap-foot .ap-link { justify-self: start; padding: 0; }
 .gl-doc > summary { cursor: pointer; list-style: none; }
 .gl-doc > summary::-webkit-details-marker { display: none; }
