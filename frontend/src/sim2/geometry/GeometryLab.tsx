@@ -1874,6 +1874,19 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <p className="gl-hint">What the water leaves and comes back at on a design day. Radiators and underfloor fed by this system are re-rated to these (a heat pump at 45/40 gets much less from a radiator rated at 75/65). Empty stays unset.</p>
               </>
             )}
+            {service === 'heating' && x && (() => {
+              // Brief 118 P4 (a view): the emitters this system feeds are the emitters in the rooms it heats.
+              const rs = plan.rooms.filter((r) => r.systems?.heating === x.id)
+              return (
+                <>
+                  <h4>Emitters it feeds</h4>
+                  {rs.length ? rs.map((r) => (
+                    <div key={r.id} className="gl-row"><span>{r.name}</span><span className="ap-setc">{roomEmitters(r).length ? emitName(r) : 'none yet'}</span></div>
+                  )) : <p className="gl-hint">No rooms have this system yet.</p>}
+                  {rs.length > 0 && <button type="button" className="ap-link" onClick={() => { setSysKind('emitters'); setChosen(rs.map((r) => r.id), []) }}>Give emitters to its {rs.length === 1 ? 'room' : `${rs.length} rooms`}</button>}
+                </>
+              )
+            })()}
             <p className="gl-hint">Fuel and efficiency come from NZA Sim's library. A change changes every room with this system.</p>
           </>
         )}
