@@ -1,0 +1,234 @@
+{
+ "source": "scripts/112_gate.mts",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "bridgewater_lighting_stated": [
+  {
+   "id": "default_lighting",
+   "unit": "w_per_m2",
+   "w_per_m2": 2
+  }
+ ],
+ "efficacy_w_m2_per_100lux": 2,
+ "lux": [
+  {
+   "id": "default_lighting",
+   "lux": 100
+  }
+ ],
+ "a_stated_w_per_m2": {
+  "eui_kwh_per_m2": 131.88554445339093,
+  "total_kwh": 556024.179993718,
+  "end_uses": {
+   "heating/electricity": 42000.05083671537,
+   "cooling/electricity": 20908.474039649773,
+   "dhw/electricity": 41173.5573333311,
+   "dhw/gas": 157428.30745099156,
+   "dhw_circulation/electricity": 1051.2,
+   "fans/electricity": 40613.111999997964,
+   "lighting/electricity": 39014.30074903205,
+   "small_power/electricity": 186136.32038400284,
+   "auxiliary/electricity": 27698.857199997437
+  }
+ },
+ "b_lux_and_efficacy": {
+  "eui_kwh_per_m2": 131.88554445339093,
+  "total_kwh": 556024.179993718,
+  "end_uses": {
+   "heating/electricity": 42000.05083671537,
+   "cooling/electricity": 20908.474039649773,
+   "dhw/electricity": 41173.5573333311,
+   "dhw/gas": 157428.30745099156,
+   "dhw_circulation/electricity": 1051.2,
+   "fans/electricity": 40613.111999997964,
+   "lighting/electricity": 39014.30074903205,
+   "small_power/electricity": 186136.32038400284,
+   "auxiliary/electricity": 27698.857199997437
+  }
+ },
+ "b_minus_a_kwh": {
+  "heating/electricity": 0,
+  "cooling/electricity": 0,
+  "dhw/electricity": 0,
+  "dhw/gas": 0,
+  "dhw_circulation/electricity": 0,
+  "fans/electricity": 0,
+  "lighting/electricity": 0,
+  "small_power/electricity": 0,
+  "auxiliary/electricity": 0
+ },
+ "max_abs_difference_kwh": 0,
+ "pass_b_equals_a": true,
+ "hot_water_on_spaces": [
+  {
+   "id": "occupancy",
+   "dhw": {
+    "basis": "per_person",
+    "litres_per_day": 55
+   }
+  }
+ ],
+ "levels": {
+  "bridgewater": {
+   "fabric": {
+    "heating_kwh": 90613.83895468018,
+    "cooling_kwh": 0,
+    "breakdown": {
+     "residual_kwh": 2.347455563267431e-8,
+     "gross_kwh": 3335341.2743262076,
+     "closes": true
+    },
+    "lighting_term_kwh": null,
+    "terms": [
+     "heating",
+     "cooling",
+     "conduction",
+     "opaque_solar_absorbed",
+     "sky_longwave",
+     "glazing_solar_absorbed",
+     "bridging",
+     "infiltration",
+     "permanent_vents",
+     "solar_transmitted",
+     "solar_lost_through_glazing",
+     "storage"
+    ]
+   },
+   "spaces": {
+    "heating_kwh": 153.4960296430092,
+    "cooling_kwh": 192750.02742263692,
+    "breakdown": {
+     "residual_kwh": -1.405226157658035e-9,
+     "gross_kwh": 3767782.852702878,
+     "closes": true
+    },
+    "lighting_term_kwh": null,
+    "terms": [
+     "heating",
+     "cooling",
+     "conduction",
+     "opaque_solar_absorbed",
+     "sky_longwave",
+     "glazing_solar_absorbed",
+     "bridging",
+     "infiltration",
+     "permanent_vents",
+     "solar_transmitted",
+     "solar_lost_through_glazing",
+     "occupancy_gains",
+     "equipment_gains",
+     "auxiliary_gains",
+     "storage"
+    ]
+   },
+   "systems": {
+    "heating_kwh": 114545.5931910414,
+    "cooling_kwh": 62725.42211894893,
+    "breakdown": {
+     "residual_kwh": -3.9776608673491864e-9,
+     "gross_kwh": 4074314.2111027306,
+     "closes": true
+    },
+    "lighting_term_kwh": 39014.30074903247,
+    "terms": [
+     "heating",
+     "cooling",
+     "conduction",
+     "opaque_solar_absorbed",
+     "sky_longwave",
+     "glazing_solar_absorbed",
+     "bridging",
+     "infiltration",
+     "permanent_vents",
+     "mechanical_ventilation",
+     "solar_transmitted",
+     "solar_lost_through_glazing",
+     "occupancy_gains",
+     "lighting_gains",
+     "equipment_gains",
+     "auxiliary_gains",
+     "storage"
+    ]
+   }
+  },
+  "two_zones": {
+   "fabric": {
+    "heating_kwh": 14703.447460385974,
+    "cooling_kwh": 0,
+    "breakdown": {
+     "residual_kwh": 1.0588347976181467e-8,
+     "gross_kwh": 476932.90524978976,
+     "closes": true
+    },
+    "lighting_term_kwh": null,
+    "terms": [
+     "heating",
+     "cooling",
+     "conduction",
+     "opaque_solar_absorbed",
+     "sky_longwave",
+     "glazing_solar_absorbed",
+     "bridging",
+     "infiltration",
+     "permanent_vents",
+     "solar_transmitted",
+     "solar_lost_through_glazing",
+     "storage"
+    ]
+   },
+   "spaces": {
+    "heating_kwh": 7829.889849040952,
+    "cooling_kwh": 6.027805450884262,
+    "breakdown": {
+     "residual_kwh": 1.0906216374451105e-8,
+     "gross_kwh": 471700.62457920687,
+     "closes": true
+    },
+    "lighting_term_kwh": null,
+    "terms": [
+     "heating",
+     "cooling",
+     "conduction",
+     "opaque_solar_absorbed",
+     "sky_longwave",
+     "glazing_solar_absorbed",
+     "bridging",
+     "infiltration",
+     "permanent_vents",
+     "solar_transmitted",
+     "solar_lost_through_glazing",
+     "occupancy_gains",
+     "equipment_gains",
+     "storage"
+    ]
+   },
+   "systems": {
+    "heating_kwh": 9339.611249077472,
+    "cooling_kwh": 10.70841465175221,
+    "breakdown": {
+     "residual_kwh": 1.0705779374120539e-8,
+     "gross_kwh": 476213.97865927295,
+     "closes": true
+    },
+    "lighting_term_kwh": 746.799479999998,
+    "terms": [
+     "heating",
+     "cooling",
+     "conduction",
+     "opaque_solar_absorbed",
+     "sky_longwave",
+     "glazing_solar_absorbed",
+     "bridging",
+     "infiltration",
+     "permanent_vents",
+     "mechanical_ventilation",
+     "solar_transmitted",
+     "solar_lost_through_glazing",
+     "occupancy_gains",
+     "lighting_gains",
+     "equipment_gains",
+     "storage"
+    ]
+   }
+  }
+ }
+}
