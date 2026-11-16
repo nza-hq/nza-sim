@@ -1,0 +1,15 @@
+{
+ "about": "Brief 109 Part 2: the cooled room (104_cooled_room_spec.json) and Bridgewater as five storeys, heated to office hours with a night setback, chosen before any comparison. 'hours' is the schedule profile's day_types (1 in use, 0 setback); the hour starting 07:00 is index 7. Heating setpoint in an hour = setback_c + f x (heat_c - setback_c); cooling runs only where f > 0. The cooled room's heated rooms keep heat_c 20 C and its middle room cool_c 24 C (the 104 spec); Bridgewater keeps its 21 C heating and 24 C cooling. Cases: unlimited, and the 108 limits (all convective, LimitCapacity in EnergyPlus).",
+ "hours": {
+  "weekday": [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+  "saturday": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "sunday": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+ },
+ "cooled_room": {
+  "setback_c": 15.0,
+  "cases": { "unlimited": null, "tight": { "west": 800, "east": 800 }, "mild": { "west": 1100, "east": 1100 } }
+ },
+ "bridgewater": { "setback_c": 16.0, "heat_c": 21.0, "cool_c": 24.0 },
+ "unmet_tolerance_k": 0.5,
+ "gate": "annual heating +-10 %; the mean weekday morning peak +-15 %; hours below in use +-20 % or +-50 h; lowest temperature in use +-1 K; the mean weekday heating profile within 15 % of EnergyPlus's daily peak in every hour"
+}
