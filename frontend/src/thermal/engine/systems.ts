@@ -9,7 +9,11 @@
  *   heating, cooling   each zone's demand × the share of each enabled group serving it ÷ the group's efficiency
  *   hot water          the tap-mix model (CLAUDE.md Systems scope), per zone from its occupants or floor, × share ÷ η
  *   hot water pump     services.dhw.circulation_pump_w, all year, when any hot water system is installed
- *   fans               each running mechanical ventilation entry's SFP × flow × the hours it runs
+ *   fans               each running mechanical ventilation entry's SFP × flow × the hours it runs (Brief 114: as its
+ *                      `runs` says: continuous, a schedule, or on demand following the people)
+ *   pumps              Brief 114: each heating, cooling and hot water system's pumps (pumps.ts), from the heat it gave
+ *                      each hour; fixed or variable speed; continuous in its season, with demand, or to a schedule
+ *   other loads        Brief 114: lifts, external lighting (continuous, a schedule, or dusk to dawn), as 'auxiliary'
  *   lighting, small power, auxiliary   the gains' electricity (before the gain fraction), split between the groups
  *                      that serve the zone by share × control factor (normalised, as today; the total is the
  *                      electricity whatever the factor). With no group, the electricity still counts, under no group.
@@ -26,6 +30,7 @@ import { readBuildingCoolingKwh, readBuildingHeatingKwh, type ModelResults } fro
 import type { Weather } from './types'
 import { VentilationError, zoneVentilation } from './ventilation'
 import { hotWaterUse, waterHeater, zoneHotWater } from './hotWater'
+import { isDark, runPumps, scheduleFractions, ScheduleError } from './pumps'
 
 export const FUELS = ['electricity', 'gas', 'oil', 'biomass', 'district_heating', 'district_cooling'] as const
 export type Fuel = (typeof FUELS)[number]
@@ -36,7 +41,7 @@ const SOURCE_FUEL: Record<string, Fuel> = {
   biomass: 'biomass', district_heating: 'district_heating', district_cooling: 'district_cooling',
 }
 
-export const END_USES = ['heating', 'cooling', 'dhw', 'dhw_circulation', 'fans', 'lighting', 'small_power', 'auxiliary'] as const
+export const END_USES = ['heating', 'cooling', 'dhw', 'dhw_circulation', 'pumps', 'fans', 'lighting', 'small_power', 'auxiliary'] as const
 export type EndUse = (typeof END_USES)[number]
 
 /** Water's heat capacity, kWh per litre per kelvin (today's WATER_SHC_KWH_PER_L_PER_K). */
@@ -84,6 +89,37 @@ export interface SystemsResults {
   zone_demand: { zone_id: string; service: 'heating' | 'cooling' | 'dhw'; kwh: number }[]
   /** Inputs the document states that this engine does not use yet (review F4): shown, never silently dropped. */
   not_modelled: { path: string; what: string }[]
+  /** Brief 114: each system's pumps, in the document's order; their energy is the 'pumps' lines (ungrouped, by system id). */
+  pumps: PumpResult[]
+  /** Brief 114: the building's other loads (lifts, external lighting); their energy is 'auxiliary' lines by load id. */
+  other_loads: OtherLoadResult[]
+}
+
+export interface PumpResult {
+  id: string
+  rated_w: number
+  /** Where the rated power came from: stated W, W per kW of the capacity or of the busiest hour, or W per m² served. */
+  rated_from: 'w' | 'capacity' | 'peak' | 'floor'
+  /** The load at which a variable-speed pump draws its rated power, W: the capacity, or with none the busiest hour. */
+  design_w: number
+  design_from: 'capacity' | 'peak'
+  speed: 'fixed' | 'variable'
+  runs: 'continuous' | 'with_demand' | 'schedule'
+  hours_run: number
+  kwh: number
+  /** The named source, when "Use defaults" filled the figures. */
+  default_from: string | null
+}
+
+export interface OtherLoadResult {
+  id: string
+  kind: string
+  label: string | null
+  power_w: number
+  runs: string
+  hours_run: number
+  kwh: number
+  default_from: string | null
 }
 
 export interface WaterHeaterResult {
@@ -274,6 +310,21 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   }))
   const floor_m2 = readDocFloorM2(doc)
   if (!(floor_m2 > 0)) miss('zones', 'the building has no floor area, so it has no EUI')
+  // Brief 114: the controller on each entry is recorded and shown, and changes no number yet; a window rule waits for
+  // Brief 115. One line each, so nothing stated is silently dropped.
+  doc.controls.forEach((c, i) => {
+    not_modelled.push({ path: `controls[${i}].controller`, what: 'controller (recorded, not yet used in the calculation)' })
+    if (c.target.kind === 'window') not_modelled.push({ path: `controls[${i}]`, what: 'window rule (Brief 115)' })
+  })
+  // Brief 114, no double count: an old auxiliary "Pumps" load beside system pumps is refused by name.
+  if (doc.system_groups.some((g) => g.enabled && g.pumps != null)) {
+    const used = new Set(doc.zones.flatMap((z) => z.profile_refs.auxiliary))
+    doc.profiles.forEach((p, i) => {
+      if (p.kind === 'auxiliary' && used.has(p.id) && /pump/i.test(`${p.id} ${p.label ?? ''}`)) {
+        miss(`profiles[${i}]`, `the auxiliary load "${p.label ?? p.id}" counts pumps, and the systems state their own pumps: pump energy would be counted twice; remove one`)
+      }
+    })
+  }
 
   if (missing.length) return { ok: false, missing }
 
@@ -284,6 +335,9 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     if (!r) { r = { id: g.id, service: g.service, label: g.label, fuel: g.fuel, efficiency: g.eff, served_kwh: 0, fuel_kwh: 0, fuel_w: new Float64Array(H) }; out.set(g.i, r) }
     return r
   }
+  // Brief 114: the heat each heating, cooling and hot water system gives each hour, W (its pumps' load).
+  const servedW = new Map<number, Float64Array>()
+  const servedOf = (g: G) => { let a = servedW.get(g.i); if (!a) { a = new Float64Array(H); servedW.set(g.i, a) } return a }
   const zone_demand: SystemsResults['zone_demand'] = []
   const serve = (service: 'heating' | 'cooling' | 'dhw', zi: number, w: Float64Array, kwh: number) => {
     zone_demand.push({ zone_id: doc.zones[zi].id, service, kwh })
@@ -292,7 +346,8 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       const r = groupOut(g)
       const f = g.share / 100
       r.served_kwh += kwh * f
-      for (let h = 0; h < H; h++) r.fuel_w[h] += (w[h] * f) / g.eff!
+      const sv = servedOf(g)
+      for (let h = 0; h < H; h++) { r.fuel_w[h] += (w[h] * f) / g.eff!; sv[h] += w[h] * f }
     }
   }
   // Review F1 (Linzie, 16 Nov 19:48, "the boiler tops up"): a zone served by a system with a capacity takes from it what
@@ -309,8 +364,9 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     const rest = Float64Array.from(d.w)
     const put = (g: G, w: ArrayLike<number>) => {
       const r = groupOut(g)
+      const sv = servedOf(g)
       let k = 0
-      for (let h = 0; h < H; h++) { k += w[h]; r.fuel_w[h] += w[h] / g.eff! }
+      for (let h = 0; h < H; h++) { k += w[h]; r.fuel_w[h] += w[h] / g.eff!; sv[h] += w[h] }
       r.served_kwh += k / 1000
     }
     for (const g of capped) {
@@ -351,13 +407,14 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       const r = groupOut(g)
       // Review F6: hot water heated first by a plant gets only what the plant had that hour.
       const gf = priorityFrac.get(g.id)
+      const sv = servedOf(g)
       if (!gf) {
         r.served_kwh += d.kwh * f
-        for (let h = 0; h < H; h++) r.fuel_w[h] += (d.w[h] * f) / g.eff!
+        for (let h = 0; h < H; h++) { r.fuel_w[h] += (d.w[h] * f) / g.eff!; sv[h] += d.w[h] * f }
         continue
       }
       let k = 0
-      for (let h = 0; h < H; h++) { const w = d.w[h] * f * gf[h]; k += w; r.fuel_w[h] += w / g.eff!; dhwShortW += d.w[h] * f - w }
+      for (let h = 0; h < H; h++) { const w = d.w[h] * f * gf[h]; k += w; r.fuel_w[h] += w / g.eff!; sv[h] += w; dhwShortW += d.w[h] * f - w }
       r.served_kwh += k / 1000
     }
   }
@@ -370,11 +427,13 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     const store = doc.services.dhw.storage_setpoint_c!, cold = doc.services.dhw.cold_supply_temp_c!
     const run = waterHeater(draw, sg.capacity_kw! * 1000, sg.storage_litres ?? 0, store, cold)
     const r = groupOut(g)
+    const sv = servedOf(g)
     let drawn = 0, short = 0, hrs = 0, peak = 0, minS = Infinity
     for (let h = 0; h < H; h++) {
       drawn += draw[h]; short += run.short_w[h]; peak = Math.max(peak, draw[h]); minS = Math.min(minS, run.stored_kwh[h])
       if (run.short_w[h] > 1e-9) hrs++
       r.fuel_w[h] += run.heater_w[h] / g.eff!
+      sv[h] += run.heater_w[h]  // the heater's own output (it refills the store), what its pumps move
     }
     r.served_kwh += (drawn - short) / 1000
     dhwShortKwh += short / 1000
@@ -389,6 +448,54 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   }
   checkServed([...out.values()], readBuildingHeatingKwh(results), readBuildingCoolingKwh(results), dhwNeeded - dhwShortKwh)
   if (dhwDemand.length && pumpW > 0) ungrouped.push({ end_use: 'dhw_circulation', zone_id: null, entry_id: null, kwh: (pumpW * H) / 1000, w: new Float64Array(H).fill(pumpW) })
+
+  // ── Brief 114: each system's pumps, from the heat it gave each hour ─────────────────────────────────────────────
+  const pumps: PumpResult[] = []
+  const pumpMissing: SystemsMissing[] = []
+  for (const g of groups) {
+    const sg = doc.system_groups[g.i]
+    const pu = sg.pumps
+    if (pu == null) continue
+    const p = `system_groups[${g.i}].pumps`
+    const load = servedW.get(g.i) ?? new Float64Array(H)
+    let peak = 0
+    for (let h = 0; h < H; h++) peak = Math.max(peak, load[h])
+    const capW = sg.capacity_kw != null && (g.service === 'heating' || g.service === 'cooling' || g.service === 'dhw') ? sg.capacity_kw * 1000 : null
+    const design_w = capW ?? peak
+    let rated_w: number, rated_from: PumpResult['rated_from']
+    if ('w' in pu.power) { rated_w = pu.power.w; rated_from = 'w' }
+    else if ('w_per_kw_capacity' in pu.power) { rated_w = (pu.power.w_per_kw_capacity * design_w) / 1000; rated_from = capW != null ? 'capacity' : 'peak' }
+    else { rated_w = pu.power.w_per_m2 * g.zones.reduce((a, zi) => a + doc.zones[zi].area_m2, 0) * (g.share / 100); rated_from = 'floor' }
+    let sched: Float64Array | null = null
+    if (pu.runs === 'schedule') {
+      if (pu.schedule_ref == null) { pumpMissing.push({ path: `${p}.schedule_ref`, message: 'required: the schedule the pumps run to' }); continue }
+      try { sched = scheduleFractions(doc, pu.schedule_ref, hours, `${p}.schedule_ref`) } catch (e) { if (e instanceof ScheduleError) { pumpMissing.push({ path: e.path, message: e.message.slice(e.path.length + 2) }); continue } throw e }
+    }
+    const run = runPumps(rated_w, pu.speed, pu.runs, load, design_w, hours.month, sched)
+    const kwh = sum(run.w) / 1000
+    ungrouped.push({ end_use: 'pumps', zone_id: null, entry_id: g.id, kwh, w: run.w })
+    pumps.push({ id: g.id, rated_w, rated_from, design_w, design_from: capW != null ? 'capacity' : 'peak', speed: pu.speed, runs: pu.runs, hours_run: run.hours_run, kwh, default_from: pu.default_from })
+  }
+  // ── Brief 114: other loads outside the rooms (lifts, external lighting); their heat warms no room ─────────────────
+  const other_loads: OtherLoadResult[] = []
+  doc.other_loads.forEach((o, i) => {
+    const p = `other_loads[${i}]`
+    let sched: Float64Array | null = null
+    if (o.schedule_ref != null) {
+      try { sched = scheduleFractions(doc, o.schedule_ref, hours, `${p}.schedule_ref`) } catch (e) { if (e instanceof ScheduleError) { pumpMissing.push({ path: e.path, message: e.message.slice(e.path.length + 2) }); return } throw e }
+    } else if (o.runs === 'schedule') { pumpMissing.push({ path: `${p}.schedule_ref`, message: 'required: the schedule it runs to' }); return }
+    const w = new Float64Array(H)
+    let hrs = 0
+    for (let h = 0; h < H; h++) {
+      const r = o.runs === 'continuous' ? 1 : o.runs === 'schedule' ? sched![h] : (isDark(hours, h) ? 1 : 0) * (sched ? sched[h] : 1)
+      w[h] = o.power_w * r
+      hrs += r
+    }
+    const kwh = sum(w) / 1000
+    ungrouped.push({ end_use: 'auxiliary', zone_id: null, entry_id: o.id, kwh, w })
+    other_loads.push({ id: o.id, kind: o.kind, label: o.label ?? null, power_w: o.power_w, runs: o.runs, hours_run: hrs, kwh, default_from: o.default_from })
+  })
+  if (pumpMissing.length) return { ok: false, missing: pumpMissing }
 
   // Lighting, small power, auxiliary: the gains' electricity, split by share × control factor.
   const THIN: [GainKind, EndUse][] = [['lighting', 'lighting'], ['equipment', 'small_power'], ['auxiliary', 'auxiliary']]
@@ -439,7 +546,7 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   return {
     ok: true,
     systems: {
-      groups: groupsOut, ungrouped, end_uses, by_fuel, electricity_w, dhw: dhwInfo, water_heaters, zone_demand, floor_m2, not_modelled,
+      groups: groupsOut, ungrouped, end_uses, by_fuel, electricity_w, dhw: dhwInfo, water_heaters, zone_demand, floor_m2, not_modelled, pumps, other_loads,
     },
   }
 }

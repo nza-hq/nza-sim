@@ -32,7 +32,7 @@
  * ventilation loss does not read it either).
  */
 import { ENGINE_CONSTANTS as K } from './constants'
-import { calendar } from './gains'
+import { calendar, zoneGains, GainsError } from './gains'
 import type { ModelDocument } from '../schema/model'
 import type { Weather } from './types'
 
@@ -64,6 +64,7 @@ export function zoneVentilation(doc: ModelDocument, hours: Weather['hours']): Zo
   const H = hours.count
   const c = calendar(hours)
   const sched = new Map(doc.profiles.flatMap((p, i) => (p.kind === 'schedule' ? [[p.id, { p, i }] as const] : [])))
+  let presenceOf: (Float64Array | null)[] | undefined
   return doc.zones.map((zone, zi) => {
     const out: ZoneVentilation[] = []
     zone.ventilation.forEach((v, j) => {
@@ -94,10 +95,27 @@ export function zoneVentilation(doc: ModelDocument, hours: Weather['hours']): Zo
         eta = 0
       }
       const ref = v.control_schedule_ref
-      if (ref == null) throw new VentilationError(`required: when the system runs ('${ALWAYS_ON}' or a schedule profile)`, `${p}.control_schedule_ref`)
       const h0 = K.rho_c_air * q * (1 - eta)
       const hw = new Float64Array(H)
       const run = new Float64Array(H)
+      // Brief 114: how the fans are told to run. Continuous: every hour. Demand: the share of the zone's people present
+      // each hour (its occupancy profile's schedule), never below the stated least share. Schedule or not stated: the
+      // schedule, as before.
+      if (v.runs === 'continuous') {
+        hw.fill(h0); run.fill(1)
+        out.push({ id: v.id, kind: v.kind, flow_m3s: q, recovery: eta, h_w_per_k: hw, running: run })
+        return
+      }
+      if (v.runs === 'demand') {
+        const m = v.demand_min_fraction
+        if (m == null) throw new VentilationError('required: the least share of the flow (0 to 1)', `${p}.demand_min_fraction`)
+        const presence = (presenceOf ??= zonePresence(doc, hours))[zi]
+        if (!presence) throw new VentilationError('fans on demand follow the people: the zone needs an occupancy profile', `zones[${zi}].profile_refs.occupancy`)
+        for (let h = 0; h < H; h++) { const f = Math.min(1, Math.max(m, presence[h])); hw[h] = h0 * f; run[h] = f }
+        out.push({ id: v.id, kind: v.kind, flow_m3s: q, recovery: eta, h_w_per_k: hw, running: run })
+        return
+      }
+      if (ref == null) throw new VentilationError(`required: when the system runs ('${ALWAYS_ON}' or a schedule profile)`, `${p}.control_schedule_ref`)
       const s = sched.get(ref)
       if (s) {
         const dt = s.p.day_types
@@ -135,4 +153,17 @@ function designOccupants(doc: ModelDocument, zi: number, path: string): number {
     people = (d.value * zone.area_m2) / area
   } else throw new VentilationError(`unknown basis "${d.basis}"`, `profiles[${i}].density.basis`)
   return Math.max(0, people * o.occupancy_rate)
+}
+
+/**
+ * Brief 114: each zone's share of its people present each hour (its occupancy profile's schedule, 0 to 1), from the
+ * same gains calculation the run uses; null for a zone with no occupancy profile. A gains refusal is passed on by name.
+ */
+function zonePresence(doc: ModelDocument, hours: Weather['hours']): (Float64Array | null)[] {
+  try {
+    return zoneGains(doc, hours).map((g) => g?.occupancy?.presence ?? null)
+  } catch (e) {
+    if (e instanceof GainsError) throw new VentilationError(e.message.slice(e.path.length + 2), e.path)
+    throw e
+  }
 }

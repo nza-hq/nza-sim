@@ -1,0 +1,349 @@
+{
+ "source": "validation/energyplus/114_pump_referee.py",
+ "pump_spec_sha256": "f344f673d59e71d528187b927c244d4c06b3a0ed9a7afc5f9b143ea8623c44be",
+ "hotwater_spec_sha256": "258180489d44bacfd983a07032546e7902cfc009355a904f8fab05d5babaa486",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "runs": {
+  "fixed_with_demand": {
+   "months_with_heat": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    9,
+    10,
+    11,
+    12
+   ],
+   "warnings": 6,
+   "hours": 8760,
+   "pump_kwh": 788.25,
+   "hours_pump_on": 4035,
+   "hours_with_heat": 4035,
+   "heat_kwh": 3858.299661543537,
+   "peak_heat_w": 2363.478125208472,
+   "sum_flow_fraction_heat_hours": 4008.185509052075,
+   "sum_load_fraction_heat_hours": 1632.4668379163495,
+   "flow_vs_load_deciles": [
+    {
+     "load_from": 0.0,
+     "load_to": 0.1,
+     "hours": 505,
+     "mean_flow_fraction": 0.8281869113986255
+    },
+    {
+     "load_from": 0.1,
+     "load_to": 0.2,
+     "hours": 466,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.2,
+     "load_to": 0.3,
+     "hours": 574,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.3,
+     "load_to": 0.4,
+     "hours": 582,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.4,
+     "load_to": 0.5,
+     "hours": 468,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.5,
+     "load_to": 0.6,
+     "hours": 512,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.6,
+     "load_to": 0.7,
+     "hours": 358,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.7,
+     "load_to": 0.8,
+     "hours": 270,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.8,
+     "load_to": 0.9,
+     "hours": 161,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.9,
+     "load_to": 1.0,
+     "hours": 139,
+     "mean_flow_fraction": 1.0169833197721725
+    }
+   ],
+   "design_kg_s": 0.05263157894736842
+  },
+  "fixed_continuous": {
+   "months_with_heat": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    9,
+    10,
+    11,
+    12
+   ],
+   "warnings": 11,
+   "hours": 8760,
+   "pump_kwh": 1752.0,
+   "hours_pump_on": 8760,
+   "hours_with_heat": 4035,
+   "heat_kwh": 3858.3001519827417,
+   "peak_heat_w": 2363.4781186522137,
+   "sum_flow_fraction_heat_hours": 4103.527695280716,
+   "sum_load_fraction_heat_hours": 1632.4670499521947,
+   "flow_vs_load_deciles": [
+    {
+     "load_from": 0.0,
+     "load_to": 0.1,
+     "hours": 505,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.1,
+     "load_to": 0.2,
+     "hours": 466,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.2,
+     "load_to": 0.3,
+     "hours": 574,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.3,
+     "load_to": 0.4,
+     "hours": 582,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.4,
+     "load_to": 0.5,
+     "hours": 468,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.5,
+     "load_to": 0.6,
+     "hours": 512,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.6,
+     "load_to": 0.7,
+     "hours": 358,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.7,
+     "load_to": 0.8,
+     "hours": 270,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.8,
+     "load_to": 0.9,
+     "hours": 161,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.9,
+     "load_to": 1.0,
+     "hours": 139,
+     "mean_flow_fraction": 1.0169833197721725
+    }
+   ],
+   "design_kg_s": 0.05263157894736842
+  },
+  "variable_with_demand": {
+   "months_with_heat": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    9,
+    10,
+    11,
+    12
+   ],
+   "warnings": 6,
+   "hours": 8760,
+   "pump_kwh": 326.05413350195545,
+   "hours_pump_on": 4035,
+   "hours_with_heat": 4035,
+   "heat_kwh": 3858.2996615435377,
+   "peak_heat_w": 2363.4781252084713,
+   "sum_flow_fraction_heat_hours": 1645.5841801961262,
+   "sum_load_fraction_heat_hours": 1632.4668379163504,
+   "flow_vs_load_deciles": [
+    {
+     "load_from": 0.0,
+     "load_to": 0.1,
+     "hours": 505,
+     "mean_flow_fraction": 0.04349855731422751
+    },
+    {
+     "load_from": 0.1,
+     "load_to": 0.2,
+     "hours": 466,
+     "mean_flow_fraction": 0.14495083941239997
+    },
+    {
+     "load_from": 0.2,
+     "load_to": 0.3,
+     "hours": 574,
+     "mean_flow_fraction": 0.24331327431708677
+    },
+    {
+     "load_from": 0.3,
+     "load_to": 0.4,
+     "hours": 582,
+     "mean_flow_fraction": 0.34326077490737755
+    },
+    {
+     "load_from": 0.4,
+     "load_to": 0.5,
+     "hours": 468,
+     "mean_flow_fraction": 0.44532558517238696
+    },
+    {
+     "load_from": 0.5,
+     "load_to": 0.6,
+     "hours": 512,
+     "mean_flow_fraction": 0.552797536055247
+    },
+    {
+     "load_from": 0.6,
+     "load_to": 0.7,
+     "hours": 358,
+     "mean_flow_fraction": 0.658639918492493
+    },
+    {
+     "load_from": 0.7,
+     "load_to": 0.8,
+     "hours": 270,
+     "mean_flow_fraction": 0.7699037905092593
+    },
+    {
+     "load_from": 0.8,
+     "load_to": 0.9,
+     "hours": 161,
+     "mean_flow_fraction": 0.8924875200164984
+    },
+    {
+     "load_from": 0.9,
+     "load_to": 1.0,
+     "hours": 139,
+     "mean_flow_fraction": 0.991571293746253
+    }
+   ],
+   "design_kg_s": 0.05263157894736842
+  },
+  "fixed_continuous_in_season": {
+   "months_with_heat": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    9,
+    10,
+    11,
+    12
+   ],
+   "warnings": 6,
+   "hours": 8760,
+   "pump_kwh": 1310.4,
+   "hours_pump_on": 6552,
+   "hours_with_heat": 4035,
+   "heat_kwh": 3858.300001093525,
+   "peak_heat_w": 2363.4781186522137,
+   "sum_flow_fraction_heat_hours": 4103.527695280716,
+   "sum_load_fraction_heat_hours": 1632.466986110175,
+   "flow_vs_load_deciles": [
+    {
+     "load_from": 0.0,
+     "load_to": 0.1,
+     "hours": 505,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.1,
+     "load_to": 0.2,
+     "hours": 466,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.2,
+     "load_to": 0.3,
+     "hours": 574,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.3,
+     "load_to": 0.4,
+     "hours": 582,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.4,
+     "load_to": 0.5,
+     "hours": 468,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.5,
+     "load_to": 0.6,
+     "hours": 512,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.6,
+     "load_to": 0.7,
+     "hours": 358,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.7,
+     "load_to": 0.8,
+     "hours": 270,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.8,
+     "load_to": 0.9,
+     "hours": 161,
+     "mean_flow_fraction": 1.0169833197721725
+    },
+    {
+     "load_from": 0.9,
+     "load_to": 1.0,
+     "hours": 139,
+     "mean_flow_fraction": 1.0169833197721725
+    }
+   ],
+   "design_kg_s": 0.05263157894736842
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c"
+}

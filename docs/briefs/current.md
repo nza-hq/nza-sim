@@ -1,5 +1,9 @@
 # Current brief
 
+**Brief 114 — Simulate v2: the Controls step and back-of-house energy — IN PROGRESS 16 Nov 2026 on `chris/114-controls` (stacked on 120).** Brief [`active/114_controls-and-back-of-house.md`](active/114_controls-and-back-of-house.md). Pumps (fixed or inverter; continuous, with demand or scheduled), fans by how they run, lifts and external lighting, and a control map that records who controls each system. Engine P1–P3 done; review, P4 (editor thread) and close to come.
+
+Previous:
+
 **Brief 120 — Simulate v2: system (plant) capacity limits — CLOSED 16 Nov 2026 on `chris/120-plant-capacity` (on top of 112).**
 A heating or cooling system's stated kW limits what it gives its rooms (schema 2.9). A short boiler on radiators shares through one lowered flow temperature, as EnergyPlus does; the room's other systems top up what a short one cannot give (Linzie 19:48). Hot water heated first takes the boiler's capacity first; a dedicated water heater states its kW and store (Linzie 19:19). Refereed against EnergyPlus; independent review answered. No change to today's engine (anchor 133.2). Brief [`archive/120_plant-capacity_COMPLETED.md`](archive/120_plant-capacity_COMPLETED.md); final report [`../audit/120/06_final_report.md`](../audit/120/06_final_report.md). P6 panel is the editor thread's. **Next:** Brief 114, then 115.
 

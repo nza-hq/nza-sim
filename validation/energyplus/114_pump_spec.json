@@ -1,0 +1,39 @@
+{
+ "about": "Brief 114 Part 2: the pumps of a heating system on the 108 hot-water referee (the cooled room's west and east rooms on hot-water radiators at 50/40, 'mild' caps). The loop's pump is given a design power and run three ways. EnergyPlus's pump design flow is set to the radiators' summed design flow (not 108's 1.5 times), so full flow is full radiator load in both programs. Engine 2 runs the same document with the heating system's pumps stated; its design load is the busiest hour (no capacity is stated). The gate is written before either is run.",
+ "case": "mild",
+ "pump_w": 200.0,
+ "variants": {
+  "fixed_with_demand": {
+   "speed": "fixed",
+   "runs": "with_demand",
+   "ep_object": "Pump:ConstantSpeed",
+   "ep_control": "Intermittent"
+  },
+  "fixed_continuous": {
+   "speed": "fixed",
+   "runs": "continuous",
+   "ep_object": "Pump:ConstantSpeed",
+   "ep_control": "Continuous"
+  },
+  "variable_with_demand": {
+   "speed": "variable",
+   "runs": "with_demand",
+   "ep_object": "Pump:VariableSpeed",
+   "ep_control": "Intermittent"
+  },
+  "fixed_continuous_in_season": {
+   "speed": "fixed",
+   "runs": "continuous",
+   "ep_object": "Pump:ConstantSpeed",
+   "ep_control": "Continuous",
+   "ep_season": "months_with_heat"
+  }
+ },
+ "gate": {
+  "fixed_with_demand": "annual pump energy within 5 %",
+  "fixed_continuous": "annual pump energy within 1 %",
+  "variable_with_demand": "annual pump energy within 15 %; the share due to load fraction against flow fraction is reported either way",
+  "fixed_continuous_in_season": "annual pump energy within 1 % (added after the first run: see below)"
+ },
+ "added_after_first_run": "fixed_continuous failed its gate (-25 %): EnergyPlus's Continuous pump runs every hour the loop is available (all year here), while the brief defines 'continuous' as every hour of the system's season (the months with any load). That is a difference of definition, not of physics. fixed_continuous_in_season gives EnergyPlus's pump a flow schedule of 1 in the months its own fixed_with_demand run had heat and 0 otherwise, to check the engine's season. Written after seeing the first result; the first result stands as reported."
+}

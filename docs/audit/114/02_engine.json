@@ -1,0 +1,34 @@
+{
+ "fixed_with_demand": {
+  "engine_kwh": 783,
+  "engine_hours_run": 3915,
+  "engine_design_w": 2344.907443371051,
+  "ep_kwh": 788.25,
+  "ep_hours_on": 4035,
+  "diff": -0.006660323501427201
+ },
+ "fixed_continuous": {
+  "engine_kwh": 1310.4,
+  "engine_hours_run": 6552,
+  "engine_design_w": 2344.907443371051,
+  "ep_kwh": 1752,
+  "ep_hours_on": 8760,
+  "diff": -0.2520547945205479
+ },
+ "variable_with_demand": {
+  "engine_kwh": 317.17181364339183,
+  "engine_hours_run": 3915,
+  "engine_design_w": 2344.907443371051,
+  "ep_kwh": 326.05413350195545,
+  "ep_hours_on": 4035,
+  "diff": -0.027241856323561575
+ },
+ "fixed_continuous_in_season": {
+  "engine_kwh": 1310.4,
+  "engine_hours_run": 6552,
+  "engine_design_w": 2344.907443371051,
+  "ep_kwh": 1310.4,
+  "ep_hours_on": 6552,
+  "diff": 0
+ }
+}

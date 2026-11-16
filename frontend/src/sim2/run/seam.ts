@@ -25,7 +25,7 @@ import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions,
 import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
 import { CATALOGUES, checkCatalogueRefs, suggestItem } from '../../thermal/catalogue'
 import { DesignError, designHeatLoss, type DesignTerm } from '../../thermal/engine/designHeatLoss'
-import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel, type WaterHeaterResult } from '../../thermal/engine/systems'
+import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel, type OtherLoadResult, type PumpResult, type WaterHeaterResult } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingHourlyW, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
@@ -178,6 +178,10 @@ export interface Summary {
         no_hot_water: boolean
         /** Brief 120: each hot water system with its water heater's output stated: its draw against the heater and store. */
         water_heaters: (WaterHeaterResult & { label: string })[]
+        /** Brief 114: each system's pumps (rated power and where it came from, how they run, hours, kWh). */
+        pumps: (PumpResult & { label: string })[]
+        /** Brief 114: lifts, external lighting and other loads outside the rooms. */
+        other_loads: OtherLoadResult[]
       }
     | { ok: false; missing: Missing[] }
     /** Brief 111: no systems at this level, so no energy. */
@@ -461,7 +465,7 @@ export function simulate(
     const v = (input as { schema_version?: unknown })?.schema_version
     const parsed = ModelDocument.safeParse(input)
     if (parsed.success) doc = parsed.data
-    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7' || v === '2.8') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2), 2.8 → 2.9 no DHW priority (Brief 120); nothing is filled
+    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7' || v === '2.8' || v === '2.9') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2), 2.8 → 2.9 no DHW priority (Brief 120), 2.9 → 2.10 no pumps, other loads or control entries (Brief 114); nothing is filled
     else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
       // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
       // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
@@ -808,6 +812,12 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
     }
     return { path, what: message.startsWith('required') ? `Hot water needs ${what[d[1]] ?? d[1]}.` : `Hot water: ${what[d[1]] ?? d[1]} ${message}.` }
   }
+  const pu = path.match(/^system_groups\[(\d+)\]\.pumps/)
+  if (pu) { const sg = doc.system_groups[Number(pu[1])]; return { path, what: `The pumps of "${sg?.label || sg?.id}": ${message}.` } }
+  const ol = path.match(/^other_loads\[(\d+)\]/)
+  if (ol) { const o = doc.other_loads[Number(ol[1])]; return { path, what: `"${o?.label || o?.id}": ${message}.` } }
+  const ax = path.match(/^profiles\[(\d+)\]$/)
+  if (ax && message.includes('counted twice')) return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
   const v = path.match(/^zones\[(\d+)\]\.ventilation\[(\d+)\]\.sfp_w_per_l_s$/)
   if (v) return { path, what: `Set the fan power (SFP) for the ventilation in ${zoneName(doc, v[1])}.` }
   return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
@@ -830,10 +840,13 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
     not_modelled: s.not_modelled.map((n) => {
       const m = n.path.match(/^system_groups\[(\d+)\]/)
       const v = n.path.match(/^zones\[(\d+)\]\.ventilation/)
-      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : n.path
+      const c = n.path.match(/^controls\[(\d+)\]/)
+      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : c ? `the control of "${doc.controls[Number(c[1])]?.target.ref}"` : n.path
       return `${owner}: ${n.what}`
     }),
     no_hot_water: s.dhw == null,
     water_heaters: s.water_heaters.map((w) => ({ ...w, label: doc.system_groups.find((g) => g.id === w.id)!.label || 'hot water system' })),
+    pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
+    other_loads: s.other_loads,
   }
 }
