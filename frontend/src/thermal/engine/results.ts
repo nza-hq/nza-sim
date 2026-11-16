@@ -136,6 +136,8 @@ export interface PlantResults {
   short_kwh: number
   /** Hot water it heated first, kWh a year (0 without). */
   reserved_kwh: number
+  /** The highest hour of that hot water, W (0 without). */
+  peak_reserved_w: number
   /** short_kwh by calendar month, January first. */
   short_kwh_by_month: number[]
   /** Brief 120 P2b: the lowest flow temperature it fell to, °C (its design flow if never short); null when it does not feed wet emitters in every zone (shared in proportion to ask). */

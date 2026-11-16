@@ -155,6 +155,21 @@ describe('Brief 120 P1 (document): capacity_kw limits the rooms a system serves'
   it('P2b: a plant with no radiators of its own in every room shares in proportion to ask, and states no flow temperature', () => {
     expect(run(doc(1)).plants[0].min_flow_c).toBeNull()
   })
+  it('a capped heat pump at 60 % beside an uncapped boiler at 40 %: settles, the heat pump never gives more than it has, and the boiler falls with it (fixed split, no top-up)', () => {
+    const c = cooledRoomDocument()
+    const d: any = structuredClone(c.doc)
+    for (const z of d.zones) z.setpoints = { ...z.setpoints, heat_c: 20, cool_c: null }
+    const zs = d.zones.map((z: any) => z.id)
+    d.system_groups = [
+      { id: 'hp', service: 'heating', zones: zs, enabled: true, share_pct: 60, source: 'ambient_air', efficiency_metric: 3, capacity_kw: 1 },
+      { id: 'boiler', service: 'heating', zones: zs, enabled: true, share_pct: 40, source: 'gas', efficiency_metric: 0.9 },
+    ]
+    const r = runModel(ModelDocument.parse(d), W, c.lib, { ...REFEREE_OPTIONS, internal_gains: 'none' })
+    const p = r.plants[0]
+    expect(p.hours_short).toBeGreaterThan(100)
+    for (let h = 0; h < W.hours.count; h++) expect(0.6 * r.zones.reduce((a, z) => a + z.hourly.heating_w[h], 0)).toBeLessThanOrEqual(1000 * (1 + 1e-9) + 1e-6)
+    expect(p.delivered_kwh).toBeCloseTo(0.6 * r.zones.reduce((a, z) => a + z.annual.heating_kwh, 0), 6)
+  })
   it('a 2.8 document upgrades with no hot water heated first', () => {
     const d: any = structuredClone(cooledRoomDocument().doc)
     d.schema_version = '2.8'

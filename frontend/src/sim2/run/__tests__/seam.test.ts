@@ -535,3 +535,47 @@ describe('Brief 119 review F10: cooling stated nowhere', () => {
     expect(r.results.zones[1].cooling_units).toBeNull()
   })
 })
+
+describe('Brief 120 P3: system capacity in the summary', () => {
+  it('Bridgewater with the heat pump capped: its line, each room\'s unmet hours split, and the design line (Rule 11, Rule 9)', async () => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 50; hp.design_return_c = 40; hp.capacity_kw = 30
+    d.zones.forEach((z: any) => {
+      z.emitters = [{ id: `${z.id}_rads`, kind: 'radiator', count: 1, rated_output_w: 30000, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 }]
+      z.design_internal_c = 'follow_heat_c'
+    })
+    d.building.design = { outdoor: { stated_c: -3 }, warm_up_w_per_m2: 5, vent_wind_m_s: 4 }
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const s = r.summary
+    expect(s.plants).toHaveLength(1)
+    const p = s.plants[0], eng = r.results.plants[0]
+    expect([p.id, p.service, p.capacity_kw, p.peak_ask_w, p.hours_short, p.short_kwh, p.min_flow_c]).toEqual([hp.id, 'heating', 30, eng.peak_ask_w, eng.hours_short, eng.short_kwh, eng.min_flow_c])
+    expect(p.hours_short).toBeGreaterThan(0)
+    expect(p.min_flow_c!).toBeLessThan(50)
+    const share = hp.share_pct / 100
+    expect(p.delivered_kwh).toBeCloseTo(share * s.zones.reduce((a, z) => a + z.heating_kwh, 0), 3)
+    for (const z of s.zones) {
+      const h = z.short.heating!
+      expect(h.system_short_hours + h.own_short_hours).toBe(h.unmet_hours)
+      expect(h.own_short_hours).toBeGreaterThanOrEqual(0)
+      expect(z.short.cooling).toBeNull()
+    }
+    expect(s.zones.some((z) => z.short.heating!.system_short_hours > 0)).toBe(true)
+    const dh = s.design_heat_loss
+    if (!dh?.ok) throw new Error('no design heat loss')
+    const line = dh.systems[0]
+    expect(line.capacity_w).toBe(30000)
+    expect(line.rooms_w).toBeCloseTo(share * dh.zones.filter((z) => z.heated).reduce((a, z) => a + z.total_w, 0), 6)
+    expect(line.total_w).toBe(line.rooms_w + line.hot_water_w)
+    if (!s.energy?.ok) throw new Error('no energy')
+    expect(s.energy.water_heaters).toEqual([])
+  })
+  it('without a capacity: no lines, no split', async () => {
+    const r = simulate(await doc(), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.plants).toEqual([])
+    expect(r.summary.zones.every((z) => z.short.heating === null && z.short.cooling === null)).toBe(true)
+  })
+})

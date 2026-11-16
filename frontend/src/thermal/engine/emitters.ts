@@ -149,10 +149,34 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
       for (const x of wet) q += wetOut(x, r, x.flow_c)
       return q
     }
+    // The same, fast, for a plant's flow search (Brief 120 P2b; it is asked many times a short step). The water's heat
+    // and the emitter's output meet at one return: with x = (return − room) ÷ (flow − room), EN 442 at exponent 1 gives
+    // x = exp(−C ÷ mcp), C the emitter's output per kelvin of log-mean difference, so the output is
+    // mcp·(flow − room)·(1 − x), in closed form; at other exponents the return is found by regula falsi (Illinois).
+    const fast = wet.map((x) => {
+      const mcp = x.flow_c === x.return_c ? Infinity : x.units * ratedOutputAt(x.unit_w, x.n, x.rated, { flow_c: x.flow_c, return_c: x.return_c, room_c: room }) / (x.flow_c - x.return_c)
+      const C = (x.units * x.unit_w) / Math.pow(logMeanDeltaT(x.rated.flow_c, x.rated.return_c, x.rated.room_c), x.n)
+      return { x, mcp, C, k1: x.n === 1 && Number.isFinite(mcp) ? 1 - Math.exp(-C / mcp) : NaN }
+    })
+    const wetOutFast = (e: (typeof fast)[number], r: number, f: number) => {
+      const d = f - r
+      if (!(d > 0)) return 0
+      if (!Number.isFinite(e.mcp)) return e.C * Math.pow(d, e.x.n)
+      if (e.x.n === 1) return e.mcp * d * e.k1
+      // g(y) = mcp·(d − y) − C·LMTD^n over y = return − room in (0, d]: positive at 0, negative at d.
+      const g = (y: number) => e.mcp * (d - y) - e.C * Math.pow(y >= d ? d : (d - y) / Math.log(d / y), e.x.n)
+      let a = d * 1e-12, b = d, ga = g(a), gb = g(b), side = 0
+      for (let i = 0; i < 60 && b - a > 1e-9 * d; i++) {
+        const c = (a * gb - b * ga) / (gb - ga), gc = g(c)
+        if (gc > 0) { a = c; ga = gc; if (side === 1) gb /= 2; side = 1 } else { b = c; gb = gc; if (side === -1) ga /= 2; side = -1 }
+        if (gc === 0) { a = b = c; break }
+      }
+      return e.mcp * (d - 0.5 * (a + b))
+    }
     const at_flow = (room_c: number, flow_c: number, group_id: string) => {
       const r = Math.min(room_c, room)
       let q: number | null = null
-      for (const x of wet) if (x.group === group_id) q = (q ?? 0) + wetOut(x, r, Math.min(flow_c, x.flow_c))
+      for (const e of fast) if (e.x.group === group_id) q = (q ?? 0) + wetOutFast(e, r, Math.min(flow_c, e.x.flow_c))
       return q
     }
     const sl = slab as { surface_id: string; layer_index: number } | null

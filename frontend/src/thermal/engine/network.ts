@@ -119,8 +119,9 @@ export interface NetworkInputs {
    *   zone taking no more than it asks) is what the plant has, and each zone's limit is its emitters' output at that
    *   flow (Brief 120 P2b; EnergyPlus's plant loop does the same, docs/audit/120/02_referee.md). A room with bigger
    *   emitters keeps more;
-   * - otherwise each zone's limit is its share of what is there, in proportion to what it asked for after its own
-   *   emitters' limit;
+   * - otherwise each zone gets the same fraction of what it asked for after its own emitters' limit;
+   * and since systems split a zone's heating in fixed proportion, a short plant holds the zone's whole heating to what
+   * its share allows (the other systems' shares fall with it; none tops up: that would be lead/lag, out of scope);
    * and the step is solved again with those limits (and again while the plant still draws more, as the zones' heat
    * moves between them). A zone's share not on any listed plant is not limited by plant. Absent or empty: no plant
    * limits (as before Brief 120).
@@ -773,7 +774,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const PL = (inp.plants ?? []).length
   const plants = inp.plants ?? []
   const plOut: NetworkPlantRun[] = plants.map((p) => ({ ask_w: new Float64Array(H), delivered_w: new Float64Array(H), short: new Float64Array(H), flow_c: p.flow ? new Float64Array(H).fill(p.flow.design_c) : null }))
-  const target = new Float64Array(PL), flowNow = new Float64Array(PL)
+  const target = new Float64Array(PL), flowNow = new Float64Array(PL), lim = new Float64Array(Z)
   // The room temperature an emitter is rated at this step: the one it follows (heating_cap_at), else the setpoint.
   const roomOf = (z: number) => (capAt[z] ? ctlPrev[z] : heatC[z])
   /** Brief 120 P2b: the flow temperature at which plant p's emitters give `t` W (each zone at most its share of ask). */
@@ -784,7 +785,14 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     for (const { zone } of plants[p].zones) lo = Math.min(lo, roomOf(zone))
     let hi = fl.design_c
     if (!(lo < hi)) return hi
-    for (let i = 0; i < 60; i++) { const m = 0.5 * (lo + hi); if (give(m) > t) hi = m; else lo = m }
+    // Regula falsi (Illinois) on give(f) − t, which rises with f: below at lo (no emitter gives anything), at or above at the design flow.
+    let ga = give(lo) - t, gb = give(hi) - t, side = 0
+    if (gb <= 0) return hi
+    for (let i = 0; i < 80 && hi - lo > 1e-7; i++) {
+      const c = (lo * gb - hi * ga) / (gb - ga), gc = give(c) - t
+      if (Math.abs(gc) <= 1e-9 * t + 1e-9) return c
+      if (gc < 0) { lo = c; ga = gc; if (side === -1) gb /= 2; side = -1 } else { hi = c; gb = gc; if (side === 1) ga /= 2; side = 1 }
+    }
     return lo
   }
   const zLimited = plants.length ? inp.zones.map(() => new Float64Array(H)) : []
@@ -807,25 +815,27 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     if (short) {
       baseW.set(capW); baseC.set(capC)
       for (let it = 0; ; it++) {
-        // Each zone's limit: the shares on short plants at their fraction of its ask, the rest at its ask.
+        // Each zone's limit. Systems split a zone's heating (cooling) in fixed proportion (Systems scope: no lead/lag),
+        // so a short plant with share s that can give the zone A holds its whole heating to A ÷ s, and the other
+        // systems' shares fall with it (none tops up). A over the zones: a fraction of each one's ask, or what its
+        // emitters give at the plant's lowered flow (P2b). The lowest limit of the short plants serving it holds.
         for (let z = 0; z < Z; z++) { capW[z] = baseW[z]; capC[z] = baseC[z] }
         for (const svc of [1, -1]) {
-          const lim = new Float64Array(Z), cover = new Float64Array(Z), any = new Uint8Array(Z)
+          lim.fill(Infinity)
           for (let p = 0; p < PL; p++) {
-            if (sign[p] !== svc) continue
-            const fl = frac[p] < 1 && svc === 1 ? plants[p].flow : null
+            if (sign[p] !== svc || !(frac[p] < 1)) continue
+            const fl = svc === 1 ? plants[p].flow : null
             if (fl) flowNow[p] = flowFor(p, target[p])
             plants[p].zones.forEach(({ zone, share }, k) => {
+              if (!(share > 0)) return
               const a = Math.max(0, svc * ask[zone])
-              lim[zone] += fl ? Math.min(share * a, fl.out[k](roomOf(zone), flowNow[p])) : share * frac[p] * a
-              cover[zone] += share
-              if (frac[p] < 1) any[zone] = 1
+              const l = fl ? Math.min(share * a, fl.out[k](roomOf(zone), flowNow[p])) / share : frac[p] * a
+              if (l < lim[zone]) lim[zone] = l
             })
           }
           for (let z = 0; z < Z; z++) {
-            if (!any[z]) continue
-            const l = lim[z] + Math.max(0, 1 - cover[z]) * Math.max(0, svc * ask[z])
-            if (svc === 1) capW[z] = Math.min(baseW[z], l); else capC[z] = Math.min(baseC[z], l)
+            if (lim[z] === Infinity) continue
+            if (svc === 1) capW[z] = Math.min(baseW[z], lim[z]); else capC[z] = Math.min(baseC[z], lim[z])
           }
         }
         passes += settle(h)

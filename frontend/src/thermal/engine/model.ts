@@ -677,17 +677,18 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const cal = plants.length ? calendar(weather.hours) : null
   const plantResults: PlantResults[] = plants.map((p, k) => {
     const r = plantRun[k]
-    let peak = 0, hrs = 0, ask = 0, del = 0, res = 0, minFlow = Infinity
+    let peak = 0, hrs = 0, ask = 0, del = 0, res = 0, resPeak = 0, minFlow = Infinity
     const byMonth = new Array(12).fill(0)
     for (let h = 0; h < H; h++) {
       peak = Math.max(peak, r.ask_w[h]); hrs += r.short[h]; ask += r.ask_w[h]; del += r.delivered_w[h]
       res += p.reserved_w ? p.reserved_w[h] : 0
+      resPeak = Math.max(resPeak, p.reserved_w ? p.reserved_w[h] : 0)
       if (r.flow_c) minFlow = Math.min(minFlow, r.flow_c[h])
       if (r.short[h] > 0) byMonth[cal!.monthIdx[h]] += (r.ask_w[h] - r.delivered_w[h]) / 1000
     }
     return {
       id: p.id, service: p.service, cap_w: p.cap_w, peak_ask_w: peak, hours_short: hrs, ask_kwh: ask / 1000, delivered_kwh: del / 1000,
-      short_kwh: byMonth.reduce((a, b) => a + b, 0), reserved_kwh: res / 1000, short_kwh_by_month: byMonth,
+      short_kwh: byMonth.reduce((a, b) => a + b, 0), reserved_kwh: res / 1000, peak_reserved_w: resPeak, short_kwh_by_month: byMonth,
       min_flow_c: r.flow_c ? minFlow : null,
     }
   })
