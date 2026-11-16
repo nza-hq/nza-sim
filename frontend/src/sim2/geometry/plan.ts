@@ -35,13 +35,18 @@ export type PlanRoom = {
 /** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
 export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
 /** The services the Systems step gives rooms. */
-export type Service = 'heating' | 'cooling' | 'ventilation' | 'dhw'
+export type Service = 'heating' | 'cooling' | 'ventilation' | 'dhw' | 'lighting'
 export const SERVICES: ReadonlyArray<{ key: Service; name: string; one: string }> = [
   { key: 'heating', name: 'Heating', one: 'Heating' },
   { key: 'cooling', name: 'Cooling', one: 'Cooling' },
   { key: 'ventilation', name: 'Ventilation', one: 'Ventilation' },
   { key: 'dhw', name: 'Hot water', one: 'Hot water' },
+  // Brief 112: the luminaires (their efficacy); the light a space needs (lux) is on its space type.
+  { key: 'lighting', name: 'Lighting', one: 'Lighting' },
 ]
+/** The services space types carried before systems were their own step (upgradePlan); never lighting, whose key on
+ * a space type is its lighting profile. */
+const OLD_SERVICES = SERVICES.filter((s) => s.key !== 'lighting')
 /** A system the user has made for a service: a library system template (its fuel and efficiency come from there),
  * and for ventilation the flow and when it runs, typed. Rooms are given one per service. Null: not set. */
 export type PlanSystem = {
@@ -56,6 +61,8 @@ export type PlanSystem = {
   /** Heating: the design flow and return temperatures, °C, its emitters are re-rated at (schema 2.4). */
   design_flow_c?: number | null
   design_return_c?: number | null
+  /** Lighting (Brief 112): the luminaires' efficacy, W/m² for each 100 lux. Runs on electricity; no library template. */
+  efficacy?: number | null
 }
 
 /** Emitter kinds (schema 2.4). Wet kinds are fed by the room's heating system and rated (EN 442); VRF indoor units and
@@ -150,7 +157,13 @@ export type SpaceType = {
   /** Typed gains (W): the library has none. Null or absent: not stated, and the document says nothing. */
   occupancy_rate?: number | null
   sensible_w_per_person?: number | null
+  /** Brief 112: the light the space needs, lux (demand). Its W/m² comes from the lighting system's efficacy. */
+  lux?: number | null
+  /** A lighting W/m² stated directly, used only while no lux is stated ("stated, not from lux"). */
   lighting_w_per_m2?: number | null
+  /** Brief 112: hot water used, litres a day per person or per m² of floor (demand); the heater is on Systems. */
+  hot_water_basis?: 'per_person' | 'per_m2' | null
+  hot_water_litres?: number | null
   equipment_w_per_m2?: number | null
   equipment_baseload_w_per_m2?: number | null
   /** Comfort band the systems hold, °C, typed. */
@@ -215,12 +228,12 @@ export function upgradePlan(p: Plan): Plan {
   type Old = SpaceType & Partial<Record<Service, string | null>> & { vent_flow?: number | null; vent_schedule?: string | null }
   const olds = p.spaces as Old[]
   const plan: Plan = { ...emptyPlan(), ...p, systems: (p.systems ?? []).filter((x) => 'template' in x) }
-  if (!olds.some((sp) => SERVICES.some((s) => s.key in sp))) return plan
+  if (!olds.some((sp) => OLD_SERVICES.some((s) => s.key in sp))) return hotWaterOnSpaces(plan)
   const systems = [...plan.systems]
   const made = new Map<string, string>()
   for (const sp of olds) {
-    for (const s of SERVICES) {
-      const t = sp[s.key]
+    for (const s of OLD_SERVICES) {
+      const t = sp[s.key as Exclude<Service, 'lighting'>]
       if (!t) continue
       const flow = s.key === 'ventilation' ? sp.vent_flow ?? null : undefined
       const schedule = s.key === 'ventilation' ? sp.vent_schedule ?? null : undefined
@@ -239,13 +252,22 @@ export function upgradePlan(p: Plan): Plan {
   const rooms = plan.rooms.map((r) => {
     if (!r.space) return r
     const sys: Partial<Record<Service, string>> = { ...r.systems }
-    for (const s of SERVICES) {
+    for (const s of OLD_SERVICES) {
       const id = made.get(`${r.space}|${s.key}`)
       if (id && !sys[s.key]) sys[s.key] = id
     }
     return Object.keys(sys).length ? { ...r, systems: sys } : r
   })
-  return { ...plan, spaces, rooms, systems }
+  return hotWaterOnSpaces({ ...plan, spaces, rooms, systems })
+}
+
+/** Brief 112: a plan saved with one building-wide daily hot water use gives it to every space type that states none,
+ * and the building keeps only the heater's temperatures, pump and load shape. */
+export function hotWaterOnSpaces(plan: Plan): Plan {
+  const hw = plan.dhw
+  if (!hw || (hw.basis == null && hw.litres == null)) return plan
+  const spaces = plan.spaces.map((sp) => (sp.hot_water_basis != null || sp.hot_water_litres != null ? sp : { ...sp, hot_water_basis: hw.basis, hot_water_litres: hw.litres }))
+  return { ...plan, spaces, dhw: { ...hw, basis: null, litres: null } }
 }
 
 export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], fabric_types: defaultFabric(), wall_spans: [], spaces: [], building: noBuildingInputs(), next: { room: 1, zone: 1, system: 1 } })

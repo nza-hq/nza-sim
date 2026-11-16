@@ -58,6 +58,7 @@ import FacadeView from './FacadeView'
 import ResultsPanel from '../run/ResultsPanel'
 import EmbeddedResults from '../run/EmbeddedResults'
 import { TODAY } from '../../thermal/schema/upgrade'
+import { lightingWm2 } from '../../thermal/engine/lighting'
 import { buildDocument } from './toDocument'
 import { previewItems } from '../run/ResultsPanel'
 import type { Summary } from '../run/seam'
@@ -112,7 +113,7 @@ const FABRIC_KINDS: Array<Kind & { key: FabricKind }> = [
   { key: 'bridge', name: 'Thermal bridges', icon: 'bridge' },
   { key: 'partition', name: 'Internal walls', icon: 'rooms' },
 ]
-const SERVICE_ICON: Record<Service, IconName> = { heating: 'boiler', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw' }
+const SERVICE_ICON: Record<Service, IconName> = { heating: 'boiler', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw', lighting: 'lighting' }
 type SysKind = Service | 'emitters'
 const SYSTEM_KINDS: Kind[] = [
   { key: 'heating', name: 'Heating', icon: 'boiler' },
@@ -120,6 +121,7 @@ const SYSTEM_KINDS: Kind[] = [
   { key: 'cooling', name: 'Cooling', icon: 'cooling' },
   { key: 'ventilation', name: 'Ventilation', icon: 'ventilation' },
   { key: 'dhw', name: 'Hot water', icon: 'dhw' },
+  { key: 'lighting', name: 'Lighting', icon: 'lighting' },
 ]
 type View = { cx: number; cy: number; k: number }
 type Drag =
@@ -1007,10 +1009,12 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     let k = plan.systems.length + 1
     while (plan.systems.some((x) => x.id === `y${k}`)) k++
     const one = SERVICES.find((x) => x.key === service)!.one
-    const x: PlanSystem = from ? { ...from, id: `y${k}`, name: `${from.name} (copy)` } : { id: `y${k}`, service, name: `${one} ${systemsOf(service).length + 1}`, template: null, ...(service === 'ventilation' ? { flow: null, schedule: null } : {}) }
+    const x: PlanSystem = from ? { ...from, id: `y${k}`, name: `${from.name} (copy)` } : { id: `y${k}`, service, name: `${one} ${systemsOf(service).length + 1}`, template: null, ...(service === 'ventilation' ? { flow: null, schedule: null } : {}), ...(service === 'lighting' ? { efficacy: null } : {}) }
     commit({ ...plan, systems: [...plan.systems, x] })
     setActiveSys((a) => ({ ...a, [service]: x.id }))
   }
+  /** Not yet set: a library template, or for lighting (no templates) the luminaires' efficacy. */
+  const sysUnset = (x: PlanSystem) => (x.service === 'lighting' ? x.efficacy == null : !x.template)
   const setSys = (id: string, q: Partial<PlanSystem>) => commit({ ...plan, systems: plan.systems.map((x) => (x.id === id ? { ...x, ...q } : x)) })
   const giveSystemTo = (ids: string[]) => curSys && commit({ ...plan, rooms: plan.rooms.map((r) => (ids.includes(r.id) ? { ...r, systems: { ...r.systems, [service]: curSys.id } } : r)) })
   const removeSystem = (id: string) => commit({ ...plan, systems: plan.systems.filter((x) => x.id !== id) })
@@ -1208,14 +1212,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     let k = plan.systems.length + 1
     while (plan.systems.some((x) => x.id === `y${k}`)) k++
     const one = SERVICES.find((x) => x.key === sv)!.one
-    const x: PlanSystem = { id: `y${k}`, service: sv, name: `${one} ${systemsOf(sv).length + 1}`, template: null, ...(sv === 'ventilation' ? { flow: null, schedule: null } : {}) }
+    const x: PlanSystem = { id: `y${k}`, service: sv, name: `${one} ${systemsOf(sv).length + 1}`, template: null, ...(sv === 'ventilation' ? { flow: null, schedule: null } : {}), ...(sv === 'lighting' ? { efficacy: null } : {}) }
     commit({ ...plan, systems: [...plan.systems, x] })
     setActiveSys((a) => ({ ...a, [sv]: x.id }))
   }
   const sysSection = (sv: Service): NavSection => ({
     items: [
       ...systemsOf(sv).map((x) => ({
-        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: !x.template }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
+        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: sysUnset(x) }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
         active: curSys?.id === x.id, onPick: () => setActiveSys((a) => ({ ...a, [sv]: x.id })),
       })),
       ...noneItem(`none-${sv}`, `No ${SERVICES.find((x) => x.key === sv)!.name.toLowerCase()}`, roomsWhere((r) => !systemsOf(sv).some((x) => x.id === r.systems?.[sv]))),
@@ -1632,7 +1636,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </div>
     )
     // A value the library has no number for: typed here; empty stays unset (the document says nothing).
-    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'people_per_room'
+    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'people_per_room' | 'lux' | 'hot_water_litres'
     const typed = (label: string, k: Gk, step: number, unit?: string, max?: number) => sp && (
       <div className="gl-row gl-typed">
         <span>{label}</span>
@@ -1697,7 +1701,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
             {typed('Occupancy rate', 'occupancy_rate', 0.05, undefined, 1)}
             <h4 className="gl-h4i"><Icon name="lighting" size={18} />Lighting</h4>
-            {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
+            {typed('Light needed', 'lux', 50, 'lux')}
+            {sp.lux != null ? (() => {
+              // Read-only: lux ÷ 100 × the efficacy of the luminaires lighting this space type's rooms (Systems).
+              const effs = [...new Set(plan.rooms.filter((r) => r.space === sp.id).map((r) => plan.systems.find((y) => y.id === r.systems?.lighting)?.efficacy ?? null))]
+              const e = effs.length === 1 ? effs[0] : null
+              return <div className="gl-row"><span>Lighting power</span><span className="ap-setc">{e != null ? `${lightingWm2(sp.lux, e).toFixed(1)} W/m², from ${sp.lux} lux × ${e}` : effs.length > 1 ? 'its rooms have luminaires of different efficacies' : 'from the luminaires\' efficacy (Systems, Lighting)'}</span></div>
+            })() : sp.lighting_w_per_m2 != null && typed('Lighting power, stated', 'lighting_w_per_m2', 0.5, 'W/m²')}
+            {sp.lux == null && sp.lighting_w_per_m2 != null && <p className="gl-hint">Stated, not from lux. Type the light needed above to work it out from the luminaires instead.</p>}
             {opt('Follows', 'light_relationship', [...RELATIONSHIPS, { key: 'always_on', name: 'Always on' }])}
             {(sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill') && opt('Its profile', 'lighting', profilesFor('lighting'))}
             {sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill'
@@ -1710,6 +1721,15 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {sp.equip_relationship === 'independent' && opt('Its profile', 'equipment', profilesFor('equipment'))}
             {sp.equip_relationship === 'independent' && <Spark label="Equipment" days={profile(sp.equipment ?? '')?.day_types ?? null} />}
             <p className="gl-hint">"With occupancy" uses the occupancy profile above, so lighting and equipment rise and fall with the people.</p>
+            <h4 className="gl-h4i"><Icon name="dhw" size={18} />Hot water</h4>
+            <div className="gl-row gl-librow"><span>Used</span>
+              <select className="gl-sel" aria-label="Hot water counted" value={sp.hot_water_basis ?? ''} onChange={(e) => setSpace(sp.id, { hot_water_basis: (e.target.value || null) as SpaceType['hot_water_basis'] })}>
+                <option value="">Not set</option>
+                <option value="per_person">Per person</option>
+                <option value="per_m2">Per m² of floor</option>
+              </select>
+            </div>
+            {sp.hot_water_basis && typed('Litres a day', 'hot_water_litres', sp.hot_water_basis === 'per_person' ? 5 : 0.5, sp.hot_water_basis === 'per_person' ? 'per person' : 'per m²')}
             <h4>Comfort</h4>
             {typed('Heating to', 'heat_c', 0.5, '°C', 40)}
             {typed('Cooling to', 'cool_c', 0.5, '°C', 40)}
@@ -1810,7 +1830,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const sv = SERVICES.find((s) => s.key === service)!
     const items: Item[] = systemsOf(service).map((y) => {
       const rs = plan.rooms.filter((r) => r.systems?.[service] === y.id)
-      return { id: y.id, name: y.name, swatch: { colour: sysColour(y.id)!, unset: !y.template }, line: sysLine(y.template, service), used: rs.length ? count(rs.length, 'room') : 'not used', removable: !rs.length }
+      return { id: y.id, name: y.name, swatch: { colour: sysColour(y.id)!, unset: sysUnset(y) }, line: service === 'lighting' ? (y.efficacy != null ? `electricity · ${y.efficacy} W/m² per 100 lux` : 'Efficacy not set yet') : sysLine(y.template, service), used: rs.length ? count(rs.length, 'room') : 'not used', removable: !rs.length }
     })
     const mech = ['mvhr', 'mev'].includes(system(x?.template)?.type ?? '')
     return (
@@ -1820,7 +1840,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         top={service === 'dhw' ? (() => {
           const hw = plan.dhw ?? noDhw()
           const setHw = (q: Partial<DhwInputs>) => commit({ ...plan, dhw: { ...hw, ...q } })
-          const n = (label: string, k: 'storage_c' | 'tap_c' | 'cold_c' | 'litres' | 'pump_w', step: number, unit: string) => (
+          const n = (label: string, k: 'storage_c' | 'tap_c' | 'cold_c' | 'pump_w', step: number, unit: string) => (
             <div className="gl-row gl-typed"><span>{label}</span><Num value={hw[k] ?? ''} unit={unit} step={step} min={0} onCommit={(v) => { const x = Number.isFinite(v) && v > 0 ? v : k === 'pump_w' && v === 0 ? 0 : null; if (x !== hw[k]) setHw({ [k]: x }) }} /></div>
           )
           return (
@@ -1829,14 +1849,6 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               {n('Stored at', 'storage_c', 1, '°C')}
               {n('Hot at the tap', 'tap_c', 1, '°C')}
               {n('Cold water in', 'cold_c', 1, '°C')}
-              <div className="gl-row gl-librow"><span>Daily use</span>
-                <select className="gl-sel" aria-label="Daily use basis" value={hw.basis ?? ''} onChange={(e) => setHw({ basis: (e.target.value || null) as DhwInputs['basis'] })}>
-                  <option value="">Not set</option>
-                  <option value="per_person">Per person</option>
-                  <option value="per_m2">Per m² of floor</option>
-                </select>
-              </div>
-              {hw.basis && n('Litres a day', 'litres', hw.basis === 'per_person' ? 5 : 0.5, hw.basis === 'per_person' ? 'per person' : 'per m²')}
               {n('Circulation pump', 'pump_w', 10, 'W')}
               <div className="gl-row gl-librow"><span>Used</span>
                 <select className="gl-sel" aria-label="When hot water is used" value={hw.shape === undefined ? 'flat' : hw.shape ?? ''} onChange={(e) => setHw({ shape: (e.target.value || null) as DhwInputs['shape'] })}>
@@ -1845,7 +1857,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   <option value="follow_occupancy">With occupancy</option>
                 </select>
               </div>
-              <p className="gl-hint">One set for the building. The heater only heats the hot share of what runs from the tap. Empty stays unset.</p>
+              <p className="gl-hint">One set for the building. How much hot water is used is on each space type (Spaces). The heater only heats the hot share of what runs from the tap. Empty stays unset.</p>
             </details>
           )
         })() : undefined}
@@ -1857,6 +1869,18 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         detail={x && (
           <>
             <input className="gl-title-in ap-tname" aria-label="System name" defaultValue={x.name} key={`${x.id}-${x.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== x.name && setSys(x.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            {service === 'lighting' ? (
+              <>
+                <div className="gl-row gl-typed"><span>Efficacy</span><Num value={x.efficacy ?? ''} unit="W/m² per 100 lux" step={0.1} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.efficacy ?? null)) setSys(x.id, { efficacy: n }) }} /></div>
+                <p className="ap-sysline">electricity</p>
+                {(() => {
+                  // The W/m² it gives each space type it lights: lux ÷ 100 × efficacy, worked out only by lightingWm2.
+                  const lit = plan.spaces.filter((sp2) => sp2.lux != null && plan.rooms.some((r) => r.space === sp2.id && r.systems?.lighting === x.id))
+                  return x.efficacy != null && lit.map((sp2) => <div key={sp2.id} className="gl-row"><span>{sp2.name}</span><span className="ap-setc">{lightingWm2(sp2.lux!, x.efficacy!).toFixed(1)} W/m², from {sp2.lux} lux × {x.efficacy}</span></div>)
+                })()}
+                <p className="gl-hint">How many watts the luminaires draw per m² for each 100 lux they deliver (LED about 2 to 3). The lux each space needs is on its space type (Spaces). Lighting controls come with the Controls step. Empty stays unset.</p>
+              </>
+            ) : <>
             <div className="gl-row gl-librow"><span>From the library</span>
               <select className="gl-sel" aria-label={`Library system for ${x.name}`} value={x.template ?? ''} onChange={(e) => setSys(x.id, { template: e.target.value || null })}>
                 <option value="">Not set</option>
@@ -1864,6 +1888,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               </select>
             </div>
             <p className="ap-sysline">{sysLine(x.template, service)}</p>
+            </>}
             {service === 'ventilation' && x.template && (
               <>
                 <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div>
@@ -1900,7 +1925,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 </>
               )
             })()}
-            <p className="gl-hint">Fuel and efficiency come from NZA Sim's library. A change changes every room with this system.</p>
+            <p className="gl-hint">{service === 'lighting' ? 'A change changes every room with this system.' : "Fuel and efficiency come from NZA Sim's library. A change changes every room with this system."}</p>
           </>
         )}
         give={giveFoot({ name: x?.name ?? null, rooms: true, now: chosenSet.rooms.map((id) => plan.systems.find((y) => y.id === plan.rooms.find((r) => r.id === id)?.systems?.[service])?.name ?? 'none'), onGive: (all) => giveSystemTo(all ? allRooms() : chosenSet.rooms) })}

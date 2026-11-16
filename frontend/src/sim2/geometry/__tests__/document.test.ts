@@ -247,7 +247,8 @@ describe('hot water for the whole building', () => {
     expect(b.issues).toEqual([])
     expect((b.doc as any).services.dhw).toMatchObject({ storage_setpoint_c: 60, tap_outlet_temp_c: 43, cold_supply_temp_c: 10, circulation_pump_w: 0, load_shape: 'flat' })
     expect((b.doc as any).services.dhw).not.toHaveProperty('demand_basis')
-    expect(b.notes.some((n) => /Hot water/.test(n))).toBe(false)
+    // Brief 112: use is a space type's; with no space types, the building's old figure has nowhere to go, and says so.
+    expect(b.notes.filter((n) => /Hot water/.test(n))).toEqual(['Hot water: a system is given but no space type states how much is used (Spaces, Hot water)'])
   })
 
   it('puts the daily use on each occupancy profile (schema 2.8), and notes a space with no people', () => {
@@ -261,6 +262,37 @@ describe('hot water for the whole building', () => {
     expect(occ(none.doc)).toBeUndefined()
     expect(none.notes).toContain('Office: hot water is 2 litres per m² a day, but the space has no people, so its hot water is not in the model until it has people')
     expect(occ(buildDocument({ ...p, dhw: { ...p.dhw!, basis: null, litres: null } }).doc).dhw ?? null).toBeNull()
+  })
+})
+
+describe('lighting from lux and the luminaires (Brief 112)', () => {
+  it('writes lux on the space\'s lighting profile and the efficacy on a lighting system group', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    const office = { id: 's1', name: 'Office', use: 'office', occupancy: 'office_occupancy', lighting: null, equipment: null, light_relationship: 'proportional', lux: 400, lighting_w_per_m2: 8 }
+    p = { ...p, spaces: [office as any], systems: [{ id: 'y1', service: 'lighting', name: 'LED', template: null, efficacy: 3 }], rooms: p.rooms.map((r) => ({ ...r, space: 's1', systems: { lighting: 'y1' } })) }
+    const b = buildDocument(p)
+    expect(b.issues).toEqual([])
+    const doc = b.doc as any
+    const L = doc.profiles.find((x: any) => x.kind === 'lighting')
+    expect(L.lux).toBe(400)
+    expect(L.magnitude).toBeUndefined()
+    expect(doc.system_groups).toEqual([expect.objectContaining({ service: 'lighting', source: 'electricity', efficiency_metric: null, efficacy_w_m2_per_100lux: 3, zones: [doc.zones[0].id] })])
+    // No lux: the W/m² stated directly is written instead ("stated, not from lux").
+    const st = buildDocument({ ...p, spaces: [{ ...office, lux: null } as any] }).doc as any
+    expect(st.profiles.find((x: any) => x.kind === 'lighting').magnitude).toEqual({ value: 8, unit: 'w_per_m2' })
+    // An efficacy left empty stays empty, for the run to name.
+    expect((buildDocument({ ...p, systems: [{ ...p.systems[0]!, efficacy: null }] }).doc as any).system_groups[0].efficacy_w_m2_per_100lux).toBeNull()
+  })
+
+  it('upgrading a plan gives the building-wide hot water use to each space type that states none', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    p = { ...p, spaces: [{ id: 's1', name: 'A', use: null, occupancy: null, lighting: null, equipment: null }, { id: 's2', name: 'B', use: null, occupancy: null, lighting: null, equipment: null, hot_water_basis: 'per_m2', hot_water_litres: 1 }], dhw: { storage_c: 60, tap_c: 43, cold_c: 10, basis: 'per_person', litres: 50, pump_w: 0 } }
+    const up = upgradePlan(p)
+    expect(up.spaces.map((x) => [x.hot_water_basis, x.hot_water_litres])).toEqual([['per_person', 50], ['per_m2', 1]])
+    expect(up.dhw).toMatchObject({ storage_c: 60, basis: null, litres: null })
+    expect(upgradePlan(up)).toEqual(up)
   })
 })
 
