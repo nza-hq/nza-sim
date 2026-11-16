@@ -13,9 +13,15 @@ import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
 import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
 import type { Summary, WhatIf } from './seam'
 import { EmitterSizing } from './EmitterSizing'
+// @ts-expect-error untyped JS from today's app (Brief 110b: reused, not redrawn)
+import LiveResultsStrip from '../../components/shared/LiveResultsStrip.jsx'
+// @ts-expect-error untyped JS from today's app
+import { useUISettings } from '../../context/UISettingsContext.jsx'
+// @ts-expect-error untyped JS from today's app
+import { COOLING_COLOUR, HEATING_COLOUR, SYSTEMS_ACCENT } from '../../data/balanceColours.js'
 import './run.css'
 
-const TERMS: Record<string, string> = {
+export const TERMS: Record<string, string> = {
   heating: 'Heating', cooling: 'Cooling', conduction: 'Fabric (conduction)', opaque_solar_absorbed: 'Sun on walls and roof',
   sky_longwave: 'Radiation to the sky', bridging: 'Thermal bridges', infiltration: 'Air leakage', permanent_vents: 'Permanent vents',
   solar_transmitted: 'Sun through windows', solar_lost_through_glazing: 'Sun lost back out through windows',
@@ -30,7 +36,7 @@ const END_USE_WORDS: Record<string, string> = {
 }
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const signed = (kwh: number) => `${kwh >= 0 ? '+' : '−'}${mwh(Math.abs(kwh))}`
-const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
+export const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
 interface Row { key: string; label: string; kwh: number; parts?: Row[] }
 const perM2 = (kwh: number, m2: number) => (m2 > 0 ? Math.round(kwh / m2).toLocaleString('en-GB') : '–')
 
@@ -195,8 +201,25 @@ export function WeatherPick({ run }: { run: Run }) {
  * The workspace's strip (Brief 110 P3): always visible above the centre tabs, the building's heating, cooling and
  * energy from the same run as the Heat flow tab, or what the run is waiting for. Numbers only from a run.
  */
+function stripItems(s: Summary, unit: 'kwh' | 'kwh_per_m2') {
+  const a = s.building.floor_m2
+  const pair = (kwh: number) => (unit === 'kwh_per_m2'
+    ? { value: perM2(kwh, a), unit: 'kWh/m²', sub: `${mwh(kwh)} MWh a year` }
+    : { value: mwh(kwh), unit: 'MWh', sub: `${perM2(kwh, a)} kWh/m² a year` })
+  const e = s.energy
+  return [
+    { label: 'Heating', ...pair(s.building.heating_kwh), accent: HEATING_COLOUR },
+    { label: 'Cooling', ...pair(s.building.cooling_kwh), accent: COOLING_COLOUR },
+    { label: 'Peak heating', value: Math.round(s.building.peak_heating_w / 1000).toLocaleString('en-GB'), unit: 'kW', sub: `cooling ${Math.round(s.building.peak_cooling_w / 1000).toLocaleString('en-GB')} kW` },
+    e?.ok
+      ? { label: 'Energy used', ...pair(e.total_kwh), accent: SYSTEMS_ACCENT }
+      : { label: 'Energy used', value: '', unit: '', sub: e === null ? 'shown when results include systems' : 'systems not complete', accent: SYSTEMS_ACCENT },
+  ]
+}
+
 export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void }) {
   const { state, weather } = run
+  const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
   const s = state.kind === 'done' ? state.summary : null
   const last = useRef<Summary | null>(null)
   if (s) last.current = s
@@ -204,20 +227,10 @@ export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void })
   return (
     <div className={`rp-strip${state.kind === 'running' ? ' rp-stale' : ''}`} role="status" aria-label="Results">
       {shown ? (
-        <>
-          <button type="button" className="rp-strip-fig" onClick={onOpen} title="Open the heat flow">
-            <span className="rp-label">Heating <i>estimate</i></span>
-            <span><b>{mwh(shown.building.heating_kwh)}</b> MWh <small>{perM2(shown.building.heating_kwh, shown.building.floor_m2)} kWh/m²</small></span>
-          </button>
-          <button type="button" className="rp-strip-fig" onClick={onOpen} title="Open the heat flow">
-            <span className="rp-label">Cooling <i>estimate</i></span>
-            <span><b>{mwh(shown.building.cooling_kwh)}</b> MWh <small>{perM2(shown.building.cooling_kwh, shown.building.floor_m2)} kWh/m²</small></span>
-          </button>
-          <button type="button" className="rp-strip-fig" onClick={onOpen} title="Open the heat flow">
-            <span className="rp-label">Energy used <i>estimate</i></span>
-            {shown.energy?.ok ? <span><b>{Math.round(shown.energy.eui_kwh_per_m2).toLocaleString('en-GB')}</b> kWh/m² <small>{mwh(shown.energy.total_kwh)} MWh</small></span> : <small className="rp-none">{shown.energy === null ? 'shown when results include systems' : 'systems not complete'}</small>}
-          </button>
-        </>
+        // Brief 110b P1: today's LiveResultsStrip, four figures, in the top bar's Per m² / Total.
+        <div className="rp-strip-live" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen?.() }} title="Open the heat flow">
+          <LiveResultsStrip items={stripItems(shown, unit)} />
+        </div>
       ) : state.kind === 'missing' ? (
         <button type="button" className="rp-strip-msg" onClick={onOpen}>No results yet: {state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set. See them on Heat flow.</button>
       ) : state.kind === 'error' ? (
@@ -227,7 +240,7 @@ export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void })
       ) : (
         <span className="rp-strip-msg">Working it out…</span>
       )}
-      {weather && <span className="rp-strip-wx" title={weather.station}>{weather.file_name}</span>}
+      {weather && <span className="rp-strip-wx" title={weather.station}>{shown ? <><i>Estimates</i>, weather </> : null}{weather.file_name}</span>}
     </div>
   )
 }

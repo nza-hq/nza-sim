@@ -18,6 +18,18 @@ Brief [`docs/briefs/archive/110_model-workspace_COMPLETED.md`](docs/briefs/archi
 - **Emitter sizing placed:** merged `chris/111-results-levels` (6b4b966, which carries 108 P4–P5). `<EmitterSizing>` sits in the Heat flow tab under Energy used; `useRun` holds the second flow and return pair and passes it as `client.run(doc, 250, { what_if })`. Checked in the browser with the two-zone fixture given radiators and 45/40 °C (test weather file, not committed): both zones show short, and comparing at 55/45 °C reruns and shows the two pairs side by side. No page errors; 105 sim2 tests pass.
 - **P5 close** ([`05_close.md`](docs/audit/110/05_close.md)): the walkthrough at 1440×900 is in `docs/audit/110/shots/`. Save, reload and rerun gives an identical document and identical results; only the run time differs. No change outside `sim2/`, one route, one sidebar entry, the additive `versions.ts` and migration 0008. **The 133.2 anchor was not run here**, because the Yeovilton EPW is local only and the download is blocked; no engine file changed, and it still needs re-running on IT15 at merge. `/sim2/geometry` stays as the standalone preview. **Next:** Brief 111 P3–P4 on this branch.
 
+## 🟡 Brief 110b — Simulate v2: carry today's NZA Sim into the Model workspace — IN PROGRESS on `sim2/110-model-workspace`
+
+Brief [`docs/briefs/active/110b_carry_over_from_today.md`](docs/briefs/active/110b_carry_over_from_today.md) (journey thread, on Linzie's 15 Nov 23:57 ask to keep today's navigation and detail).
+
+- **Fix before P0 (756d7c2):** Linzie found the preview "not clickable". With an empty project, Fabric, Spaces and Systems bounced back to Shape, and in the artifact's sandbox the results worker never started. Each step now opens and says what it needs. The preview inlines the worker as a data: URL and has "Load the example building" and "Use sample weather" buttons.
+- **P0 check** ([`00_check.md`](docs/audit/110b/00_check.md)): of the 14 rows, 1 done, 7 partial, 6 to do.
+- **P1 (part):**
+  - The Heat flow tab draws today's `HeatBalance` (Rows, Stacked and Sankey) from the run, through a new optional `lines` prop on `HeatBalance` and `BalanceSankey`. Today's callers do not pass it, so they are unchanged.
+  - Every balance term is drawn. Conduction, sun on walls and roof, and radiation to the sky are drawn as one net "Walls, roof and floor" line, and the table below lists all three. It follows the zone chosen on the left.
+  - The strip is today's `LiveResultsStrip` (heating, cooling, peak, energy used) and follows the top bar's Per m² / Total. 107 sim2 tests pass and the build is clean.
+  - Monthly, Profiles and solar by orientation need per-month and per-surface results from the run (building thread).
+
 ## 🟡 Brief 111 — Simulate v2: "Results include" levels (Parts 1–2 here; 3–4 the editor's) — IN PROGRESS on `chris/111-results-levels` (stacked on 108)
 
 Brief [`docs/briefs/active/111_results-include.md`](docs/briefs/active/111_results-include.md). Linzie approved the plan 15 Nov 21:53.

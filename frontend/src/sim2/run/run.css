@@ -67,3 +67,10 @@ button.rp-strip-msg { cursor: pointer; text-decoration: underline; text-underlin
 .rp-flow { position: absolute; inset: 0; z-index: 25; overflow: auto; background: #F7F8F8; }
 .rp-flow-in { max-width: 760px; margin: 0 auto; padding: 20px 24px 40px; }
 .rp-flow-in h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; color: #1F2937; }
+
+/* Brief 110b P1: today's HeatBalance inside the Heat flow tab. */
+.rp-hb { height: 520px; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; margin: 12px 0 20px; display: flex; flex-direction: column; }
+.rp-hb > div:last-child { flex: 1; min-height: 0; }
+.rp-hb-for { font-size: 12px; color: #6B7280; padding: 8px 20px 0; margin: 0; }
+.rp-strip-live { flex: 1; min-width: 0; cursor: pointer; }
+.rp-strip-live > div { border-top: 0; min-height: 0 !important; background: #fff; height: 100%; }
