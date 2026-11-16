@@ -162,7 +162,17 @@ function buildGraph(data, unit, orientationDeg = 0, mode = DEFAULT_MODE, modules
 
 // ── Render ───────────────────────────────────────────────────────────────────
 
-export default function BalanceSankey({ data, unit, orientationDeg = 0, onElementClick, mode = DEFAULT_MODE, modules = null }) {
+// Brief 110b P1: the same graph from ready-made lines (HeatBalance's `lines` prop). Every line is drawn.
+function buildGraphFromLines(lines, unit) {
+  const nodes = [], links = []
+  const v = (l) => (unit === 'kwh_per_m2' ? l.kwh_per_m2 : l.kwh)
+  for (const l of lines.gains) if (v(l) > 0.001) { nodes.push({ id: l.key, label: l.label, colour: l.colour }); links.push({ source: l.key, target: BUILDING_NODE_ID, value: v(l), colour: l.colour }) }
+  nodes.push({ id: BUILDING_NODE_ID, label: 'Zone', colour: BUILDING_NODE_COLOUR })
+  for (const l of lines.losses) if (v(l) > 0.001) { nodes.push({ id: l.key, label: l.label, colour: l.colour }); links.push({ source: BUILDING_NODE_ID, target: l.key, value: v(l), colour: l.colour }) }
+  return links.length ? { nodes, links } : null
+}
+
+export default function BalanceSankey({ data, unit, orientationDeg = 0, onElementClick, mode = DEFAULT_MODE, modules = null, lines = null }) {
   const containerRef = useRef(null)
   const [dims, setDims] = useState({ width: 720, height: 420 })
   const [hover, setHover] = useState(null)
@@ -182,7 +192,7 @@ export default function BalanceSankey({ data, unit, orientationDeg = 0, onElemen
   }, [])
 
   const graph = useMemo(() => {
-    const raw = buildGraph(data, unit, orientationDeg, mode, modules)
+    const raw = lines ? buildGraphFromLines(lines, unit) : buildGraph(data, unit, orientationDeg, mode, modules)
     if (!raw) return null
     try {
       const layout = sankey()
@@ -210,7 +220,7 @@ export default function BalanceSankey({ data, unit, orientationDeg = 0, onElemen
     } catch (e) {
       return null
     }
-  }, [data, unit, orientationDeg, dims, mode, modules])
+  }, [data, unit, orientationDeg, dims, mode, modules, lines])
 
   if (!graph) {
     return (

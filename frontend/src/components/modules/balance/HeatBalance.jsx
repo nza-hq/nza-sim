@@ -641,6 +641,11 @@ export default function HeatBalance({
   layout: layoutProp,
   onLayoutChange,
   hideLayoutToggle = false,
+  // Brief 110b P1 (Model workspace): optional ready-made lines, for a source that is not instantCalc's
+  // heat_balance (Simulate v2's run). Shape: { gia_m2, gains: [{ key, label, kwh, kwh_per_m2, colour }],
+  // losses: [same] }. The caller owns completeness (Rule 9): every line it passes is drawn, none is filtered.
+  // Omitted -> unchanged: today's callers never pass it.
+  lines = null,
 }) {
   const [showStateOneDisclosure, setShowStateOneDisclosure] = useState(false)
 
@@ -671,8 +676,12 @@ export default function HeatBalance({
   })()
 
   const { losses, gains, scale, totalLosses, totalGains, gia } = useMemo(() => {
-    const lossItems = flattenLosses(data, unit, mode, modules)
-    const gainItems = flattenGains(data, unit, orientationDeg, mode)
+    const fromLines = (arr) => arr.map(l => ({
+      key: l.key, label: l.label, colour: l.colour, meta: l,
+      value: unit === 'kwh_per_m2' ? l.kwh_per_m2 : l.kwh, raw_kwh: l.kwh, raw_kwh_per_m2: l.kwh_per_m2,
+    }))
+    const lossItems = lines ? fromLines(lines.losses) : flattenLosses(data, unit, mode, modules)
+    const gainItems = lines ? fromLines(lines.gains) : flattenGains(data, unit, orientationDeg, mode)
     const allValues = [...lossItems.map(i => i.value), ...gainItems.map(i => i.value)]
     const scale = Math.max(...allValues, 0.1)
     // Bug fix (Chris reported 2026-05-17): Σ totals were read from
@@ -695,11 +704,11 @@ export default function HeatBalance({
       scale,
       totalLosses,
       totalGains,
-      gia: data?.metadata?.gia_m2 ?? 0,
+      gia: lines ? (lines.gia_m2 ?? 0) : (data?.metadata?.gia_m2 ?? 0),
     }
-  }, [data, unit, orientationDeg, mode, modules])
+  }, [data, unit, orientationDeg, mode, modules, lines])
 
-  if (!data || !data.annual) {
+  if (!lines && (!data || !data.annual)) {
     return (
       <div className="h-full flex items-center justify-center text-mid-grey text-xxs">
         {uiEngineMode === 'dynamic'
@@ -791,6 +800,7 @@ export default function HeatBalance({
         )}
         {layout === 'sankey' && (
           <BalanceSankey
+            lines={lines}
             data={data}
             unit={unit}
             orientationDeg={orientationDeg}

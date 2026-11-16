@@ -1,7 +1,13 @@
 /**
  * Brief 105 Part 4: the run seam. A model document in, either results or the list of what is missing, in plain words.
  *
- *   simulate(doc, { weather, constructions? }) → { ok: true, results, summary } | { ok: false, missing }
+ *   simulate(doc, { weather, constructions?, level?, fabric_heat_c? }) → { ok: true, results, summary } | { ok: false, missing }
+ *
+ * Brief 111 Part 1, "Results include": `level` runs a copy of the document with objects removed (Rule 8: removed, never
+ * muted). 'fabric': the Building module's envelope alone, every zone heated to `fabric_heat_c` (stated by the caller,
+ * never defaulted here), no cooling, no gains, no ventilation entries, no emitters, no systems. 'spaces': the spaces'
+ * own setpoints and gains and natural ventilation, without mechanical ventilation, emitters or systems. 'systems'
+ * (absent): the document as it is. See `levelDocument`.
  *
  * The document is checked against the schema; an older version is refused, not upgraded (review F1). Then the inputs a run
  * needs and the editor may not have yet are checked together, so the person sees every gap at once:
@@ -77,6 +83,39 @@ export interface ZoneHours {
   recovery: { mornings: number; median_h: number | null; not_reached: number } | null
 }
 
+/** Brief 111: what a run includes. */
+export const LEVELS = ['fabric', 'spaces', 'systems'] as const
+export type Level = (typeof LEVELS)[number]
+
+/**
+ * The run copy for a level (Brief 111 Part 1, Rule 8). Objects outside the level are removed from the copy, never
+ * zeroed or switched off; the document itself is not changed.
+ * - fabric: gain profiles and every zone's references to them, every ventilation entry (q50 infiltration and permanent
+ *   vents are on the zone and its surfaces, and stay), emitters and system groups removed; each zone heated to
+ *   `heatC` with no cooling and no setback.
+ * - spaces: mechanical ventilation entries (mvhr, mev), emitters and system groups removed; the zones' own setpoints,
+ *   gains and natural ventilation stay.
+ * - systems: the document unchanged.
+ */
+export function levelDocument(doc: ModelDocument, level: Level, heatC: number | null = null): ModelDocument {
+  if (level === 'systems') return doc
+  const d = structuredClone(doc)
+  d.system_groups = []
+  for (const z of d.zones) {
+    z.emitters = []
+    z.ventilation = level === 'fabric' ? [] : z.ventilation.filter((v) => v.kind === 'natural')
+  }
+  if (level === 'fabric') {
+    if (heatC == null || !Number.isFinite(heatC)) throw new Error('fabric level needs the heating setpoint')
+    d.profiles = d.profiles.filter((p) => p.kind === 'schedule')
+    for (const z of d.zones) {
+      z.profile_refs = { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
+      z.setpoints = { heat_c: heatC, cool_c: null, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' }
+    }
+  }
+  return ModelDocument.parse(d)
+}
+
 export interface Summary {
   engine: ModelResults['engine']
   run_ms: number
@@ -104,6 +143,9 @@ export interface Summary {
   hourly: { heating_w: Float64Array; cooling_w: Float64Array } | null
   /** Constructions used that are drafts awaiting review (not yet in the library), by display name. */
   drafts: string[]
+  /** Brief 111: what this run includes, and for 'fabric' the temperature every zone was heated to. */
+  level: Level
+  fabric_heat_c: number | null
   /**
    * Energy the installed systems use (Brief 107), or what they still need. Demand shows either way. The EUI here is
    * v2's own boundary (Rule 11), read once through readSystemsEui.
@@ -120,6 +162,8 @@ export interface Summary {
         no_hot_water: boolean
       }
     | { ok: false; missing: Missing[] }
+    /** Brief 111: no systems at this level, so no energy. */
+    | null
   /**
    * Brief 108 Part 4: each zone that states emitters, their output against the peak it needs, and the standard rating
    * that would cover it. Null when no zone states emitters (heating is not limited anywhere).
@@ -244,7 +288,14 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
   return { missing, library: lib.library, drafts: lib.drafts }
 }
 
-export function simulate(input: unknown, deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; what_if?: WhatIf; hourly?: boolean }): SimulateResult {
+export function simulate(
+  input: unknown,
+  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean },
+): SimulateResult {
+  const level = deps.level ?? 'systems'
+  if (!LEVELS.includes(level)) return { ok: false, missing: [{ path: 'level', what: `Unknown results level "${String(level)}".` }] }
+  const fabricC = level === 'fabric' ? deps.fabric_heat_c ?? null : null
+  if (level === 'fabric' && (fabricC == null || !Number.isFinite(fabricC))) return { ok: false, missing: [{ path: 'fabric_heat_c', what: 'Fabric only needs the temperature every room is heated to.' }] }
   let doc: ModelDocument
   try {
     const v = (input as { schema_version?: unknown })?.schema_version
@@ -261,6 +312,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
   } catch (e) {
     return { ok: false, missing: [{ path: 'schema_version', what: `The building cannot be read (${(e as Error).message}).` }] }
   }
+  doc = levelDocument(doc, level, fabricC)
   const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
   if (pre.missing.length) return { ok: false, missing: pre.missing }
   const weather = deps.weather!
@@ -331,7 +383,8 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     window_solar: windowSolar(results.zones),
     hourly: deps.hourly ? { heating_w: bHeat, cooling_w: bCool } : null,
     drafts: pre.drafts,
-    energy: energyOf(doc, results, weather),
+    level, fabric_heat_c: fabricC,
+    energy: level === 'systems' ? energyOf(doc, results, weather) : null,
     emitters: null,
   }
   summary.emitters = emitterSummary(doc, results, options, run, weather, deps.what_if ?? null)

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="25.02" y1="4.88" x2="25.02" y2="45.12"/>
+  <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="20.28 9.05 24.98 13.24 29.76 8.98"/>
+  <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="20.28 40.71 24.98 36.51 29.76 40.77"/>
+  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="41.8" y1="15.42" x2="8.24" y2="34.58"/>
+  <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="36.68 12.53 35.01 19.1 41.23 20.92"/>
+  <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="9.08 28.92 15.2 30.71 13.51 37.39"/>
+  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="41.76" y1="34.56" x2="8.2" y2="15.4"/>
+  <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="41.13 29.02 35.01 30.81 36.7 37.49"/>
+  <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="13.53 12.63 15.2 19.2 8.98 21.02"/>
+</svg>

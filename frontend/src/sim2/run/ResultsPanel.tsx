@@ -11,10 +11,17 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../../auth/AuthGate'
 import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
 import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
-import type { Summary } from './seam'
+import type { Summary, WhatIf } from './seam'
+import { EmitterSizing } from './EmitterSizing'
+// @ts-expect-error untyped JS from today's app (Brief 110b: reused, not redrawn)
+import LiveResultsStrip from '../../components/shared/LiveResultsStrip.jsx'
+// @ts-expect-error untyped JS from today's app
+import { useUISettings } from '../../context/UISettingsContext.jsx'
+// @ts-expect-error untyped JS from today's app
+import { COOLING_COLOUR, HEATING_COLOUR, SYSTEMS_ACCENT } from '../../data/balanceColours.js'
 import './run.css'
 
-const TERMS: Record<string, string> = {
+export const TERMS: Record<string, string> = {
   heating: 'Heating', cooling: 'Cooling', conduction: 'Fabric (conduction)', opaque_solar_absorbed: 'Sun on walls and roof',
   sky_longwave: 'Radiation to the sky', bridging: 'Thermal bridges', infiltration: 'Air leakage', permanent_vents: 'Permanent vents',
   solar_transmitted: 'Sun through windows', solar_lost_through_glazing: 'Sun lost back out through windows',
@@ -29,7 +36,7 @@ const END_USE_WORDS: Record<string, string> = {
 }
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const signed = (kwh: number) => `${kwh >= 0 ? '+' : '−'}${mwh(Math.abs(kwh))}`
-const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
+export const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
 interface Row { key: string; label: string; kwh: number; parts?: Row[] }
 const perM2 = (kwh: number, m2: number) => (m2 > 0 ? Math.round(kwh / m2).toLocaleString('en-GB') : '–')
 
@@ -70,22 +77,24 @@ type State =
   | { kind: 'done'; summary: Summary; ms: number }
 
 /**
- * `right`: px from the editor's right edge, so the panel can sit beside a card the editor shows there (default 16).
- * The panel starts closed, as a tab showing the heating when there is a result.
+ * The run for one document: a worker, rerun about a quarter of a second after each change, plus the weather it runs
+ * on. One per editor; the floating panel, the workspace's strip, Heat flow tab and Site weather all read the same one.
  */
-export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?: number }) {
+export function useRun(doc: unknown, previewDoc: unknown = null) {
   const auth = useAuth()
-  const [open, setOpen] = useState(false)
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
   const [weatherError, setWeatherError] = useState<string | null>(null)
   const [orgFiles, setOrgFiles] = useState<string[] | null>(null)
   const localFile = useRef<{ bytes: Uint8Array; name: string } | null>(null)
   const [saveNote, setSaveNote] = useState<string | null>(null)
-  const [info, setInfo] = useState(false)
   const client = useRef<RunClient | null>(null)
   const latestDoc = useRef(doc)
   latestDoc.current = doc
+  // Brief 108 P5: a second flow and return pair, run on the same rooms beside the first.
+  const [whatIf, setWhatIf] = useState<WhatIf | null>(null)
+  const latestWhatIf = useRef(whatIf)
+  latestWhatIf.current = whatIf
 
   useEffect(() => {
     let c: RunClient
@@ -102,7 +111,7 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
         if (w.ok) { setWeather({ file_name: w.file_name, station: w.station }); setWeatherError(null) }
         else { setWeather(null); setWeatherError(w.error) }
         setState({ kind: 'running' })
-        c.run(latestDoc.current, 0)
+        c.run(latestDoc.current, 0, { what_if: latestWhatIf.current })
       },
       failed,
       )
@@ -111,14 +120,56 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
       return
     }
     client.current = c
-    return () => c.dispose()
+    // Preview, then apply (Linzie, 16 Nov 00:22): a second worker runs the change being previewed, on the same weather,
+    // so the strip can show where the numbers stand now and where they would go. It is not started until asked for.
+    return () => { c.dispose(); preview.current?.dispose(); preview.current = null }
   }, [])
+
+  const preview = useRef<RunClient | null>(null)
+  const [previewState, setPreviewState] = useState<State>({ kind: 'idle' })
+  const latestPreview = useRef(previewDoc)
+  latestPreview.current = previewDoc
+  const weatherBytes = useRef<{ bytes: Uint8Array; name: string; source: 'local' | 'organisation' } | null>(null)
+  const previewClient = () => {
+    if (preview.current) return preview.current
+    try {
+      const p = new RunClient(
+        (a: RunAnswer) => {
+          const r = a.result
+          if (r.ok) setPreviewState({ kind: 'done', summary: r.summary, ms: a.ms })
+          else if ('missing' in r) setPreviewState({ kind: 'missing', items: r.missing })
+          else setPreviewState({ kind: 'error', message: r.error })
+        },
+        (w: WeatherAnswer) => { if (w.ok && latestPreview.current) p.run(latestPreview.current, 0, { what_if: latestWhatIf.current }) },
+        (why) => setPreviewState({ kind: 'error', message: why }),
+      )
+      preview.current = p
+      const wb = weatherBytes.current
+      if (wb) p.setWeather(wb.bytes.slice(), wb.name, wb.source)
+      return p
+    } catch (e) {
+      setPreviewState({ kind: 'error', message: (e as Error).message || 'the browser blocked the background worker' })
+      return null
+    }
+  }
+  const sendWeather = (bytes: Uint8Array, name: string, source: 'local' | 'organisation') => {
+    weatherBytes.current = { bytes, name, source }
+    client.current?.setWeather(bytes.slice(), name, source)
+    preview.current?.setWeather(bytes.slice(), name, source)
+  }
+  useEffect(() => {
+    if (!previewDoc) { setPreviewState({ kind: 'idle' }); return }
+    const p = previewClient()
+    if (!p) return
+    setPreviewState({ kind: 'running' })
+    if (weatherBytes.current) p.run(previewDoc, 0, { what_if: whatIf })
+  }, [previewDoc, whatIf])
 
   useEffect(() => {
     if (!client.current) return
     setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
-    client.current.run(doc)
-  }, [doc])
+    client.current.run(doc, 250, { what_if: whatIf })
+  }, [doc, whatIf])
 
   // The organisation's weather files, when signed in.
   useEffect(() => {
@@ -132,7 +183,7 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
     const bytes = new Uint8Array(await f.arrayBuffer())
     localFile.current = { bytes, name: f.name }
     setSaveNote(null)
-    client.current.setWeather(bytes.slice(), f.name, 'local')
+    sendWeather(bytes, f.name, 'local')
     e.target.value = ''
   }
   const onOrg = async (name: string) => {
@@ -141,7 +192,7 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
     if (error || !data) { setWeatherError(error?.message ?? 'The weather file could not be downloaded.'); return }
     localFile.current = null
     setSaveNote(null)
-    client.current.setWeather(new Uint8Array(await data.arrayBuffer()), name, 'organisation')
+    sendWeather(new Uint8Array(await data.arrayBuffer()), name, 'organisation')
   }
   const canSave = !!auth && (auth.org.role === 'admin' || auth.org.role === 'editor')
   const onSave = async () => {
@@ -156,41 +207,127 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
     } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
-  const s = state.kind === 'done' ? state.summary : null
-  const [zoneOpen, setZoneOpen] = useState<string | null>(null)
+  return { auth, state, previewState, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+}
+export type Run = ReturnType<typeof useRun>
 
-  if (!open) {
-    return <button type="button" className="rp-tab" style={{ right }} onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : state.kind === 'missing' ? ` · ${state.items.length} to set` : ''}</button>
+/** The weather file the run uses, named with its station (decision 4), and how to choose one. */
+export function WeatherPick({ run }: { run: Run }) {
+  const { auth, weather, orgFiles, canSave, saveNote, weatherError, onLocal, onOrg, onSave } = run
+  return (
+    <div className="rp-weather">
+      <span className="rp-label">Weather</span>
+      {weather ? <span><b>{weather.file_name}</b> · {weather.station}</span> : <span className="rp-none">No weather file</span>}
+      <div className="rp-weather-pick">
+        <label className="rp-btn">
+          Choose a file…
+          <input type="file" accept=".epw" onChange={onLocal} hidden />
+        </label>
+        {auth && orgFiles && orgFiles.length > 0 && (
+          <select defaultValue="" onChange={(e) => onOrg(e.target.value)} aria-label="Your organisation's weather files">
+            <option value="" disabled>Your organisation's files</option>
+            {orgFiles.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        )}
+      </div>
+      {canSave && weather && run.hasLocalFile() && (
+        <button type="button" className="rp-btn rp-save" onClick={onSave}>Save to {auth!.org.name}</button>
+      )}
+      {saveNote && <p className="rp-note">{saveNote}</p>}
+      {weatherError && <p className="rp-error">That file could not be read: {weatherError}</p>}
+    </div>
+  )
+}
+
+/**
+ * The workspace's strip (Brief 110 P3): always visible above the centre tabs, the building's heating, cooling and
+ * energy from the same run as the Heat flow tab, or what the run is waiting for. Numbers only from a run.
+ */
+function stripItems(s: Summary, unit: 'kwh' | 'kwh_per_m2') {
+  const a = s.building.floor_m2
+  const pair = (kwh: number) => (unit === 'kwh_per_m2'
+    ? { value: perM2(kwh, a), unit: 'kWh/m²', sub: `${mwh(kwh)} MWh a year` }
+    : { value: mwh(kwh), unit: 'MWh', sub: `${perM2(kwh, a)} kWh/m² a year` })
+  const e = s.energy
+  return [
+    { label: 'Heating', ...pair(s.building.heating_kwh), accent: HEATING_COLOUR },
+    { label: 'Cooling', ...pair(s.building.cooling_kwh), accent: COOLING_COLOUR },
+    { label: 'Peak heating', value: Math.round(s.building.peak_heating_w / 1000).toLocaleString('en-GB'), unit: 'kW', sub: `cooling ${Math.round(s.building.peak_cooling_w / 1000).toLocaleString('en-GB')} kW` },
+    e?.ok
+      ? { label: 'Energy used', ...pair(e.total_kwh), accent: SYSTEMS_ACCENT }
+      : { label: 'Energy used', value: '', unit: '', sub: e === null ? 'shown when results include systems' : 'systems not complete', accent: SYSTEMS_ACCENT },
+  ]
+}
+
+/** One decimal, so a small change still shows. */
+const one = (x: number) => x.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+/** The previewed change: each figure now → if applied, and by how much (Linzie, 16 Nov 00:22: "show what's happening"). */
+export function previewItems(a: Summary, b: Summary, unit: 'kwh' | 'kwh_per_m2') {
+  const per = (s: Summary, kwh: number) => (unit === 'kwh_per_m2' ? (s.building.floor_m2 > 0 ? kwh / s.building.floor_m2 : NaN) : kwh / 1000)
+  const u = unit === 'kwh_per_m2' ? 'kWh/m²' : 'MWh'
+  const move = (label: string, x: number, y: number, accent: string) => {
+    const d = Math.round((y - x) * 10) / 10
+    return { label, value: `${one(x)} → ${one(y)}`, unit: u, sub: d === 0 ? 'no change' : `${d > 0 ? '+' : '−'}${one(Math.abs(d))} ${u}`, accent }
+  }
+  const items = [
+    move('Heating', per(a, a.building.heating_kwh), per(b, b.building.heating_kwh), HEATING_COLOUR),
+    move('Cooling', per(a, a.building.cooling_kwh), per(b, b.building.cooling_kwh), COOLING_COLOUR),
+  ]
+  if (a.energy?.ok && b.energy?.ok) items.push(move('Energy used', per(a, a.energy.total_kwh), per(b, b.energy.total_kwh), SYSTEMS_ACCENT))
+  return items
+}
+
+export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void }) {
+  const { state, weather, previewState } = run
+  const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
+  const s = state.kind === 'done' ? state.summary : null
+  const last = useRef<Summary | null>(null)
+  if (s) last.current = s
+  const shown = s ?? (state.kind === 'running' ? last.current : null)
+  if (previewState.kind !== 'idle' && shown) {
+    const p = previewState.kind === 'done' ? previewState.summary : null
+    return (
+      <div className={`rp-strip rp-strip-pv${p ? '' : ' rp-stale'}`} role="status" aria-label="Preview">
+        <div className="rp-strip-live">
+          {p ? <LiveResultsStrip items={previewItems(shown, p, unit)} />
+            : <span className="rp-strip-msg">{previewState.kind === 'missing' ? 'This change leaves inputs unset: no figures for it yet.' : previewState.kind === 'error' ? `The preview could not run: ${previewState.message}` : 'Working out the change…'}</span>}
+        </div>
+        <span className="rp-strip-pvtag">Preview · not applied yet</span>
+      </div>
+    )
   }
   return (
-    <section className="rp" style={{ right }} aria-label="Results">
-      <header className="rp-head">
-        <h2>Heating and cooling demand</h2>
-        <button type="button" className="rp-x" onClick={() => setOpen(false)} aria-label="Hide results">–</button>
-      </header>
-
-      <div className="rp-weather">
-        <span className="rp-label">Weather</span>
-        {weather ? <span><b>{weather.file_name}</b> · {weather.station}</span> : <span className="rp-none">No weather file</span>}
-        <div className="rp-weather-pick">
-          <label className="rp-btn">
-            Choose a file…
-            <input type="file" accept=".epw" onChange={onLocal} hidden />
-          </label>
-          {auth && orgFiles && orgFiles.length > 0 && (
-            <select defaultValue="" onChange={(e) => onOrg(e.target.value)} aria-label="Your organisation's weather files">
-              <option value="" disabled>Your organisation's files</option>
-              {orgFiles.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          )}
+    <div className={`rp-strip${state.kind === 'running' ? ' rp-stale' : ''}`} role="status" aria-label="Results">
+      {shown ? (
+        // Brief 110b P1: today's LiveResultsStrip, four figures, in the top bar's Per m² / Total.
+        <div className="rp-strip-live" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen?.() }} title="Open the heat flow">
+          <LiveResultsStrip items={stripItems(shown, unit)} />
         </div>
-        {canSave && weather && localFile.current && (
-          <button type="button" className="rp-btn rp-save" onClick={onSave}>Save to {auth!.org.name}</button>
-        )}
-        {saveNote && <p className="rp-note">{saveNote}</p>}
-        {weatherError && <p className="rp-error">That file could not be read: {weatherError}</p>}
-      </div>
+      ) : state.kind === 'missing' ? (
+        <button type="button" className="rp-strip-msg" onClick={onOpen}>No results yet: {state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set. See them on Heat flow.</button>
+      ) : state.kind === 'error' ? (
+        <span className="rp-strip-msg rp-error">The run failed: {state.message}</span>
+      ) : !weather ? (
+        <span className="rp-strip-msg">No results yet: choose a weather file (Site).</span>
+      ) : (
+        <span className="rp-strip-msg">Working it out…</span>
+      )}
+      {weather && <span className="rp-strip-wx" title={weather.station}>{shown ? <><i>Estimates</i>, weather </> : null}{weather.file_name}</span>}
+    </div>
+  )
+}
 
+/** The results themselves: totals, energy used, by zone (each opens to its own balance) and the building's balance.
+ * `focusZone`: the zone the person has chosen in the workspace, opened first. */
+export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string | null }) {
+  const { state } = run
+  const [info, setInfo] = useState(false)
+  const s = state.kind === 'done' ? state.summary : null
+  const [zoneOpen, setZoneOpen] = useState<string | null>(focusZone ?? null)
+  useEffect(() => { if (focusZone !== undefined) setZoneOpen(focusZone) }, [focusZone])
+
+  return (
+    <div className="rp-body">
       {state.kind === 'missing' && (
         <div className="rp-missing" role="status">
           <p>To show results, the building needs:</p>
@@ -216,7 +353,9 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           </div>
 
           <h3>Energy used <i>estimate</i></h3>
-          {s.energy.ok ? (
+          {s.energy === null ? (
+            <p className="rp-none">Energy used is shown when results include systems.</p>
+          ) : s.energy.ok ? (
             <>
               <div className="rp-totals">
                 <div>
@@ -252,6 +391,8 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
               <ul>{s.energy.missing.map((m) => <li key={m.path + m.what}>{m.what}</li>)}</ul>
             </div>
           )}
+
+          <EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} />
 
           <h3>
             By zone <i>estimate</i>
@@ -291,6 +432,29 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           <p className="rp-foot">MWh a year; + into the building, − out. Ran in {Math.round(state.kind === 'done' ? state.ms : 0)} ms.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The standalone editor's panel (`/sim2/geometry`): floats beside the editor's cards, `right` px from its right edge,
+ * and starts closed as a tab showing the heating when there is a result.
+ */
+export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?: number }) {
+  const run = useRun(doc)
+  const [open, setOpen] = useState(false)
+  const s = run.state.kind === 'done' ? run.state.summary : null
+  if (!open) {
+    return <button type="button" className="rp-tab" style={{ right }} onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : run.state.kind === 'missing' ? ` · ${run.state.items.length} to set` : ''}</button>
+  }
+  return (
+    <section className="rp" style={{ right }} aria-label="Results">
+      <header className="rp-head">
+        <h2>Heating and cooling demand</h2>
+        <button type="button" className="rp-x" onClick={() => setOpen(false)} aria-label="Hide results">–</button>
+      </header>
+      <WeatherPick run={run} />
+      <ResultsBody run={run} />
     </section>
   )
 }
