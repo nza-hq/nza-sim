@@ -14,7 +14,16 @@ import { Link, useSearchParams } from 'react-router-dom'
 import ResizeHandle from './ResizeHandle'
 import { LEFT, MODEL_CENTRE_TABS, RIGHT, clamp, loadLayout, saveLayout, type CentreTab, type Layout } from './layout'
 import { SHELF, STEPS, isStep, type StepId } from './steps'
+// @ts-expect-error untyped JS from today's app
+import { MODULE_THEMES } from '../../data/moduleThemes.js'
 import './workspace.css'
+
+/** Brief 110b row 1: each step wears the accent of today's module it stands for. */
+const ACCENT: Record<StepId, string> = {
+  site: MODULE_THEMES.weather.accent, shape: MODULE_THEMES.building.accent, fabric: MODULE_THEMES.building.accent,
+  spaces: MODULE_THEMES.gains.accent, systems: MODULE_THEMES.systems.accent, check: MODULE_THEMES.consumption.accent,
+  interventions: MODULE_THEMES.interventions.accent,
+}
 
 export type Slots = { left: HTMLElement; centre: HTMLElement; right: HTMLElement; strip: HTMLElement }
 
@@ -30,7 +39,7 @@ export function StepRail({ step, onStep }: { step: StepId; onStep: (s: StepId) =
       <ol>
         {STEPS.map((s) => (
           <li key={s.id}>
-            <button type="button" aria-current={s.id === step ? 'step' : undefined} onClick={() => onStep(s.id)} title={s.line}>
+            <button type="button" aria-current={s.id === step ? 'step' : undefined} onClick={() => onStep(s.id)} title={s.line} style={{ '--acc': ACCENT[s.id] } as React.CSSProperties}>
               <span className="mw-n">{s.n}</span>
               <span className="mw-name">{s.name}</span>
             </button>
