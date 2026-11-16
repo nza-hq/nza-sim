@@ -788,6 +788,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const startExample = () => { const r = addShape(plan, EXAMPLE); if (!('why' in r)) { commit(r.plan); fitTo(EXAMPLE); pick('select'); setSel({ kind: 'blocks', idx: [0] }) } }
   /** Where Site puts the weather choice (the run's own picker, rendered there). */
   const [weatherEl, setWeatherEl] = useState<HTMLElement | null>(null)
+  const [sizingEl, setSizingEl] = useState<HTMLElement | null>(null)
   /** Profiles step: the kind shown and the profile chosen (Brief 110b). */
   const [profKind, setProfKind] = useState<ProfileKind>('occupancy')
   const [profSel, setProfSel] = useState<string | null>(null)
@@ -1884,6 +1885,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                     <div key={r.id} className="gl-row"><span>{r.name}</span><span className="ap-setc">{roomEmitters(r).length ? emitName(r) : 'none yet'}</span></div>
                   )) : <p className="gl-hint">No rooms have this system yet.</p>}
                   {rs.length > 0 && <button type="button" className="ap-link" onClick={() => { setSysKind('emitters'); setChosen(rs.map((r) => r.id), []) }}>Give emitters to its {rs.length === 1 ? 'room' : `${rs.length} rooms`}</button>}
+                  <h4>Do they meet the need?</h4>
+                  <div ref={setSizingEl} className="ap-sizing" />
                 </>
               )
             })()}
@@ -1904,7 +1907,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
-      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>

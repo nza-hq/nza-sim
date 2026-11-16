@@ -13,6 +13,8 @@ import { shareModel, type ModelShare } from './modelChannel'
 // @ts-expect-error untyped JS component from today's app (Brief 110b: reused, not redrawn)
 import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 import { createPortal } from '../workspace/portal'
+import { DesignHeatLoss } from './DesignHeatLoss'
+import { EmitterSizing } from './EmitterSizing'
 import { balanceLines } from './balanceLines'
 import { LevelSwitch, ResultsBody, ResultsStrip, WeatherPick, useRun } from './ResultsPanel'
 import type { StepId } from '../workspace/steps'
@@ -23,7 +25,7 @@ import './run.css'
 /** Brief 111 P4: each step opens at its natural level; the person can change it at any time. */
 const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', check: 'systems', interventions: 'systems' }
 
-export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, focusZone, weatherEl, onOpen }: {
+export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */
   step?: StepId
   doc: unknown
@@ -37,6 +39,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   showBody: boolean
   focusZone: string | null
   weatherEl: HTMLElement | null
+  /** Brief 118 P4: where a heating system's passport wants its design heat loss and emitter check. */
+  sizingEl?: HTMLElement | null
   onOpen: () => void
 }) {
   const run = useRun(doc, previewDoc)
@@ -74,6 +78,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
         centre,
       )}
       {weatherEl && createPortal(<WeatherPick run={run} />, weatherEl)}
+      {sizingEl && createPortal(!s ? <p className="gl-hint">The emitter check needs a run: choose a weather file on Site.</p> : !s.emitters && !s.design_heat_loss ? <p className="gl-hint">Give the rooms emitters (with their rated output) to see whether they meet each room's need.</p> : <><DesignHeatLoss summary={s} /><EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} /></>, sizingEl)}
     </>
   )
 }
