@@ -22,13 +22,14 @@
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
-import { zoneEmitters, zoneSizing, type ZoneSizing } from '../../thermal/engine/emitters'
+import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
+import { CATALOGUES, checkCatalogueRefs, suggestItem } from '../../thermal/catalogue'
 import { DesignError, designHeatLoss, type DesignTerm } from '../../thermal/engine/designHeatLoss'
 import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingHourlyW, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
-import { ModelDocument, type Surface } from '../../thermal/schema/model'
+import { COOLING_KINDS, ModelDocument, type Surface } from '../../thermal/schema/model'
 type SurfaceKind = Surface['kind']
 import { upgradeDocument } from '../../thermal/schema/upgrade'
 import { CONSTRUCTIONS, resolveConstructions, type LibraryItem, type Missing } from './library'
@@ -210,6 +211,21 @@ export type DesignSummary =
     }
   | { ok: false; missing: Missing[] }
 
+/**
+ * Brief 119 Part 3: what to add from the catalogue the zone's wet emitters were taken from, when the zone is short:
+ * the smallest item at their height that adds the rating needed (or the fewest of the largest). Null when the zone is
+ * not short, or its wet emitters do not all name items of one catalogue and one height.
+ */
+export interface CatalogueSuggestion {
+  catalogue: string; title: string
+  item: string; type: string; height_mm: number; length_mm: number; output_w: number
+  count: number
+  /** The rating at ΔT 50 still to add, W: the rating needed less the rating there now. */
+  extra_rated_w: number
+}
+/** A zone's emitter sizing (the engine's) with the catalogue's suggestion. */
+export type ZoneSizing = EngineZoneSizing & { catalogue: CatalogueSuggestion | null }
+
 /** One zone's emitters: sizing (peak from a run with the emitters unlimited) and how the capped run went. */
 export type EmitterZone = ZoneSizing & {
   id: string; name: string
@@ -226,8 +242,32 @@ export type EmitterZone = ZoneSizing & {
   hours_at_cap: number
 }
 
+/**
+ * Brief 119: one zone's cooling units against its cooling need: the units' sensible cooling (stated, fixed), the peak
+ * from the run with the units unlimited, and how the limited run went.
+ */
+export interface CoolingZone {
+  id: string; name: string
+  cap_w: number
+  peak_w: number
+  shortfall_w: number
+  /** Hours more than 0.5 K above the cooling setpoint in the limited run (of the hours in use when `in_use`). */
+  unmet_hours: number
+  /** The highest control temperature in the limited run, °C: of the year, or of the hours in use when `in_use` (review F4). */
+  max_c: number
+  in_use: boolean
+  hours_at_cap: number
+}
+
 export interface EmitterSummary {
   zones: EmitterZone[]
+  /** Brief 119: the zones whose units cool (empty when none does). */
+  cooling: CoolingZone[]
+  /**
+   * Review F10: cooled zones with a unit that could cool (fan coil, VRF indoor, other) but states no cooling, and no
+   * unit that does: their cooling is not limited (Rule 8: nothing stated, nothing limited), said on the panel.
+   */
+  cooling_unstated: { id: string; name: string }[]
   /**
    * The same building with every wet heating system's design flow and return temperatures replaced, and nothing else
    * changed (Linzie's case: 70/60 against 50/40). Null when no what-if was asked for.
@@ -324,7 +364,28 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
     }
     if (z.infiltration_q50 == null && z.infiltration_ach == null) missing.push(explain(`zones[${i}].infiltration_q50`, 'required', doc))
   })
+  // Brief 119: an emitter that names a catalogue item states the item's own figures (Rule 3: the reference never fills).
+  for (const m of checkCatalogueRefs(doc)) missing.push({ path: m.path, what: `An emitter in ${zoneName(doc, m.path.match(/^zones\[(\d+)\]/)![1])} ${m.what}.` })
   return { missing, library: lib.library, drafts: lib.drafts }
+}
+
+/** Brief 119 Part 3: the engine's sizing of zone `zi` with the catalogue's suggestion (see CatalogueSuggestion). */
+function withCatalogue(doc: ModelDocument, zi: number, s: EngineZoneSizing): ZoneSizing {
+  const none = { ...s, catalogue: null }
+  if (!(s.shortfall_w > 0) || s.needed_rated_w == null || s.rated_now_w == null) return none
+  const wet = doc.zones[zi].emitters.filter((e) => e.heats && e.system_group_id != null)
+  const refs = wet.map((e) => e.catalogue_ref)
+  if (refs.length === 0 || refs.some((r) => r == null)) return none
+  const c = CATALOGUES[refs[0]!.catalogue]
+  if (!c || refs.some((r) => r!.catalogue !== c.id)) return none
+  const heights = new Set(refs.map((r) => c.items.find((x) => x.id === r!.item)?.height_mm))
+  if (heights.size !== 1) return none
+  const h = [...heights][0]!
+  const extra = s.needed_rated_w - s.rated_now_w
+  const sug = suggestItem(c, h, extra)
+  if (!sug) return none
+  const it = sug.item
+  return { ...s, catalogue: { catalogue: c.id, title: c.title, item: it.id, type: it.type, height_mm: it.height_mm, length_mm: it.length_mm, output_w: it.output_w, count: sug.count, extra_rated_w: extra } }
 }
 
 export function simulate(
@@ -340,7 +401,7 @@ export function simulate(
     const v = (input as { schema_version?: unknown })?.schema_version
     const parsed = ModelDocument.safeParse(input)
     if (parsed.success) doc = parsed.data
-    else if (v === '2.3' || v === '2.4' || v === '2.5') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117); nothing is filled
+    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119); nothing is filled
     else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
       // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
       // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
@@ -537,7 +598,7 @@ function emitterSummary(
       if (!z.emitters) return []
       return [{
         id: z.zone_id, name: d.zones[i].name,
-        ...zoneSizing(d, i, z.emitters, free.zones[i].annual.peak_heating_w),
+        ...withCatalogue(d, i, zoneSizing(d, i, z.emitters, free.zones[i].annual.peak_heating_w)),
         ...(d.zones[i].setpoints.hours_ref != null
           ? { unmet_hours: z.annual.unmet_heating_hours_in_use, min_c: z.annual.min_control_in_use_c ?? readZoneMinControlC(z), in_use: true }
           : { unmet_hours: z.annual.unmet_heating_hours, min_c: readZoneMinControlC(z), in_use: false }),
@@ -546,24 +607,38 @@ function emitterSummary(
     })
   const free = unlimited(doc)
   const zones = sized(doc, results, free)
-  if (!whatIf) return { zones, what_if: null }
+  // Brief 119: the cooling units against the unlimited run's cooling peak (the what-if moves heating water only).
+  const cooling: CoolingZone[] = results.zones.flatMap((z, i) => {
+    if (!z.cooling_units) return []
+    const peak = free.zones[i].annual.peak_cooling_w, inUse = doc.zones[i].setpoints.hours_ref != null
+    return [{
+      id: z.zone_id, name: doc.zones[i].name, cap_w: z.cooling_units.cap_w, peak_w: peak, shortfall_w: Math.max(0, peak - z.cooling_units.cap_w),
+      unmet_hours: (inUse ? z.annual.unmet_cooling_hours_in_use : z.annual.unmet_cooling_hours) ?? 0,
+      max_c: inUse ? z.annual.max_control_in_use_c ?? z.annual.max_control_c : z.annual.max_control_c,  // review F4
+      in_use: inUse, hours_at_cap: z.cooling_units.hours_at_cap,
+    }]
+  })
+  const cooling_unstated = doc.zones.flatMap((z, i) =>
+    z.setpoints.cool_c != null && !results.zones[i].cooling_units && z.emitters.some((e) => COOLING_KINDS.includes(e.kind) && e.cooling_output_w == null)
+      ? [{ id: z.id, name: z.name }] : [])
+  if (!whatIf) return { zones, cooling, cooling_unstated, what_if: null }
   const { design_flow_c: flow_c, design_return_c: return_c } = whatIf
   const w = structuredClone(doc)
   let changed = 0
   for (const g of w.system_groups) {
     if (g.service === 'heating' && g.design_flow_c != null) { g.design_flow_c = flow_c; g.design_return_c = return_c; changed++ }
   }
-  if (changed === 0) return { zones, what_if: { ok: false, flow_c, return_c, missing: [{ path: 'system_groups', what: 'No heating system states flow and return temperatures, so there is nothing to compare.' }] } }
+  if (changed === 0) return { zones, cooling, cooling_unstated, what_if: { ok: false, flow_c, return_c, missing: [{ path: 'system_groups', what: 'No heating system states flow and return temperatures, so there is nothing to compare.' }] } }
   let wr: ModelResults
   try { wr = run(w, options) } catch (e) {
     const m = engineMissing(e, w)
-    if (m) return { zones, what_if: { ok: false, flow_c, return_c, missing: [m] } }
+    if (m) return { zones, cooling, cooling_unstated, what_if: { ok: false, flow_c, return_c, missing: [m] } }
     throw e
   }
   // Review F10: unlimited, only the radiant share can differ between the two pairs (when a zone mixes fixed and wet
   // emitters, the output weighting moves). Where no zone's share moves, the base run's peaks are the what-if's.
   const same = results.zones.every((z, i) => Math.abs((z.emitters?.radiant_fraction ?? 0) - (wr.zones[i].emitters?.radiant_fraction ?? 0)) < 1e-12)
-  return { zones, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr, same ? free : unlimited(w)), energy: energyOf(w, wr, weather) } }
+  return { zones, cooling, cooling_unstated, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr, same ? free : unlimited(w)), energy: energyOf(w, wr, weather) } }
 }
 
 /** Brief 117: a design heat loss refusal in plain words. */
@@ -596,7 +671,7 @@ function designSummary(doc: ModelDocument, results: ModelResults, weather: Weath
     const at = structuredClone(d)
     r.zones.forEach((z, i) => { if (z.heated) at.zones[i].setpoints.heat_c = z.internal_c })
     const em = zoneEmitters(at)
-    return r.zones.map((z, i) => (em[i] && z.heated ? zoneSizing(at, i, em[i]!, z.total_w) : null))
+    return r.zones.map((z, i) => (em[i] && z.heated ? withCatalogue(at, i, zoneSizing(at, i, em[i]!, z.total_w)) : null))
   }
   let base: (ZoneSizing | null)[]
   let other: (ZoneSizing | null)[] | null = null

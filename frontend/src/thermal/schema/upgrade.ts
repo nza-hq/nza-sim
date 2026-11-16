@@ -27,6 +27,9 @@
  *
  * 2.5 → 2.6 (Brief 117) adds the building's design conditions and each zone's design internal temperature, null: no
  * design heat loss is worked out until they are stated. Nothing is filled.
+ *
+ * 2.6 → 2.7 (Brief 119) adds each emitter's cooling output and catalogue reference, null, and `heats`, true: every
+ * emitter before 2.7 heated (the meaning it had, not a value filled in). No zone's cooling is limited until stated.
  */
 import { ModelDocument, SCHEMA_VERSION } from './model'
 
@@ -108,15 +111,21 @@ export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
   if (from === '2.0' || from === '2.1') to22(doc)
-  if (from !== '2.3' && from !== '2.4' && from !== '2.5') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
+  if (from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
   to24(doc)
   to25(doc)
   to26(doc)
+  to27(doc)
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
+}
+
+/** 2.6 → 2.7 (Brief 119): no emitter cools or names a catalogue item; every emitter heats, as it did. Nothing is filled. */
+function to27(doc: Obj): void {
+  for (const z of doc.zones as Obj[]) for (const e of z.emitters as Obj[]) { e.heats ??= true; e.cooling_output_w ??= null; e.catalogue_ref ??= null }
 }
 
 /** 2.3 → 2.4 (Brief 108): no emitters stated, so no zone's heating is limited (as before). Nothing is filled. */

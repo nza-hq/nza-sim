@@ -268,6 +268,11 @@ export const Ventilation = z
  */
 export const EMITTER_KINDS = ['radiator', 'underfloor', 'fan_coil', 'vrf_indoor', 'electric', 'other'] as const
 export const FIXED_OUTPUT_KINDS: readonly string[] = ['vrf_indoor', 'electric']
+/** Schema 2.7 (Brief 119): the kinds that can cool a room (a fan coil, a VRF indoor unit, or another stated unit). */
+export const COOLING_KINDS: readonly string[] = ['fan_coil', 'vrf_indoor', 'other']
+/** Schema 2.7 (Brief 119): where an emitter's rated figures come from, a published catalogue's item (thermal/catalogue). */
+export const CatalogueRef = z.object({ catalogue: z.string().min(1), item: z.string().min(1) }).strict()
+export type CatalogueRef = z.infer<typeof CatalogueRef>
 export const Emitter = z
   .object({
     id,
@@ -293,6 +298,19 @@ export const Emitter = z
      */
     source_surface_id: id.nullable().default(null),
     source_layer_index: z.number().int().nonnegative().nullable().default(null),
+    /**
+     * Schema 2.7 (Brief 119). `heats`: whether the unit heats the room. Every emitter before 2.7 was a heating emitter,
+     * so left out reads as true (the meaning 2.6 had, not a value filled in). False only for a unit that cools and
+     * does not heat; its heating fields are then left empty.
+     */
+    heats: z.boolean().default(true),
+    /**
+     * One unit's sensible cooling, W, held fixed (not re-rated), as EnergyPlus's LimitCapacity takes it; null: the unit
+     * does not cool. Only the cooling kinds. A zone whose units state any cooling has its cooling limited to their sum.
+     */
+    cooling_output_w: nonNeg.nullable().default(null),
+    /** The catalogue item its rated figures were taken from, or null (typed in). The run checks the figures against it. */
+    catalogue_ref: CatalogueRef.nullable().default(null),
   })
   .strict()
 export type Emitter = z.infer<typeof Emitter>
@@ -491,7 +509,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.6' as const
+export const SCHEMA_VERSION = '2.7' as const
 
 export const ModelDocument = z
   .object({
@@ -598,6 +616,15 @@ export const ModelDocument = z
         const p = ['zones', i, 'emitters', j]
         if (emitterIds.has(e.id)) ctx.addIssue({ code: 'custom', path: [...p, 'id'], message: `emitter id "${e.id}" is used twice` })
         emitterIds.add(e.id)
+        // Brief 119: only the cooling kinds cool, and a unit that does not heat must cool.
+        if (!COOLING_KINDS.includes(e.kind)) {
+          if (e.cooling_output_w != null) ctx.addIssue({ code: 'custom', path: [...p, 'cooling_output_w'], message: `a ${e.kind} does not cool; leave empty` })
+          if (!e.heats) ctx.addIssue({ code: 'custom', path: [...p, 'heats'], message: `a ${e.kind} heats` })
+        }
+        if (!e.heats) {
+          if (e.system_group_id != null) ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: 'a unit that does not heat names no heating system' })
+          return
+        }
         if (FIXED_OUTPUT_KINDS.includes(e.kind)) {
           if (e.system_group_id != null) ctx.addIssue({ code: 'custom', path: [...p, 'system_group_id'], message: `a ${e.kind} unit has a fixed output and names no system` })
           return
