@@ -51,8 +51,9 @@ Brief [`docs/briefs/active/111_results-include.md`](docs/briefs/active/111_resul
 - **P2 Fabric only against EnergyPlus** ([`02_fabric.md`](docs/audit/111/02_fabric.md)): Bridgewater five storeys at 21 °C, heating only: 90.61 vs 88.42 MWh (+2.5 %, pass ±10 %); storeys −3.0 to +6.7 %. The two-zone fixture has no referee yet: it needs a document-to-EnergyPlus writer (proposed as its own work).
 
 ## 🟡 Brief 108 — Simulate v2: emitters per room, capped heat output — IN PROGRESS on `chris/108-emitters` (stacked on 107)
+## ✅ Brief 108 — Simulate v2: emitters per room, capped heat output — CLOSED 15 Nov 2026 on `chris/108-emitters` (stacked on 107; PR awaiting Linzie)
 
-Brief [`docs/briefs/active/108_emitters.md`](docs/briefs/active/108_emitters.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.
+Brief [`docs/briefs/archive/108_emitters_COMPLETED.md`](docs/briefs/archive/108_emitters_COMPLETED.md); final report [`10_final_report.md`](docs/audit/108/10_final_report.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.
 
 - **P0 recon** ([`00_reconnaissance.md`](docs/audit/108/00_reconnaissance.md)):
   - EN 442 log-mean rating; a 75/65/20 radiator at 50/40 gives 38 % of its rating.

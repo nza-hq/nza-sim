@@ -185,6 +185,11 @@ which of these scope items they affect.
   demand served
 - Proportional split across multiple systems serving the same demand
   (no priority+capacity, no lead/lag, no schedule-based handoff)
+- Emitter capacity per zone (Brief 108, Linzie 15 Nov 2026): a zone's
+  heating is limited to its emitters' output at the system's flow and
+  return temperatures (EN 442), re-rated each hour at the room's
+  temperature at the design water flow; the zone then runs below its
+  setpoint, and the unmet hours are reported. Simulate v2 only.
 - Comfort-vs-setpoint diagnostic: demand at envelope comfort vs
   delivered at service setpoint, per service, with the delta exposed
 - DHW tap-mix model: the boiler heats only the hot fraction of tap
