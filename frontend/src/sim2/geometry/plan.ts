@@ -139,7 +139,15 @@ export type EmitterType = {
   rated_return_c: number | null
   rated_room_c: number | null
   exponent_n: number | null
+  /** Schema 2.7 (Brief 119): false only for a unit that cools and does not heat. Left out: it heats. */
+  heats?: boolean
+  /** One unit's sensible cooling, W (fan coils, VRF indoor units, other); null or left out: it does not cool. */
+  cooling_output_w?: number | null
+  /** The catalogue item its rated figures were taken from (thermal/catalogue); the run checks them against it. */
+  catalogue?: { catalogue: string; item: string } | null
 }
+/** Brief 119: the kinds that can cool a room. */
+export const coolingKind = (k: EmitterKind) => k === 'fan_coil' || k === 'vrf_indoor' || k === 'other'
 export const isWet = (k: EmitterKind) => EMITTER_KINDS.find((x) => x.key === k)!.wet
 
 /** Uses a zone can be given: the zone types today's schedule editor offers (UnifiedScheduleEditor.jsx). */
