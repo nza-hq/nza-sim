@@ -60,7 +60,7 @@ def day_of_year_types() -> list:
 
 # EnergyPlus's zone air heat balance: its default (third-order backward difference) and the first-order Euler step the
 # engines use. On a setpoint step with unlimited ideal loads the third-order form over-delivers in the first quarter
-# hour (1,876.5 kW against Euler's 1,231.2 kW on Bridgewater's top storey, 21 Jan 07:00), the room overshoots to a
+# hour (1,876.5 kW against Euler's 1,231.2 kW on Bridgewater's top storey, 22 Jan 07:00), the room overshoots to a
 # 23.6 C hour mean and cooling takes 502.7 kW back the next step (docs/audit/109/02_referee.md). Both are run and
 # reported; the gate is read against Euler.
 ALGORITHMS = ("ThirdOrderBackwardDifference", "EulerMethod")

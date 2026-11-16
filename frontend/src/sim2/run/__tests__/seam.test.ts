@@ -104,6 +104,47 @@ describe('simulate', () => {
     expect(Array.from(h.summary.hourly.heating_w).reduce((x, y) => x + y, 0) / 1000).toBeCloseTo(s.building.heating_kwh, 6)
     expect(Math.max(...h.summary.hourly.cooling_w)).toBeCloseTo(s.building.peak_cooling_w, 6)
   })
+  it('heating hours: hours below in use, morning and steady peaks with when, and a cold morning\'s time back (Brief 109 P4)', async () => {
+    const d = await doc()
+    expect(simulate(d, { weather: WEATHER }).ok && (simulate(d, { weather: WEATHER }) as any).summary.zones.every((z: any) => z.hours === null)).toBe(true)
+    const HOURS = JSON.parse(readFileSync(repo('validation/energyplus/109_setback_spec.json'), 'utf8')).hours
+    d.profiles.push({ id: 'hours', kind: 'schedule', day_types: HOURS })
+    for (const z of d.zones) { z.setpoints.hours_ref = 'hours'; z.setpoints.setback_c = 16 }
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    r.summary.zones.forEach((z, i) => {
+      const h = z.hours!, res = r.results.zones[i]
+      expect(h.setpoint_c).toBe(d.zones[i].setpoints.heat_c); expect(h.setback_c).toBe(16)
+      expect(h.in_use_hours).toBe(res.annual.in_use_hours)
+      expect(h.unmet_in_use_hours).toBe(res.annual.unmet_heating_hours_in_use)
+      // The peaks are the engine's own hours, in use, the morning one at the start of the hours (07:00 here).
+      expect(h.morning_peak!.w).toBe(res.hourly.heating_w[h.morning_peak!.hour])
+      expect(h.morning_peak!.hour % 24).toBe(7)
+      expect(h.steady_peak!.w).toBe(res.hourly.heating_w[h.steady_peak!.hour])
+      expect(h.morning_peak!.w).toBeGreaterThan(h.steady_peak!.w)
+      expect(h.recovery!.mornings).toBeGreaterThan(20)
+      expect(h.recovery!.median_h).toBe(0)  // unlimited heating holds the setpoint from the first hour
+    })
+    // With the heating limited, the room takes longer to come back.
+    for (const z of d.zones) z.emitters = [{ id: `${z.id}_e`, kind: 'electric', count: 1, rated_output_w: 15000, radiant_fraction: 0, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    const c = simulate(d, { weather: WEATHER })
+    if (!c.ok) throw new Error(JSON.stringify(c.missing))
+    const h0 = c.summary.zones[0].hours!.recovery!
+    expect((h0.median_h ?? 99) + h0.not_reached).toBeGreaterThan(0)
+  })
+  it('a setback refused in words (Brief 109 P4)', async () => {
+    const d = await doc()
+    d.zones[0].setpoints.setback_c = 16
+    const r = simulate(d, { weather: WEATHER })
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.missing[0].what).toMatch(/^Choose the hours ".+" is heated in, so its setback knows when to apply\.$/)
+    d.profiles.push({ id: 'h', kind: 'schedule', day_types: { weekday: Array(24).fill(0.5), saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+    d.zones[0].setpoints.hours_ref = 'h'; d.zones[0].setpoints.setback_c = null
+    const r2 = simulate(d, { weather: WEATHER })
+    if (r2.ok) throw new Error('ran')
+    expect(r2.missing[0].what).toMatch(/^The schedule "h", weekday, hour 0: a part value \(0\.5\) needs a setback/)
+  })
   it('energy used by the installed systems, and what they still need while demand still shows (Brief 107 P4)', async () => {
     const r = simulate(await doc(), { weather: WEATHER })
     if (!r.ok) throw new Error(JSON.stringify(r.missing))

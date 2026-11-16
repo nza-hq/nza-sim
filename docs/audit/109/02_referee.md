@@ -45,7 +45,7 @@ For the cooled room, heating is within −3.8 % to −5.2 % in every case. The b
 
 In EnergyPlus, "Zone Ideal Loads Zone Sensible Heating" is m·cp·(T_supply − T_zone), with T_zone taken before the step solves. On a step from 16 to 21 °C it counts the temperature rise a second time.
 
-Bridgewater top storey, 21 Jan, first quarter hour after 07:00 (EulerMethod, time-step outputs):
+Bridgewater top storey, 22 Jan, first quarter hour after 07:00 (EulerMethod, time-step outputs):
 
 | | kW |
 |---|---|
@@ -61,7 +61,7 @@ The referees now report the zone air heat balance's system terms, time step by t
 
 ### 2. The third-order zone air scheme overshoots on a step
 
-EnergyPlus's default is ThirdOrderBackwardDifference. Bridgewater top storey, 21 Jan 07:00, heat into the air per quarter hour:
+EnergyPlus's default is ThirdOrderBackwardDifference. Bridgewater top storey, 22 Jan 07:00, heat into the air per quarter hour:
 
 - **Third order:** 1,876.5 kW, then −502.7 kW (cooling), then 0. The room's hour mean is 23.59 °C against a 21 °C setpoint.
 - **Euler:** 1,231.2 kW, then 29.5 kW, 28.4 kW and 27.9 kW. Hour mean 20.99 °C.
@@ -73,7 +73,7 @@ Annual heating differs less between the schemes (Floor 1: 24.94 against 24.05 MW
 ## Not attributed yet (for the review)
 
 **Overnight cooling, Bridgewater.** Engine 2 cools more slowly overnight than EnergyPlus.
-- Floor 3, 21 Jan, 06:00: Engine 2 is at 16.58 °C against EnergyPlus's 16.00 °C. So the engine's morning step is 4.42 K, not 5 K.
+- Floor 3, 22 Jan, 06:00: Engine 2 is at 16.58 °C against EnergyPlus's 16.00 °C. So the engine's morning step is 4.42 K, not 5 K.
 - Averaged over weekdays, the morning peak is 10–13 % low on Floors 1–4 and 4.5 % low on Floor 5.
 - On the cooled room, whose referee uses the engine's fixed ISO inside convection (flag `iso_conv`), the same line is within 1 % in the limited cases. Bridgewater's referee uses EnergyPlus's own inside convection.
 - The two differ, but which term causes the slower cooling has not been instrumented. It is left as an open item, not explained.

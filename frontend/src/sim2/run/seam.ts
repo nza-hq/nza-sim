@@ -15,7 +15,7 @@
  * cooling, per zone and for the building, the building's breakdown (Rule 9: every term, summed over the zones;
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
-import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine/model'
+import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
 import { zoneSizing, type ZoneSizing } from '../../thermal/engine/emitters'
 import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
@@ -44,6 +44,26 @@ export type Facing = 'N' | 'E' | 'S' | 'W' | 'horizontal'
 /** Sun through windows by facing, kWh a year: transmitted into the room, and absorbed in the glass (Brief 109). */
 export interface WindowSolar { facing: Facing; transmitted_kwh: number; absorbed_kwh: number }
 
+/**
+ * Brief 109 Part 4: a zone heated to hours. Hours are numbered from 1 January 00:00 (0 to 8,759). The morning peak is
+ * the largest hour of heating in the first in-use hour of any day (bringing the room back from its setback); the
+ * steady peak is the largest in any other in-use hour. Recovery is over the cold mornings: days whose first in-use
+ * hour starts from below the setpoint, coldest quarter by the day's mean outdoor temperature. Each morning counts the
+ * hours until the control temperature is within UNMET_K of the setpoint (0: within the first hour); a morning that
+ * never gets there that day is counted apart.
+ */
+export interface ZoneHours {
+  /** The heating setpoint in use, and the setback outside (null: heating off outside the hours), °C. */
+  setpoint_c: number
+  setback_c: number | null
+  in_use_hours: number
+  unmet_in_use_hours: number | null
+  min_in_use_c: number | null
+  morning_peak: { w: number; hour: number } | null
+  steady_peak: { w: number; hour: number } | null
+  recovery: { mornings: number; median_h: number | null; not_reached: number } | null
+}
+
 export interface Summary {
   engine: ModelResults['engine']
   run_ms: number
@@ -57,6 +77,8 @@ export interface Summary {
     monthly: Monthly
     by_surface: SurfaceLine[]
     window_solar: WindowSolar[]
+    /** Brief 109: heated to hours (a schedule and, usually, a setback); null when heated (or not) all year. */
+    hours: ZoneHours | null
   }[]
   /** The building's balance by term, kWh a year: positive is heat into the building. Heating and cooling included. */
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
@@ -142,12 +164,27 @@ const EMITTER_FIELD: Record<string, string> = {
   count: 'how many there are', rated_output_w: 'the rated output (W)', radiant_fraction: 'the radiant fraction',
   system_group_id: 'the heating system that feeds it', rated_flow_c: 'the rated flow temperature', rated_return_c: 'the rated return temperature',
   rated_room_c: 'the rated room temperature', exponent_n: 'the exponent (n)',
+  source_surface_id: 'the floor its pipes are in', source_layer_index: 'the layer its pipes run along',
 }
 const zoneName = (d: ModelDocument | null, i: string) => `"${d?.zones[Number(i)]?.name || `zone ${Number(i) + 1}`}"`
 const profileLabel = (d: ModelDocument | null, i: string) => d?.profiles[Number(i)]?.label || d?.profiles[Number(i)]?.id || `profile ${i}`
 
 /** One missing input in plain words; the engine's own message when there is no wording for its path. */
 export function explain(path: string, message: string, doc: ModelDocument | null): Missing {
+  // Brief 109: heating hours and setbacks, in words (the engine's refusals in zoneSetpointHours).
+  const hz = path.match(/^zones\[(\d+)\]\.setpoints(\.hours_ref|\.setback_c)?$/)
+  if (hz && message !== 'required') {
+    const zn = zoneName(doc, hz[1])
+    if (hz[2] === '.hours_ref') {
+      if (message.startsWith('a setback needs')) return { path, what: `Choose the hours ${zn} is heated in, so its setback knows when to apply.` }
+      if (message.startsWith('no profile')) return { path, what: `The hours chosen for ${zn} no longer exist. Choose them again.` }
+      return { path, what: `The hours for ${zn} must be a schedule: ${message}.` }
+    }
+    if (hz[2] === '.setback_c') return { path, what: `In ${zn}, ${message}.` }
+    return { path, what: `Set a heating or cooling setpoint for ${zn}, or take away its hours.` }
+  }
+  const dt = path.match(/^profiles\[(\d+)\]\.day_types\.(\w+)$/)
+  if (dt) return { path, what: `The schedule "${profileLabel(doc, dt[1])}", ${message.replace(/^\w+ hour/, (x) => `${x.split(' ')[0]}, hour`)}.` }
   for (const [re, f] of WORDS) {
     const m = path.match(re)
     if (m) return { path, what: f(m, doc) }
@@ -253,6 +290,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     return FACINGS.filter((f) => m.has(f)).map((f) => m.get(f)!)
   }
   const bHeat = readBuildingHourlyW(results, 'heating'), bCool = readBuildingHourlyW(results, 'cooling')
+  const hoursOf = zoneSetpointHours(doc, weather.weather.hours)
   const summary: Summary = {
     engine: results.engine, run_ms: results.run_ms,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
@@ -266,6 +304,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
       id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh,
       heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true),
       monthly: monthly(z.hourly.heating_w, z.hourly.cooling_w), by_surface: bySurface([z], true), window_solar: windowSolar([z]),
+      hours: hoursOf[i] && doc.zones[i].setpoints.heat_c != null ? zoneHours(z, doc.zones[i].setpoints, hoursOf[i]!, weather.weather.hours.dry_bulb, options.control) : null,
     })),
     breakdown: byTerm(results.zones, false),
     by_surface: bySurface(results.zones, false),
@@ -277,6 +316,50 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
   }
   summary.emitters = emitterSummary(doc, results, options, run, weather, deps.what_if ?? null)
   return { ok: true, results, summary }
+}
+
+/** Brief 109 Part 4: a scheduled zone's hours below, peaks and morning recovery (see ZoneHours). */
+function zoneHours(z: ModelResults['zones'][number], set: { heat_c: number | null; setback_c?: number | null }, sh: ZoneSetpointHours, te: ArrayLike<number>, control: RunOptions['control']): ZoneHours {
+  const H = z.hourly.heating_w.length, q = z.hourly.heating_w
+  const ctl = control === 'operative' ? z.hourly.theta_operative_c : z.hourly.theta_air_c
+  const use = sh.in_use, sp = sh.hourly.heat_c
+  let morning: ZoneHours['morning_peak'] = null, steady: ZoneHours['steady_peak'] = null
+  const starts: { day: number; h: number; tmean: number }[] = []
+  for (let d = 0; d * 24 < H; d++) {
+    let first = -1
+    for (let i = 0; i < 24; i++) {
+      const h = d * 24 + i
+      if (!use[h]) continue
+      if (first < 0) {
+        first = h
+        if (!morning || q[h] > morning.w) morning = { w: q[h], hour: h }
+      } else if (!steady || q[h] > steady.w) steady = { w: q[h], hour: h }
+    }
+    // A cold morning starts from below the setpoint (the hour before was set back).
+    if (first > 0 && ctl[first - 1] < sp[first] - UNMET_K) {
+      let t = 0
+      for (let i = 0; i < 24; i++) t += te[d * 24 + i]
+      starts.push({ day: d, h: first, tmean: t / 24 })
+    }
+  }
+  let recovery: ZoneHours['recovery'] = null
+  if (starts.length) {
+    const cold = [...starts].sort((a, b) => a.tmean - b.tmean).slice(0, Math.max(1, Math.round(starts.length / 4)))
+    const took: number[] = []
+    let notReached = 0
+    for (const m of cold) {
+      let h = m.h
+      while (h < (m.day + 1) * 24 && use[h] && ctl[h] < sp[h] - UNMET_K) h++
+      if (h < (m.day + 1) * 24 && use[h]) took.push(h - m.h); else notReached++
+    }
+    took.sort((a, b) => a - b)
+    const median = took.length ? (took.length % 2 ? took[(took.length - 1) / 2] : (took[took.length / 2 - 1] + took[took.length / 2]) / 2) : null
+    recovery = { mornings: cold.length, median_h: median, not_reached: notReached }
+  }
+  return {
+    setpoint_c: set.heat_c!, setback_c: set.setback_c ?? null, in_use_hours: z.annual.in_use_hours, unmet_in_use_hours: z.annual.unmet_heating_hours_in_use, min_in_use_c: z.annual.min_control_in_use_c,
+    morning_peak: morning, steady_peak: steady, recovery,
+  }
 }
 
 const FACINGS: readonly Facing[] = ['N', 'E', 'S', 'W', 'horizontal']
