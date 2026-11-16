@@ -181,8 +181,10 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
           Cooling units (fan coils, VRF indoor units) give their stated sensible cooling, held the same in every hour; moisture
           removal is not counted. The peak need is the zone's highest hourly cooling with its units unlimited. Where the units
           give less, the zone runs warmer and the hours more than 0.5 °C above the cooling setpoint are counted. Checked
-          against EnergyPlus: with units well below the need (about 55 %), this counts up to about a quarter more of those
-          hours, because its cooling peak is about 5 % above EnergyPlus's; nearer the need it is within 20 hours.
+          against EnergyPlus: its cooling need is about 5 % above EnergyPlus's (a gap not yet explained), so with units well
+          below the need (about 55 %) it counts about a quarter more of those hours (379 against 299), and nearer the need
+          about 20 more a year (51 against 33 at 78 %). The highest temperature reads up to about 0.9 °C above EnergyPlus's.
+          For a zone cooled to hours, the hours and the highest temperature are of the hours in use.
         </p>
       )}
       {zones.length > 0 && (design != null ? (
@@ -233,6 +235,12 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
       <ul className="es-zones">
         {zones.map((z, i) => <ZoneBlock key={z.id} z={z} other={others ? others[i] : null} mode={showDesign ? 'design' : 'year'} />)}
       </ul>
+      {em.cooling_unstated.length > 0 && (
+        <p className="es-line es-muted">
+          {em.cooling_unstated.map((z) => z.name).join(', ')}: {em.cooling_unstated.length === 1 ? 'its units state' : 'their units state'} no
+          cooling output, so {em.cooling_unstated.length === 1 ? 'its' : 'their'} cooling is not limited. State the cooling per unit to check it.
+        </p>
+      )}
       {cooling.length > 0 && (
         <>
           <h4 className="es-sub">Cooling</h4>

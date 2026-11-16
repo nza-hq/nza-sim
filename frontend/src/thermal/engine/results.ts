@@ -76,6 +76,8 @@ export interface ZoneResults {
     unmet_cooling_hours_in_use: number | null
     /** Brief 119: the highest control temperature (air or operative, as the run's control), °C. */
     max_control_c: number
+    /** Brief 119 review F4: the highest control temperature in use, °C (null: never in use). The mirror of min_control_in_use_c. */
+    max_control_in_use_c: number | null
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
   emitters: {

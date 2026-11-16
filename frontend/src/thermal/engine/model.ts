@@ -574,11 +574,12 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     // Brief 119: the mirror for cooling: hours more than UNMET_K above each hour's cooling setpoint, and at the units' limit.
     const cooled = zone.setpoints.cool_c != null
     const cu = cool[zi], capCool = cu && options.emitter_limit !== 'none' ? cu.cap_w : Infinity
-    let unmetC = 0, unmetCUse = 0, maxCtl = -Infinity, atCoolCap = 0
+    let unmetC = 0, unmetCUse = 0, maxCtl = -Infinity, maxUse = -Infinity, atCoolCap = 0
     for (let h = 0; h < H; h++) {
       const csp = sh ? sh.hourly.cool_c[h] : zone.setpoints.cool_c ?? NaN
       const inUse = sh ? sh.in_use[h] === 1 : true
       maxCtl = Math.max(maxCtl, ctlT[h])
+      if (inUse) maxUse = Math.max(maxUse, ctlT[h])
       if (ctlT[h] > csp + UNMET_K) { unmetC++; if (inUse) unmetCUse++ }
       if (cu && !Number.isNaN(csp) && run.cooling_w[h] >= capCool * (1 - 1e-9) && (capCool > 0 || ctlT[h] > csp + 1e-6)) atCoolCap++
     }
@@ -613,6 +614,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         in_use_hours: sh ? sh.in_use_hours : H,
         unmet_heating_hours_in_use: heated ? unmetUse : null, min_control_in_use_c: Number.isFinite(minUse) ? minUse : null,
         unmet_cooling_hours: cooled ? unmetC : null, unmet_cooling_hours_in_use: cooled ? unmetCUse : null, max_control_c: maxCtl,
+        max_control_in_use_c: Number.isFinite(maxUse) ? maxUse : null,
       },
       emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters, slab: em.slab } : null,
       cooling_units: cu ? { cap_w: cu.cap_w, hours_at_cap: atCoolCap, units: cu.units } : null,

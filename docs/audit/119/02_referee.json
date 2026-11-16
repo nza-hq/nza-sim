@@ -2,6 +2,7 @@
  "source": "scripts/119_referee.mts",
  "spec_sha256": "0367d6767d1d7558de91498646bf1749d36ecb23c753a0ecdf63943f3b06a809",
  "gate": "each limited zone against EnergyPlus: annual cooling ±10 %, hours more than 0.5 K above the cooling setpoint ±20 % or ±50 h, highest air temperature ±1 K (108's heating gate, mirrored; the brief's ±5 % was replaced before any run so that the two limits are held to one gate)",
+ "brief_gate": "annual cooling ±5 %, hours above ±50 h (brief Part 2 as first written)",
  "cooled_room": {
   "unlimited": {
    "caps": null,
@@ -24,7 +25,8 @@
     "cooling_pct": 4.5,
     "unmet_diff_h": 0,
     "max_diff_k": 0,
-    "pass": true
+    "pass": true,
+    "pass_brief_gate": true
    }
   },
   "tight": {
@@ -50,7 +52,12 @@
     "cooling_pct": 3.8,
     "unmet_diff_h": 80,
     "max_diff_k": 0.92,
-    "pass": false
+    "pass": false,
+    "pass_brief_gate": false,
+    "limit_effect": {
+     "engine_mwh": -0.041,
+     "energyplus_mwh": -0.03
+    }
    }
   },
   "mild": {
@@ -76,7 +83,12 @@
     "cooling_pct": 4.4,
     "unmet_diff_h": 18,
     "max_diff_k": 0.66,
-    "pass": true
+    "pass": true,
+    "pass_brief_gate": true,
+    "limit_effect": {
+     "engine_mwh": -0.004,
+     "energyplus_mwh": -0.003
+    }
    }
   }
  },
@@ -103,7 +115,8 @@
      "cooling_pct": 28.8,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": false
+     "pass": false,
+     "pass_brief_gate": false
     },
     "Floor_2": {
      "engine2": {
@@ -124,7 +137,8 @@
      "cooling_pct": 13.5,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": false
+     "pass": false,
+     "pass_brief_gate": false
     },
     "Floor_3": {
      "engine2": {
@@ -145,7 +159,8 @@
      "cooling_pct": 9,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": true
+     "pass": true,
+     "pass_brief_gate": false
     },
     "Floor_4": {
      "engine2": {
@@ -166,7 +181,8 @@
      "cooling_pct": 7.1,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": true
+     "pass": true,
+     "pass_brief_gate": false
     },
     "Floor_5": {
      "engine2": {
@@ -187,10 +203,11 @@
      "cooling_pct": -7.3,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": true
+     "pass": true,
+     "pass_brief_gate": false
     }
    },
-   "run_ms": 478
+   "run_ms": 558
   },
   "limited": {
    "caps": {
@@ -216,7 +233,8 @@
      "cooling_pct": 28.8,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": false
+     "pass": false,
+     "pass_brief_gate": false
     },
     "Floor_2": {
      "engine2": {
@@ -237,7 +255,8 @@
      "cooling_pct": 13.5,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": false
+     "pass": false,
+     "pass_brief_gate": false
     },
     "Floor_3": {
      "engine2": {
@@ -258,7 +277,12 @@
      "cooling_pct": 8.9,
      "unmet_diff_h": 11,
      "max_diff_k": 0.06,
-     "pass": true
+     "pass": true,
+     "pass_brief_gate": false,
+     "limit_effect": {
+      "engine_mwh": -0.175,
+      "energyplus_mwh": -0.15
+     }
     },
     "Floor_4": {
      "engine2": {
@@ -279,7 +303,8 @@
      "cooling_pct": 7.2,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": true
+     "pass": true,
+     "pass_brief_gate": false
     },
     "Floor_5": {
      "engine2": {
@@ -300,10 +325,11 @@
      "cooling_pct": -7.3,
      "unmet_diff_h": 0,
      "max_diff_k": 0,
-     "pass": true
+     "pass": true,
+     "pass_brief_gate": false
     }
    },
-   "run_ms": 274
+   "run_ms": 354
   }
  }
 }

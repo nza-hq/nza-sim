@@ -78,6 +78,13 @@ for (const name of ['unlimited', 'limited']) {
   })
   bw[name] = { caps: name === 'limited' ? SPEC.bridgewater.caps : null, storeys, run_ms: +r.run_ms.toFixed(0) }
 }
-const out = { source: 'scripts/119_referee.mts', spec_sha256: EP.spec_sha256, gate: SPEC.gate, cooled_room: cooled, bridgewater_five_storeys: bw }
+// Review F2: the brief's own gate (annual cooling ±5 %, hours above ±50 h), shown beside the spec's, and the limit's own
+// effect (limited − unlimited annual cooling), engine against EnergyPlus: what this brief changed.
+const briefGate = (g: any) => Math.abs(g.cooling_pct) <= 5 && Math.abs(g.unmet_diff_h) <= 50
+const effect = (lim: any, unl: any) => ({ engine_mwh: +(lim.engine2.cool - unl.engine2.cool).toFixed(3), energyplus_mwh: +(lim.energyplus.cool - unl.energyplus.cool).toFixed(3) })
+for (const [name, c] of Object.entries<any>(cooled)) { c.middle.pass_brief_gate = briefGate(c.middle); if (name !== 'unlimited') c.middle.limit_effect = effect(c.middle, (cooled as any).unlimited.middle) }
+for (const [ez, st] of Object.entries<any>((bw as any).limited.storeys)) { st.pass_brief_gate = briefGate(st); if (ez in SPEC.bridgewater.caps) st.limit_effect = effect(st, (bw as any).unlimited.storeys[ez]) }
+for (const st of Object.values<any>((bw as any).unlimited.storeys)) st.pass_brief_gate = briefGate(st)
+const out = { source: 'scripts/119_referee.mts', spec_sha256: EP.spec_sha256, gate: SPEC.gate, brief_gate: 'annual cooling ±5 %, hours above ±50 h (brief Part 2 as first written)', cooled_room: cooled, bridgewater_five_storeys: bw }
 writeFileSync(path.join(root, 'docs/audit/119/02_referee.json'), JSON.stringify(out, null, 1) + '\n')
 console.log(JSON.stringify(out, null, 1))

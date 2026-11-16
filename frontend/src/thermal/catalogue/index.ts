@@ -59,7 +59,7 @@ export const STELRAD_VITA_COMPACT: Catalogue = {
   title: 'Stelrad Vita Compact',
   maker: 'Stelrad',
   source_url: 'https://www.stelrad.com/wp-content/uploads/2021/11/26979_Vita-Compact_Web.pdf',
-  retrieved: '16 Nov 2026, as text extracted from the PDF (the download itself is blocked here, so no file hash). The type of each column is read from the product codes (7645 22 04: 450 mm, Type 22, 400 mm) and agrees with the per-metre outputs printed in the piping table (K2: 1,371 W/m at 450 mm, 1,732 W/m at 600 mm).',
+  retrieved: '16 Nov 2026, as text extracted from the PDF (the download itself is blocked here, so no file hash). The type of each column is read from the product codes (7645 22 04: 450 mm, Type 22, 400 mm) and agrees with the per-metre outputs printed in the piping table (K2: 1,371 W/m at 450 mm, 1,732 W/m at 600 mm). No date is printed; the URL path\'s 2021/11 is the only one. All 26 rows were matched again against a second, independent read of the PDF by the Brief 119 review.',
   edition: null,
   source_sha256: null,
   rating: { flow_c: 75, return_c: 65, room_c: 20 },

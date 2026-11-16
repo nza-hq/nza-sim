@@ -226,3 +226,51 @@ describe('(f) refusals by name, nothing filled', () => {
     expect(up.zones[0].emitters[0]).toMatchObject({ heats: true, cooling_output_w: null, catalogue_ref: null, rated_output_w: 500 })
   })
 })
+
+describe('review F5: cooling limited beside a heating split, and cooling to hours', () => {
+  const els = [wall('a', 60), wall('b', 40)]
+  const k = els.reduce((s, e) => s + e.area_m2 / (Rchain(e) + 1 / e.h_ci), 0) + 40 + 60
+  const cap = 7 * k
+  const net = (over: Partial<NetworkInputs['zones'][number]> = {}, control: 'air' | 'operative' = 'air'): NetworkInputs => ({
+    zones: [{ air_capacity_j_per_k: 1e6, bridging_w_per_k: 40, ventilation_w_per_k: flat(60), solar_transmitted_w: flat(0), solar_beam_w: null, other_gains: null, setpoints: { heat_c: 20, cool_c: 26 }, initial_c: 26, cooling_cap_w: cap, ...over }],
+    elements: els.map((element) => ({ element, zone_a: 0, zone_b: null, solar_absorbed_w_per_m2: flat(0), inside_solar_absorptance: 0.6, inside_solar_absorptance_b: null })),
+    hours: H, theta_e: flat(HOT), theta_ground: 10, control, hc_convective_fraction: 1, solar_convective_fraction: 0, warmup_days: 60,
+  })
+  it('heating half radiant, cooling all at the air (EW ≠ EWc): the cap goes in by the cooling split, on air and operative control', () => {
+    // At the cap all the cooling is taken from the air, so the air settles at 40 − cap / k whatever the heating's split.
+    for (const control of ['air', 'operative'] as const) {
+      const r = runNetwork(net({ heating_convective_fraction: 0.5 }, control))
+      expect(last(r.zones[0].cooling_w)).toBeCloseTo(cap, 9)
+      expect(Math.abs(last(r.zones[0].theta_air) - (HOT - cap / k))).toBeLessThan(0.01)
+      expect(Math.max(...r.zones[0].closure_wh)).toBeLessThanOrEqual(1e-6)
+    }
+  })
+  it('cooled to hours, at its limit: no cooling at all in the hours it is off', () => {
+    const cool = Float64Array.from({ length: H }, (_, h) => (h % 24 < 8 ? NaN : 26))
+    const r = runNetwork(net({ setpoint_hours: { heat_c: flat(20), cool_c: cool } }))
+    let atCap = 0
+    for (let h = 0; h < H; h++) {
+      if (Number.isNaN(cool[h])) expect(r.zones[0].cooling_w[h]).toBe(0)
+      else if (r.zones[0].cooling_w[h] >= cap * (1 - 1e-9)) atCap++
+    }
+    expect(atCap).toBeGreaterThan(0)
+    const e1 = runZone(zone1(els, { cooling_cap_w: cap, setpoint_hours: { heat_c: flat(20), cool_c: cool } }))
+    for (let h = 0; h < H; h++) if (Number.isNaN(cool[h])) expect(e1.cooling_w[h]).toBe(0)
+  })
+})
+
+describe('review F4: the highest temperature in use', () => {
+  it('a zone cooled to hours reports its highest in use, and the panel reads it', () => {
+    const b = withUnits(800, (d) => {
+      const mid = d.zones.find((z: any) => z.setpoints.cool_c != null)
+      d.profiles.push({ id: 'office', kind: 'schedule', day_types: { weekday: Array.from({ length: 24 }, (_, h) => (h >= 8 && h < 18 ? 1 : 0)), saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+      mid.setpoints.hours_ref = 'office'
+    })
+    let r
+    try { r = runModel(b.doc, W, b.lib, OPTS) } catch (e) { throw new Error(`hours fixture: ${(e as Error).message}`) }
+    const z = r.zones[cooledIndex(b.doc)]
+    expect(z.annual.max_control_in_use_c).not.toBeNull()
+    expect(z.annual.max_control_in_use_c!).toBeLessThanOrEqual(z.annual.max_control_c)
+    expect(z.annual.unmet_cooling_hours_in_use!).toBeLessThanOrEqual(z.annual.unmet_cooling_hours!)
+  })
+})

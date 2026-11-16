@@ -31,7 +31,7 @@ Systems module: emitter capacity per zone (CLAUDE.md, Brief 108) extended to coo
 
 ## Part 2 — EnergyPlus referee
 
-Cooled room and Bridgewater five storeys with cooling limited below the peak. Gate stated before running: annual cooling ±5 % per zone, hours above the setpoint ±50 h. Report, never tune (Rule 10). Commit: `119 P2: cooling limit refereed against EnergyPlus`.
+Cooled room and Bridgewater five storeys with cooling limited below the peak. Gate as first written: annual cooling ±5 % per zone, hours above the setpoint ±50 h. **Amended by the builder at P2 (review F2):** 108's heating gate, mirrored (annual cooling ±10 %, hours above ±20 % or ±50 h, highest ±1 K), so that the two limits are held to one gate. The change was made in the same commit as the results, and both verdicts are reported in `docs/audit/119/02_referee.md`. Report, never tune (Rule 10). Commit: `119 P2: cooling limit refereed against EnergyPlus`.
 
 ## Part 3 — Standard sizes from a published catalogue
 

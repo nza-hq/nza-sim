@@ -502,3 +502,15 @@ describe('Brief 119: radiators from the catalogue', () => {
     if (!r.ok) expect(r.missing[0]).toMatchObject({ path: 'zones[0].emitters[0].rated_output_w', what: expect.stringContaining('states 3500, but the output of Stelrad Vita Compact 76602220 is 3465') })
   })
 })
+
+describe('Brief 119 review F10: cooling stated nowhere', () => {
+  it('a cooled zone with a VRF unit that heats and states no cooling is named, and its cooling is not limited', async () => {
+    const d = await doc()
+    const z = d.zones[1]
+    z.emitters = [{ id: 'v', kind: 'vrf_indoor', count: 2, rated_output_w: 5000, radiant_fraction: 0, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.emitters!.cooling_unstated).toEqual([{ id: z.id, name: z.name }])
+    expect(r.results.zones[1].cooling_units).toBeNull()
+  })
+})

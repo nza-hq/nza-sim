@@ -29,7 +29,7 @@ import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems,
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingHourlyW, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
-import { ModelDocument, type Surface } from '../../thermal/schema/model'
+import { COOLING_KINDS, ModelDocument, type Surface } from '../../thermal/schema/model'
 type SurfaceKind = Surface['kind']
 import { upgradeDocument } from '../../thermal/schema/upgrade'
 import { CONSTRUCTIONS, resolveConstructions, type LibraryItem, type Missing } from './library'
@@ -253,7 +253,7 @@ export interface CoolingZone {
   shortfall_w: number
   /** Hours more than 0.5 K above the cooling setpoint in the limited run (of the hours in use when `in_use`). */
   unmet_hours: number
-  /** The highest control temperature in the limited run, °C. */
+  /** The highest control temperature in the limited run, °C: of the year, or of the hours in use when `in_use` (review F4). */
   max_c: number
   in_use: boolean
   hours_at_cap: number
@@ -263,6 +263,11 @@ export interface EmitterSummary {
   zones: EmitterZone[]
   /** Brief 119: the zones whose units cool (empty when none does). */
   cooling: CoolingZone[]
+  /**
+   * Review F10: cooled zones with a unit that could cool (fan coil, VRF indoor, other) but states no cooling, and no
+   * unit that does: their cooling is not limited (Rule 8: nothing stated, nothing limited), said on the panel.
+   */
+  cooling_unstated: { id: string; name: string }[]
   /**
    * The same building with every wet heating system's design flow and return temperatures replaced, and nothing else
    * changed (Linzie's case: 70/60 against 50/40). Null when no what-if was asked for.
@@ -608,28 +613,32 @@ function emitterSummary(
     const peak = free.zones[i].annual.peak_cooling_w, inUse = doc.zones[i].setpoints.hours_ref != null
     return [{
       id: z.zone_id, name: doc.zones[i].name, cap_w: z.cooling_units.cap_w, peak_w: peak, shortfall_w: Math.max(0, peak - z.cooling_units.cap_w),
-      unmet_hours: (inUse ? z.annual.unmet_cooling_hours_in_use : z.annual.unmet_cooling_hours) ?? 0, max_c: z.annual.max_control_c,
+      unmet_hours: (inUse ? z.annual.unmet_cooling_hours_in_use : z.annual.unmet_cooling_hours) ?? 0,
+      max_c: inUse ? z.annual.max_control_in_use_c ?? z.annual.max_control_c : z.annual.max_control_c,  // review F4
       in_use: inUse, hours_at_cap: z.cooling_units.hours_at_cap,
     }]
   })
-  if (!whatIf) return { zones, cooling, what_if: null }
+  const cooling_unstated = doc.zones.flatMap((z, i) =>
+    z.setpoints.cool_c != null && !results.zones[i].cooling_units && z.emitters.some((e) => COOLING_KINDS.includes(e.kind) && e.cooling_output_w == null)
+      ? [{ id: z.id, name: z.name }] : [])
+  if (!whatIf) return { zones, cooling, cooling_unstated, what_if: null }
   const { design_flow_c: flow_c, design_return_c: return_c } = whatIf
   const w = structuredClone(doc)
   let changed = 0
   for (const g of w.system_groups) {
     if (g.service === 'heating' && g.design_flow_c != null) { g.design_flow_c = flow_c; g.design_return_c = return_c; changed++ }
   }
-  if (changed === 0) return { zones, cooling, what_if: { ok: false, flow_c, return_c, missing: [{ path: 'system_groups', what: 'No heating system states flow and return temperatures, so there is nothing to compare.' }] } }
+  if (changed === 0) return { zones, cooling, cooling_unstated, what_if: { ok: false, flow_c, return_c, missing: [{ path: 'system_groups', what: 'No heating system states flow and return temperatures, so there is nothing to compare.' }] } }
   let wr: ModelResults
   try { wr = run(w, options) } catch (e) {
     const m = engineMissing(e, w)
-    if (m) return { zones, cooling, what_if: { ok: false, flow_c, return_c, missing: [m] } }
+    if (m) return { zones, cooling, cooling_unstated, what_if: { ok: false, flow_c, return_c, missing: [m] } }
     throw e
   }
   // Review F10: unlimited, only the radiant share can differ between the two pairs (when a zone mixes fixed and wet
   // emitters, the output weighting moves). Where no zone's share moves, the base run's peaks are the what-if's.
   const same = results.zones.every((z, i) => Math.abs((z.emitters?.radiant_fraction ?? 0) - (wr.zones[i].emitters?.radiant_fraction ?? 0)) < 1e-12)
-  return { zones, cooling, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr, same ? free : unlimited(w)), energy: energyOf(w, wr, weather) } }
+  return { zones, cooling, cooling_unstated, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr, same ? free : unlimited(w)), energy: energyOf(w, wr, weather) } }
 }
 
 /** Brief 117: a design heat loss refusal in plain words. */
