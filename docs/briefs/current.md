@@ -1,5 +1,7 @@
 # Current brief
 
+**Brief 120 — Simulate v2: system (plant) capacity limits — RESERVED 16 Nov 2026 on `chris/120-plant-capacity` (stacked on 112).** Brief [`active/120_plant-capacity.md`](active/120_plant-capacity.md). Linzie 18:42. Engine parts P0–P5, P7 here; P6 the editor's. Claims: `frontend/src/thermal/schema/`, `frontend/src/thermal/engine/`, `frontend/src/sim2/run/{seam.ts,__tests__/}`, `validation/energyplus/120_*`, `docs/audit/120/`.
+
 **Brief 112 — Simulate v2: the demand/energy split (Spaces = demand, Systems = energy) — ACTIVE 16 Nov 2026 on `chris/112-demand-energy-split`.** Brief [`active/112_demand-energy-split.md`](active/112_demand-energy-split.md). Parts 1–4 here; 5 the editor's. Claims: `frontend/src/thermal/schema/`, `frontend/src/thermal/engine/`, `frontend/src/sim2/run/{seam.ts,__tests__/}`, `docs/audit/112/`. Then Brief 120 (system capacity), then 114 and 115.
 
 **Brief 119 — Simulate v2: cooling limited by the room's units, and emitters picked from standard sizes — CLOSED 16 Nov 2026 on `chris/119-cooling-emitters`.**
