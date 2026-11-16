@@ -74,6 +74,8 @@ const UnifiedScheduleEditor = lazy(() => import('../../components/shared/schedul
 import { GAIN_COLOURS } from '../../components/modules/gains/gainColours.js'
 // @ts-expect-error untyped JS from today's app
 import GlazingInspector from '../../components/library/GlazingInspector.jsx'
+// @ts-expect-error untyped JS from today's app (the schedule pop-out, reused)
+import SchedulePopout from '../../components/shared/SchedulePopout.jsx'
 import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
 // three.js only loads when 3D is first opened.
@@ -1625,6 +1627,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   }
   /** Brief 118 P5: an edit to a profile. The project's own is changed; a library one is never changed: the edit makes
    * the project's own copy, and this project's space types and ventilation systems move to it. */
+  /** The profile open in today's schedule pop-out (from a space type's day charts), by key. */
+  const [schedPop, setSchedPop] = useState<string | null>(null)
   const editProfile = (key: string, next: { weekday: number[]; saturday: number[]; sunday: number[]; monthly_multipliers?: number[] }) => {
     const p0 = profile(key)
     if (!p0) return
@@ -1644,6 +1648,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       systems: plan.systems.map((y) => (y.schedule === key ? { ...y, schedule: k2 } : y)),
     })
     setProfSel(k2)
+    setSchedPop((p) => (p === key ? k2 : p))
   }
   const renameProfile = (key: string, name: string) => commit({ ...plan, own_profiles: (plan.own_profiles ?? []).map((x) => (x.key === key ? { ...x, name } : x)) })
 
@@ -1756,7 +1761,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {opt('Use', 'use', USES as Array<{ key: string; name: string }>)}
             <h4 className="gl-h4i"><Icon name="person" size={18} />People</h4>
             {opt('Occupancy', 'occupancy', [{ key: ALWAYS, name: 'In all the time (100%)' }, ...profilesFor('occupancy')])}
-            <Spark label="Occupancy" days={sp.occupancy === ALWAYS ? { weekday: Array(24).fill(1) } : profile(sp.occupancy ?? '')?.day_types ?? null} />
+            <Spark label="Occupancy" days={sp.occupancy === ALWAYS ? { weekday: Array(24).fill(1) } : profile(sp.occupancy ?? '')?.day_types ?? null} onEdit={sp.occupancy && sp.occupancy !== ALWAYS ? () => setSchedPop(sp.occupancy) : undefined} />
             <div className="gl-row gl-librow"><span>Count people</span>
               <select className="gl-sel" aria-label="Count people" value={sp.people_basis ?? 'per_m2'} onChange={(e) => setSpace(sp.id, { people_basis: e.target.value as 'per_m2' | 'per_room' })}>
                 <option value="per_m2">Per m² of floor</option>
@@ -1777,14 +1782,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {sp.lux == null && sp.lighting_w_per_m2 != null && <p className="gl-hint">Stated, not from lux. Type the light needed above to work it out from the luminaires instead.</p>}
             {onControlsLine('Switched', lightRelName(sp), null)}
             {sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill'
-              ? <Spark label="Lighting" days={profile(sp.lighting ?? '')?.day_types ?? null} />
+              ? <Spark label="Lighting" days={profile(sp.lighting ?? '')?.day_types ?? null} onEdit={sp.lighting ? () => setSchedPop(sp.lighting) : undefined} />
               : sp.light_relationship === 'always_on' ? <Spark label="Lighting" days={{ weekday: Array(24).fill(1) }} /> : null}
             <h4 className="gl-h4i"><Icon name="power" size={18} />Equipment</h4>
             {typed('In use', 'equipment_w_per_m2', 0.5, 'W/m²')}
             {typed('Always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
             {opt('Follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}
             {sp.equip_relationship === 'independent' && opt('Its profile', 'equipment', profilesFor('equipment'))}
-            {sp.equip_relationship === 'independent' && <Spark label="Equipment" days={profile(sp.equipment ?? '')?.day_types ?? null} />}
+            {sp.equip_relationship === 'independent' && <Spark label="Equipment" days={profile(sp.equipment ?? '')?.day_types ?? null} onEdit={sp.equipment ? () => setSchedPop(sp.equipment) : undefined} />}
             <p className="gl-hint">"With occupancy" uses the occupancy profile above, so lighting and equipment rise and fall with the people.</p>
             <h4 className="gl-h4i"><Icon name="dhw" size={18} />Hot water</h4>
             <div className="gl-row gl-librow"><span>Used</span>
@@ -2452,7 +2457,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
-      {mode === 'profiles' && centreTab !== 'heat-flow' && (() => {
+      {mode === 'profiles' && (centreTab ?? 'drawing') === 'drawing' && (() => {
         // Brief 118 P5: Profiles gets the full centre, with today's schedule editor (no drawing).
         const sel = profSel ? profile(profSel) : null
         const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
@@ -2469,7 +2474,19 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </div>
         )
       })()}
-      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {schedPop && (() => {
+        const sel = profile(schedPop)
+        if (!sel?.day_types) return null
+        const accent = (GAIN_COLOURS as Record<string, string>)[sel.schedule_type] ?? '#EA580C'
+        return (
+          <SchedulePopout isOpen onClose={() => setSchedPop(null)} title={`Schedule · ${sel.name}`} accent={accent} persistKey="nza-sim2-schedule-popout-position">
+            <Suspense fallback={<p className="gl-hint">Opening the editor…</p>}>
+              <UnifiedScheduleEditor key={sel.key} schedule={{ ...sel.day_types, monthly_multipliers: sel.monthly_multipliers ?? Array(12).fill(1) }} onChange={(next: { weekday: number[]; saturday: number[]; sunday: number[]; monthly_multipliers?: number[] }) => editProfile(sel.key, next)} accent={accent} mode="live" enableExceptions={false} contextLabel={`${sel.name}${sel.own ? '' : ' · from the library: an edit makes this project\'s copy'}`} />
+            </Suspense>
+          </SchedulePopout>
+        )
+      })()}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} showMonthly={centreTab === 'monthly'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
@@ -2477,7 +2494,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </Suspense>
         </div>
       )}
-      {onControls && centreTab !== 'heat-flow' && controlMapView()}
+      {onControls && (centreTab ?? 'drawing') === 'drawing' && controlMapView()}
       {note && <div className="gl-note" role="status">{note}</div>}
       <div className="gl-viewswitch" role="group" aria-label="View">
         <button type="button" aria-pressed={shownLook === 'plan'} onClick={() => setLook('plan')}>Plan</button>
