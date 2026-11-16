@@ -427,3 +427,6 @@
 .ap-new { margin: 8px 0 4px; width: 100%; }
 .ap-newin { display: block; margin: 2px 0 4px 28px; font-size: 12px; }
 .ap-setc { margin-left: auto; font-size: 12px; color: #374151; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Brief 114: a value filled by "Use defaults", until edited. */
+.ap-default { font-size: 12px; color: #235546; background: #EAF3EF; border-radius: 6px; padding: 4px 8px; margin: 4px 0; }

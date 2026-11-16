@@ -69,7 +69,25 @@ export type PlanSystem = {
   dhw_first?: string | null
   /** Lighting (Brief 112): the luminaires' efficacy, W/m² for each 100 lux. Runs on electricity; no library template. */
   efficacy?: number | null
+  /** Brief 114: heating, cooling and hot water, the system's pumps (null or absent: none stated). */
+  pumps?: PlanPumps | null
+  /** Brief 114: ventilation, how the fans are told to run, and with demand the least share of the flow. */
+  runs?: 'continuous' | 'schedule' | 'demand' | null
+  demand_min?: number | null
 }
+/** Brief 114: a system's pumps as typed; each null is not stated. `default_from`: the source "Use defaults" filled them
+ * from, cleared on any edit. `schedule`: a profile key, with runs 'schedule' only. */
+export type PlanPumps = {
+  basis: 'w' | 'w_per_kw_capacity' | 'w_per_m2' | null
+  value: number | null
+  speed: 'fixed' | 'variable' | null
+  runs: 'continuous' | 'with_demand' | 'schedule' | null
+  schedule: string | null
+  default_from: string | null
+}
+export const noPumps = (): PlanPumps => ({ basis: null, value: null, speed: null, runs: null, schedule: null, default_from: null })
+/** Brief 114: a building load outside the rooms (a lift, external lighting): its power and when it runs. */
+export type OtherLoadInput = { id: string; kind: 'lift' | 'external_lighting' | 'other'; name: string; power_w: number | null; runs: 'continuous' | 'schedule' | 'dusk_to_dawn' | null; schedule: string | null }
 
 /** Emitter kinds (schema 2.4). Wet kinds are fed by the room's heating system and rated (EN 442); VRF indoor units and
  * electric heaters have a fixed output. */
@@ -225,6 +243,8 @@ export type Plan = {
    * space type or system points at are the project's too, listed or not. Not part of the document: only a profile
    * something uses reaches the engine. */
   profiles?: string[]
+  /** Brief 114: lifts, external lighting and other loads outside the rooms (Systems, Other loads). */
+  other_loads?: OtherLoadInput[]
   /** Whole-building fabric inputs, typed (null: not stated). */
   building?: BuildingInputs
   /** Emitter types (Systems step), given to rooms with a count. */

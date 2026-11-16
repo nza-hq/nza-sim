@@ -39,7 +39,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type Plan, type PlanPumps, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, systemsFor } from '../library/library'
@@ -59,6 +59,7 @@ import ResultsPanel from '../run/ResultsPanel'
 import EmbeddedResults from '../run/EmbeddedResults'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { lightingWm2 } from '../../thermal/engine/lighting'
+import { NCM_SOURCE, defaultPumps } from '../../thermal/catalogue/auxiliaryDefaults'
 import { buildDocument } from './toDocument'
 import { previewItems } from '../run/ResultsPanel'
 import type { Summary } from '../run/seam'
@@ -114,7 +115,7 @@ const FABRIC_KINDS: Array<Kind & { key: FabricKind }> = [
   { key: 'partition', name: 'Internal walls', icon: 'rooms' },
 ]
 const SERVICE_ICON: Record<Service, IconName> = { heating: 'boiler', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw', lighting: 'lighting' }
-type SysKind = Service | 'emitters'
+type SysKind = Service | 'emitters' | 'other'
 const SYSTEM_KINDS: Kind[] = [
   { key: 'heating', name: 'Heating', icon: 'boiler' },
   { key: 'emitters', name: 'Emitters', icon: 'heating' },
@@ -122,6 +123,7 @@ const SYSTEM_KINDS: Kind[] = [
   { key: 'ventilation', name: 'Ventilation', icon: 'ventilation' },
   { key: 'dhw', name: 'Hot water', icon: 'dhw' },
   { key: 'lighting', name: 'Lighting', icon: 'lighting' },
+  { key: 'other', name: 'Other loads', icon: 'power' },
 ]
 type View = { cx: number; cy: number; k: number }
 type Drag =
@@ -272,8 +274,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [opening, setOpening] = useState<'glazing' | 'door'>('glazing')
   const elem: FabricElement = fkind === 'openings' ? opening : fkind === 'air' || fkind === 'bridge' || fkind === 'set' ? 'wall' : fkind
   const [sysKind, setSysKind] = useState<SysKind>('heating')
-  const service: Service = sysKind === 'emitters' ? 'heating' : sysKind
+  const service: Service = sysKind === 'emitters' || sysKind === 'other' ? 'heating' : sysKind
+  const [activeLoad, setActiveLoad] = useState<string | null>(null)
   const [activeEmit, setActiveEmit] = useState<string | null>(null)
+  const [pumpNote, setPumpNote] = useState<string | null>(null)
   const [emitCount, setEmitCount] = useState(1)
   const [active, setActive] = useState<Partial<Record<FabricElement, string>>>({})
   const [activeSpace, setActiveSpace] = useState<string | null>(null)
@@ -1291,6 +1295,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       }]
     }
     if (mode === 'systems') {
+      if (sysKind === 'other') {
+        return [{ items: otherLoads.map((l) => ({ id: l.id, name: l.name, onRename: (name: string) => setLoad(l.id, { name }), swatch: { colour: '#6B7280', unset: l.power_w == null || l.runs == null }, rooms: [], active: curLoad?.id === l.id, onPick: () => setActiveLoad(l.id) })), onNew: { label: '+ New other load', run: () => newLoad() } }]
+      }
       if (sysKind === 'emitters') {
         return [{ items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: activeEmit === t.id, onPick: () => setActiveEmit(t.id) })), onNew: { label: '+ New emitter type', run: () => newEmitter() } }]
       }
@@ -1832,8 +1839,125 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     )
   }
 
+  // ─── Brief 114: other building loads (lifts, external lighting), outside the rooms ─────────
+  const otherLoads = plan.other_loads ?? []
+  const curLoad = otherLoads.find((x) => x.id === activeLoad) ?? otherLoads[0] ?? null
+  const LOAD_KINDS: Array<{ key: OtherLoadInput['kind']; name: string }> = [{ key: 'lift', name: 'Lift' }, { key: 'external_lighting', name: 'External lighting' }, { key: 'other', name: 'Other' }]
+  const newLoad = () => {
+    let k = otherLoads.length + 1
+    while (otherLoads.some((x) => x.id === `load_${k}`)) k++
+    const x: OtherLoadInput = { id: `load_${k}`, kind: 'lift', name: `Lift ${otherLoads.filter((y) => y.kind === 'lift').length + 1}`, power_w: null, runs: null, schedule: null }
+    commit({ ...plan, other_loads: [...otherLoads, x] })
+    setActiveLoad(x.id)
+  }
+  const setLoad = (id: string, q: Partial<OtherLoadInput>) => commit({ ...plan, other_loads: otherLoads.map((x) => (x.id === id ? { ...x, ...q } : x)) })
+  const otherLoadsPanel = () => {
+    const x = curLoad
+    const items: Item[] = otherLoads.map((l) => ({ id: l.id, name: l.name, swatch: { colour: '#6B7280', unset: l.power_w == null || l.runs == null }, line: `${LOAD_KINDS.find((k) => k.key === l.kind)!.name}${l.power_w != null ? ` · ${l.power_w} W` : ''}`, used: 'the building', removable: true }))
+    const res = figs.now?.energy && figs.now.energy.ok ? figs.now.energy.other_loads.find((r) => r.id === x?.id) : null
+    return (
+      <GivePanel
+        kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
+        title="Other building loads" icon="power"
+        items={items} active={x?.id ?? null} onActive={setActiveLoad}
+        onNew={newLoad} newLabel="New load"
+        onRemove={(id) => commit({ ...plan, other_loads: otherLoads.filter((y) => y.id !== id) })}
+        detail={x ? (
+          <>
+            <input className="gl-title-in ap-tname" aria-label="Load name" defaultValue={x.name} key={`${x.id}-${x.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== x.name && setLoad(x.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            <div className="gl-row gl-librow"><span>What it is</span>
+              <select className="gl-sel" aria-label="What the load is" value={x.kind} onChange={(e) => setLoad(x.id, { kind: e.target.value as OtherLoadInput['kind'] })}>
+                {LOAD_KINDS.map((k) => <option key={k.key} value={k.key}>{k.name}</option>)}
+              </select>
+            </div>
+            <div className="gl-row gl-typed"><span>Power</span><Num value={x.power_w ?? ''} unit="W" step={50} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v >= 0 ? v : null; if (n !== x.power_w) setLoad(x.id, { power_w: n }) }} /></div>
+            <div className="gl-row gl-librow"><span>Runs</span>
+              <select className="gl-sel" aria-label="When the load runs" value={x.runs ?? ''} onChange={(e) => setLoad(x.id, { runs: (e.target.value || null) as OtherLoadInput['runs'], ...(e.target.value === 'continuous' ? { schedule: null } : {}) })}>
+                <option value="">Not set</option>
+                <option value="continuous">Every hour</option>
+                <option value="schedule">On a schedule</option>
+                <option value="dusk_to_dawn">Dusk to dawn (photocell)</option>
+              </select>
+            </div>
+            {(x.runs === 'schedule' || x.runs === 'dusk_to_dawn') && (
+              <div className="gl-row gl-librow"><span>{x.runs === 'dusk_to_dawn' ? 'And within' : 'Schedule'}</span>
+                <select className="gl-sel" aria-label="Load schedule" value={x.schedule ?? ''} onChange={(e) => setLoad(x.id, { schedule: e.target.value || null })}>
+                  <option value="">{x.runs === 'dusk_to_dawn' ? 'All night (no time clock)' : 'Not set'}</option>
+                  {profOptions(profilesFor('ventilation'))}
+                </select>
+              </div>
+            )}
+            {res && <div className="gl-row"><span>In the year</span><span className="ap-setc">{Math.round(res.hours_run).toLocaleString('en-GB')} h, {Math.round(res.kwh).toLocaleString('en-GB')} kWh</span></div>}
+            <p className="gl-hint">Power while it runs, in W. Dusk to dawn runs the hours the weather file has no daylight; with a schedule too, only inside it (photocell and time clock). Its heat warms no room. Empty stays unset.</p>
+          </>
+        ) : <p className="gl-hint ap-pnone">Lifts, external lighting and other loads outside the rooms. Add one with "New load".</p>}
+        give={null}
+      />
+    )
+  }
+  /** Brief 114: a system's pumps block. An edit clears "default, from …". */
+  const pumpsBlock = (x: PlanSystem, sv: Service) => {
+    const pu: PlanPumps = x.pumps ?? noPumps()
+    const setPu = (q: Partial<PlanPumps>) => setSys(x.id, { pumps: { ...pu, ...q, default_from: null } })
+    const dflt = () => {
+      const d = defaultPumps(built.doc as Parameters<typeof defaultPumps>[0], `${sv}_${x.id}`)
+      if (!d) return setPumpNote(x.id)
+      const [basis, value] = Object.entries(d.power)[0] as [PlanPumps['basis'], number]
+      setPumpNote(null)
+      setSys(x.id, { pumps: { basis, value, speed: d.speed, runs: d.runs, schedule: null, default_from: d.default_from } })
+    }
+    return (
+      <>
+        <h4>Pumps</h4>
+        <div className="gl-row gl-typed"><span>Power</span>
+          <Num value={pu.value ?? ''} unit={pu.basis === 'w_per_kw_capacity' ? 'W per kW' : pu.basis === 'w_per_m2' ? 'W/m²' : 'W'} step={pu.basis === 'w' ? 10 : 0.1} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v >= 0 ? v : null; if (n !== pu.value) setPu({ value: n, basis: pu.basis ?? 'w' }) }} />
+        </div>
+        <div className="gl-row gl-librow"><span>Stated as</span>
+          <select className="gl-sel" aria-label="Pump power stated as" value={pu.basis ?? ''} onChange={(e) => setPu({ basis: (e.target.value || null) as PlanPumps['basis'] })}>
+            <option value="">Not set</option>
+            <option value="w">Watts</option>
+            <option value="w_per_kw_capacity">W per kW of output</option>
+            <option value="w_per_m2">W per m² it serves</option>
+          </select>
+        </div>
+        <div className="gl-row gl-librow"><span>Speed</span>
+          <select className="gl-sel" aria-label="Pump speed" value={pu.speed ?? ''} onChange={(e) => setPu({ speed: (e.target.value || null) as PlanPumps['speed'] })}>
+            <option value="">Not set</option>
+            <option value="fixed">Fixed speed</option>
+            <option value="variable">Variable speed (inverter)</option>
+          </select>
+        </div>
+        <div className="gl-row gl-librow"><span>Runs</span>
+          <select className="gl-sel" aria-label="When the pumps run" value={pu.runs ?? ''} onChange={(e) => setPu({ runs: (e.target.value || null) as PlanPumps['runs'], ...(e.target.value !== 'schedule' ? { schedule: null } : {}) })}>
+            <option value="">Not set</option>
+            <option value="with_demand">With demand (when the system has load)</option>
+            <option value="continuous">Continuously through its season</option>
+            <option value="schedule">On a schedule</option>
+          </select>
+        </div>
+        {pu.runs === 'schedule' && (
+          <div className="gl-row gl-librow"><span>Schedule</span>
+            <select className="gl-sel" aria-label="Pump schedule" value={pu.schedule ?? ''} onChange={(e) => setPu({ schedule: e.target.value || null })}>
+              <option value="">Not set</option>
+              {profOptions(profilesFor('ventilation'))}
+            </select>
+          </div>
+        )}
+        {pu.default_from && <p className="ap-default">Default, from {pu.default_from}</p>}
+        {(() => {
+          const r = figs.now?.energy && figs.now.energy.ok ? figs.now.energy.pumps.find((y) => y.id === `${sv}_${x.id}`) : null
+          return r ? <div className="gl-row"><span>In the year</span><span className="ap-setc">{Math.round(r.rated_w).toLocaleString('en-GB')} W rated, {Math.round(r.hours_run).toLocaleString('en-GB')} h, {Math.round(r.kwh).toLocaleString('en-GB')} kWh</span></div> : null
+        })()}
+        {pumpNote === x.id && <p className="gl-hint">{sv === 'dhw' ? 'No published default for a hot water circuit: state its pumps (the circulation pump is under "For the whole building").' : 'No default: no water circuit is known for this system. State its flow temperature (heating) or give it wet emitters, or state the pumps.'}</p>}
+        <div className="gl-btns"><button type="button" className="gl-btn quiet" onClick={dflt}>Use defaults</button></div>
+        <p className="gl-hint">"Continuously" runs every hour of the system's season (the months it has load), not all year. A variable-speed pump keeps its rated power and saves at part load. The pumps' heat into the water is not counted. Defaults are {NCM_SOURCE}.</p>
+      </>
+    )
+  }
+
   const systemsPanel = () => {
     if (sysKind === 'emitters') return emittersPanel()
+    if (sysKind === 'other') return otherLoadsPanel()
     const x = curSys
     const sv = SERVICES.find((s) => s.key === service)!
     const items: Item[] = systemsOf(service).map((y) => {
@@ -1923,12 +2047,23 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <>
                 <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div>
                 <div className="gl-row gl-librow"><span>Runs</span>
-                  <select className="gl-sel" aria-label="When it runs" value={x.schedule ?? ''} onChange={(e) => setSys(x.id, { schedule: e.target.value || null })}>
+                  <select className="gl-sel" aria-label="How the fans run" value={x.runs ?? (x.schedule === 'always_on' ? 'continuous' : x.schedule ? 'schedule' : '')} onChange={(e) => { const r = (e.target.value || null) as PlanSystem['runs']; setSys(x.id, { runs: r, ...(r === 'continuous' ? { schedule: 'always_on' } : r === 'demand' ? { schedule: null } : x.schedule === 'always_on' ? { schedule: null } : {}) }) }}>
                     <option value="">Not set</option>
-                    <option value="always_on">Always on (24/7)</option>
-                    {profOptions(profilesFor('ventilation'))}
+                    <option value="continuous">Continuously (24/7)</option>
+                    <option value="schedule">On a schedule</option>
+                    <option value="demand">With demand (CO₂ or presence)</option>
                   </select>
                 </div>
+                {(x.runs ?? (x.schedule && x.schedule !== 'always_on' ? 'schedule' : null)) === 'schedule' && (
+                  <div className="gl-row gl-librow"><span>Schedule</span>
+                    <select className="gl-sel" aria-label="When it runs" value={x.schedule ?? ''} onChange={(e) => setSys(x.id, { schedule: e.target.value || null })}>
+                      <option value="">Not set</option>
+                      {profOptions(profilesFor('ventilation'))}
+                    </select>
+                  </div>
+                )}
+                {x.runs === 'demand' && <div className="gl-row gl-typed"><span>Least share of flow</span><Num value={x.demand_min ?? ''} step={0.05} min={0} max={1} onCommit={(v) => { const n = Number.isFinite(v) && v >= 0 && v <= 1 ? v : null; if (n !== (x.demand_min ?? null)) setSys(x.id, { demand_min: n }) }} /></div>}
+                {x.runs === 'demand' && <p className="gl-hint">The flow follows the people in the rooms (their occupancy profile), never below the least share (0 to 1).</p>}
               </>
             )}
             {service === 'heating' && x.template && (
@@ -1970,6 +2105,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                       </select>
                     </div>
                   )}
+                  {pumpsBlock(x, service)}
                   <p className="gl-hint">{service === 'dhw'
                     ? 'A dedicated water heater: its output, and the store it refills (the store needs the output). A hot water system a boiler heats first takes neither. Empty: not limited.'
                     : `Empty: not limited. With an output, the rooms it serves share it; a room it cannot hold is marked "system short" on the drawing. Where two systems split a room, the others top up what a capped one cannot give, in no order (no lead/lag).${service === 'heating' ? ' Heating hot water first takes from the same output.' : ' Cooling output is shared between rooms in proportion to what each asks; this has not yet been checked against EnergyPlus.'}`}</p>

@@ -272,7 +272,14 @@ export function buildDocument(plan0: Plan): Built {
       id: `${v.id}_vent`, label: v.name, kind, enabled: true, share_pct: 100,
       flow_rate: v.flow ?? null, flow_rate_basis: v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
-      control_schedule_ref: scheduleRef(v.schedule),
+      // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
+      // least share). Not stated: the schedule decides, as before.
+      ...(() => {
+        const runs = v.runs ?? null
+        if (runs === 'demand') return { runs, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: null }
+        if (runs === 'continuous') return { runs, control_schedule_ref: 'always_on' }
+        return { ...(runs ? { runs } : {}), control_schedule_ref: scheduleRef(v.schedule) }
+      })(),
     }]
   }
 
@@ -412,6 +419,14 @@ export function buildDocument(plan0: Plan): Built {
   // Systems: per service, one group per system the user made, serving every zone it is given to, at 100% of that
   // service (one system per service per zone here). A template with no fuel ("No mechanical cooling") is none.
   const system_groups: Record<string, unknown>[] = []
+  // Brief 114: a system's pumps, written once every figure is stated (a note says what is missing).
+  const pumpsOf = (sys: PlanSystem) => {
+    const pu = sys.pumps
+    if (!pu || (pu.basis == null && pu.value == null && pu.speed == null && pu.runs == null)) return {}
+    const miss = [pu.value == null || pu.basis == null ? 'power' : '', pu.speed == null ? 'fixed or variable speed' : '', pu.runs == null ? 'how they run' : '', pu.runs === 'schedule' && !pu.schedule ? 'their schedule' : ''].filter(Boolean)
+    if (miss.length) { notes.push(`${sys.name}: its pumps need ${miss.join(', ')} (Systems)`); return {} }
+    return { pumps: { power: { [pu.basis!]: pu.value }, speed: pu.speed, runs: pu.runs, schedule_ref: pu.runs === 'schedule' ? scheduleRef(pu.schedule) : null, default_from: pu.default_from ?? null } }
+  }
   const hasGroup = (service: Service, id: string) => used.some((z) => zoneSys(z.id, service)?.id === id && !!system(zoneSys(z.id, service)?.template)?.fuel)
   for (const service of ['heating', 'cooling', 'dhw'] as const) {
     const bySystem = new Map<string, string[]>()
@@ -426,6 +441,7 @@ export function buildDocument(plan0: Plan): Built {
       system_groups.push({ id: `${service}_${id}`, service, label: sys.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: t.key, ...(is24 && service === 'heating' ? { design_flow_c: sys.design_flow_c ?? null, design_return_c: sys.design_return_c ?? null } : {}),
         // Brief 120: what it can give (kW); a water heater's store; the hot water system a boiler heats first.
         capacity_kw: sys.capacity_kw ?? null,
+        ...pumpsOf(sys),
         ...(service === 'dhw' ? { storage_litres: sys.storage_litres ?? null } : {}),
         ...(service === 'heating' && sys.dhw_first && hasGroup('dhw', sys.dhw_first) ? { dhw_priority_group_id: `dhw_${sys.dhw_first}` } : {}) })
     }
@@ -489,6 +505,15 @@ export function buildDocument(plan0: Plan): Built {
       dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, load_shape: hw.shape === undefined ? 'flat' : hw.shape, circulation_pump_w: hw.pump_w },
     },
     profiles,
+    // Brief 114: loads outside the rooms, written once stated; their heat warms no room.
+    ...(() => {
+      const loads = (plan.other_loads ?? []).flatMap((l) => {
+        const miss = [l.power_w == null ? 'its power' : '', l.runs == null ? 'how it runs' : '', l.runs === 'schedule' && !l.schedule ? 'its schedule' : ''].filter(Boolean)
+        if (miss.length) { notes.push(`${l.name}: needs ${miss.join(', ')} (Systems, Other loads)`); return [] }
+        return [{ id: l.id, kind: l.kind, label: l.name, power_w: l.power_w, runs: l.runs, schedule_ref: l.runs === 'schedule' || (l.runs === 'dusk_to_dawn' && l.schedule) ? scheduleRef(l.schedule) : null, default_from: null }]
+      })
+      return loads.length ? { other_loads: loads } : {}
+    })(),
     weather_ref: { kind: 'legacy', id: 'unassigned' },
     library_refs: libraryRefs(),
   }
