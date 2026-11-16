@@ -1,0 +1,114 @@
+{
+ "source": "scripts/109_overnight.mts",
+ "weekday_mornings_january": 22,
+ "rows": {
+  "engine2, fixed convection by tilt": {
+   "Floor_1": {
+    "t18": 21,
+    "t06": 19.1,
+    "drop": 1.9
+   },
+   "Floor_2": {
+    "t18": 21,
+    "t06": 19.48,
+    "drop": 1.52
+   },
+   "Floor_3": {
+    "t18": 21,
+    "t06": 19.51,
+    "drop": 1.49
+   },
+   "Floor_4": {
+    "t18": 21,
+    "t06": 19.45,
+    "drop": 1.55
+   },
+   "Floor_5": {
+    "t18": 21,
+    "t06": 19,
+    "drop": 2
+   }
+  },
+  "engine2, TARP inside": {
+   "Floor_1": {
+    "t18": 21,
+    "t06": 18.92,
+    "drop": 2.08
+   },
+   "Floor_2": {
+    "t18": 21,
+    "t06": 19.32,
+    "drop": 1.68
+   },
+   "Floor_3": {
+    "t18": 21,
+    "t06": 19.34,
+    "drop": 1.66
+   },
+   "Floor_4": {
+    "t18": 21,
+    "t06": 19.3,
+    "drop": 1.7
+   },
+   "Floor_5": {
+    "t18": 21,
+    "t06": 18.9,
+    "drop": 2.1
+   }
+  },
+  "energyplus, its own convection": {
+   "Floor_1": {
+    "t18": 21,
+    "t06": 18.94,
+    "drop": 2.06
+   },
+   "Floor_2": {
+    "t18": 21,
+    "t06": 19.27,
+    "drop": 1.73
+   },
+   "Floor_3": {
+    "t18": 21,
+    "t06": 19.3,
+    "drop": 1.7
+   },
+   "Floor_4": {
+    "t18": 21,
+    "t06": 19.25,
+    "drop": 1.75
+   },
+   "Floor_5": {
+    "t18": 21,
+    "t06": 18.87,
+    "drop": 2.13
+   }
+  },
+  "energyplus, the engine's fixed convection": {
+   "Floor_1": {
+    "t18": 21,
+    "t06": 19.07,
+    "drop": 1.93
+   },
+   "Floor_2": {
+    "t18": 21,
+    "t06": 19.42,
+    "drop": 1.58
+   },
+   "Floor_3": {
+    "t18": 21,
+    "t06": 19.45,
+    "drop": 1.55
+   },
+   "Floor_4": {
+    "t18": 21,
+    "t06": 19.39,
+    "drop": 1.61
+   },
+   "Floor_5": {
+    "t18": 21,
+    "t06": 18.97,
+    "drop": 2.03
+   }
+  }
+ }
+}

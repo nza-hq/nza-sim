@@ -19,3 +19,5 @@
 .es-building { margin-bottom: 8px; }
 .es-hint { flex-basis: 100%; font-size: 11px; line-height: 15px; color: #6B7A75; }
 .es-warn { margin: 0 0 8px; color: #A0522D; }
+.es .rp-note p { margin: 0 0 6px; }
+.es .rp-note p:last-child { margin: 0; }

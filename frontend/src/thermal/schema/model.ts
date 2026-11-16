@@ -285,6 +285,14 @@ export const Emitter = z
     rated_room_c: finite.nullable(),
     /** EN 442 exponent n (about 1.3 panel radiators, 1.1 underfloor, 1.0 fan coils). */
     exponent_n: finite.nullable(),
+    /**
+     * Schema 2.5 (Brief 109): underfloor heating only, and required for it: the floor (or ground) surface its pipes are
+     * in, and the layer whose inside face they run along (layers counted from the surface's first, zone_b or outside,
+     * layer, 0-based; EnergyPlus's "thermal source present after layer number" is this plus 1). Null for every other kind.
+     * Left out reads as null (not stated), so an emitter written before 2.5 still reads; nothing is filled.
+     */
+    source_surface_id: id.nullable().default(null),
+    source_layer_index: z.number().int().nonnegative().nullable().default(null),
   })
   .strict()
 export type Emitter = z.infer<typeof Emitter>
@@ -450,7 +458,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.4' as const
+export const SCHEMA_VERSION = '2.5' as const
 
 export const ModelDocument = z
   .object({
