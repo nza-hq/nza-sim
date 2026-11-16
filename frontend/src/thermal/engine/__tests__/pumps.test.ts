@@ -130,6 +130,21 @@ describe('Brief 114 P2: pumps in the systems run', () => {
     expect(pump(s, 'hp').hours_run).toBe(q1)
     expect(pump(s, 'chiller').hours_run).toBe(H)  // the cooled room has load all year
     expect(readEndUseKwh(s, 'pumps')).toBeCloseTo((100 * q1 + 50 * H) / 1000, 9)
+    expect(pump(s, 'hp')).toMatchObject({ season_months: [1, 2, 3], season_from: 'load' })
+  })
+  it('continuous in a stated season (Linzie 16 Nov 23:11): every hour of those months, whatever the load', () => {
+    const d = setup()
+    d.system_groups[0].pumps = { power: { w: 100 }, speed: 'fixed', runs: 'continuous', season_months: [10, 11, 12, 1, 2, 3, 4] }
+    const s = ok(d, [1, 2])
+    let n = 0
+    for (let h = 0; h < H; h++) if ([10, 11, 12, 1, 2, 3, 4].includes(W.hours.month[h])) n++
+    expect(pump(s, 'hp')).toMatchObject({ hours_run: n, season_months: [1, 2, 3, 4, 10, 11, 12], season_from: 'stated' })
+    expect(readEndUseKwh(s, 'pumps')).toBeCloseTo((100 * n) / 1000, 9)
+    const issues = (x: any) => { const r = ModelDocument.safeParse(x); return r.success ? [] : r.error.issues.map((i) => i.path.join('.')) }
+    d.system_groups[0].pumps = { power: { w: 100 }, speed: 'fixed', runs: 'with_demand', season_months: [1] }
+    expect(issues(d)).toEqual(['system_groups.0.pumps.season_months'])
+    d.system_groups[0].pumps = { power: { w: 100 }, speed: 'fixed', runs: 'continuous', season_months: [1, 1] }
+    expect(issues(d)).toEqual(['system_groups.0.pumps.season_months'])
   })
   it('to a schedule: only its hours, whatever the load', () => {
     const d = setup()

@@ -110,8 +110,9 @@ export interface PumpResult {
   speed: 'fixed' | 'variable'
   runs: 'continuous' | 'with_demand' | 'schedule'
   hours_run: number
-  /** The months of its season, 1–12 (runs 'continuous'): those with any load. */
+  /** The months of its season, 1–12 (runs 'continuous'): as stated, or with none those with any load. */
   season_months: number[] | null
+  season_from: 'stated' | 'load' | null
   /** The named source, when "Use defaults" filled the figures. */
   default_from: string | null
 }
@@ -499,11 +500,12 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       if (pu.schedule_ref == null) { pumpMissing.push({ path: `${p}.schedule_ref`, message: 'required: the schedule the pumps run to' }); continue }
       try { sched = scheduleFractions(doc, pu.schedule_ref, hours, `${p}.schedule_ref`) } catch (e) { if (e instanceof ScheduleError) { pumpMissing.push({ path: e.path, message: e.message.slice(e.path.length + 2) }); continue } throw e }
     }
-    const run = runPumps(rated_w, pu.speed, pu.runs, load, design_w, hours.month, sched)
+    const run = runPumps(rated_w, pu.speed, pu.runs, load, design_w, hours.month, sched, pu.season_months)
     ungrouped.push({ end_use: 'pumps', zone_id: null, entry_id: g.id, kwh: sum(run.w) / 1000, w: run.w })
-    let season: number[] | null = null
-    if (pu.runs === 'continuous') { const m = new Set<number>(); for (let h = 0; h < H; h++) if (load[h] > 0) m.add(hours.month[h]); season = [...m].sort((a, b) => a - b) }
-    pumps.push({ id: g.id, rated_w, rated_from, design_w, design_from, speed: pu.speed, runs: pu.runs, hours_run: run.hours_run, season_months: season, default_from: pu.default_from })
+    let season: number[] | null = null, season_from: PumpResult['season_from'] = null
+    if (pu.runs === 'continuous' && pu.season_months != null) { season = [...pu.season_months].sort((a, b) => a - b); season_from = 'stated' }
+    else if (pu.runs === 'continuous') { const m = new Set<number>(); for (let h = 0; h < H; h++) if (load[h] > 0) m.add(hours.month[h]); season = [...m].sort((a, b) => a - b); season_from = 'load' }
+    pumps.push({ id: g.id, rated_w, rated_from, design_w, design_from, speed: pu.speed, runs: pu.runs, hours_run: run.hours_run, season_months: season, season_from, default_from: pu.default_from })
   }
   // ── Brief 114: other loads outside the rooms (lifts, external lighting); their heat warms no room ─────────────────
   const other_loads: OtherLoadResult[] = []

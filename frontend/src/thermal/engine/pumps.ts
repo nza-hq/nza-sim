@@ -6,7 +6,8 @@
  *   rated W     power.w; or power.w_per_kw_capacity × the system's capacity_kw (with none, a heating system's design
  *               heat loss when the building states design conditions; otherwise refused, review F4);
  *               or power.w_per_m2 × the floor it serves (each zone's area × the system's share)
- *   running r   'continuous': 1 in every hour of the months in which the system has any load (its season)
+ *   running r   'continuous': 1 in every hour of its season: the stated months, or with none the months in which
+ *               the system has any load (Linzie 16 Nov 23:11: the season, not all year)
  *               'with_demand': 1 in the hours its load is above zero, else 0
  *               'schedule': the schedule profile's fraction of the hour
  *   fixed       P = rated × r
@@ -71,10 +72,11 @@ export interface PumpRun {
  * (capacity, or its busiest hour); `month` the weather's month of each hour (1–12); `sched` the schedule's fractions.
  */
 export function runPumps(rated_w: number, speed: 'fixed' | 'variable', runs: 'continuous' | 'with_demand' | 'schedule',
-  load_w: Float64Array, design_w: number, month: ArrayLike<number>, sched: Float64Array | null): PumpRun {
+  load_w: Float64Array, design_w: number, month: ArrayLike<number>, sched: Float64Array | null,
+  seasonMonths: readonly number[] | null = null): PumpRun {
   const H = load_w.length
-  const season = new Set<number>()
-  if (runs === 'continuous') for (let h = 0; h < H; h++) if (load_w[h] > 0) season.add(month[h])
+  const season = new Set<number>(seasonMonths ?? [])
+  if (runs === 'continuous' && seasonMonths == null) for (let h = 0; h < H; h++) if (load_w[h] > 0) season.add(month[h])
   const w = new Float64Array(H)
   let hours_run = 0
   for (let h = 0; h < H; h++) {

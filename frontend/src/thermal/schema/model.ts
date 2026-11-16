@@ -417,8 +417,11 @@ export const SERVICES = ['heating', 'cooling', 'dhw', 'lighting', 'small_power',
  *   NCM Modelling Guide 2021 Table 14, at its share of each zone).
  * - `speed`: 'fixed' draws its rated power whenever it runs; 'variable' (an inverter) draws its rated power × a stated
  *   part-load curve on the hour's load (thermal/engine/pumps.ts).
- * - `runs`: 'continuous', every hour of the months in which the system has any load (its season); 'with_demand', the
- *   hours its load is above zero; 'schedule', the fraction of each hour in `schedule_ref`.
+ * - `runs`: 'continuous', every hour of the system's season (Linzie 16 Nov 23:11, card: "Only the heating or cooling
+ *   season", not all year); 'with_demand', the hours its load is above zero; 'schedule', the fraction of each hour in
+ *   `schedule_ref`.
+ * - `season_months`: for 'continuous', the months of the season (1–12), as stated. Null: the months in which the
+ *   system has any load, shown in the results as worked out from the load.
  * - `default_from`: when "Use defaults" filled the figures, the named source they came from; null once edited.
  * Pump energy is electricity, at "+ Systems"; the pumps' heat into the water is not counted (stated).
  */
@@ -429,6 +432,7 @@ export const Pumps = z
     speed: z.enum(['fixed', 'variable']),
     runs: z.enum(['continuous', 'with_demand', 'schedule']),
     schedule_ref: id.nullable().default(null),
+    season_months: z.array(z.number().int().min(1).max(12)).min(1).nullable().default(null),
     default_from: z.string().min(1).nullable().default(null),
   })
   .strict()
@@ -806,6 +810,9 @@ export const ModelDocument = z
       if (!PUMP_SERVICES.includes(g.service)) ctx.addIssue({ code: 'custom', path: at, message: `a ${g.service} system has no pumps; leave empty` })
       if (g.pumps.runs === 'with_demand' && g.pumps.schedule_ref != null) ctx.addIssue({ code: 'custom', path: [...at, 'schedule_ref'], message: 'pumps that run with demand have no schedule; leave empty' })
       scheduleRef(g.pumps.runs, g.pumps.schedule_ref, at, `the pumps of "${g.id}"`)
+      const sm = g.pumps.season_months
+      if (sm != null && g.pumps.runs !== 'continuous') ctx.addIssue({ code: 'custom', path: [...at, 'season_months'], message: 'only pumps that run continuously have a season; leave empty' })
+      if (sm != null && new Set(sm).size !== sm.length) ctx.addIssue({ code: 'custom', path: [...at, 'season_months'], message: 'a month is given twice' })
     })
     const otherIds = new Set<string>()
     doc.other_loads.forEach((o, i) => {
