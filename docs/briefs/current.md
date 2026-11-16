@@ -1,3 +1,6 @@
+**Brief 117 — Simulate v2: design heat loss per room (BS EN 12831-1) and whether the emitters meet it — ACTIVE 16 Nov 2026 on `chris/117-static-heat-loss` (stacked on 109).**
+Linzie, 16 Nov 10:57 and 10:58: a static design heat loss mode beside the year-round check, built before Brief 112. Brief [`active/117_static_heat_loss.md`](active/117_static_heat_loss.md). Claims: `frontend/src/thermal/engine/designHeatLoss.ts`, `frontend/src/thermal/schema/`, `frontend/src/sim2/run/seam.ts`, `frontend/src/sim2/run/EmitterSizing.tsx`.
+
 # Current brief
 
 **Brief 109 — Simulate v2: heating hours and setbacks, morning warm-up, underfloor heating in the slab — CLOSED 16 Nov 2026 on `chris/109-dynamics` (PR awaiting Linzie).**
