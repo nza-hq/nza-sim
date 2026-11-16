@@ -1,5 +1,7 @@
 # Current brief
 
+**Brief 112 — Simulate v2: the demand/energy split (Spaces = demand, Systems = energy) — ACTIVE 16 Nov 2026 on `chris/112-demand-energy-split`.** Brief [`active/112_demand-energy-split.md`](active/112_demand-energy-split.md). Parts 1–4 here; 5 the editor's. Claims: `frontend/src/thermal/schema/`, `frontend/src/thermal/engine/`, `frontend/src/sim2/run/{seam.ts,__tests__/}`, `docs/audit/112/`. Then Brief 120 (system capacity), then 114 and 115.
+
 **Brief 119 — Simulate v2: cooling limited by the room's units, and emitters picked from standard sizes — CLOSED 16 Nov 2026 on `chris/119-cooling-emitters`.**
 Fan coils, VRF and other units state their cooling per unit; each room's cooling is capped and the hours above, highest temperature and hours at the limit are shown (schema 2.7). Emitters can name a Stelrad Vita Compact K2 size; the run checks them and suggests a size when a room is short. Refereed against EnergyPlus (the limit's own effect agrees; the tight case misses on Brief 104's open cooled-room gap, reported). Independent review answered. No change to today's engine (anchor 133.2). Brief [`archive/119_cooling-emitters_COMPLETED.md`](archive/119_cooling-emitters_COMPLETED.md); final report [`../audit/119/06_final_report.md`](../audit/119/06_final_report.md). **Next:** Brief 112, then 114, then 115.
 
