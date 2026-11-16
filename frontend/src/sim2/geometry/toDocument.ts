@@ -362,7 +362,14 @@ export function buildDocument(plan0: Plan): Built {
         ...(hwUse ? { dhw: hwUse } : {}),
       })
     } else {
-      if (hwUse?.basis === 'per_m2') notes.push(`${sp.name}: hot water is ${hwUse.litres_per_day} litres per m² a day, but the space has no people, so its hot water is not in the model until it has people`)
+      // Hot water per m² needs no people (review F8): an occupancy profile with none carries it, with the space's own
+      // occupancy shape when one is chosen (the run names it if the load shape follows occupancy and there is none).
+      if (hwUse?.basis === 'per_m2') {
+        const shape = allTime ? { weekday: Array(24).fill(1), saturday: Array(24).fill(1), sunday: Array(24).fill(1) } : sp.occupancy && profile(sp.occupancy)?.day_types ? shapeOf(sp.occupancy) : null
+        occupancy = `${sp.id}_occupancy`
+        addProfile({ id: occupancy, kind: 'occupancy', label: `Hot water, no people (${sp.name})`, ...(shape ? { schedule: shape } : {}), density: { value: 0, basis: 'per_m2' }, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}), dhw: hwUse })
+        notes.push(`${sp.name}: no people are stated; its hot water (${hwUse.litres_per_day} litres per m² a day) is carried on an occupancy profile with none`)
+      }
       if (sp.occupancy) notes.push(`${sp.name}: occupancy needs people per ${perRoom ? 'room' : 'm²'} before it goes in the model`)
     }
     return { occupancy, lighting: gain('lighting'), equipment: gain('equipment'), auxiliary: [] }

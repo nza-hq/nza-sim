@@ -259,8 +259,11 @@ describe('hot water for the whole building', () => {
     const occ = (d: any) => d.profiles.find((x: any) => x.kind === 'occupancy')
     expect(occ(buildDocument(p).doc).dhw).toEqual({ basis: 'per_person', litres_per_day: 50 })
     const none = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: null } as any], dhw: { ...p.dhw!, basis: 'per_m2', litres: 2 } })
-    expect(occ(none.doc)).toBeUndefined()
-    expect(none.notes).toContain('Office: hot water is 2 litres per m² a day, but the space has no people, so its hot water is not in the model until it has people')
+    // Per m² needs no people (112 review F8): a no-people occupancy profile carries it.
+    expect(none.issues).toEqual([])
+    expect(occ(none.doc)).toMatchObject({ density: { value: 0, basis: 'per_m2' }, dhw: { basis: 'per_m2', litres_per_day: 2 } })
+    expect((none.doc as any).zones[0].profile_refs.occupancy).toBe(occ(none.doc).id)
+    expect(buildDocument({ ...p, spaces: [{ ...office, people_per_m2: null } as any] }).doc.profiles.some((x: any) => x.kind === 'occupancy')).toBe(false)
     expect(occ(buildDocument({ ...p, dhw: { ...p.dhw!, basis: null, litres: null } }).doc).dhw ?? null).toBeNull()
   })
 })
