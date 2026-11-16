@@ -155,20 +155,53 @@ describe('Brief 120 P1 (document): capacity_kw limits the rooms a system serves'
   it('P2b: a plant with no radiators of its own in every room shares in proportion to ask, and states no flow temperature', () => {
     expect(run(doc(1)).plants[0].min_flow_c).toBeNull()
   })
-  it('a capped heat pump at 60 % beside an uncapped boiler at 40 %: settles, the heat pump never gives more than it has, and the boiler falls with it (fixed split, no top-up)', () => {
+  it('a capped heat pump at 60 % beside an uncapped boiler at 40 %: the boiler tops up (Linzie, 16 Nov 19:48), the heat pump never gives more than it has', () => {
+    const c = cooledRoomDocument()
+    const mk = (cap: number | null) => {
+      const d: any = structuredClone(c.doc)
+      for (const z of d.zones) z.setpoints = { ...z.setpoints, heat_c: 20, cool_c: null }
+      const zs = d.zones.map((z: any) => z.id)
+      d.system_groups = [
+        { id: 'hp', service: 'heating', zones: zs, enabled: true, share_pct: 60, source: 'ambient_air', efficiency_metric: 3, capacity_kw: cap },
+        { id: 'boiler', service: 'heating', zones: zs, enabled: true, share_pct: 40, source: 'gas', efficiency_metric: 0.9 },
+      ]
+      return runModel(ModelDocument.parse(d), W, c.lib, { ...REFEREE_OPTIONS, internal_gains: 'none' })
+    }
+    const free = mk(null), r = mk(0.6)
+    const p = r.plants[0]
+    expect(p.hours_short).toBeGreaterThan(1000)
+    for (let h = 0; h < W.hours.count; h++) expect(p.zones.reduce((a, z) => a + z.given_w[h], 0)).toBeLessThanOrEqual(600 * (1 + 1e-9) + 1e-6)
+    // The rooms get what they got with no cap: the boiler covers the rest.
+    r.zones.forEach((z, i) => {
+      expect(z.annual.heating_kwh).toBeCloseTo(free.zones[i].annual.heating_kwh, 3)
+      expect(z.annual.unmet_heating_hours).toBe(free.zones[i].annual.unmet_heating_hours)
+      expect(z.annual.system_short_heating_hours_in_use).toBe(0)
+    })
+    const sum = (z: { given_w: Float64Array }) => z.given_w.reduce((a, b) => a + b, 0) / 1000
+    expect(p.delivered_kwh).toBeCloseTo(p.zones.reduce((a, z) => a + sum(z), 0), 6)
+    expect(p.delivered_kwh).toBeLessThan(0.6 * r.zones.reduce((a, z) => a + z.annual.heating_kwh, 0))
+  })
+  it('two capped systems in the same rooms: the one with spare covers the other, up to its own capacity', () => {
     const c = cooledRoomDocument()
     const d: any = structuredClone(c.doc)
     for (const z of d.zones) z.setpoints = { ...z.setpoints, heat_c: 20, cool_c: null }
     const zs = d.zones.map((z: any) => z.id)
     d.system_groups = [
-      { id: 'hp', service: 'heating', zones: zs, enabled: true, share_pct: 60, source: 'ambient_air', efficiency_metric: 3, capacity_kw: 1 },
-      { id: 'boiler', service: 'heating', zones: zs, enabled: true, share_pct: 40, source: 'gas', efficiency_metric: 0.9 },
+      { id: 'hp', service: 'heating', zones: zs, enabled: true, share_pct: 60, source: 'ambient_air', efficiency_metric: 3, capacity_kw: 0.3 },
+      { id: 'boiler', service: 'heating', zones: zs, enabled: true, share_pct: 40, source: 'gas', efficiency_metric: 0.9, capacity_kw: 2 },
     ]
     const r = runModel(ModelDocument.parse(d), W, c.lib, { ...REFEREE_OPTIONS, internal_gains: 'none' })
-    const p = r.plants[0]
-    expect(p.hours_short).toBeGreaterThan(100)
-    for (let h = 0; h < W.hours.count; h++) expect(0.6 * r.zones.reduce((a, z) => a + z.hourly.heating_w[h], 0)).toBeLessThanOrEqual(1000 * (1 + 1e-9) + 1e-6)
-    expect(p.delivered_kwh).toBeCloseTo(0.6 * r.zones.reduce((a, z) => a + z.annual.heating_kwh, 0), 6)
+    const [hp, boiler] = r.plants
+    let boilerAboveShare = 0
+    for (let h = 0; h < W.hours.count; h++) {
+      const gh = hp.zones.reduce((a, z) => a + z.given_w[h], 0), gb = boiler.zones.reduce((a, z) => a + z.given_w[h], 0)
+      expect(gh).toBeLessThanOrEqual(300 * (1 + 1e-9) + 1e-6)
+      expect(gb).toBeLessThanOrEqual(2000 * (1 + 1e-9) + 1e-6)
+      const rooms = r.zones.reduce((a, z) => a + z.hourly.heating_w[h], 0)
+      expect(gh + gb).toBeCloseTo(rooms, 4)
+      if (gb > 0.4 * rooms + 1) boilerAboveShare++
+    }
+    expect(boilerAboveShare).toBeGreaterThan(1000)
   })
   it('a 2.8 document upgrades with no hot water heated first', () => {
     const d: any = structuredClone(cooledRoomDocument().doc)

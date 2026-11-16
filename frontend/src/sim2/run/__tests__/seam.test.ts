@@ -555,21 +555,25 @@ describe('Brief 120 P3: system capacity in the summary', () => {
     expect(p.hours_short).toBeGreaterThan(0)
     expect(p.min_flow_c!).toBeLessThan(50)
     const share = hp.share_pct / 100
-    expect(p.delivered_kwh).toBeCloseTo(share * s.zones.reduce((a, z) => a + z.heating_kwh, 0), 3)
+    // The boiler beside it has no capacity, so it tops up (Linzie, 16 Nov 19:48): no room is short because of the system.
+    if (!s.energy?.ok) throw new Error('no energy')
+    const served = s.energy.systems.filter((g) => g.service === 'heating').reduce((a, g) => a + g.served_kwh, 0)
+    expect(served).toBeCloseTo(s.zones.reduce((a, z) => a + z.heating_kwh, 0), 3)
+    expect(s.energy.systems.find((g) => g.id === hp.id)!.served_kwh).toBeCloseTo(p.delivered_kwh, 3)
+    expect(p.delivered_kwh).toBeLessThan(share * s.zones.reduce((a, z) => a + z.heating_kwh, 0))
     for (const z of s.zones) {
       const h = z.short.heating!
-      expect(h.system_short_hours + h.own_short_hours).toBe(h.unmet_hours)
+      expect(h.system_short_hours + h.both_short_hours + h.own_short_hours).toBe(h.unmet_hours)
       expect(h.own_short_hours).toBeGreaterThanOrEqual(0)
       expect(z.short.cooling).toBeNull()
     }
-    expect(s.zones.some((z) => z.short.heating!.system_short_hours > 0)).toBe(true)
+    expect(s.zones.every((z) => z.short.heating!.system_short_hours === 0 && z.short.heating!.both_short_hours === 0)).toBe(true)
     const dh = s.design_heat_loss
     if (!dh?.ok) throw new Error('no design heat loss')
     const line = dh.systems[0]
     expect(line.capacity_w).toBe(30000)
     expect(line.rooms_w).toBeCloseTo(share * dh.zones.filter((z) => z.heated).reduce((a, z) => a + z.total_w, 0), 6)
     expect(line.total_w).toBe(line.rooms_w + line.hot_water_w)
-    if (!s.energy?.ok) throw new Error('no energy')
     expect(s.energy.water_heaters).toEqual([])
   })
   it('without a capacity: no lines, no split', async () => {

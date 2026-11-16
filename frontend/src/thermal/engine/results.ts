@@ -79,11 +79,15 @@ export interface ZoneResults {
     /** Brief 119 review F4: the highest control temperature in use, °C (null: never in use). The mirror of min_control_in_use_c. */
     max_control_in_use_c: number | null
     /**
-     * Brief 120: of the hours in use below (above) the setpoint, those in which a system's capacity held the zone below
-     * its ask ("system short"); the rest are the zone's own emitters or units, or warm-up (null: no system limits it).
+     * Brief 120 (review F3): of the hours in use below (above) the setpoint, those in which a system's capacity held the
+     * zone below its ask while the zone's own emitters (units) were not at their limit in that ask ("system short"), and
+     * those in which both were ("both"). The rest are the zone's own emitters or units, or warm-up. Null: no system with
+     * a capacity serves the zone.
      */
     system_short_heating_hours_in_use: number | null
     system_short_cooling_hours_in_use: number | null
+    both_short_heating_hours_in_use: number | null
+    both_short_cooling_hours_in_use: number | null
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
   emitters: {
@@ -142,6 +146,11 @@ export interface PlantResults {
   short_kwh_by_month: number[]
   /** Brief 120 P2b: the lowest flow temperature it fell to, °C (its design flow if never short); null when it does not feed wet emitters in every zone (shared in proportion to ask). */
   min_flow_c: number | null
+  /**
+   * Review F1: what it gave each zone it serves, W each hour (Σ = what it delivered). With a short plant beside others,
+   * the zone's systems no longer give in fixed shares (the others top up); Systems reads each system's energy from here.
+   */
+  zones: { zone_id: string; share: number; given_w: Float64Array }[]
 }
 
 export const readZoneHeatingKwh = (r: ZoneResults) => r.annual.heating_kwh

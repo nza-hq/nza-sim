@@ -288,7 +288,34 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       for (let h = 0; h < H; h++) r.fuel_w[h] += (w[h] * f) / g.eff!
     }
   }
-  for (const d of demand) serve(d.service, d.zi, d.w, d.kwh)
+  // Review F1 (Linzie, 16 Nov 19:48, "the boiler tops up"): a zone served by a system with a capacity takes from it what
+  // the run recorded it gave (results.plants[].zones, Rule 11), and its systems with no capacity take the rest of the
+  // zone's heating (cooling) in proportion to their shares. Without capacities this is each system's share, as before.
+  const given = new Map<string, Float64Array>()
+  for (const p of results.plants ?? []) for (const z of p.zones) given.set(`${p.id}|${z.zone_id}`, z.given_w)
+  for (const d of demand) {
+    const zid = doc.zones[d.zi].id
+    const gs = covering(d.service, d.zi).filter((g) => g.share > 0)
+    const capped = gs.filter((g) => given.has(`${g.id}|${zid}`))
+    if (!capped.length) { serve(d.service, d.zi, d.w, d.kwh); continue }
+    zone_demand.push({ zone_id: zid, service: d.service, kwh: d.kwh })
+    const rest = Float64Array.from(d.w)
+    const put = (g: G, w: ArrayLike<number>) => {
+      const r = groupOut(g)
+      let k = 0
+      for (let h = 0; h < H; h++) { k += w[h]; r.fuel_w[h] += w[h] / g.eff! }
+      r.served_kwh += k / 1000
+    }
+    for (const g of capped) {
+      const w = given.get(`${g.id}|${zid}`)!
+      put(g, w)
+      for (let h = 0; h < H; h++) rest[h] -= w[h]
+    }
+    const free = gs.filter((g) => !capped.includes(g))
+    const fs = free.reduce((a, g) => a + g.share, 0)
+    for (let h = 0; h < H; h++) if (Math.abs(rest[h]) < 1e-6 * (Math.abs(d.w[h]) + 1)) rest[h] = 0
+    if (fs > 0) for (const g of free) put(g, rest.map((x) => (x * g.share) / fs))
+  }
   // Brief 120: a hot water system with its heater's output takes its share of every zone's draw into one store; the
   // others serve each zone's draw as before. What a short heater's taps did not get is not served (Rule 9: it is
   // taken off the need below, and shown).

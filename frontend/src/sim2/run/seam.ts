@@ -195,7 +195,15 @@ export interface Summary {
 }
 
 /** Brief 120 P3: a zone's unmet hours in use, and which side held it there. */
-export interface ShortSplit { unmet_hours: number; system_short_hours: number; own_short_hours: number }
+export interface ShortSplit {
+  unmet_hours: number
+  /** The system held the room and its own emitters (units) were not at their limit: a bigger system would fix these. */
+  system_short_hours: number
+  /** Both: the system held it and its own emitters (units) were at their limit too. */
+  both_short_hours: number
+  /** Its own emitters (units) alone, or warm-up: a bigger system would not fix these. */
+  own_short_hours: number
+}
 
 /**
  * Brief 120 P3: one system's capacity against what its rooms asked of it (the engine's PlantResults, Rule 11), with its
@@ -510,7 +518,7 @@ export function simulate(
     }
     return FACINGS.filter((f) => m.has(f)).map((f) => m.get(f)!)
   }
-  const split = (unmet: number, sys: number): ShortSplit => ({ unmet_hours: unmet, system_short_hours: sys, own_short_hours: unmet - sys })
+  const split = (unmet: number, sys: number, both: number): ShortSplit => ({ unmet_hours: unmet, system_short_hours: sys, both_short_hours: both, own_short_hours: unmet - sys - both })
   const bHeat = readBuildingHourlyW(results, 'heating'), bCool = readBuildingHourlyW(results, 'cooling')
   const hoursOf = zoneSetpointHours(doc, weather.weather.hours)
   const summary: Summary = {
@@ -528,8 +536,8 @@ export function simulate(
       monthly: monthly(z.hourly.heating_w, z.hourly.cooling_w), by_surface: bySurface([z], true), window_solar: windowSolar([z]),
       hours: hoursOf[i] && doc.zones[i].setpoints.heat_c != null ? zoneHours(z, doc.zones[i].setpoints, hoursOf[i]!, weather.weather.hours.dry_bulb, options.control) : null,
       short: {
-        heating: z.annual.system_short_heating_hours_in_use == null ? null : split(z.annual.unmet_heating_hours_in_use ?? 0, z.annual.system_short_heating_hours_in_use),
-        cooling: z.annual.system_short_cooling_hours_in_use == null ? null : split(z.annual.unmet_cooling_hours_in_use ?? 0, z.annual.system_short_cooling_hours_in_use),
+        heating: z.annual.system_short_heating_hours_in_use == null ? null : split(z.annual.unmet_heating_hours_in_use ?? 0, z.annual.system_short_heating_hours_in_use, z.annual.both_short_heating_hours_in_use ?? 0),
+        cooling: z.annual.system_short_cooling_hours_in_use == null ? null : split(z.annual.unmet_cooling_hours_in_use ?? 0, z.annual.system_short_cooling_hours_in_use, z.annual.both_short_cooling_hours_in_use ?? 0),
       },
     })),
     plants: results.plants.map((p) => {
