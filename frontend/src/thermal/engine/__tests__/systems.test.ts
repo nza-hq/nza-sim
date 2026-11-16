@@ -196,12 +196,14 @@ describe('systems: review responses (Brief 107 F1–F8)', () => {
   })
   it('F4: inputs not modelled yet are listed, not silently dropped', () => {
     const d = setup()
+    // Brief 120: a heating system's capacity is modelled (in the run), so it is no longer listed; a hot water one's is.
     d.system_groups[0].capacity_kw = 0.1
+    d.system_groups[3].capacity_kw = 30
     d.system_groups[1].control_schedule_ref = 'nowhere'
     d.zones[0].ventilation[0].defrost_penalty_kwh = 5
     expect(ok(d).not_modelled).toEqual([
-      { path: 'system_groups[0].capacity_kw', what: 'capacity' },
       { path: 'system_groups[1].control_schedule_ref', what: 'control schedule "nowhere" (not in this building)' },
+      { path: 'system_groups[3].capacity_kw', what: 'capacity' },
       { path: 'zones[0].ventilation[0].defrost_penalty_kwh', what: 'defrost penalty' },
     ])
   })

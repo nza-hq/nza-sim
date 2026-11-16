@@ -78,6 +78,12 @@ export interface ZoneResults {
     max_control_c: number
     /** Brief 119 review F4: the highest control temperature in use, °C (null: never in use). The mirror of min_control_in_use_c. */
     max_control_in_use_c: number | null
+    /**
+     * Brief 120: of the hours in use below (above) the setpoint, those in which a system's capacity held the zone below
+     * its ask ("system short"); the rest are the zone's own emitters or units, or warm-up (null: no system limits it).
+     */
+    system_short_heating_hours_in_use: number | null
+    system_short_cooling_hours_in_use: number | null
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
   emitters: {
@@ -108,6 +114,30 @@ export interface ModelResults {
     active_set: { max_passes: number; hours_over_one: number } | null
   }
   run_ms: number
+  /** Brief 120: each heating or cooling system with a capacity, in the document's order (empty: none). */
+  plants: PlantResults[]
+}
+
+/**
+ * Brief 120: a system's capacity against what its zones asked of it. `ask` is each hour's heating (or cooling) the
+ * zones would have taken from it at their setpoints with only their own emitters' limits; `delivered` what it gave
+ * them. `short_kwh` is asked less given over the hours it was short (the zones then float, so it is not the heat that a
+ * bigger plant would have used over the year, which also counts the recovery after).
+ */
+export interface PlantResults {
+  id: string
+  service: 'heating' | 'cooling'
+  cap_w: number
+  /** The highest hour's ask, W, and the hours (fractions summed) the plant was short. */
+  peak_ask_w: number
+  hours_short: number
+  ask_kwh: number
+  delivered_kwh: number
+  short_kwh: number
+  /** Hot water it heated first, kWh a year (0 without). */
+  reserved_kwh: number
+  /** short_kwh by calendar month, January first. */
+  short_kwh_by_month: number[]
 }
 
 export const readZoneHeatingKwh = (r: ZoneResults) => r.annual.heating_kwh

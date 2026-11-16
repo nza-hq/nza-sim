@@ -110,6 +110,32 @@ export interface NetworkInputs {
    * every step.
    */
   inside_convection?: 'fixed' | 'tarp'
+  /**
+   * Brief 120: plant (system) capacity. Each step, the zones a plant serves draw at most `cap_w` from it, less
+   * `reserved_w` that hour (hot water it heats first), summed over its share of each zone's heating (or cooling). When
+   * they ask for more, each zone's limit that step becomes its share of what is there, in proportion to what it asked
+   * for after its own emitters' limit (Linzie's decision 1), and the step is solved again with those limits (and again
+   * while the plant still draws more, as the zones' heat moves between them). A zone's share not on any listed plant
+   * is not limited by plant. Absent or empty: no plant limits (as before Brief 120).
+   */
+  plants?: NetworkPlant[] | null
+}
+
+export interface NetworkPlant {
+  service: 'heating' | 'cooling'
+  /** The plant's output, W (heat delivered, or sensible cooling). */
+  cap_w: number
+  /** The zones it serves and its share of each one's heating (or cooling), 0 to 1. */
+  zones: { zone: number; share: number }[]
+  /** Each hour, W of the capacity taken first by something else (hot water with priority); null: none. */
+  reserved_w?: ArrayLike<number> | null
+}
+
+export interface NetworkPlantRun {
+  /** Each hour: what the zones asked of the plant before its limit (after the emitters'), what it gave them, W; and the share of the hour it was short (0 to 1). */
+  ask_w: Float64Array
+  delivered_w: Float64Array
+  short: Float64Array
 }
 
 export interface NetworkZoneRun {
@@ -132,6 +158,8 @@ export interface NetworkZoneRun {
   }
   /** |Σ terms + heating − cooling − storage| per hour, Wh, over this zone's own nodes. */
   closure_wh: Float64Array
+  /** Brief 120: the share of each hour (0 to 1) the zone's heating or cooling was held below its ask by a plant's limit; absent without plants. */
+  plant_limited?: Float64Array
 }
 
 export interface NetworkRun {
@@ -148,6 +176,8 @@ export interface NetworkRun {
   nodes: number
   /** Most passes of the active-set iteration in any hour, and the hours that needed more than one. */
   active_set: { max_passes: number; hours_over_one: number }
+  /** Brief 120: per plant, in the order given (empty without plants). */
+  plants: NetworkPlantRun[]
 }
 
 export class NetworkError extends Error {
@@ -161,6 +191,19 @@ function check(inp: NetworkInputs) {
     for (let i = 0; i < H; i++) if (!Number.isFinite(a[i])) throw new NetworkError(`hour ${i} is not a number`, p)
   }
   if (inp.zones.length === 0) throw new NetworkError('at least one zone', 'zones')
+  ;(inp.plants ?? []).forEach((pl, i) => {
+    const p = `plants[${i}]`
+    if (pl.service !== 'heating' && pl.service !== 'cooling') throw new NetworkError(`unknown service "${String(pl.service)}"`, `${p}.service`)
+    if (!(pl.cap_w > 0) || !Number.isFinite(pl.cap_w)) throw new NetworkError('must be above 0', `${p}.cap_w`)
+    for (const { zone, share } of pl.zones) {
+      if (!(zone >= 0 && zone < inp.zones.length)) throw new NetworkError(`no zone ${zone}`, `${p}.zones`)
+      if (!(share >= 0 && share <= 1)) throw new NetworkError('a share must be 0 to 1', `${p}.zones`)
+    }
+    if (pl.reserved_w) {
+      arr(pl.reserved_w, `${p}.reserved_w`)
+      for (let h = 0; h < H; h++) if (pl.reserved_w[h] < 0) throw new NetworkError(`hour ${h} is negative`, `${p}.reserved_w`)
+    }
+  })
   arr(inp.theta_e, 'theta_e')
   inp.zones.forEach((z, i) => {
     const p = `zones[${i}]`
@@ -672,6 +715,105 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     return 0.5 * (xa[i] + r)
   }
 
+  /** The active set for this step, from the modes of the step before; returns the passes it took. */
+  const settle = (h: number) => {
+    let passes = 0
+    for (;;) {
+      passes++
+      solveReduced()
+      let changed = false
+      for (let z = 0; z < Z; z++) {
+        if (mode[z] === 1 && phi[z] < 0) { mode[z] = 0; changed = true }
+        else if (mode[z] === 1 && phi[z] > capW[z]) { mode[z] = 2; changed = true }  // Brief 108: needs more than its emitters give
+        else if (mode[z] === -1 && phi[z] > 0) { mode[z] = 0; changed = true }
+        else if (mode[z] === -1 && -phi[z] > capC[z]) { mode[z] = -2; changed = true }  // Brief 119: needs more than its units give
+        else if (mode[z] === -2) {
+          // At its limit, the zone floats; once it would fall below its setpoint it needs less than the limit.
+          if (control(z) < coolC[z] - 1e-9) { mode[z] = -1; changed = true }
+        } else if (mode[z] === 2) {
+          // At its limit, the zone floats; once it would rise above its setpoint it needs less than the limit.
+          if (control(z) > heatC[z] + 1e-9) { mode[z] = 1; changed = true }
+        } else if (mode[z] === 0) {
+          const c = control(z)
+          if (c < heatC[z] - 1e-9) { mode[z] = 1; changed = true }
+          else if (c > coolC[z] + 1e-9) { mode[z] = -1; changed = true }
+        }
+      }
+      if (!changed) break
+      if (passes > 3 * Z + 3) throw new NetworkError(`the heating/cooling set did not settle in hour ${h}`, 'setpoints')
+    }
+    return passes
+  }
+
+  /**
+   * Brief 120: each plant's limit for this step. Asks are the zones' heating (or cooling) with only their emitters'
+   * limits; a short plant scales each zone's ask by its fraction f (shares weighted), the step is solved again, and f
+   * is lowered while the plant still gives more than it has (the zones' heat moves between them as they float).
+   */
+  const PL = (inp.plants ?? []).length
+  const plants = inp.plants ?? []
+  const plOut: NetworkPlantRun[] = plants.map(() => ({ ask_w: new Float64Array(H), delivered_w: new Float64Array(H), short: new Float64Array(H) }))
+  const zLimited = plants.length ? inp.zones.map(() => new Float64Array(H)) : []
+  const ask = new Float64Array(Z), baseW = new Float64Array(Z), baseC = new Float64Array(Z), frac = new Float64Array(PL), avail = new Float64Array(PL)
+  const sign = plants.map((p) => (p.service === 'heating' ? 1 : -1))
+  const drawOf = (p: number, from: ArrayLike<number>) => { let d = 0; for (const { zone, share } of plants[p].zones) d += share * Math.max(0, sign[p] * from[zone]); return d }
+  const plantLimit = (h: number, w: number, record: boolean) => {
+    for (let z = 0; z < Z; z++) ask[z] = phi[z]
+    let short = false
+    for (let p = 0; p < PL; p++) {
+      avail[p] = Math.max(0, plants[p].cap_w - (plants[p].reserved_w ? plants[p].reserved_w![h] : 0))
+      const a = drawOf(p, ask)
+      frac[p] = a > avail[p] * (1 + 1e-9) + 1e-9 ? avail[p] / a : 1
+      if (frac[p] < 1) short = true
+      if (record) plOut[p].ask_w[h] += w * a
+    }
+    let passes = 0
+    if (short) {
+      baseW.set(capW); baseC.set(capC)
+      for (let it = 0; ; it++) {
+        // Each zone's limit: the shares on short plants at their fraction of its ask, the rest at its ask.
+        for (let z = 0; z < Z; z++) { capW[z] = baseW[z]; capC[z] = baseC[z] }
+        for (const svc of [1, -1]) {
+          const lim = new Float64Array(Z), cover = new Float64Array(Z), any = new Uint8Array(Z)
+          for (let p = 0; p < PL; p++) {
+            if (sign[p] !== svc) continue
+            for (const { zone, share } of plants[p].zones) {
+              const a = Math.max(0, svc * ask[zone])
+              lim[zone] += share * frac[p] * a; cover[zone] += share
+              if (frac[p] < 1) any[zone] = 1
+            }
+          }
+          for (let z = 0; z < Z; z++) {
+            if (!any[z]) continue
+            const l = lim[z] + Math.max(0, 1 - cover[z]) * Math.max(0, svc * ask[z])
+            if (svc === 1) capW[z] = Math.min(baseW[z], l); else capC[z] = Math.min(baseC[z], l)
+          }
+        }
+        passes += settle(h)
+        let over = false
+        for (let p = 0; p < PL; p++) {
+          const d = drawOf(p, phi)
+          if (d > avail[p] * (1 + 1e-9) + 1e-6) { over = true; frac[p] *= avail[p] / d }
+        }
+        if (!over) break
+        if (it > 50) throw new NetworkError(`plant limits did not settle in hour ${h}`, 'plants')
+      }
+      // A zone held by the plant (not its own emitters) starts the next step from its setpoint, as it would have.
+      for (let z = 0; z < Z; z++) {
+        const heldH = mode[z] === 2 && capW[z] < baseW[z] - 1e-9, heldC = mode[z] === -2 && capC[z] < baseC[z] - 1e-9
+        if (record && (heldH || heldC)) zLimited[z][h] += w
+        if (heldH) mode[z] = 1
+        if (heldC) mode[z] = -1
+      }
+      capW.set(baseW); capC.set(baseC)
+    }
+    if (record) for (let p = 0; p < PL; p++) {
+      plOut[p].delivered_w[h] += w * drawOf(p, phi)
+      if (frac[p] < 1) plOut[p].short[h] += w
+    }
+    return passes
+  }
+
   /** One step of hour h at outdoor temperature te; recorded outputs add w (1 / steps per hour) of their value. */
   const sub = (h: number, te: number, record: boolean, w: number) => {
     if (tarp) tarpCoefficients()
@@ -724,31 +866,8 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
 
     // Ideal loads: hold every zone that would leave its band on it, all together. The set starts from the hour
     // before and is iterated until consistent (a held zone's demand has the right sign; a free zone is in its band).
-    let passes = 0
-    for (;;) {
-      passes++
-      solveReduced()
-      let changed = false
-      for (let z = 0; z < Z; z++) {
-        if (mode[z] === 1 && phi[z] < 0) { mode[z] = 0; changed = true }
-        else if (mode[z] === 1 && phi[z] > capW[z]) { mode[z] = 2; changed = true }  // Brief 108: needs more than its emitters give
-        else if (mode[z] === -1 && phi[z] > 0) { mode[z] = 0; changed = true }
-        else if (mode[z] === -1 && -phi[z] > capC[z]) { mode[z] = -2; changed = true }  // Brief 119: needs more than its units give
-        else if (mode[z] === -2) {
-          // At its limit, the zone floats; once it would fall below its setpoint it needs less than the limit.
-          if (control(z) < coolC[z] - 1e-9) { mode[z] = -1; changed = true }
-        } else if (mode[z] === 2) {
-          // At its limit, the zone floats; once it would rise above its setpoint it needs less than the limit.
-          if (control(z) > heatC[z] + 1e-9) { mode[z] = 1; changed = true }
-        } else if (mode[z] === 0) {
-          const c = control(z)
-          if (c < heatC[z] - 1e-9) { mode[z] = 1; changed = true }
-          else if (c > coolC[z] + 1e-9) { mode[z] = -1; changed = true }
-        }
-      }
-      if (!changed) break
-      if (passes > 3 * Z + 3) throw new NetworkError(`the heating/cooling set did not settle in hour ${h}`, 'setpoints')
-    }
+    let passes = settle(h)
+    if (PL) passes += plantLimit(h, w, record)
     if (record) { maxPasses = Math.max(maxPasses, passes); if (passes > 1) hoursOverOne++ }
 
     // The full state: x = S0⁻¹·(b + Σ e_j·q_j + Σ eh_j·φ_j).
@@ -854,10 +973,12 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       other_gains_w: col(z, 9), interzone_w: col(z, 10), storage_w: col(z, 11),
     },
     closure_wh: col(z, 12),
+    ...(PL ? { plant_limited: zLimited[z] } : {}),
   }))
   return {
     hours: H, zones: zr, nodes, active_set: { max_passes: maxPasses, hours_over_one: hoursOverOne },
     element_terms: els.map((_, k) => ({ boundary_wh: elB[k], solar_absorbed_wh: elS[k], sky_wh: elK[k] })),
     element_interzone_wh: els.map((_, k) => (two[k] ? elI[k] : null)),
+    plants: plOut,
   }
 }

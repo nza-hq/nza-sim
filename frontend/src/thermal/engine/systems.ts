@@ -25,6 +25,7 @@ import { zoneGains, GainsError, type GainKind } from './gains'
 import { readBuildingCoolingKwh, readBuildingHeatingKwh, type ModelResults } from './results'
 import type { Weather } from './types'
 import { VentilationError, zoneVentilation } from './ventilation'
+import { hotWaterUse, zoneHotWater } from './hotWater'
 
 export const FUELS = ['electricity', 'gas', 'oil', 'biomass', 'district_heating', 'district_cooling'] as const
 export type Fuel = (typeof FUELS)[number]
@@ -39,7 +40,7 @@ export const END_USES = ['heating', 'cooling', 'dhw', 'dhw_circulation', 'fans',
 export type EndUse = (typeof END_USES)[number]
 
 /** Water's heat capacity, kWh per litre per kelvin (today's WATER_SHC_KWH_PER_L_PER_K). */
-export const WATER_KWH_PER_L_K = 4.18 / 3600
+export { WATER_KWH_PER_L_K } from './hotWater'
 /** Today's tolerance on a service's shares totalling 100 % (systemsEngine.js _validateShares). */
 const SHARE_TOLERANCE_PCT = 0.5
 
@@ -120,7 +121,8 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   doc.system_groups.forEach((g, i) => {
     if (!g.enabled) return
     const p = `system_groups[${i}]`
-    if (g.capacity_kw != null) not_modelled.push({ path: `${p}.capacity_kw`, what: 'capacity' })
+    // Brief 120: a heating or cooling system's capacity limits its zones in the run; on other services it is not used.
+    if (g.capacity_kw != null && g.service !== 'heating' && g.service !== 'cooling') not_modelled.push({ path: `${p}.capacity_kw`, what: 'capacity' })
     if (g.control_mechanism != null) not_modelled.push({ path: `${p}.control_mechanism`, what: 'control mechanism' })
     // Not used, so not refused when it names a schedule the building lacks (today's library schedules are not carried
     // over); the panel lists it either way.
@@ -184,60 +186,28 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   const dhwDemand: { zi: number; w: Float64Array; kwh: number }[] = []
   let pumpW = 0
   let dhwNeeded = 0  // the tap-mix over every zone, independent of which zones are served (review F2)
-  const d0 = doc.services.dhw
   // Brief 112: hot water use is the spaces' (each occupancy profile's `dhw`), the heater's temperatures the building's.
-  const useOf = (zi: number) => {
-    const ref = doc.zones[zi].profile_refs.occupancy
-    const pi = ref == null ? -1 : doc.profiles.findIndex((p) => p.id === ref)
-    const p = pi < 0 ? null : doc.profiles[pi]
-    return p && p.kind === 'occupancy' && p.dhw ? { ...p.dhw, path: `profiles[${pi}].dhw` } : null
-  }
-  const anyUse = doc.zones.some((_, zi) => useOf(zi) != null)
+  const anyUse = doc.zones.some((_, zi) => hotWaterUse(doc, zi) != null)
   // Hot water use stated with no system to serve it is named, not dropped (review F1), and a system with no use is named.
   if (dhwGroups.length === 0 && anyUse) miss('services.dhw', 'hot water use is stated on a space but no hot water system serves it')
   if (dhwGroups.length > 0 && !anyUse) miss('services.dhw', 'a hot water system is installed but no space states its hot water use (litres a day per person or per m²)')
   if (dhwGroups.length > 0) {
-    const d = d0
-    const need = (v: number | string | null, k: string) => { if (v == null) miss(`services.dhw.${k}`, 'required: a hot water system is installed'); return v }
-    const store = need(d.storage_setpoint_c, 'storage_setpoint_c') as number | null
-    const tap = need(d.tap_outlet_temp_c, 'tap_outlet_temp_c') as number | null
-    const cold = need(d.cold_supply_temp_c, 'cold_supply_temp_c') as number | null
-    const shape = need(d.load_shape, 'load_shape') as string | null
-    const pump = need(d.circulation_pump_w, 'circulation_pump_w') as number | null
-    if (pump != null && !(pump >= 0)) miss('services.dhw.circulation_pump_w', 'must be ≥ 0')
-    if (shape != null && shape !== 'flat' && shape !== 'follow_occupancy') miss('services.dhw.load_shape', `unknown shape "${shape}" (flat or follow_occupancy)`)
-    if (store != null && cold != null && !(store > cold)) miss('services.dhw.storage_setpoint_c', 'must be above the cold supply temperature')
-    if (store != null && cold != null && tap != null && !(tap >= cold && tap <= store)) miss('services.dhw.tap_outlet_temp_c', 'must be between the cold supply and the store temperatures')
-    if (store != null && cold != null && tap != null && shape != null && store > cold) {
-      const hot = (tap - cold) / (store - cold)
+    const pump = doc.services.dhw.circulation_pump_w
+    if (pump == null) miss('services.dhw.circulation_pump_w', 'required: a hot water system is installed')
+    else if (!(pump >= 0)) miss('services.dhw.circulation_pump_w', 'must be ≥ 0')
+    // Brief 120: one calculation of each zone's hot water (hotWater.ts), shared with the plant that heats it first.
+    const a = zoneHotWater(doc, gains, H)
+    if (!a.ok) for (const m of a.issues) miss(m.path, m.message)
+    else if (a.hw) {
       let total = 0
-      doc.zones.forEach((zone, zi) => {
-        // Every zone with hot water use must be served (review F1): per m², every zone with floor; per person, every
-        // zone with occupants.
-        const use = useOf(zi)
-        if (!use) return
-        let tapLitres: number
-        if (use.basis === 'per_person') {
-          const occ = gains[zi]?.occupancy
-          if (!occ) return  // the gains already named why there is no occupancy
-          tapLitres = occ.people * use.litres_per_day
-        } else tapLitres = use.litres_per_day * zone.area_m2
-        const kwh = tapLitres * hot * (store - cold) * WATER_KWH_PER_L_K * 365  // a year of days, as today
-        if (!(kwh > 0)) return
-        dhwNeeded += kwh
+      a.hw.zones.forEach((z, zi) => {
+        if (!z) return
+        dhwNeeded += z.kwh  // the tap-mix over every zone, independent of which zones are served (review F2)
         if (!sharesOk('dhw', zi, 'hot water')) return
-        const w = new Float64Array(H)
-        if (shape === 'follow_occupancy') {
-          const occ = gains[zi]?.occupancy
-          if (!occ) { miss(`zones[${zi}].profile_refs.occupancy`, `hot water following occupancy needs ${zone.name || zone.id}'s occupancy`); return }
-          const ps = sum(occ.presence)
-          if (!(ps > 0)) { miss('services.dhw.load_shape', `${zone.name || zone.id} is never occupied, so its hot water cannot follow occupancy`); return }
-          for (let h = 0; h < H; h++) w[h] = (kwh * 1000 * occ.presence[h]) / ps
-        } else w.fill((kwh * 1000) / H)
-        dhwDemand.push({ zi, w, kwh })
-        total += kwh
+        dhwDemand.push({ zi, w: z.w, kwh: z.kwh })
+        total += z.kwh
       })
-      dhwInfo = { hot_fraction: hot, demand_kwh: total }
+      dhwInfo = { hot_fraction: a.hw.hot_fraction, demand_kwh: total }
       pumpW = pump ?? 0
     }
   }

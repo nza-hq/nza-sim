@@ -46,7 +46,9 @@ export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'pr
  */
 export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }
 export function runOptionsFor(doc: ModelDocument): RunOptions {
-  return doc.zones.some((z) => z.emitters.length > 0 && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
+  // Brief 120: a zone on a system with a stated capacity is limited too, so it steps in quarter hours the same way.
+  const onPlant = (zid: string) => doc.system_groups.some((g) => g.enabled && (g.service === 'heating' || g.service === 'cooling') && g.capacity_kw != null && g.zones.includes(zid))
+  return doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
 }
 
 /** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */

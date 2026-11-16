@@ -416,7 +416,16 @@ export const SystemGroup = z
     control_mechanism: z.string().nullable().optional(),
     control_schedule_ref: z.string().nullable().optional(),
     control_factor: finite.nullable().optional(),
+    /**
+     * The system's output, kW. Brief 120: on a heating or cooling system, a limit: in any hour the zones it serves draw
+     * at most this from it (its share of each). Null or absent: not limited. Not used on other services.
+     */
     capacity_kw: finite.nullable().optional(),
+    /**
+     * Schema 2.9 (Brief 120): a heating system that also heats the water of this hot water system, first (a system
+     * boiler with a priority valve): each hour its rooms get its capacity less that hot water. Null: no hot water on it.
+     */
+    dhw_priority_group_id: id.nullable().default(null),
     /** A library system template, when the system was chosen from one. */
     template_ref: z.string().nullable().optional(),
     /** Schema 2.4 (Brief 108): a wet heating system's design flow and return, °C, at which its emitters are rated. */
@@ -533,7 +542,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.8' as const
+export const SCHEMA_VERSION = '2.9' as const
 
 export const ModelDocument = z
   .object({
@@ -662,6 +671,15 @@ export const ModelDocument = z
     })
     // Brief 112: efficacy is a lighting system's; a lighting profile states lux or a W/m², not both.
     doc.system_groups.forEach((g, i) => {
+      // Brief 120: hot water with priority is on a heating system with a capacity, and names a hot water system.
+      if (g.dhw_priority_group_id != null) {
+        const at = ['system_groups', i, 'dhw_priority_group_id']
+        const d = doc.system_groups.find((x) => x.id === g.dhw_priority_group_id)
+        if (g.service !== 'heating') ctx.addIssue({ code: 'custom', path: at, message: `a ${g.service} system heats no hot water first; leave empty` })
+        else if (!d) ctx.addIssue({ code: 'custom', path: at, message: `"${g.id}" heats hot water system "${g.dhw_priority_group_id}" first, which does not exist` })
+        else if (d.service !== 'dhw') ctx.addIssue({ code: 'custom', path: at, message: `"${d.id}" is a ${d.service} system, not hot water` })
+        else if (g.capacity_kw == null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'capacity_kw'], message: `"${g.id}" heats hot water first, so it needs its capacity (kW)` })
+      }
       if (g.service !== 'lighting' && g.efficacy_w_m2_per_100lux != null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'efficacy_w_m2_per_100lux'], message: `a ${g.service} system has no luminaire efficacy; leave empty` })
     })
     doc.profiles.forEach((p, i) => {

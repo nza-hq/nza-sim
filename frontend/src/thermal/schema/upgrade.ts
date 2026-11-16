@@ -111,7 +111,7 @@ export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7' && from !== '2.8') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
   if (from === '2.0' || from === '2.1') to22(doc)
   if (from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
@@ -119,9 +119,15 @@ export function upgradeDocument(input: unknown): ModelDocument {
   to25(doc)
   to26(doc)
   if (from !== '2.7') to27(doc)
-  to28(doc)
+  if (from !== '2.8') to28(doc)
+  to29(doc)
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
+}
+
+/** 2.8 → 2.9 (Brief 120): no heating system heats hot water first. Capacities already stated now limit (Linzie's decision 3). */
+function to29(doc: Obj): void {
+  for (const g of doc.system_groups as Obj[]) g.dhw_priority_group_id ??= null
 }
 
 /**
