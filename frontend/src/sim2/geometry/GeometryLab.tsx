@@ -1373,8 +1373,12 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     if (!pending || pending.same) return null
     if (!figs.now) return null
     if (!figs.preview) return figs.why ?? 'Working out the change…'
-    const h = previewItems(figs.now, figs.preview, unit)[0]!
-    return `Heating ${h.value} ${h.unit} (${h.sub})`
+    // A system changes energy used, not demand: on Systems the card says energy used when the run has it.
+    const its = previewItems(figs.now, figs.preview, unit)
+    const e = its.find((x) => x.label === 'Energy used')
+    if (mode === 'systems' && !e && !figs.preview.energy?.ok) return 'Energy used: shown once every service has a system'
+    const h = (mode === 'systems' && e) || its[0]!
+    return `${h.label} ${h.value} ${h.unit} (${h.sub})`
   }
   const applyPending = () => {
     if (!pending || pending.same) return

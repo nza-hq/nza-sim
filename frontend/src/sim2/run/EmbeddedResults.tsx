@@ -78,7 +78,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
         centre,
       )}
       {weatherEl && createPortal(<WeatherPick run={run} />, weatherEl)}
-      {sizingEl && createPortal(!s ? <p className="gl-hint">The emitter check needs a run: choose a weather file on Site.</p> : !s.emitters && !s.design_heat_loss ? <p className="gl-hint">Give the rooms emitters (with their rated output) to see whether they meet each room's need.</p> : <><DesignHeatLoss summary={s} /><EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} /></>, sizingEl)}
+      {sizingEl && createPortal(!s ? <p className="gl-hint">{run.state.kind === 'missing' ? 'The emitter check needs a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The emitter check needs a run: choose a weather file on Site.'}</p> : !s.emitters && !s.design_heat_loss ? <p className="gl-hint">Give the rooms emitters (with their rated output) to see whether they meet each room's need.</p> : <><DesignHeatLoss summary={s} /><EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} /></>, sizingEl)}
     </>
   )
 }

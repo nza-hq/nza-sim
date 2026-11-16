@@ -80,6 +80,17 @@ type State =
  * The run for one document: a worker, rerun about a quarter of a second after each change, plus the weather it runs
  * on. One per editor; the floating panel, the workspace's strip, Heat flow tab and Site weather all read the same one.
  */
+/** Engine refusals the run's own wording does not cover yet, said in the workspace's words (Brief 118 test on Bridgewater:
+ * a hotel space type's lighting follows occupancy, and its people per m² is still unset, so the zone has no occupancy). */
+function plainMissing(items: { path: string; what: string }[], doc: unknown) {
+  return items.map((m) => {
+    const z = m.path.match(/^zones\[(\d+)\]\.profile_refs\.occupancy$/)
+    if (!z) return m
+    const zone = (doc as { zones?: { name?: string }[] } | null)?.zones?.[Number(z[1])]
+    return { ...m, what: `Say how many people use "${zone?.name || `zone ${Number(z[1]) + 1}`}": people per m² or per room on its space type (Spaces). Its lighting or equipment follows them.` }
+  })
+}
+
 export function useRun(doc: unknown, previewDoc: unknown = null) {
   const auth = useAuth()
   const [state, setState] = useState<State>({ kind: 'idle' })
@@ -111,7 +122,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
       (a: RunAnswer) => {
         const r = a.result
         if (r.ok) setState({ kind: 'done', summary: r.summary, ms: a.ms })
-        else if ('missing' in r) setState({ kind: 'missing', items: r.missing })
+        else if ('missing' in r) setState({ kind: 'missing', items: plainMissing(r.missing, latestDoc.current) })
         else setState({ kind: 'error', message: r.error })
       },
       (w: WeatherAnswer) => {
@@ -144,7 +155,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
         (a: RunAnswer) => {
           const r = a.result
           if (r.ok) setPreviewState({ kind: 'done', summary: r.summary, ms: a.ms })
-          else if ('missing' in r) setPreviewState({ kind: 'missing', items: r.missing })
+          else if ('missing' in r) setPreviewState({ kind: 'missing', items: plainMissing(r.missing, latestPreview.current) })
           else setPreviewState({ kind: 'error', message: r.error })
         },
         (w: WeatherAnswer) => { if (w.ok && latestPreview.current) p.run(latestPreview.current, 0, opts()) },
