@@ -400,6 +400,8 @@ export function buildDocument(plan0: Plan): Built {
       return { heat_c: heat, cool_c: cool, setback_c: null, hours_ref: null, control_strategy: heat != null || cool != null ? 'active_setpoint' : null }
     })(),
     ventilation: ventOf(z.id),
+    // A heated room is held at its heating temperature for the design heat loss (said on Systems, Heating).
+    ...(bi.design_outdoor != null && spaceOf.get(z.id)?.heat_c != null ? { design_internal_c: 'follow_heat_c' } : {}),
     infiltration_q50: bi.q50,
     infiltration_ach: null,
     ...(is21 ? { internal_heat_capacity_j_per_k_m2: TODAY.internal_heat_capacity_j_per_k_m2 } : {}),
@@ -410,6 +412,7 @@ export function buildDocument(plan0: Plan): Built {
   // Systems: per service, one group per system the user made, serving every zone it is given to, at 100% of that
   // service (one system per service per zone here). A template with no fuel ("No mechanical cooling") is none.
   const system_groups: Record<string, unknown>[] = []
+  const hasGroup = (service: Service, id: string) => used.some((z) => zoneSys(z.id, service)?.id === id && !!system(zoneSys(z.id, service)?.template)?.fuel)
   for (const service of ['heating', 'cooling', 'dhw'] as const) {
     const bySystem = new Map<string, string[]>()
     for (const z of used) {
@@ -420,7 +423,11 @@ export function buildDocument(plan0: Plan): Built {
     for (const [id, zs] of bySystem) {
       const sys = plan.systems.find((x) => x.id === id)!
       const t = system(sys.template)!
-      system_groups.push({ id: `${service}_${id}`, service, label: sys.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: t.key, ...(is24 && service === 'heating' ? { design_flow_c: sys.design_flow_c ?? null, design_return_c: sys.design_return_c ?? null } : {}) })
+      system_groups.push({ id: `${service}_${id}`, service, label: sys.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: t.key, ...(is24 && service === 'heating' ? { design_flow_c: sys.design_flow_c ?? null, design_return_c: sys.design_return_c ?? null } : {}),
+        // Brief 120: what it can give (kW); a water heater's store; the hot water system a boiler heats first.
+        capacity_kw: sys.capacity_kw ?? null,
+        ...(service === 'dhw' ? { storage_litres: sys.storage_litres ?? null } : {}),
+        ...(service === 'heating' && sys.dhw_first && hasGroup('dhw', sys.dhw_first) ? { dhw_priority_group_id: `dhw_${sys.dhw_first}` } : {}) })
     }
   }
   // Brief 112: lighting systems are luminaires, stated by their efficacy; they run on electricity and have no library
@@ -470,6 +477,8 @@ export function buildDocument(plan0: Plan): Built {
       thermal_bridging: bi.tb_multiplier != null ? { mode: 'iso14683_auto', multiplier: bi.tb_multiplier, alpha_pct: null } : { mode: null, multiplier: null, alpha_pct: null },
       thermal_mass: { mode: null, category: null },
       opening_defaults: {},
+      // Brief 117/120: the design heat loss's conditions, only once an outdoor temperature is chosen.
+      ...(bi.design_outdoor != null ? { design: { outdoor: typeof bi.design_outdoor === 'number' ? { stated_c: bi.design_outdoor } : { from_weather: bi.design_outdoor }, warm_up_w_per_m2: bi.warm_up_w_per_m2 ?? null, vent_wind_m_s: bi.vent_wind_m_s ?? null } } : {}),
     },
     zones,
     surfaces,

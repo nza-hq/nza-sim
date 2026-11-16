@@ -299,6 +299,32 @@ describe('lighting from lux and the luminaires (Brief 112)', () => {
   })
 })
 
+describe('system capacity and design conditions (Brief 120 P6)', () => {
+  it('writes each system\'s kW, the water heater\'s store, the hot water a boiler heats first, and the design conditions', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    p = {
+      ...p,
+      spaces: [{ id: 's1', name: 'Office', use: 'office', occupancy: null, lighting: null, equipment: null, heat_c: 21 } as any],
+      systems: [{ id: 'y1', service: 'heating', name: 'Boiler', template: 'gas_boiler_heating', capacity_kw: 12, dhw_first: 'y2' }, { id: 'y2', service: 'dhw', name: 'Cylinder', template: 'gas_boiler_dhw', capacity_kw: null, storage_litres: null }],
+      rooms: p.rooms.map((r) => ({ ...r, space: 's1', systems: { heating: 'y1', dhw: 'y2' } })),
+      building: { q50: 5, tb_multiplier: 1, exposure: 'normal', design_outdoor: -3, warm_up_w_per_m2: null, vent_wind_m_s: null },
+    }
+    const doc = buildDocument(p).doc as any
+    const g = (s0: string) => doc.system_groups.find((x: any) => x.service === s0)
+    expect(g('heating')).toMatchObject({ capacity_kw: 12, dhw_priority_group_id: 'dhw_y2' })
+    expect(g('dhw')).toMatchObject({ capacity_kw: null, storage_litres: null })
+    expect(doc.building.design).toEqual({ outdoor: { stated_c: -3 }, warm_up_w_per_m2: null, vent_wind_m_s: null })
+    expect(doc.zones[0].design_internal_c).toBe('follow_heat_c')
+    const w = buildDocument({ ...p, systems: [{ ...p.systems[0]!, dhw_first: null }, { ...p.systems[1]!, capacity_kw: 3, storage_litres: 150 }], building: { ...p.building!, design_outdoor: 'heating_99_6' } })
+    expect(w.issues).toEqual([])
+    expect((w.doc as any).system_groups.find((x: any) => x.service === 'dhw')).toMatchObject({ capacity_kw: 3, storage_litres: 150 })
+    expect((w.doc as any).system_groups.find((x: any) => x.service === 'heating').dhw_priority_group_id ?? null).toBeNull()
+    expect((w.doc as any).building.design.outdoor).toEqual({ from_weather: 'heating_99_6' })
+    expect((buildDocument({ ...p, building: { ...p.building!, design_outdoor: null } }).doc as any).building.design ?? null).toBeNull()
+  })
+})
+
 describe('emitters in rooms (schema 2.4)', () => {
   it('sums each type over a zone, feeds wet ones from the heating system, and writes design temperatures', () => {
     const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
