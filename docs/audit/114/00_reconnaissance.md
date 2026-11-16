@@ -1,6 +1,6 @@
 # Brief 114 P0: reconnaissance and decisions
 
-16 Nov 2026, branch `chris/114-controls` from `chris/120-plant-capacity` (6928471; 112 merged in). Brief: [`docs/briefs/active/114_controls-and-back-of-house.md`](../../briefs/active/114_controls-and-back-of-house.md). Linzie, 16 Nov 00:57: a place for back-of-house auxiliary energy with defaults (pumps, inverter or not; fans, continuous or not), and "almost a little BMS section": one place to see how the whole building is controlled.
+16 Nov 2026, branch `chris/114-controls` from `chris/120-plant-capacity` (6928471; 112 merged in). Brief: [`docs/briefs/archive/114_controls-and-back-of-house_COMPLETED.md`](../../briefs/archive/114_controls-and-back-of-house_COMPLETED.md). Linzie, 16 Nov 00:57: a place for back-of-house auxiliary energy with defaults (pumps, inverter or not; fans, continuous or not), and "almost a little BMS section": one place to see how the whole building is controlled.
 
 **Scope (CLAUDE.md process rule 10).** Systems module: pump and fan energy, and the building's other electrical loads, are "energy delivered by installed equipment" and "control mechanism" per system (Systems scope). The control map records controllers; it changes no physics in Building or Operation. Simulate v2 only; today's engine is not touched.
 

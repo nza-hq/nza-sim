@@ -217,6 +217,15 @@ which of these scope items they affect.
   Hot water heated first takes the boiler's capacity before the rooms.
   A dedicated water heater states its kW and store litres (Linzie
   19:19). Simulate v2 only.
+- Back-of-house energy and the control map (Brief 114, Linzie 16 Nov
+  00:57): pumps per heating / cooling / hot water system (W, W per kW
+  or W per m²; fixed or inverter on EnergyPlus's ideal curve, labelled
+  as such; continuous in the system's season (Linzie 23:11), with
+  demand, or scheduled), fans continuous / scheduled / on demand
+  inside their hours, lifts and external lighting as other loads, and
+  `controls[]` recording who controls each thing (recorded, changes no
+  number). Defaults from NCM Modelling Guide 2021 Table 14, labelled.
+  Simulate v2 only.
 - Comfort-vs-setpoint diagnostic: demand at envelope comfort vs
   delivered at service setpoint, per service, with the delta exposed
 - DHW tap-mix model: the boiler heats only the hot fraction of tap
