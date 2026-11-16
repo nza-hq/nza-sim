@@ -299,6 +299,22 @@ describe('lighting from lux and the luminaires (Brief 112)', () => {
   })
 })
 
+describe("the project's own profiles (Brief 118 P5)", () => {
+  it('reads an own profile before the library, and does not pin it as a library item', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    const wk = Array.from({ length: 24 }, (_, h) => (h >= 9 && h < 17 ? 0.9 : 0))
+    const own = { key: 'own_1', name: 'Office (this project)', schedule_type: 'occupancy' as const, from: 'office_occupancy', day_types: { weekday: wk, saturday: Array(24).fill(0), sunday: Array(24).fill(0) }, monthly_multipliers: null }
+    p = { ...p, own_profiles: [own], profiles: ['own_1'], spaces: [{ id: 's1', name: 'Office', use: 'office', occupancy: 'own_1', lighting: null, equipment: null, people_per_m2: 0.1 } as any], rooms: p.rooms.map((r) => ({ ...r, space: 's1' })) }
+    const b = buildDocument(p)
+    expect(b.issues).toEqual([])
+    const occ = (b.doc as any).profiles.find((x: any) => x.kind === 'occupancy')
+    expect(occ.schedule.weekday).toEqual(wk)
+    expect(occ.label).toBe('Office (this project) (Office)')
+    expect((b.doc as any).library_refs.some((r: any) => r.key === 'own_1')).toBe(false)
+  })
+})
+
 describe('emitters in rooms (schema 2.4)', () => {
   it('sums each type over a zone, feeds wet ones from the heating system, and writes design temperatures', () => {
     const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]

@@ -39,10 +39,10 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OwnProfile, type Plan, type PlanSystem, SERVICES, profileOf, profilesOfKind, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
-import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, systemsFor } from '../library/library'
+import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
 import { CONSTRUCTION_SETS, SET_ELEMENTS } from '../library/sets'
 import { applySet, setById } from './applySet'
@@ -66,6 +66,9 @@ import type { Summary } from '../run/seam'
 import { useUISettings } from '../../context/UISettingsContext.jsx'
 // @ts-expect-error untyped JS from today's app (Brief 110b P2: today's inspectors, reused)
 import ConstructionInspector from '../../components/library/ConstructionInspector.jsx'
+// Today's schedule editor (Brief 37), imported as it is: the Profiles step's full centre (Brief 118 P5, Linzie 19:19).
+const UnifiedScheduleEditor = lazy(() => import('../../components/shared/scheduleEditor/UnifiedScheduleEditor.jsx'))
+import { GAIN_COLOURS } from '../../components/modules/gains/gainColours.js'
 // @ts-expect-error untyped JS from today's app
 import GlazingInspector from '../../components/library/GlazingInspector.jsx'
 import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
@@ -218,6 +221,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>(emptyPlan)
+  // The project's own profiles first, then the library's (Brief 118 P5).
+  const profile = (key: string | null | undefined) => profileOf(plan, key)
+  const profilesFor = (t: OwnProfile['schedule_type']) => profilesOfKind(plan, t)
   const [past, setPast] = useState<Plan[]>([])
   const [future, setFuture] = useState<Plan[]>([])
   /** While a preview is worked out, a give writes here instead of to the plan (preview, then apply). */
@@ -1291,7 +1297,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     if (mode === 'profiles') {
       return [{
         items: projectProfiles().filter((key) => profile(key)!.schedule_type === profKind).map((key) => ({
-          id: key, name: short(profile(key)!.name), swatch: { colour: '#EA580C' },
+          id: key, name: short(profile(key)!.name), swatch: { colour: '#EA580C' }, ...(profile(key)!.own ? { onRename: (name: string) => renameProfile(key, name) } : {}),
           rooms: roomsWhere((r) => { const sp = plan.spaces.find((x) => x.id === r.space); const v = plan.systems.find((x) => x.id === r.systems?.ventilation); return (!!sp && spaceUses(sp).includes(key)) || v?.schedule === key }),
           // On Profiles the drawing colours the rooms that use the profile chosen; nothing is chosen for applying.
           choose: () => undefined,
@@ -1585,6 +1591,30 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const o = (x: { key: string; name: string }) => <option key={x.key} value={x.key}>{short(x.name)}</option>
     return !a.length || !b.length ? items.map(o) : <><optgroup label="This project's profiles">{a.map(o)}</optgroup><optgroup label="More in the library">{b.map(o)}</optgroup></>
   }
+  /** Brief 118 P5: an edit to a profile. The project's own is changed; a library one is never changed: the edit makes
+   * the project's own copy, and this project's space types and ventilation systems move to it. */
+  const editProfile = (key: string, next: { weekday: number[]; saturday: number[]; sunday: number[]; monthly_multipliers?: number[] }) => {
+    const p0 = profile(key)
+    if (!p0) return
+    const day_types = { weekday: next.weekday, saturday: next.saturday, sunday: next.sunday }
+    const mm = next.monthly_multipliers ?? p0.monthly_multipliers ?? null
+    const owns = plan.own_profiles ?? []
+    if (p0.own) return commit({ ...plan, own_profiles: owns.map((x) => (x.key === key ? { ...x, day_types, monthly_multipliers: mm } : x)) })
+    let n = owns.length + 1
+    while (owns.some((x) => x.key === `own_${n}`)) n++
+    const k2 = `own_${n}`
+    const sw = (v: string | null) => (v === key ? k2 : v)
+    commit({
+      ...plan,
+      own_profiles: [...owns, { key: k2, name: `${p0.name} (this project)`, schedule_type: p0.schedule_type as OwnProfile['schedule_type'], from: key, day_types, monthly_multipliers: mm }],
+      profiles: [...(plan.profiles ?? []).filter((x) => x !== key), k2],
+      spaces: plan.spaces.map((sp) => ({ ...sp, occupancy: sw(sp.occupancy), lighting: sw(sp.lighting), equipment: sw(sp.equipment) })),
+      systems: plan.systems.map((y) => (y.schedule === key ? { ...y, schedule: k2 } : y)),
+    })
+    setProfSel(k2)
+  }
+  const renameProfile = (key: string, name: string) => commit({ ...plan, own_profiles: (plan.own_profiles ?? []).map((x) => (x.key === key ? { ...x, name } : x)) })
+
   const profilesPanel = () => {
     const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
     const mine = projectProfiles().filter((k) => profile(k)!.schedule_type === kind.key)
@@ -1592,7 +1622,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const sel = profSel && mine.includes(profSel) ? profile(profSel)! : null
     const items: Item[] = mine.map((k) => {
       const p = profile(k)!, u = usersOf(k)
-      return { id: k, name: short(p.name), swatch: { colour: '#EA580C' }, line: 'From the library', used: u.length ? count(u.length, 'user') : 'not used', removable: !u.length }
+      return { id: k, name: short(p.name), swatch: { colour: '#EA580C' }, line: p.own ? (profile((plan.own_profiles ?? []).find((x) => x.key === k)?.from)?.name ? `This project's, from ${short(profile((plan.own_profiles ?? []).find((x) => x.key === k)!.from)!.name)}` : "This project's") : 'From the library', used: u.length ? count(u.length, 'user') : 'not used', removable: !u.length }
     })
     return (
       <GivePanel
@@ -1600,7 +1630,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         title={`${kind.name} profiles`} icon="profile"
         items={items} active={sel?.key ?? null}
         onActive={setProfSel}
-        onRemove={(id) => { commit({ ...plan, profiles: (plan.profiles ?? []).filter((k) => k !== id) }); if (profSel === id) setProfSel(null) }}
+        onRemove={(id) => { commit({ ...plan, profiles: (plan.profiles ?? []).filter((k) => k !== id), own_profiles: (plan.own_profiles ?? []).filter((x) => x.key !== id) }); if (profSel === id) setProfSel(null) }}
         top={
           <div className="gl-row gl-librow"><span>Add from the library</span>
             <select className="gl-sel" aria-label={`Add a ${kind.name.toLowerCase()} profile`} value="" onChange={(e) => { const k = e.target.value; if (k) { commit({ ...plan, profiles: [...(plan.profiles ?? []), k] }); setProfSel(k) } }}>
@@ -1611,10 +1641,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         }
         detail={sel ? (
           <>
-            <h3 className="ap-pname">{sel.name}</h3>
+            {sel.own
+              ? <input className="gl-title-in ap-tname" aria-label="Profile name" defaultValue={sel.name} key={`${sel.key}-${sel.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== sel.name && renameProfile(sel.key, e.target.value.trim())} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+              : <h3 className="ap-pname">{sel.name}</h3>}
             <Spark label={kind.spark} days={sel.day_types ?? null} />
             <p className="gl-hint">{usersOf(sel.key).length ? `Used by ${usersOf(sel.key).join(', ')}.` : `Not used yet: ${kind.where}.`}</p>
-            <p className="gl-hint">From today's NZA Sim library, as it is there. To change its hours, use today's <a href="/gains">Profiles page</a>; making a project's own profile here comes next.</p>
+            <p className="gl-hint">{sel.own
+              ? "This project's own profile. Edit its hours in the editor in the middle; every space type and system using it follows."
+              : "From NZA Sim's library. Editing it in the middle makes this project's own copy, and this project's space types and systems move to it; the library stays as it is."}</p>
           </>
         ) : (
           <p className="gl-hint ap-pnone">{mine.length ? 'Choose one to see its day and what uses it.' : `None in this project yet. Add one from the library; ${kind.where}.`}</p>
@@ -1942,6 +1976,23 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
+      {mode === 'profiles' && centreTab !== 'heat-flow' && (() => {
+        // Brief 118 P5: Profiles gets the full centre, with today's schedule editor (no drawing).
+        const sel = profSel ? profile(profSel) : null
+        const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
+        const accent = (GAIN_COLOURS as Record<string, string>)[profKind] ?? '#EA580C'
+        return (
+          <div className="gl-profedit">
+            {sel?.day_types ? (
+              <Suspense fallback={<p className="gl-hint">Opening the editor…</p>}>
+                <UnifiedScheduleEditor key={sel.key} schedule={{ ...sel.day_types, monthly_multipliers: sel.monthly_multipliers ?? Array(12).fill(1) }} onChange={(next: { weekday: number[]; saturday: number[]; sunday: number[]; monthly_multipliers?: number[] }) => editProfile(sel.key, next)} accent={accent} mode="live" enableExceptions={false} contextLabel={`${sel.name}${sel.own ? '' : ' · from the library: an edit makes this project\'s copy'}`} />
+              </Suspense>
+            ) : (
+              <div className="gl-profnone"><h3>{kind.name} profiles</h3><p>Choose a profile on the left to edit its hours here, or add one from the library on the right.</p></div>
+            )}
+          </div>
+        )
+      })()}
       {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
