@@ -10,7 +10,7 @@
 import { infiltration, ventCoefficient, ventConductance, type Vent } from './air'
 import { computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K } from './constants'
-import { innerElement, opaqueElement, windowElement, type ConstructionBody, type Element } from './elements'
+import { ElementError, innerElement, layerFaceNode, opaqueElement, windowElement, type ConstructionBody, type Element } from './elements'
 import { runNetwork } from './network'
 import type { BreakdownLine, ModelResults, ZoneResults } from './results'
 import { shadingFactor } from './shading'
@@ -332,8 +332,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const sp = options.surface_physics ?? null
   const Zn = doc.zones.length
   // Sub-hourly steps and TARP convection run on the network solver (one zone is a network of one: multizone.test (c)).
+  // Underfloor heating in a floor (Brief 109) is Engine 2's: its heat enters a node inside the element.
   const network = Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
-    || options.surface_physics?.inside_convection === 'tarp'
+    || options.surface_physics?.inside_convection === 'tarp' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
 
   // The window junction over several zones: 4√A per facade (all its glazing, every zone), shared out by area. On one
   // zone with one glazing surface per facade this is Engine 1's 4√A per surface; cutting a facade into storeys does
@@ -410,6 +411,29 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const capOf = (zi: number) => (limited(zi) && !byRoom ? emit[zi]!.cap_w : null)
   const capAtOf = (zi: number) => (limited(zi) && byRoom ? emit[zi]!.at : null)
   const hcfHeatOf = (zi: number) => (emit[zi] ? 1 - emit[zi]!.radiant_fraction : null)
+  // Brief 109: where underfloor heating's heat enters its floor: the element, and the node at its layer's inside face.
+  const sourceOf = (zi: number) => {
+    const sl = emit[zi]?.slab
+    if (!sl) return null
+    const zone = doc.zones[zi], ej = zone.emitters.findIndex((e) => e.kind === 'underfloor')
+    const p = `zones[${zi}].emitters[${ej}].source_layer_index`
+    const k = elements.findIndex((e) => e.id === sl.surface_id)
+    const s = doc.surfaces.find((x) => x.id === sl.surface_id)!
+    const el = elements[k]
+    if (el.kind !== 'opaque') throw new ModelError(`surface "${s.id}" is not an opaque floor`, `zones[${zi}].emitters[${ej}].source_surface_id`)
+    let node: number
+    try { node = layerFaceNode(library[s.construction_ref.key].layers ?? [], el.boundary, sl.layer_index, p) } catch (e) {
+      if (e instanceof ElementError) throw new ModelError(e.message.slice(e.path.length + 2), p)
+      throw e
+    }
+    if (el.boundary === 'zone') {
+      // A floor between two zones: its layers run from zone_b's face to zone_a's, and each half's heat is its zone's.
+      const mid = Math.floor((el.c.length - 2) / 2)
+      const mine = s.zone_a === zone.id ? node > mid : node <= mid
+      if (!mine) throw new ModelError(`layer ${sl.layer_index} is in the half of "${s.id}" nearer the other zone; underfloor heating's pipes must be in this zone's half`, p)
+    }
+    return { element: k, node, share: sl.share }
+  }
   const gainsIn = (zi: number) => {
     const g = gains[zi]
     return g ? { w: g.total_w, convective_fraction: g.convective_fraction } : null
@@ -457,6 +481,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         other_gains: options.other_gains ?? gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c }, setpoint_hours: hoursOf[zi]?.hourly ?? null,
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
         heating_cap_w: capOf(zi), heating_cap_at: capAtOf(zi), heating_convective_fraction: hcfHeatOf(zi),
+        heating_source: sourceOf(zi),
       })),
       elements: elements.map((element, k) => ({
         element, zone_a: zoneA[k], zone_b: zoneB[k], solar_absorbed_w_per_m2: absorbed[k],
@@ -576,7 +601,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         in_use_hours: sh ? sh.in_use_hours : H,
         unmet_heating_hours_in_use: heated ? unmetUse : null, min_control_in_use_c: Number.isFinite(minUse) ? minUse : null,
       },
-      emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters } : null,
+      emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters, slab: em.slab } : null,
       breakdown: lines,
       closure,
       run_ms,

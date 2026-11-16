@@ -72,7 +72,11 @@ export interface ZoneResults {
     min_control_in_use_c: number | null
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
-  emitters: { cap_w: number; radiant_fraction: number; hours_at_cap: number; emitters: { id: string; kind: string; output_w: number; rated_w: number; exponent_n: number | null }[] } | null
+  emitters: {
+    cap_w: number; radiant_fraction: number; hours_at_cap: number; emitters: { id: string; kind: string; output_w: number; rated_w: number; exponent_n: number | null }[]
+    /** Brief 109: underfloor heating's floor and layer, and its share of the zone's heating; null when none is in a floor. */
+    slab: { surface_id: string; layer_index: number; share: number } | null
+  } | null
   /** Every term of the balance, per element where it has one (Rule 9). The lines sum to the closure residual. */
   breakdown: BreakdownLine[]
   closure: { max_wh: number; sum_kwh: number }

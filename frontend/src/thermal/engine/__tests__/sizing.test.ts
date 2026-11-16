@@ -103,7 +103,7 @@ describe('no one number, said why', () => {
     expect(s.needed_rated_w!).toBeCloseTo((5000 - 800) / factor(50, 40, a.doc.zones[0].setpoints.heat_c!), 9)
   })
   it('two exponents', () => {
-    const s = sizeOf((d) => d.zones[0].emitters.push({ ...d.zones[0].emitters[0], id: 'ufh', kind: 'underfloor', exponent_n: 1.1 }))
+    const s = sizeOf((d) => d.zones[0].emitters.push({ ...d.zones[0].emitters[0], id: 'e2', kind: 'other', exponent_n: 1.1 }))
     expect(s.needed_rated_w).toBeNull(); expect(s.note).toMatch(/different exponents/)
   })
   it('two heating systems', () => {
