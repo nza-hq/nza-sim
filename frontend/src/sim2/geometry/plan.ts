@@ -13,6 +13,7 @@
  * model document is written, each zone's stretch of the run takes the windows whose middles fall on it.
  */
 import { area, ccw, type XY } from './ported/zones'
+import { type Profile, profile as libProfile, profilesFor as libProfilesFor } from '../library/library'
 
 export type { XY }
 
@@ -256,6 +257,27 @@ export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c
 export const noDhw = (): DhwInputs => ({ storage_c: null, tap_c: null, cold_c: null, basis: null, litres: null, pump_w: null, shape: 'flat' })
 export const noBuildingInputs = (): BuildingInputs => ({ q50: null, tb_multiplier: null, exposure: null })
 
+/** Brief 118 P5: a project's own profile, made by editing one (Profiles step, today's schedule editor). A library
+ * profile is never changed: editing one makes this copy, and the project's space types and systems move to it.
+ * Same shape as a library profile's (hourly fractions by day type, monthly multipliers). */
+export type OwnProfile = {
+  key: string
+  name: string
+  schedule_type: 'occupancy' | 'lighting' | 'equipment' | 'ventilation'
+  /** The library profile it was copied from, or null. */
+  from: string | null
+  day_types: { weekday: number[]; saturday: number[]; sunday: number[] }
+  monthly_multipliers: number[] | null
+}
+/** A profile by key: the project's own first, then the library's. Own profiles carry no body hash (not library items). */
+export function profileOf(plan: Pick<Plan, 'own_profiles'>, key: string | null | undefined): (Omit<Profile, 'body_hash'> & { body_hash?: string; own?: true }) | undefined {
+  if (!key) return undefined
+  const o = plan.own_profiles?.find((x) => x.key === key)
+  return o ? { key: o.key, name: o.name, schedule_type: o.schedule_type, building_type: null, zone_type: null, day_types: o.day_types, monthly_multipliers: o.monthly_multipliers, own: true } : libProfile(key)
+}
+/** A kind's profiles: the project's own, then the library's. */
+export const profilesOfKind = (plan: Pick<Plan, 'own_profiles'>, t: OwnProfile['schedule_type']) => [...(plan.own_profiles ?? []).filter((x) => x.schedule_type === t).map((x) => profileOf(plan, x.key)!), ...libProfilesFor(t)]
+
 export type Plan = {
   /** Separate outlines, each anticlockwise. Blocks never touch or overlap (touching ones are joined). */
   blocks: XY[][]
@@ -279,6 +301,8 @@ export type Plan = {
   other_loads?: OtherLoadInput[]
   /** Brief 114: the Controls step's record of who controls each system (recorded, not yet used in the calculation). */
   controls?: PlanControl[]
+  /** The project's own profiles (edited copies; see OwnProfile). */
+  own_profiles?: OwnProfile[]
   /** Whole-building fabric inputs, typed (null: not stated). */
   building?: BuildingInputs
   /** Emitter types (Systems step), given to rooms with a count. */

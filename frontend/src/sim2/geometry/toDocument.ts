@@ -24,9 +24,9 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, profileOf, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
-import { construction, efficiencyFor, profile, system } from '../library/library'
+import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
 import type { XY } from './ported/zones'
 
@@ -48,6 +48,8 @@ export type Built = {
 export function buildDocument(plan0: Plan): Built {
   // A plan held from before Brief 112 (one building-wide hot water use) is read as its space types' own.
   const plan = hotWaterOnSpaces(plan0)
+  // The project's own profiles first, then the library's (Brief 118 P5).
+  const profile = (key: string | null | undefined) => profileOf(plan, key)
   const notes: string[] = []
   const h = plan.storey_height_m
   const { shares: roomShares, open } = edgesOf(plan.blocks, plan.rooms)
@@ -483,7 +485,7 @@ export function buildDocument(plan0: Plan): Built {
   // Every library item the document uses, pinned by its body hash (from the snapshot), so a run says what it read.
   function libraryRefs() {
     const refs = new Map<string, { kind: string; key: string; version: null; body_hash: string }>()
-    const pin = (kind: string, item: { key: string; body_hash: string } | undefined) => item && refs.set(`${kind}:${item.key}`, { kind, key: item.key, version: null, body_hash: item.body_hash })
+    const pin = (kind: string, item: { key: string; body_hash?: string } | undefined) => item?.body_hash && refs.set(`${kind}:${item.key}`, { kind, key: item.key, version: null, body_hash: item.body_hash! })
     for (const sf of surfaces) pin('construction', construction((sf.construction_ref as { key: string }).key))
     for (const g of system_groups) pin('system_template', system(g.template_ref as string))
     for (const z of used) {
