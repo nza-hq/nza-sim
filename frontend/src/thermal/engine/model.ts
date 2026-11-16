@@ -12,7 +12,7 @@ import { computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K } from './constants'
 import { ElementError, innerElement, layerFaceNode, opaqueElement, windowElement, type ConstructionBody, type Element } from './elements'
 import { runNetwork } from './network'
-import type { BreakdownLine, ModelResults, ZoneResults } from './results'
+import type { BreakdownLine, ModelResults, PlantResults, ZoneResults } from './results'
 import { shadingFactor } from './shading'
 import { solarOnSurface, type SolarOptions } from './solar'
 import { simpleGlazingAngular, simpleGlazingOptics } from './glazing'
@@ -22,6 +22,8 @@ import type { ModelDocument } from '../schema/model'
 import { calendar, GainsError, zoneGains, type ZoneGains } from './gains'
 import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
 import { EmitterError, zoneCooling, zoneEmitters, type ZoneCooling, type ZoneEmitters } from './emitters'
+import { zoneHotWater } from './hotWater'
+import type { NetworkPlant } from './network'
 
 export class ModelError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'ModelError' }
@@ -331,9 +333,15 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const { elements, zoneA, zoneB, insideAlpha, insideAlphaB, absorbed } = built
   const sp = options.surface_physics ?? null
   const Zn = doc.zones.length
+  // Brief 120: each enabled heating or cooling system with a stated capacity limits its zones (decision 3: only where
+  // stated). 'none' lifts it with the emitters' limits. A stated capacity of 0 or less is refused by name.
+  const plantGroups = options.emitter_limit === 'none' ? [] : doc.system_groups.map((g, i) => ({ g, i }))
+    .filter(({ g }) => g.enabled && (g.service === 'heating' || g.service === 'cooling') && g.capacity_kw != null)
+  for (const { g, i } of plantGroups) if (!(g.capacity_kw! > 0)) throw new ModelError('must be above 0 (kW), or left empty for no limit', `system_groups[${i}].capacity_kw`)
   // Sub-hourly steps and TARP convection run on the network solver (one zone is a network of one: multizone.test (c)).
-  // Underfloor heating in a floor (Brief 109) is Engine 2's: its heat enters a node inside the element.
-  const network = Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
+  // Underfloor heating in a floor (Brief 109) is Engine 2's: its heat enters a node inside the element. So are
+  // system capacities (Brief 120): their limits are shared among zones within the step.
+  const network = plantGroups.length > 0 || Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
     || options.surface_physics?.inside_convection === 'tarp' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
 
   // The window junction over several zones: 4√A per facade (all its glazing, every zone), shared out by area. On one
@@ -392,6 +400,39 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   } else if (options.internal_gains != null && options.internal_gains !== 'none') {
     throw new ModelError(`unknown value ${JSON.stringify(options.internal_gains)} ('none' or 'profiles')`, 'options.internal_gains')
   }
+  // Brief 120: the plants, with the hot water a heating system heats first (hotWater.ts, the one calculation).
+  const zIdx = new Map(doc.zones.map((z, i) => [z.id, i]))
+  const plants: (NetworkPlant & { id: string; hw_group: string | null; hw_frac: Float64Array | null })[] = plantGroups.map(({ g, i }) => {
+    let reserved: Float64Array | null = null
+    if (g.dhw_priority_group_id != null) {
+      const d = doc.system_groups.find((x) => x.id === g.dhw_priority_group_id)!
+      reserved = new Float64Array(H)
+      if (d.enabled) {
+        const a = zoneHotWater(doc, gains, H)
+        if (!a.ok) throw new ModelError(`${a.issues[0].message} (hot water heated first by "${g.id}")`, a.issues[0].path)
+        if (a.hw) for (const zid of d.zones) {
+          const z = a.hw.zones[zIdx.get(zid)!]
+          if (z) for (let h = 0; h < H; h++) reserved[h] += (d.share_pct / 100) * z.w[h]
+        }
+      }
+      void i
+    }
+    // Review F6: hot water heated first takes at most the plant's capacity; above it, the taps get that hour's share
+    // `hw_frac` (Systems serves only that, and the rest is shown short). The rooms then get nothing that hour.
+    let hwFrac: Float64Array | null = null
+    if (reserved) {
+      const cap = g.capacity_kw! * 1000
+      for (let h = 0; h < H; h++) if (reserved[h] > cap) { hwFrac ??= new Float64Array(H).fill(1); hwFrac[h] = cap / reserved[h]; reserved[h] = cap }
+    }
+    return { id: g.id, service: g.service as 'heating' | 'cooling', cap_w: g.capacity_kw! * 1000, zones: g.zones.map((z) => ({ zone: zIdx.get(z)!, share: g.share_pct / 100 })), reserved_w: reserved, flow: null, hw_group: g.dhw_priority_group_id ?? null, hw_frac: hwFrac }
+  })
+  // Review F1 (Linzie, 16 Nov 19:48): each zone's share of heating (cooling) on enabled systems with no capacity; they
+  // top up a short plant's deficit in the zone.
+  const freeShare = { heating: new Float64Array(doc.zones.length), cooling: new Float64Array(doc.zones.length) }
+  for (const g of doc.system_groups) {
+    if (!g.enabled || (g.service !== 'heating' && g.service !== 'cooling') || plants.some((p) => p.id === g.id)) continue
+    for (const zid of g.zones) { const zi = zIdx.get(zid); if (zi != null) freeShare[g.service][zi] += g.share_pct / 100 }
+  }
   // Brief 109: each zone's heating hours and setback, resolved into its hourly setpoints (null: one setpoint all year).
   const hoursOf = zoneSetpointHours(doc, weather.hours)
   // Emitters per zone (Brief 108): a zone that states them is limited to their output, and their radiant share sets
@@ -403,6 +444,17 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     if (e instanceof EmitterError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
     throw e
   }
+  // Brief 120 P2b: a heating plant whose every zone has wet emitters on it shares a shortfall through one lower flow
+  // temperature (the emitters' own output at it), as a wet system does; otherwise in proportion to ask.
+  plantGroups.forEach(({ g }, k) => {
+    if (g.service !== 'heating' || g.design_flow_c == null) return
+    const out = plants[k].zones.map(({ zone }) => {
+      const em = emit[zone]
+      if (!em || em.at_flow(0, g.design_flow_c!, g.id) == null) return null  // null: no wet emitter of this system in the zone
+      return (room_c: number, flow_c: number) => em.at_flow(room_c, flow_c, g.id)!
+    })
+    if (out.every((f) => f != null)) plants[k].flow = { design_c: g.design_flow_c, out: out as ((r: number, f: number) => number)[] }
+  })
   // Review F8: a mode parameter that is not one of its values is refused, never read as the default (CLAUDE.md lesson 11).
   if (options.emitter_limit != null && options.emitter_limit !== 'cap' && options.emitter_limit !== 'none') throw new ModelError(`unknown emitter_limit "${String(options.emitter_limit)}"`, 'options.emitter_limit')
   if (options.emitter_rating != null && options.emitter_rating !== 'room' && options.emitter_rating !== 'setpoint') throw new ModelError(`unknown emitter_rating "${String(options.emitter_rating)}"`, 'options.emitter_rating')
@@ -443,6 +495,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const kwhOf = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
   let solved: Solved[]
   let solver: ModelResults['solver']
+  let plantRun: ReturnType<typeof runNetwork>['plants'] = []
+  let plantLimited: (Float64Array | null)[] = doc.zones.map(() => null)
+  let ownLimited: (Float64Array | null)[] = doc.zones.map(() => null)
   if (!network) {
     const zone = doc.zones[0], Z = built.zones[0], a = air[0]
     const run = runZone({
@@ -493,7 +548,11 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       warmup_days: options.warmup_days,
       steps_per_hour: options.time_step?.steps_per_hour, theta_e_between: options.time_step?.theta_e_between,
       inside_convection: sp?.inside_convection === 'tarp' ? 'tarp' : 'fixed',
+      plants, plant_free_share: plants.length ? freeShare : null,
     })
+    plantRun = run.plants
+    plantLimited = run.zones.map((z) => z.plant_limited ?? null)
+    ownLimited = run.zones.map((z) => z.own_limited ?? null)
     solved = run.zones.map((z, zi) => ({
       heating_cap_w: z.heating_cap_w,
       heating_w: z.heating_w, cooling_w: z.cooling_w, theta_air: z.theta_air, theta_op: z.theta_op, theta_mrt: z.theta_mrt,
@@ -575,12 +634,20 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const cooled = zone.setpoints.cool_c != null
     const cu = cool[zi], capCool = cu && options.emitter_limit !== 'none' ? cu.cap_w : Infinity
     let unmetC = 0, unmetCUse = 0, maxCtl = -Infinity, maxUse = -Infinity, atCoolCap = 0
+    // Brief 120: unmet hours in use while a plant held the zone below its ask.
+    const pl = plantLimited[zi], ol = ownLimited[zi]
+    const onPlant = (svc: 'heating' | 'cooling') => plants.some((p) => p.service === svc && p.zones.some((x) => x.zone === zi && x.share > 0))
+    // Review F3: a short hour is the system's alone when the plant held the zone and its own emitters (units) were not at
+    // their limit in what it asked; both when they were too; the rest are the zone's own (or warm-up).
+    let sysH = 0, sysC = 0, bothH = 0, bothC = 0
+    const held = (h: number, w: number) => pl != null && pl[h] > 0 && w > 0
+    const own = (h: number) => ol != null && ol[h] > 0
     for (let h = 0; h < H; h++) {
       const csp = sh ? sh.hourly.cool_c[h] : zone.setpoints.cool_c ?? NaN
       const inUse = sh ? sh.in_use[h] === 1 : true
       maxCtl = Math.max(maxCtl, ctlT[h])
       if (inUse) maxUse = Math.max(maxUse, ctlT[h])
-      if (ctlT[h] > csp + UNMET_K) { unmetC++; if (inUse) unmetCUse++ }
+      if (ctlT[h] > csp + UNMET_K) { unmetC++; if (inUse) { unmetCUse++; if (held(h, run.cooling_w[h])) { if (own(h)) bothC++; else sysC++ } } }
       if (cu && !Number.isNaN(csp) && run.cooling_w[h] >= capCool * (1 - 1e-9) && (capCool > 0 || ctlT[h] > csp + 1e-6)) atCoolCap++
     }
     for (let h = 0; h < H; h++) {
@@ -588,7 +655,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       const inUse = sh ? sh.in_use[h] === 1 : true
       minCtl = Math.min(minCtl, ctlT[h])
       if (inUse) minUse = Math.min(minUse, ctlT[h])
-      if (ctlT[h] < hsp - UNMET_K) { unmet++; if (inUse) unmetUse++ }
+      if (ctlT[h] < hsp - UNMET_K) { unmet++; if (inUse) { unmetUse++; if (held(h, run.heating_w[h])) { if (own(h)) bothH++; else sysH++ } } }
       const capH = run.heating_cap_w ? run.heating_cap_w[h] : em?.cap_w ?? Infinity  // review F1: the hour's own limit
       if (em && !Number.isNaN(hsp) && run.heating_w[h] >= capH * (1 - 1e-9) && (capH > 0 || ctlT[h] < hsp - 1e-6)) atCap++
     }
@@ -615,6 +682,10 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         unmet_heating_hours_in_use: heated ? unmetUse : null, min_control_in_use_c: Number.isFinite(minUse) ? minUse : null,
         unmet_cooling_hours: cooled ? unmetC : null, unmet_cooling_hours_in_use: cooled ? unmetCUse : null, max_control_c: maxCtl,
         max_control_in_use_c: Number.isFinite(maxUse) ? maxUse : null,
+        system_short_heating_hours_in_use: heated && onPlant('heating') ? sysH : null,
+        system_short_cooling_hours_in_use: cooled && onPlant('cooling') ? sysC : null,
+        both_short_heating_hours_in_use: heated && onPlant('heating') ? bothH : null,
+        both_short_cooling_hours_in_use: cooled && onPlant('cooling') ? bothC : null,
       },
       emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters, slab: em.slab } : null,
       cooling_units: cu ? { cap_w: cu.cap_w, hours_at_cap: atCoolCap, units: cu.units } : null,
@@ -624,7 +695,30 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     }
     return r
   })
-  return { engine: network ? 'thermal-2' : 'thermal-1', zones, solver, run_ms }
+  // Brief 120: each plant over the year.
+  const cal = plants.length ? calendar(weather.hours) : null
+  const plantResults: PlantResults[] = plants.map((p, k) => {
+    const r = plantRun[k]
+    let peak = 0, hrs = 0, ask = 0, del = 0, res = 0, resPeak = 0, minFlow = Infinity
+    const byMonth = new Array(12).fill(0)
+    for (let h = 0; h < H; h++) {
+      peak = Math.max(peak, r.ask_w[h]); hrs += r.short[h]; ask += r.ask_w[h]; del += r.delivered_w[h]
+      res += p.reserved_w ? p.reserved_w[h] : 0
+      resPeak = Math.max(resPeak, p.reserved_w ? p.reserved_w[h] : 0)
+      if (r.flow_c) minFlow = Math.min(minFlow, r.flow_c[h])
+      if (r.short[h] > 0) byMonth[cal!.monthIdx[h]] += (r.ask_w[h] - r.delivered_w[h]) / 1000
+    }
+    let hwHrs = 0, hwShort = 0
+    if (p.hw_frac) for (let h = 0; h < H; h++) if (p.hw_frac[h] < 1) { hwHrs++; hwShort += (p.reserved_w![h] / p.hw_frac[h] - p.reserved_w![h]) / 1000 }
+    return {
+      hot_water_id: p.hw_group, hot_water_given_frac: p.hw_frac, hot_water_short_hours: hwHrs, hot_water_short_kwh: hwShort,
+      id: p.id, service: p.service, cap_w: p.cap_w, peak_ask_w: peak, hours_short: hrs, ask_kwh: ask / 1000, delivered_kwh: del / 1000,
+      asked_not_given_step_sum_kwh: byMonth.reduce((a, b) => a + b, 0), reserved_kwh: res / 1000, peak_reserved_w: resPeak, asked_not_given_step_sum_kwh_by_month: byMonth,
+      min_flow_c: r.flow_c ? minFlow : null,
+      zones: p.zones.map(({ zone, share }, j) => ({ zone_id: doc.zones[zone].id, share, given_w: r.zone_w[j] })),
+    }
+  })
+  return { engine: network ? 'thermal-2' : 'thermal-1', zones, solver, run_ms, plants: plantResults }
 }
 
 /**

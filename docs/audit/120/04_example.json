@@ -1,0 +1,306 @@
+{
+ "source": "scripts/120_example.mts",
+ "weather": {
+  "file": "GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw",
+  "station": "Yeovilton.AF, ENG, GBR (WMO 038530)",
+  "sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2"
+ },
+ "boiler": {
+  "id": "heating_y_boiler",
+  "label": "Gas boiler 1",
+  "zones": [
+   "z1",
+   "z2",
+   "z8",
+   "z9"
+  ],
+  "design_flow_c": 70
+ },
+ "design_kw": 15.8,
+ "cases": {
+  "uncapped_1000kw": {
+   "run_ms": 4509,
+   "steps_per_hour": 4,
+   "eui": 96.9,
+   "heating_kwh": 14112,
+   "plants": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 1000,
+     "hours_short": 0,
+     "delivered_kwh": 11031,
+     "min_flow_c": 70
+    }
+   ],
+   "design": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 1000,
+     "rooms_kw": 15.8,
+     "hot_water_kw": 0
+    }
+   ],
+   "rooms": [
+    {
+     "room": "Café",
+     "heating_kwh": 1353,
+     "unmet_hours": 54,
+     "system_short_hours": 0,
+     "both_short_hours": 0,
+     "own_short_hours": 54
+    },
+    {
+     "room": "Kitchen",
+     "heating_kwh": 3231,
+     "unmet_hours": 564,
+     "system_short_hours": 0,
+     "both_short_hours": 0,
+     "own_short_hours": 564
+    },
+    {
+     "room": "WCs",
+     "heating_kwh": 1977,
+     "unmet_hours": 179,
+     "system_short_hours": 0,
+     "both_short_hours": 0,
+     "own_short_hours": 179
+    },
+    {
+     "room": "Main hall",
+     "heating_kwh": 4470,
+     "unmet_hours": 133,
+     "system_short_hours": 0,
+     "both_short_hours": 0,
+     "own_short_hours": 133
+    }
+   ],
+   "fuel": [
+    {
+     "label": "Gas boiler 1",
+     "fuel_kwh": 11990
+    },
+    {
+     "label": "Air source heat pump",
+     "fuel_kwh": 766
+    },
+    {
+     "label": "VRF (meeting room)",
+     "fuel_kwh": 179
+    }
+   ]
+  },
+  "capped_100pct_of_design": {
+   "run_ms": 2117,
+   "steps_per_hour": 4,
+   "eui": 96.6,
+   "heating_kwh": 13909,
+   "plants": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 15.8,
+     "hours_short": 397.8,
+     "delivered_kwh": 10810,
+     "min_flow_c": 48.1
+    }
+   ],
+   "design": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 15.8,
+     "rooms_kw": 15.8,
+     "hot_water_kw": 0
+    }
+   ],
+   "rooms": [
+    {
+     "room": "Café",
+     "heating_kwh": 1358,
+     "unmet_hours": 140,
+     "system_short_hours": 0,
+     "both_short_hours": 140,
+     "own_short_hours": 0
+    },
+    {
+     "room": "Kitchen",
+     "heating_kwh": 3043,
+     "unmet_hours": 673,
+     "system_short_hours": 0,
+     "both_short_hours": 434,
+     "own_short_hours": 239
+    },
+    {
+     "room": "WCs",
+     "heating_kwh": 1968,
+     "unmet_hours": 295,
+     "system_short_hours": 0,
+     "both_short_hours": 188,
+     "own_short_hours": 107
+    },
+    {
+     "room": "Main hall",
+     "heating_kwh": 4441,
+     "unmet_hours": 246,
+     "system_short_hours": 0,
+     "both_short_hours": 246,
+     "own_short_hours": 0
+    }
+   ],
+   "fuel": [
+    {
+     "label": "Gas boiler 1",
+     "fuel_kwh": 11750
+    },
+    {
+     "label": "Air source heat pump",
+     "fuel_kwh": 772
+    },
+    {
+     "label": "VRF (meeting room)",
+     "fuel_kwh": 179
+    }
+   ]
+  },
+  "capped_75pct_of_design": {
+   "run_ms": 2057,
+   "steps_per_hour": 4,
+   "eui": 96.3,
+   "heating_kwh": 13727,
+   "plants": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 11.9,
+     "hours_short": 551,
+     "delivered_kwh": 10611,
+     "min_flow_c": 41.6
+    }
+   ],
+   "design": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 11.9,
+     "rooms_kw": 15.8,
+     "hot_water_kw": 0
+    }
+   ],
+   "rooms": [
+    {
+     "room": "Café",
+     "heating_kwh": 1355,
+     "unmet_hours": 204,
+     "system_short_hours": 0,
+     "both_short_hours": 204,
+     "own_short_hours": 0
+    },
+    {
+     "room": "Kitchen",
+     "heating_kwh": 2883,
+     "unmet_hours": 778,
+     "system_short_hours": 0,
+     "both_short_hours": 586,
+     "own_short_hours": 192
+    },
+    {
+     "room": "WCs",
+     "heating_kwh": 1955,
+     "unmet_hours": 387,
+     "system_short_hours": 0,
+     "both_short_hours": 279,
+     "own_short_hours": 108
+    },
+    {
+     "room": "Main hall",
+     "heating_kwh": 4419,
+     "unmet_hours": 353,
+     "system_short_hours": 0,
+     "both_short_hours": 353,
+     "own_short_hours": 0
+    }
+   ],
+   "fuel": [
+    {
+     "label": "Gas boiler 1",
+     "fuel_kwh": 11534
+    },
+    {
+     "label": "Air source heat pump",
+     "fuel_kwh": 777
+    },
+    {
+     "label": "VRF (meeting room)",
+     "fuel_kwh": 179
+    }
+   ]
+  },
+  "capped_50pct_of_design": {
+   "run_ms": 2414,
+   "steps_per_hour": 4,
+   "eui": 95.5,
+   "heating_kwh": 13299,
+   "plants": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 7.9,
+     "hours_short": 874.5,
+     "delivered_kwh": 10140,
+     "min_flow_c": 34
+    }
+   ],
+   "design": [
+    {
+     "label": "Gas boiler 1",
+     "capacity_kw": 7.9,
+     "rooms_kw": 15.8,
+     "hot_water_kw": 0
+    }
+   ],
+   "rooms": [
+    {
+     "room": "Café",
+     "heating_kwh": 1310,
+     "unmet_hours": 385,
+     "system_short_hours": 0,
+     "both_short_hours": 385,
+     "own_short_hours": 0
+    },
+    {
+     "room": "Kitchen",
+     "heating_kwh": 2567,
+     "unmet_hours": 960,
+     "system_short_hours": 0,
+     "both_short_hours": 869,
+     "own_short_hours": 91
+    },
+    {
+     "room": "WCs",
+     "heating_kwh": 1889,
+     "unmet_hours": 589,
+     "system_short_hours": 0,
+     "both_short_hours": 481,
+     "own_short_hours": 108
+    },
+    {
+     "room": "Main hall",
+     "heating_kwh": 4374,
+     "unmet_hours": 559,
+     "system_short_hours": 0,
+     "both_short_hours": 559,
+     "own_short_hours": 0
+    }
+   ],
+   "fuel": [
+    {
+     "label": "Gas boiler 1",
+     "fuel_kwh": 11021
+    },
+    {
+     "label": "Air source heat pump",
+     "fuel_kwh": 791
+    },
+    {
+     "label": "VRF (meeting room)",
+     "fuel_kwh": 180
+    }
+   ]
+  }
+ }
+}

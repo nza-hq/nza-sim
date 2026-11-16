@@ -117,3 +117,30 @@ describe('simulate at each level', () => {
     expect(r).toEqual({ ok: false, missing: [{ path: 'fabric_heat_c', what: 'Fabric only needs the temperature every room is heated to.' }] })
   })
 })
+
+describe('Brief 114 review F4: pumps sized on the design heat loss through the seam', () => {
+  it('a heating system with no capacity, W per kW: rated on its rooms\' design heat loss when design conditions are stated, refused when not', async () => {
+    const d: any = structuredClone(await doc())
+    const g = d.system_groups.find((x: any) => x.service === 'heating' && x.enabled)
+    delete g.capacity_kw
+    g.capacity_kw = null
+    g.pumps = { power: { w_per_kw_capacity: 10 }, speed: 'variable', runs: 'with_demand', schedule_ref: null, default_from: null }
+    const without = simulate(d, { weather: WEATHER })
+    expect(without.ok).toBe(true)
+    if (!without.ok) return
+    expect(without.summary.energy.ok).toBe(false)
+    if (without.summary.energy.ok) return
+    expect(without.summary.energy.missing.map((m: any) => m.what).join(' ')).toMatch(/design conditions/)
+    d.building.design = { outdoor: { stated_c: -5 }, warm_up_w_per_m2: null, vent_wind_m_s: 4 }
+    for (const z of d.zones) z.design_internal_c = 'follow_heat_c'
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok || !r.summary.energy.ok || !r.summary.design_heat_loss?.ok) throw new Error(JSON.stringify(r.ok ? [r.summary.energy, r.summary.design_heat_loss] : r).slice(0, 2000))
+    const p = r.summary.energy.pumps.find((x) => x.id === g.id)!
+    const dz = r.summary.design_heat_loss.zones
+    const rooms = g.zones.reduce((a: number, zid: string) => { const z = dz.find((q) => q.id === zid)!; return a + (z.heated ? (g.share_pct / 100) * z.total_w : 0) }, 0)
+    expect(p).toMatchObject({ design_from: 'design_heat_loss', rated_from: 'design_heat_loss' })
+    expect(p.design_w).toBeCloseTo(rooms, 6)
+    expect(p.rated_w).toBeCloseTo(rooms / 100, 6)
+    expect(p.kwh).toBeGreaterThan(0)
+  })
+})

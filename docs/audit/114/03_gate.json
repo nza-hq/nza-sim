@@ -1,0 +1,130 @@
+{
+ "source": "scripts/114_gate.mts",
+ "weather": "Denver TMY3 .mos (anchor EPW not in this container)",
+ "weather_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "a_digest": "2da3e6b5c50164b59035a2aab6b0f0b65988ed291cfba8617bc69588b369e58b",
+ "a_eui_kwh_per_m2": 148.328148316599,
+ "a_end_uses": {
+  "heating/electricity": 72176.34579111925,
+  "cooling/electricity": 60053.539268376604,
+  "dhw/electricity": 41173.5573333311,
+  "dhw/gas": 157428.30745099156,
+  "dhw_circulation/electricity": 1051.2,
+  "fans/electricity": 40613.111999997964,
+  "lighting/electricity": 39014.30074903205,
+  "small_power/electricity": 186136.32038400284,
+  "auxiliary/electricity": 27698.857199997437
+ },
+ "b": {
+  "fixed": {
+   "eui_kwh_per_m2": 154.7361483165992,
+   "eui_change": 6.408000000000214,
+   "changed_lines_kwh": {
+    "pumps/electricity": 27015.871680000862
+   },
+   "only_pumps_changed": true,
+   "heating_same": true,
+   "cooling_same": true,
+   "pumps": [
+    {
+     "id": "sys_heating_1782394791339_15293",
+     "label": "Primary heating (vrf_heat_recovery_dual_function)",
+     "rated_w": 2403.0971999999997,
+     "hours_run": 4024,
+     "kwh": 9670.06313280002
+    },
+    {
+     "id": "sys_heating_1782394791339_18072",
+     "label": "Secondary heating (electric_panel_heater)",
+     "rated_w": 126.4788,
+     "hours_run": 4024,
+     "kwh": 508.950691199976
+    },
+    {
+     "id": "sys_cooling_1782394791339_17069",
+     "label": "Primary cooling (vrf_heat_recovery_dual_function)",
+     "rated_w": 5059.152,
+     "hours_run": 3328,
+     "kwh": 16836.857856000865
+    },
+    {
+     "id": "sys_cooling_1782394791339_15552",
+     "label": "Secondary cooling (dx_split_cooling)",
+     "rated_w": 0,
+     "hours_run": 0,
+     "kwh": 0
+    }
+   ]
+  },
+  "variable": {
+   "eui_kwh_per_m2": 150.61453180758292,
+   "eui_change": 2.2863834909839227,
+   "changed_lines_kwh": {
+    "pumps/electricity": 9639.301342648549
+   },
+   "only_pumps_changed": true,
+   "heating_same": true,
+   "cooling_same": true,
+   "pumps": [
+    {
+     "id": "sys_heating_1782394791339_15293",
+     "label": "Primary heating (vrf_heat_recovery_dual_function)",
+     "rated_w": 2403.0971999999997,
+     "hours_run": 4024,
+     "kwh": 3205.6983919986837
+    },
+    {
+     "id": "sys_heating_1782394791339_18072",
+     "label": "Secondary heating (electric_panel_heater)",
+     "rated_w": 126.4788,
+     "hours_run": 4024,
+     "kwh": 168.72096799993142
+    },
+    {
+     "id": "sys_cooling_1782394791339_17069",
+     "label": "Primary cooling (vrf_heat_recovery_dual_function)",
+     "rated_w": 5059.152,
+     "hours_run": 3328,
+     "kwh": 6264.881982649934
+    },
+    {
+     "id": "sys_cooling_1782394791339_15552",
+     "label": "Secondary cooling (dx_split_cooling)",
+     "rated_w": 0,
+     "hours_run": 0,
+     "kwh": 0
+    }
+   ]
+  },
+  "levels": {
+   "bridgewater": {
+    "fabric": {
+     "closes": true,
+     "pumps_kwh": null
+    },
+    "spaces": {
+     "closes": true,
+     "pumps_kwh": null
+    },
+    "systems": {
+     "closes": true,
+     "pumps_kwh": 9639.301342648549
+    }
+   },
+   "two_zones": {
+    "fabric": {
+     "closes": true,
+     "pumps_kwh": null
+    },
+    "spaces": {
+     "closes": true,
+     "pumps_kwh": null
+    },
+    "systems": {
+     "closes": true,
+     "pumps_kwh": 643.728
+    }
+   }
+  }
+ }
+}

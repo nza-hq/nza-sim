@@ -31,7 +31,7 @@ export const TERMS: Record<string, string> = {
 }
 const FUEL_WORDS: Record<string, string> = { electricity: 'Electricity', gas: 'Gas', oil: 'Oil', biomass: 'Biomass', district_heating: 'District heat', district_cooling: 'District cooling' }
 const END_USE_WORDS: Record<string, string> = {
-  heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', dhw_circulation: 'Hot water pump', fans: 'Fans', lighting: 'Lighting',
+  heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', dhw_circulation: 'Hot water pump', pumps: 'Pumps', fans: 'Fans', lighting: 'Lighting',
   small_power: 'Small power', auxiliary: 'Other electrical',
 }
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })

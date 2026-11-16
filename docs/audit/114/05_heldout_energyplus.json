@@ -1,0 +1,68 @@
+{
+ "source": "validation/energyplus/114_heldout_referee.py",
+ "spec_sha256": "297dd2bb365f0fa3b393ab7b44822a5d9fb5f32eaddc7144c65258577e8747d0",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "runs": {
+  "heldout": {
+   "warnings": 7,
+   "steps_per_hour": 4,
+   "plant_w": 1300,
+   "plant": {
+    "heat_mwh": 3.5752292749951433,
+    "peak_w": 1300.0,
+    "short_steps": 5781,
+    "short_hours": 1445.25,
+    "min_flow_c": 36.11672559277151,
+    "min_flow_c_short_steps": 41.93135236376689,
+    "steps": 35040
+   },
+   "rooms": {
+    "west": {
+     "heat_mwh": 1.9131788851937002,
+     "unmet_hours": 423,
+     "min_c": 14.295374992382236,
+     "peak_w": 896.2419925434283,
+     "share_of_plant_in_short_steps": 0.5918340745059519
+    },
+    "east": {
+     "heat_mwh": 1.6755671010952076,
+     "unmet_hours": 1279,
+     "min_c": 9.551917828932503,
+     "peak_w": 763.2611551288853,
+     "share_of_plant_in_short_steps": 0.41324494712443804
+    }
+   }
+  },
+  "heldout_free": {
+   "warnings": 7,
+   "steps_per_hour": 4,
+   "plant_w": 100000,
+   "plant": {
+    "heat_mwh": 3.780208078781922,
+    "peak_w": 2292.775561474877,
+    "short_steps": 0,
+    "short_hours": 0.0,
+    "min_flow_c": 36.116726810180246,
+    "min_flow_c_short_steps": null,
+    "steps": 35040
+   },
+   "rooms": {
+    "west": {
+     "heat_mwh": 1.9413820590734965,
+     "unmet_hours": 0,
+     "min_c": 19.997668978785654,
+     "peak_w": 1484.175268934688,
+     "share_of_plant_in_short_steps": null
+    },
+    "east": {
+     "heat_mwh": 1.8493521644288526,
+     "unmet_hours": 705,
+     "min_c": 13.84662311668224,
+     "peak_w": 816.0050168705219,
+     "share_of_plant_in_short_steps": null
+    }
+   }
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c"
+}

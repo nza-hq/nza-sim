@@ -24,8 +24,8 @@
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
 import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
 import { CATALOGUES, checkCatalogueRefs, suggestItem } from '../../thermal/catalogue'
-import { DesignError, designHeatLoss, type DesignTerm } from '../../thermal/engine/designHeatLoss'
-import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
+import { DesignError, designHeatLoss, systemRoomsDesignW, type DesignTerm } from '../../thermal/engine/designHeatLoss'
+import { FUELS, readDocFloorM2, readEntryKwh, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel, type OtherLoadResult, type PumpResult, type WaterHeaterResult } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingHourlyW, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
@@ -46,7 +46,9 @@ export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'pr
  */
 export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }
 export function runOptionsFor(doc: ModelDocument): RunOptions {
-  return doc.zones.some((z) => z.emitters.length > 0 && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
+  // Brief 120: a zone on a system with a stated capacity is limited too, so it steps in quarter hours the same way.
+  const onPlant = (zid: string) => doc.system_groups.some((g) => g.enabled && (g.service === 'heating' || g.service === 'cooling') && g.capacity_kw != null && g.zones.includes(zid))
+  return doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
 }
 
 /** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */
@@ -139,7 +141,15 @@ export interface Summary {
     window_solar: WindowSolar[]
     /** Brief 109: heated to hours (a schedule and, usually, a setback); null when heated (or not) all year. */
     hours: ZoneHours | null
+    /**
+     * Brief 120 P3: the zone's hours in use below its heating setpoint (above its cooling setpoint), split into those a
+     * system's capacity held it there ("system short") and the rest (its own emitters or units, or warm-up). Null for a
+     * service no system with a capacity serves in the zone.
+     */
+    short: { heating: ShortSplit | null; cooling: ShortSplit | null }
   }[]
+  /** Brief 120 P3: each heating or cooling system with a capacity, in the document's order (empty: none states one). */
+  plants: PlantSummary[]
   /** The building's balance by term, kWh a year: positive is heat into the building. Heating and cooling included. */
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
   /** The building's surface lines by kind (heat between zones left out, as in `breakdown`). */
@@ -166,6 +176,12 @@ export interface Summary {
         not_modelled: string[]
         /** True when no hot water system or hot water use is stated, so hot water is not in the total (review F1). */
         no_hot_water: boolean
+        /** Brief 120: each hot water system with its water heater's output stated: its draw against the heater and store. */
+        water_heaters: (WaterHeaterResult & { label: string })[]
+        /** Brief 114: each system's pumps (rated power and where it came from, how they run, hours, kWh). */
+        pumps: (PumpResult & { label: string; kwh: number })[]
+        /** Brief 114: lifts, external lighting and other loads outside the rooms. */
+        other_loads: (OtherLoadResult & { kwh: number })[]
       }
     | { ok: false; missing: Missing[] }
     /** Brief 111: no systems at this level, so no energy. */
@@ -181,6 +197,45 @@ export interface Summary {
    */
   design_heat_loss: DesignSummary | null
 }
+
+/** Brief 120 P3: a zone's unmet hours in use, and which side held it there. */
+export interface ShortSplit {
+  unmet_hours: number
+  /** The system held the room and its own emitters (units) were not at their limit: a bigger system would fix these. */
+  system_short_hours: number
+  /** Both: the system held it and its own emitters (units) were at their limit too. */
+  both_short_hours: number
+  /** Its own emitters (units) alone, or warm-up: a bigger system would not fix these. */
+  own_short_hours: number
+}
+
+/**
+ * Brief 120 P3: one system's capacity against what its rooms asked of it (the engine's PlantResults, Rule 11), with its
+ * name. `min_flow_c`: how far the water fell when short (a boiler feeding radiators in every room it serves), else null.
+ * Review F4: the engine's asked-not-given step sum is not an energy and is not shown. Nor are its ask figures (peak and
+ * year): a room below its setpoint asks for its whole recovery in one step, so with no emitter limit the peak ask can be
+ * many times the design heat loss (editor, 16 Nov: 306 kW against 31.3 kW on Bridgewater). Shown: the hours short at
+ * the stated capacity; a year's difference needs two runs.
+ */
+export interface PlantSummary {
+  id: string; label: string; service: 'heating' | 'cooling'
+  capacity_kw: number
+  /** Hours (in steps, summed) it gave all it had. */
+  hours_short: number
+  delivered_kwh: number
+  /** Hot water it heated first, kWh a year (0 without); the hours its capacity could not cover it, and what the taps did not get, kWh (review F6). */
+  hot_water_first_kwh: number
+  hot_water_short_hours: number
+  hot_water_short_kwh: number
+  min_flow_c: number | null
+}
+
+/**
+ * Brief 120 P3: a heating system with a capacity against its rooms' design heat loss: each heated room's design loss ×
+ * the system's share of it, plus the highest hour of hot water it heats first. Over capacity, it cannot hold every room
+ * at the design condition.
+ */
+export interface DesignSystemLine { id: string; label: string; capacity_w: number; rooms_w: number; hot_water_w: number; total_w: number }
 
 /** Brief 117: one room's design heat loss, its lines summed by term (Rule 9: they sum to `total_w`). */
 export interface DesignZoneSummary {
@@ -212,6 +267,8 @@ export type DesignSummary =
       zones: DesignZoneSummary[]
       /** The what-if pair the emitter lines were also rated at, or null. */
       what_if: WhatIf | null
+      /** Brief 120 P3: each heating system with a capacity against its rooms' design losses (empty: none states one). */
+      systems: DesignSystemLine[]
     }
   | { ok: false; missing: Missing[] }
 
@@ -409,7 +466,7 @@ export function simulate(
     const v = (input as { schema_version?: unknown })?.schema_version
     const parsed = ModelDocument.safeParse(input)
     if (parsed.success) doc = parsed.data
-    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2); nothing is filled
+    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7' || v === '2.8' || v === '2.9') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2), 2.8 → 2.9 no DHW priority (Brief 120), 2.9 → 2.10 no pumps, other loads or control entries (Brief 114); nothing is filled
     else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
       // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
       // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
@@ -469,6 +526,7 @@ export function simulate(
     }
     return FACINGS.filter((f) => m.has(f)).map((f) => m.get(f)!)
   }
+  const split = (unmet: number, sys: number, both: number): ShortSplit => ({ unmet_hours: unmet, system_short_hours: sys, both_short_hours: both, own_short_hours: unmet - sys - both })
   const bHeat = readBuildingHourlyW(results, 'heating'), bCool = readBuildingHourlyW(results, 'cooling')
   const hoursOf = zoneSetpointHours(doc, weather.weather.hours)
   const summary: Summary = {
@@ -485,7 +543,19 @@ export function simulate(
       heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true),
       monthly: monthly(z.hourly.heating_w, z.hourly.cooling_w), by_surface: bySurface([z], true), window_solar: windowSolar([z]),
       hours: hoursOf[i] && doc.zones[i].setpoints.heat_c != null ? zoneHours(z, doc.zones[i].setpoints, hoursOf[i]!, weather.weather.hours.dry_bulb, options.control) : null,
+      short: {
+        heating: z.annual.system_short_heating_hours_in_use == null ? null : split(z.annual.unmet_heating_hours_in_use ?? 0, z.annual.system_short_heating_hours_in_use, z.annual.both_short_heating_hours_in_use ?? 0),
+        cooling: z.annual.system_short_cooling_hours_in_use == null ? null : split(z.annual.unmet_cooling_hours_in_use ?? 0, z.annual.system_short_cooling_hours_in_use, z.annual.both_short_cooling_hours_in_use ?? 0),
+      },
     })),
+    plants: results.plants.map((p) => {
+      const g = doc.system_groups.find((x) => x.id === p.id)!
+      return {
+        id: p.id, label: g.label || `${SERVICE_WORDS[p.service]} system`, service: p.service, capacity_kw: p.cap_w / 1000,
+        hours_short: p.hours_short, delivered_kwh: p.delivered_kwh,
+        hot_water_first_kwh: p.reserved_kwh, hot_water_short_hours: p.hot_water_short_hours, hot_water_short_kwh: p.hot_water_short_kwh, min_flow_c: p.min_flow_c,
+      }
+    }),
     breakdown: byTerm(results.zones, false),
     by_surface: bySurface(results.zones, false),
     window_solar: windowSolar(results.zones),
@@ -699,6 +769,11 @@ function designSummary(doc: ModelDocument, results: ModelResults, weather: Weath
   return {
     ok: true, outdoor_c: r.outdoor_c, outdoor_source: r.outdoor_source, ground_c: r.ground_c,
     warm_up_w_per_m2: r.warm_up_w_per_m2, vent_wind_m_s: r.vent_wind_m_s, building_w: r.building_w, what_if: whatIf,
+    systems: results.plants.filter((p) => p.service === 'heating').map((p) => {
+      const g = doc.system_groups.find((x) => x.id === p.id)!
+      const rooms = systemRoomsDesignW(doc, r, p.id)
+      return { id: p.id, label: g.label || 'heating system', capacity_w: p.cap_w, rooms_w: rooms, hot_water_w: p.peak_reserved_w, total_w: rooms + p.peak_reserved_w }
+    }),
     zones: r.zones.map((z, i) => {
       const by = new Map<DesignTerm, number>()
       for (const l of z.lines) by.set(l.term, (by.get(l.term) ?? 0) + l.w)
@@ -737,6 +812,12 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
     }
     return { path, what: message.startsWith('required') ? `Hot water needs ${what[d[1]] ?? d[1]}.` : `Hot water: ${what[d[1]] ?? d[1]} ${message}.` }
   }
+  const pu = path.match(/^system_groups\[(\d+)\]\.pumps/)
+  if (pu) { const sg = doc.system_groups[Number(pu[1])]; return { path, what: `The pumps of "${sg?.label || sg?.id}": ${message}.` } }
+  const ol = path.match(/^other_loads\[(\d+)\]/)
+  if (ol) { const o = doc.other_loads[Number(ol[1])]; return { path, what: `"${o?.label || o?.id}": ${message}.` } }
+  const ax = path.match(/^profiles\[(\d+)\]$/)
+  if (ax && message.includes('counted twice')) return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
   const v = path.match(/^zones\[(\d+)\]\.ventilation\[(\d+)\]\.sfp_w_per_l_s$/)
   if (v) return { path, what: `Set the fan power (SFP) for the ventilation in ${zoneName(doc, v[1])}.` }
   return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
@@ -744,7 +825,16 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
 
 function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
   let a: ReturnType<typeof runSystems>
-  try { a = runSystems(doc, results, weather.weather.hours) } catch (e) {
+  // Brief 114 review F4: a heating system's pumps with no capacity are sized on its rooms' design heat loss, when the
+  // building states its design conditions (one calculation, designHeatLoss; a refusal there is the design line's).
+  let design: Map<string, number> | null = null
+  if (doc.building.design != null && doc.system_groups.some((g) => g.pumps != null && g.capacity_kw == null && g.service === 'heating')) {
+    try {
+      const r = designHeatLoss(doc, results.zones, weather.weather)
+      design = new Map(doc.system_groups.filter((g) => g.service === 'heating').map((g) => [g.id, systemRoomsDesignW(doc, r, g.id)]))
+    } catch (e) { if (!(e instanceof DesignError)) throw e }
+  }
+  try { a = runSystems(doc, results, weather.weather.hours, design) } catch (e) {
     // The served-equals-demand check (Rule 9) failing is a fault in the tool, never a number to show.
     if (e instanceof ServedError) return { ok: false, missing: [{ path: 'systems', what: `The energy check failed (${e.message}). This is a fault in the tool; please report it.` }] }
     throw e
@@ -759,9 +849,14 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
     not_modelled: s.not_modelled.map((n) => {
       const m = n.path.match(/^system_groups\[(\d+)\]/)
       const v = n.path.match(/^zones\[(\d+)\]\.ventilation/)
-      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : n.path
+      const c = n.path.match(/^controls\[(\d+)\]/)
+      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : c ? `the control of "${doc.controls[Number(c[1])]?.target.ref}"` : n.path
       return `${owner}: ${n.what}`
     }),
     no_hot_water: s.dhw == null,
+    water_heaters: s.water_heaters.map((w) => ({ ...w, label: doc.system_groups.find((g) => g.id === w.id)!.label || 'hot water system' })),
+    // Review F8: the kWh is the end-use line's (Rule 11), read through readEntryKwh.
+    pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, kwh: readEntryKwh(s, 'pumps', p.id), label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
+    other_loads: s.other_loads.map((o) => ({ ...o, kwh: readEntryKwh(s, 'auxiliary', o.id) })),
   }
 }

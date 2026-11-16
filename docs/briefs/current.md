@@ -1,5 +1,15 @@
 # Current brief
 
+**No brief in progress.** Next: Brief 115 (windows and natural ventilation).
+
+Previous:
+
+**Brief 114 — Simulate v2: the Controls step and back-of-house energy — CLOSED 16 Nov 2026 on `chris/114-controls` (on top of 120).**
+Pumps per system (fixed or inverter on the ideal curve, labelled; continuous in the season, with demand or scheduled), fans by how they run, lifts and external lighting, and a control map of who controls what (schema 2.10). NCM defaults, labelled. Refereed against EnergyPlus; independent review answered; Linzie's two answers in (16 Nov 23:11). No change to today's engine (anchor 133.2). Brief [`archive/114_controls-and-back-of-house_COMPLETED.md`](archive/114_controls-and-back-of-house_COMPLETED.md); final report [`../audit/114/06_final_report.md`](../audit/114/06_final_report.md). **Next:** Brief 115.
+
+**Brief 120 — Simulate v2: system (plant) capacity limits — CLOSED 16 Nov 2026 on `chris/120-plant-capacity` (on top of 112).**
+A heating or cooling system's stated kW limits what it gives its rooms (schema 2.9). A short boiler on radiators shares through one lowered flow temperature, as EnergyPlus does; the room's other systems top up what a short one cannot give (Linzie 19:48). Hot water heated first takes the boiler's capacity first; a dedicated water heater states its kW and store (Linzie 19:19). Refereed against EnergyPlus; independent review answered. No change to today's engine (anchor 133.2). Brief [`archive/120_plant-capacity_COMPLETED.md`](archive/120_plant-capacity_COMPLETED.md); final report [`../audit/120/06_final_report.md`](../audit/120/06_final_report.md). P6 panel is the editor thread's. **Next:** Brief 114, then 115.
+
 **Brief 112 — Simulate v2: the demand/energy split (Spaces = demand, Systems = energy) — CLOSED 16 Nov 2026 on `chris/112-demand-energy-split`.**
 Spaces state lux and hot water use; Systems state luminaire efficacy (W/m² per 100 lux) and the heater (schema 2.8). Lighting W/m² = lux ÷ 100 × efficacy in one place; lighting heat arrives at + Systems. Bridgewater restated in lux and efficacy gives every end use exactly. Older documents keep their stated W/m²; nothing is guessed. Independent review answered. No change to today's engine (anchor 133.2). Brief [`archive/112_demand-energy-split_COMPLETED.md`](archive/112_demand-energy-split_COMPLETED.md); final report [`../audit/112/06_final_report.md`](../audit/112/06_final_report.md). **Next:** Brief 120 (plant capacity), then 114, then 115.
 

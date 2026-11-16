@@ -1,0 +1,99 @@
+{
+ "source": "validation/energyplus/120_plant_referee.py",
+ "spec_sha256": "a09327a39088b29877adcfc935c6c2d122fb4dc885fceef0306ec41d6ef56b4f",
+ "cooled_room_spec_sha256": "3a3f7c4af45fb9070e45d21ad0c4defe7e78e45d29f6196cf175e538af62725f",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "runs": {
+  "binds": {
+   "warnings": 6,
+   "steps_per_hour": 4,
+   "plant_w": 1600,
+   "plant": {
+    "heat_mwh": 3.7559377896125636,
+    "peak_w": 1600.0,
+    "short_steps": 3118,
+    "short_hours": 779.5,
+    "min_flow_c": 35.847680356671596,
+    "min_flow_c_short_steps": 35.847680356671596,
+    "steps": 35040
+   },
+   "rooms": {
+    "west": {
+     "heat_mwh": 1.8827903290175327,
+     "unmet_hours": 487,
+     "min_c": 14.054526071669468,
+     "peak_w": 899.4681702927447,
+     "share_of_plant_in_short_steps": 0.5032391621557518
+    },
+    "east": {
+     "heat_mwh": 1.8798848391998562,
+     "unmet_hours": 485,
+     "min_c": 14.050733373683423,
+     "peak_w": 897.8703987861354,
+     "share_of_plant_in_short_steps": 0.5029908351929667
+    }
+   }
+  },
+  "free": {
+   "warnings": 6,
+   "steps_per_hour": 4,
+   "plant_w": 2600,
+   "plant": {
+    "heat_mwh": 3.8573771869763287,
+    "peak_w": 2363.2557039526546,
+    "short_steps": 0,
+    "short_hours": 0.0,
+    "min_flow_c": 38.75745341206002,
+    "min_flow_c_short_steps": null,
+    "steps": 35040
+   },
+   "rooms": {
+    "west": {
+     "heat_mwh": 1.9306575087094617,
+     "unmet_hours": 27,
+     "min_c": 17.810281360100014,
+     "peak_w": 1181.8701608030776,
+     "share_of_plant_in_short_steps": null
+    },
+    "east": {
+     "heat_mwh": 1.9276421528340746,
+     "unmet_hours": 26,
+     "min_c": 17.807929629276515,
+     "peak_w": 1181.956705994157,
+     "share_of_plant_in_short_steps": null
+    }
+   }
+  },
+  "unequal": {
+   "warnings": 6,
+   "steps_per_hour": 4,
+   "plant_w": 1600,
+   "plant": {
+    "heat_mwh": 3.75489958293073,
+    "peak_w": 1600.0,
+    "short_steps": 3061,
+    "short_hours": 765.25,
+    "min_flow_c": 33.738370431720604,
+    "min_flow_c_short_steps": 33.738370431720604,
+    "steps": 35040
+   },
+   "rooms": {
+    "west": {
+     "heat_mwh": 1.9271256961481227,
+     "unmet_hours": 173,
+     "min_c": 15.838284436698883,
+     "peak_w": 1052.4079768465037,
+     "share_of_plant_in_short_steps": 0.5607431392369573
+    },
+    "east": {
+     "heat_mwh": 1.8349322984839058,
+     "unmet_hours": 587,
+     "min_c": 12.282599723027104,
+     "peak_w": 940.7135536245274,
+     "share_of_plant_in_short_steps": 0.4453938177028266
+    }
+   }
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c"
+}

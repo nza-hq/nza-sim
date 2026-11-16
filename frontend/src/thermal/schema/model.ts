@@ -263,6 +263,16 @@ export const Ventilation = z
     defrost_penalty_kwh: finite.nullable().optional(),
     control_mechanism: z.string().nullable().optional(),
     control_schedule_ref: z.string().nullable().optional(),
+    /**
+     * Schema 2.10 (Brief 114): how the fans are told to run. 'continuous': every hour (`control_schedule_ref` left
+     * empty or 'always_on'). 'schedule': the fraction of each hour in its `control_schedule_ref` schedule. 'demand'
+     * (CO₂ or presence): inside the hours `control_schedule_ref` gives (a schedule, or 'always_on'), the flow follows
+     * the people in the zone, each hour's share of its occupancy profile's people, never below `demand_min_fraction`;
+     * outside them the fans are off (review F1). Null: not stated, so the schedule decides, as before 2.10.
+     */
+    runs: z.enum(['continuous', 'schedule', 'demand']).nullable().default(null),
+    /** Schema 2.10: with `runs: 'demand'` only, and required for it: the least share of the flow, 0 to 1. */
+    demand_min_fraction: fraction.nullable().default(null),
     legacy_v25: z
       .object({
         name: z.string().optional(),
@@ -400,6 +410,34 @@ export type Zone = z.infer<typeof Zone>
 
 export const SERVICES = ['heating', 'cooling', 'dhw', 'lighting', 'small_power', 'auxiliary'] as const
 
+/**
+ * Schema 2.10 (Brief 114, Linzie 16 Nov 00:57): the pumps of a heating, cooling or hot water system.
+ * - `power`: the pumps' rated electrical power: W; or W per kW of the system (its `capacity_kw`, or with none its
+ *   busiest hour's heat, stated in the results); or W per m² of the floor it serves (the NCM's pump power density,
+ *   NCM Modelling Guide 2021 Table 14, at its share of each zone).
+ * - `speed`: 'fixed' draws its rated power whenever it runs; 'variable' (an inverter) draws its rated power × a stated
+ *   part-load curve on the hour's load (thermal/engine/pumps.ts).
+ * - `runs`: 'continuous', every hour of the system's season (Linzie 16 Nov 23:11, card: "Only the heating or cooling
+ *   season", not all year); 'with_demand', the hours its load is above zero; 'schedule', the fraction of each hour in
+ *   `schedule_ref`.
+ * - `season_months`: for 'continuous', the months of the season (1–12), as stated. Null: the months in which the
+ *   system has any load, shown in the results as worked out from the load.
+ * - `default_from`: when "Use defaults" filled the figures, the named source they came from; null once edited.
+ * Pump energy is electricity, at "+ Systems"; the pumps' heat into the water is not counted (stated).
+ */
+export const PUMP_SERVICES: readonly string[] = ['heating', 'cooling', 'dhw']
+export const Pumps = z
+  .object({
+    power: z.union([z.object({ w: nonNeg }).strict(), z.object({ w_per_kw_capacity: nonNeg }).strict(), z.object({ w_per_m2: nonNeg }).strict()]),
+    speed: z.enum(['fixed', 'variable']),
+    runs: z.enum(['continuous', 'with_demand', 'schedule']),
+    schedule_ref: id.nullable().default(null),
+    season_months: z.array(z.number().int().min(1).max(12)).min(1).nullable().default(null),
+    default_from: z.string().min(1).nullable().default(null),
+  })
+  .strict()
+export type Pumps = z.infer<typeof Pumps>
+
 /** One installed system serving a service over a set of zones, with its share of that service's demand. */
 export const SystemGroup = z
   .object({
@@ -416,7 +454,23 @@ export const SystemGroup = z
     control_mechanism: z.string().nullable().optional(),
     control_schedule_ref: z.string().nullable().optional(),
     control_factor: finite.nullable().optional(),
+    /**
+     * The system's output, kW. Brief 120: on a heating or cooling system, a limit: in any hour the zones it serves draw
+     * at most this from it (its share of each). On a hot water system, its water heater's output (with
+     * `storage_litres`, the store it refills). Null or absent: not limited. Not used on other services.
+     */
     capacity_kw: finite.nullable().optional(),
+    /**
+     * Schema 2.9 (Brief 120, Linzie 16 Nov 19:19): a hot water system's stored hot water, litres, at the store
+     * temperature. With `capacity_kw`, the store covers what the taps draw above the heater's output and the heater
+     * refills it. Null: no store stated (with a capacity, the heater alone meets each hour). Hot water only.
+     */
+    storage_litres: nonNeg.nullable().default(null),
+    /**
+     * Schema 2.9 (Brief 120): a heating system that also heats the water of this hot water system, first (a system
+     * boiler with a priority valve): each hour its rooms get its capacity less that hot water. Null: no hot water on it.
+     */
+    dhw_priority_group_id: id.nullable().default(null),
     /** A library system template, when the system was chosen from one. */
     template_ref: z.string().nullable().optional(),
     /** Schema 2.4 (Brief 108): a wet heating system's design flow and return, °C, at which its emitters are rated. */
@@ -424,6 +478,8 @@ export const SystemGroup = z
     design_return_c: finite.nullable().optional(),
     /** Schema 2.8 (Brief 112): a lighting system's luminaires, W/m² for each 100 lux delivered. Lighting only. */
     efficacy_w_m2_per_100lux: nonNeg.nullable().default(null),
+    /** Schema 2.10 (Brief 114): the system's pumps; heating, cooling and hot water only. Null: none stated. */
+    pumps: Pumps.nullable().default(null),
   })
   .strict()
 export type SystemGroup = z.infer<typeof SystemGroup>
@@ -533,7 +589,59 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.8' as const
+/**
+ * Schema 2.10 (Brief 114): the building's other electrical loads under Systems, not in any room: lifts, external
+ * lighting and the like. `power_w` is the load while it runs. `runs`: 'continuous' every hour; 'schedule' the fraction
+ * of each hour in `schedule_ref`; 'dusk_to_dawn' (a photocell) the hours with no daylight (the weather file's global
+ * horizontal irradiance 0 for the hour), and with a `schedule_ref` too only inside it (photocell and time clock). Their
+ * heat warms no room (stated). `default_from` as on pumps.
+ */
+export const OTHER_LOAD_KINDS = ['lift', 'external_lighting', 'other'] as const
+export const OtherLoad = z
+  .object({
+    id,
+    kind: z.enum(OTHER_LOAD_KINDS),
+    label: z.string().optional(),
+    power_w: nonNeg,
+    runs: z.enum(['continuous', 'schedule', 'dusk_to_dawn']),
+    schedule_ref: id.nullable().default(null),
+    default_from: z.string().min(1).nullable().default(null),
+  })
+  .strict()
+export type OtherLoad = z.infer<typeof OtherLoad>
+
+/**
+ * Schema 2.10 (Brief 114, shape agreed with Brief 115): how each thing in the building is told to run. One entry per
+ * target. `controller` (a central BMS, a local controller, a time clock, by hand, or a photocell) is recorded and shown
+ * and does not yet change any number ("Recorded, not yet used in the calculation"); it is for the meter check and BMS
+ * trend logs. The figures it controls stay where they live (a zone's setpoints and hours, a system's pumps, a
+ * ventilation entry's `runs`): the Controls step edits them there, so each field still has one place.
+ * A `window` entry carries the window rule (Brief 115 owns the meanings and the physics; until it lands the rule is
+ * recorded, not used). Its `ref` is a zone; `hours_ref` is the allowed opening hours (window entries only).
+ */
+export const CONTROL_TARGETS = ['system', 'ventilation', 'lighting', 'window'] as const
+export const CONTROLLERS = ['central_bms', 'local', 'time_clock', 'manual', 'photocell'] as const
+export const ControlEntry = z
+  .object({
+    id,
+    target: z.object({ kind: z.enum(CONTROL_TARGETS), ref: id }).strict(),
+    controller: z.enum(CONTROLLERS),
+    hours_ref: id.nullable().default(null),
+    note: z.string().nullable().default(null),
+    rule: z.enum(['temperature', 'adaptive', 'timetable']).nullable().default(null),
+    open_fraction: fraction.nullable().default(null),
+    open_above_ref: id.nullable().default(null),
+    min_open_h: nonNeg.nullable().default(null),
+    min_closed_h: nonNeg.nullable().default(null),
+    operation: z.enum(['by_hand', 'automated']).nullable().default(null),
+    modulation: z.object({ full_open_below_dk: finite, min_open_above_dk: finite, min_fraction: fraction }).strict().nullable().default(null),
+    adaptive_category: z.enum(['I', 'II', 'III']).nullable().default(null),
+  })
+  .strict()
+export type ControlEntry = z.infer<typeof ControlEntry>
+const WINDOW_FIELDS = ['rule', 'open_fraction', 'open_above_ref', 'min_open_h', 'min_closed_h', 'operation', 'modulation', 'adaptive_category'] as const
+
+export const SCHEMA_VERSION = '2.10' as const
 
 export const ModelDocument = z
   .object({
@@ -546,6 +654,10 @@ export const ModelDocument = z
     profiles: z.array(Profile),
     weather_ref: WeatherRef,
     library_refs: z.array(LibraryRef),
+    /** Schema 2.10 (Brief 114): lifts, external lighting and other loads outside the rooms. */
+    other_loads: z.array(OtherLoad).default([]),
+    /** Schema 2.10 (Brief 114): the control map, one entry per controlled thing. */
+    controls: z.array(ControlEntry).default([]),
   })
   .strict()
   .superRefine((doc, ctx) => {
@@ -662,7 +774,84 @@ export const ModelDocument = z
     })
     // Brief 112: efficacy is a lighting system's; a lighting profile states lux or a W/m², not both.
     doc.system_groups.forEach((g, i) => {
+      // Brief 120: hot water with priority is on a heating system with a capacity, and names a hot water system.
+      if (g.dhw_priority_group_id != null) {
+        const at = ['system_groups', i, 'dhw_priority_group_id']
+        const d = doc.system_groups.find((x) => x.id === g.dhw_priority_group_id)
+        if (g.service !== 'heating') ctx.addIssue({ code: 'custom', path: at, message: `a ${g.service} system heats no hot water first; leave empty` })
+        else if (!d) ctx.addIssue({ code: 'custom', path: at, message: `"${g.id}" heats hot water system "${g.dhw_priority_group_id}" first, which does not exist` })
+        else if (d.service !== 'dhw') ctx.addIssue({ code: 'custom', path: at, message: `"${d.id}" is a ${d.service} system, not hot water` })
+        else if (g.capacity_kw == null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'capacity_kw'], message: `"${g.id}" heats hot water first, so it needs its capacity (kW)` })
+      }
+      // Brief 120: a water heater's store is a hot water system's, and needs the heater's output to refill it.
+      if (g.storage_litres != null) {
+        const at = ['system_groups', i, 'storage_litres']
+        const by = doc.system_groups.find((x) => x.dhw_priority_group_id === g.id)
+        if (g.service !== 'dhw') ctx.addIssue({ code: 'custom', path: at, message: `a ${g.service} system stores no hot water; leave empty` })
+        else if (by) ctx.addIssue({ code: 'custom', path: at, message: `"${g.id}" is heated first by "${by.id}": a store on a boiler's priority circuit is not modelled yet (its hot water is taken from the boiler hour by hour); leave empty` })
+        else if (g.capacity_kw == null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'capacity_kw'], message: `"${g.id}" stores ${g.storage_litres} litres, so it needs its water heater's output (kW) to refill it` })
+      }
+      if (g.service === 'dhw' && g.capacity_kw != null) {
+        const by = doc.system_groups.find((x) => x.dhw_priority_group_id === g.id)
+        if (by) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'capacity_kw'], message: `"${g.id}" is heated first by "${by.id}", whose capacity is its limit; leave this empty, or give it its own water heater` })
+      }
       if (g.service !== 'lighting' && g.efficacy_w_m2_per_100lux != null) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'efficacy_w_m2_per_100lux'], message: `a ${g.service} system has no luminaire efficacy; leave empty` })
+    })
+    // Brief 114: pumps on heating, cooling and hot water systems; a schedule only when they run to one.
+    const schedIds = new Set(doc.profiles.filter((p) => p.kind === 'schedule').map((p) => p.id))
+    const scheduleRef = (runs: string, ref: string | null, at: (string | number)[], what: string) => {
+      if (runs === 'schedule' && ref == null) ctx.addIssue({ code: 'custom', path: [...at, 'schedule_ref'], message: `${what} runs to a schedule: name it` })
+      if (ref != null && !schedIds.has(ref)) ctx.addIssue({ code: 'custom', path: [...at, 'schedule_ref'], message: `schedule "${ref}" does not exist` })
+      if (runs === 'continuous' && ref != null) ctx.addIssue({ code: 'custom', path: [...at, 'schedule_ref'], message: `${what} runs continuously, so it has no schedule; leave empty` })
+    }
+    doc.system_groups.forEach((g, i) => {
+      if (g.pumps == null) return
+      const at = ['system_groups', i, 'pumps']
+      if (!PUMP_SERVICES.includes(g.service)) ctx.addIssue({ code: 'custom', path: at, message: `a ${g.service} system has no pumps; leave empty` })
+      if (g.pumps.runs === 'with_demand' && g.pumps.schedule_ref != null) ctx.addIssue({ code: 'custom', path: [...at, 'schedule_ref'], message: 'pumps that run with demand have no schedule; leave empty' })
+      scheduleRef(g.pumps.runs, g.pumps.schedule_ref, at, `the pumps of "${g.id}"`)
+      const sm = g.pumps.season_months
+      if (sm != null && g.pumps.runs !== 'continuous') ctx.addIssue({ code: 'custom', path: [...at, 'season_months'], message: 'only pumps that run continuously have a season; leave empty' })
+      if (sm != null && new Set(sm).size !== sm.length) ctx.addIssue({ code: 'custom', path: [...at, 'season_months'], message: 'a month is given twice' })
+    })
+    const otherIds = new Set<string>()
+    doc.other_loads.forEach((o, i) => {
+      const at = ['other_loads', i]
+      if (otherIds.has(o.id)) ctx.addIssue({ code: 'custom', path: [...at, 'id'], message: `other load id "${o.id}" is used twice` })
+      otherIds.add(o.id)
+      scheduleRef(o.runs, o.schedule_ref, at, `"${o.id}"`)
+    })
+    doc.zones.forEach((z0, i) => z0.ventilation.forEach((v, j) => {
+      const at = ['zones', i, 'ventilation', j]
+      if (v.runs === 'demand' && v.demand_min_fraction == null) ctx.addIssue({ code: 'custom', path: [...at, 'demand_min_fraction'], message: 'fans on demand need their least share of the flow (0 to 1)' })
+      if (v.runs !== 'demand' && v.demand_min_fraction != null) ctx.addIssue({ code: 'custom', path: [...at, 'demand_min_fraction'], message: 'only for fans on demand; leave empty' })
+      if (v.runs === 'continuous' && v.control_schedule_ref != null && v.control_schedule_ref !== 'always_on') ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans that run continuously have no schedule; leave empty' })
+      if (v.runs === 'schedule' && (v.control_schedule_ref == null || !schedIds.has(v.control_schedule_ref))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans that run to a schedule need a schedule profile' })
+      if (v.runs === 'demand' && (v.control_schedule_ref == null || (v.control_schedule_ref !== 'always_on' && !schedIds.has(v.control_schedule_ref)))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans on demand need the hours they may run: always_on or a schedule profile' })
+    }))
+    // Brief 114: the control map. One entry per target, which must exist; window fields only on a window entry.
+    const ventIds = new Set(doc.zones.flatMap((z0) => z0.ventilation.map((v) => v.id)))
+    const ctlIds = new Set<string>(), targets = new Set<string>()
+    doc.controls.forEach((c, i) => {
+      const at = ['controls', i]
+      if (ctlIds.has(c.id)) ctx.addIssue({ code: 'custom', path: [...at, 'id'], message: `control id "${c.id}" is used twice` })
+      ctlIds.add(c.id)
+      const key = `${c.target.kind}|${c.target.ref}`
+      if (targets.has(key)) ctx.addIssue({ code: 'custom', path: [...at, 'target'], message: `${c.target.kind} "${c.target.ref}" has two control entries; keep one` })
+      targets.add(key)
+      const g = doc.system_groups.find((x) => x.id === c.target.ref)
+      const ok = c.target.kind === 'system' ? g != null && g.service !== 'lighting'
+        : c.target.kind === 'lighting' ? g?.service === 'lighting'
+          : c.target.kind === 'ventilation' ? ventIds.has(c.target.ref)
+            : zoneIds.has(c.target.ref)
+      if (!ok) ctx.addIssue({ code: 'custom', path: [...at, 'target', 'ref'], message: `no ${c.target.kind === 'window' ? 'zone' : c.target.kind === 'system' ? 'heating, cooling, hot water or other system' : c.target.kind === 'lighting' ? 'lighting system' : 'ventilation entry'} "${c.target.ref}"` })
+      if (c.target.kind !== 'window') {
+        if (c.hours_ref != null) ctx.addIssue({ code: 'custom', path: [...at, 'hours_ref'], message: 'the hours of a system or fans are on the thing itself (its heating hours, pumps or fans); hours here are a window\'s allowed opening hours' })
+        for (const f of WINDOW_FIELDS) if (c[f] != null) ctx.addIssue({ code: 'custom', path: [...at, f], message: 'a window rule field; only on a window entry' })
+      } else {
+        if (c.hours_ref != null && !schedIds.has(c.hours_ref)) ctx.addIssue({ code: 'custom', path: [...at, 'hours_ref'], message: `schedule "${c.hours_ref}" does not exist` })
+        if (c.rule === 'adaptive' && c.adaptive_category == null) ctx.addIssue({ code: 'custom', path: [...at, 'adaptive_category'], message: 'an adaptive window rule needs its EN 16798-1 category (I, II or III)' })
+      }
     })
     doc.profiles.forEach((p, i) => {
       if (p.kind === 'lighting' && p.lux != null && p.magnitude != null) ctx.addIssue({ code: 'custom', path: ['profiles', i], message: `lighting "${p.id}" states both lux and a W/m²: keep one` })

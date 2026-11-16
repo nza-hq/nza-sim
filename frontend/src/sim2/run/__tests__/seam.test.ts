@@ -299,6 +299,15 @@ describe('simulate', () => {
     if (!r.ok || !now.ok) throw new Error(JSON.stringify(r))
     expect(r.summary.zones).toEqual(now.summary.zones)
   })
+  it('a 2.8 document runs, with no hot water priority (Brief 120)', async () => {
+    const d = await doc()
+    const now = simulate(d, { weather: WEATHER })
+    d.schema_version = '2.8'
+    for (const g of d.system_groups) delete g.dhw_priority_group_id
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok || !now.ok) throw new Error(JSON.stringify(r))
+    expect(r.summary.zones).toEqual(now.summary.zones)
+  })
   it('emitters: each zone\'s output against its peak, the rating that covers it, and the same rooms at 70/60 (Brief 108 P4)', async () => {
     expect((simulate(await doc(), { weather: WEATHER }) as any).summary.emitters).toBeNull()
     const withRads = async (rated: (zi: number) => number) => {
@@ -524,5 +533,54 @@ describe('Brief 119 review F10: cooling stated nowhere', () => {
     if (!r.ok) throw new Error(JSON.stringify(r.missing))
     expect(r.summary.emitters!.cooling_unstated).toEqual([{ id: z.id, name: z.name }])
     expect(r.results.zones[1].cooling_units).toBeNull()
+  })
+})
+
+describe('Brief 120 P3: system capacity in the summary', () => {
+  it('Bridgewater with the heat pump capped: its line, each room\'s unmet hours split, and the design line (Rule 11, Rule 9)', async () => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 50; hp.design_return_c = 40; hp.capacity_kw = 30
+    d.zones.forEach((z: any) => {
+      z.emitters = [{ id: `${z.id}_rads`, kind: 'radiator', count: 1, rated_output_w: 30000, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 }]
+      z.design_internal_c = 'follow_heat_c'
+    })
+    d.building.design = { outdoor: { stated_c: -3 }, warm_up_w_per_m2: 5, vent_wind_m_s: 4 }
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const s = r.summary
+    expect(s.plants).toHaveLength(1)
+    const p = s.plants[0], eng = r.results.plants[0]
+    expect([p.id, p.service, p.capacity_kw, p.hours_short, p.min_flow_c, p.hot_water_short_hours]).toEqual([hp.id, 'heating', 30, eng.hours_short, eng.min_flow_c, eng.hot_water_short_hours])
+    for (const k of ['asked_not_given_step_sum_kwh', 'peak_ask_w', 'ask_kwh']) expect(k in p).toBe(false)
+    expect(p.hours_short).toBeGreaterThan(0)
+    expect(p.min_flow_c!).toBeLessThan(50)
+    const share = hp.share_pct / 100
+    // The boiler beside it has no capacity, so it tops up (Linzie, 16 Nov 19:48): no room is short because of the system.
+    if (!s.energy?.ok) throw new Error('no energy')
+    const served = s.energy.systems.filter((g) => g.service === 'heating').reduce((a, g) => a + g.served_kwh, 0)
+    expect(served).toBeCloseTo(s.zones.reduce((a, z) => a + z.heating_kwh, 0), 3)
+    expect(s.energy.systems.find((g) => g.id === hp.id)!.served_kwh).toBeCloseTo(p.delivered_kwh, 3)
+    expect(p.delivered_kwh).toBeLessThan(share * s.zones.reduce((a, z) => a + z.heating_kwh, 0))
+    for (const z of s.zones) {
+      const h = z.short.heating!
+      expect(h.system_short_hours + h.both_short_hours + h.own_short_hours).toBe(h.unmet_hours)
+      expect(h.own_short_hours).toBeGreaterThanOrEqual(0)
+      expect(z.short.cooling).toBeNull()
+    }
+    expect(s.zones.every((z) => z.short.heating!.system_short_hours === 0 && z.short.heating!.both_short_hours === 0)).toBe(true)
+    const dh = s.design_heat_loss
+    if (!dh?.ok) throw new Error('no design heat loss')
+    const line = dh.systems[0]
+    expect(line.capacity_w).toBe(30000)
+    expect(line.rooms_w).toBeCloseTo(share * dh.zones.filter((z) => z.heated).reduce((a, z) => a + z.total_w, 0), 6)
+    expect(line.total_w).toBe(line.rooms_w + line.hot_water_w)
+    expect(s.energy.water_heaters).toEqual([])
+  })
+  it('without a capacity: no lines, no split', async () => {
+    const r = simulate(await doc(), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.plants).toEqual([])
+    expect(r.summary.zones.every((z) => z.short.heating === null && z.short.cooling === null)).toBe(true)
   })
 })

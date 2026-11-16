@@ -61,9 +61,60 @@ export type PlanSystem = {
   /** Heating: the design flow and return temperatures, °C, its emitters are re-rated at (schema 2.4). */
   design_flow_c?: number | null
   design_return_c?: number | null
+  /** Brief 120: heating and cooling, its output, kW (limits the rooms it serves); hot water, the water heater's output. */
+  capacity_kw?: number | null
+  /** Brief 120: hot water, the store the heater refills, litres (needs the heater's kW). */
+  storage_litres?: number | null
+  /** Brief 120: heating, a hot water system (PlanSystem id) it heats first. */
+  dhw_first?: string | null
   /** Lighting (Brief 112): the luminaires' efficacy, W/m² for each 100 lux. Runs on electricity; no library template. */
   efficacy?: number | null
+  /** Brief 114: heating, cooling and hot water, the system's pumps (null or absent: none stated). */
+  pumps?: PlanPumps | null
+  /** Brief 114: ventilation, how the fans are told to run, and with demand the least share of the flow. */
+  runs?: 'continuous' | 'schedule' | 'demand' | null
+  demand_min?: number | null
 }
+/** Brief 114: a system's pumps as typed; each null is not stated. `default_from`: the source "Use defaults" filled them
+ * from, cleared on any edit. `schedule`: a profile key, with runs 'schedule' only. */
+export type PlanPumps = {
+  basis: 'w' | 'w_per_kw_capacity' | 'w_per_m2' | null
+  value: number | null
+  speed: 'fixed' | 'variable' | null
+  runs: 'continuous' | 'with_demand' | 'schedule' | null
+  schedule: string | null
+  default_from: string | null
+  /** Continuous pumps only: the months of the season, 1–12 (Controls). Null or absent: the months with load. */
+  season_months?: number[] | null
+}
+/** Months as words: a run of months (wrapping the year) as "Oct–Apr", otherwise listed. */
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export function monthsText(ms: number[]): string {
+  const set = new Set(ms)
+  if (set.size === 12) return 'all year'
+  if (set.size === 1) return MONTHS[ms[0]! - 1]!
+  const start = [...set].find((m) => !set.has(m === 1 ? 12 : m - 1))
+  if (start != null) {
+    let n = 0, m = start
+    while (set.has(m)) { n++; m = m === 12 ? 1 : m + 1 }
+    if (n === set.size) return `${MONTHS[start - 1]}–${MONTHS[(start + n - 2) % 12]}`
+  }
+  return [...set].sort((a, b) => a - b).map((m) => MONTHS[m - 1]).join(', ')
+}
+export const noPumps = (): PlanPumps => ({ basis: null, value: null, speed: null, runs: null, schedule: null, default_from: null })
+/** Brief 114: a building load outside the rooms (a lift, external lighting): its power and when it runs. */
+/** Brief 114: who or what controls a system, its fans or its lighting. Recorded, not yet used in the calculation. */
+export const CONTROLLERS = [
+  { key: 'central_bms', name: 'Central BMS' },
+  { key: 'local', name: 'Local controls' },
+  { key: 'time_clock', name: 'Time clock' },
+  { key: 'manual', name: 'By hand' },
+  { key: 'photocell', name: 'Photocell' },
+] as const
+export type Controller = (typeof CONTROLLERS)[number]['key']
+/** A control entry on the plan: `ref` is the plan system's id (ventilation and lighting systems included). */
+export type PlanControl = { kind: 'system' | 'ventilation' | 'lighting'; ref: string; controller: Controller | null; note: string | null }
+export type OtherLoadInput = { id: string; kind: 'lift' | 'external_lighting' | 'other'; name: string; power_w: number | null; runs: 'continuous' | 'schedule' | 'dusk_to_dawn' | null; schedule: string | null }
 
 /** Emitter kinds (schema 2.4). Wet kinds are fed by the room's heating system and rated (EN 442); VRF indoor units and
  * electric heaters have a fixed output. */
@@ -169,6 +220,11 @@ export type SpaceType = {
   /** Comfort band the systems hold, °C, typed. */
   heat_c?: number | null
   cool_c?: number | null
+  /** Brief 114 (edited on Controls): the heating hours (a schedule profile's key, or today's heating setpoint profile
+   * read as its hours at its highest temperature; null or 'always_on': every hour) and
+   * the temperature outside them, °C (null: off outside them). */
+  heat_hours?: string | null
+  setback_c?: number | null
   /** How the gains enter the zone (schema 2.3 profile fields), visible and editable on the space type. A new space
    * type starts from today's engine values (TODAY in thermal/schema/upgrade.ts). */
   radiant_fraction?: number | null
@@ -186,7 +242,14 @@ export type SpaceType = {
 
 /** Air leakage (q50, m³/h·m² at 50 Pa, every zone), thermal bridging (ISO 14683 default junctions × multiplier) and
  * site exposure. */
-export type BuildingInputs = { q50: number | null; tb_multiplier: number | null; exposure: 'sheltered' | 'normal' | 'exposed' | null }
+export type BuildingInputs = {
+  q50: number | null; tb_multiplier: number | null; exposure: 'sheltered' | 'normal' | 'exposed' | null
+  /** Brief 117/120: the design heat loss's outdoor temperature: stated °C, or the weather file's coldest 0.4 % / 1 %. */
+  design_outdoor?: number | 'heating_99_6' | 'heating_99' | null
+  /** Brief 117: warm-up allowance after a setback, W/m² (null: none), and the wind for permanent vents, m/s. */
+  warm_up_w_per_m2?: number | null
+  vent_wind_m_s?: number | null
+}
 /** Hot water, for the whole building (the schema's service-level fields): stored, tap and cold-supply temperatures,
  * daily demand per person or per m² of floor, a circulation pump, and when it is used (shown as 'flat' until changed). Typed; null is not stated. */
 export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c: number | null; basis: 'per_person' | 'per_m2' | null; litres: number | null; pump_w: number | null; shape?: 'flat' | 'follow_occupancy' | null }
@@ -212,6 +275,10 @@ export type Plan = {
    * space type or system points at are the project's too, listed or not. Not part of the document: only a profile
    * something uses reaches the engine. */
   profiles?: string[]
+  /** Brief 114: lifts, external lighting and other loads outside the rooms (Systems, Other loads). */
+  other_loads?: OtherLoadInput[]
+  /** Brief 114: the Controls step's record of who controls each system (recorded, not yet used in the calculation). */
+  controls?: PlanControl[]
   /** Whole-building fabric inputs, typed (null: not stated). */
   building?: BuildingInputs
   /** Emitter types (Systems step), given to rooms with a count. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALWAYS, azimuthOf, emptyPlan, layoutIn, upgradePlan, wallRuns, type Plan, type PlanSystem, type XY } from '../plan'
+import { ALWAYS, azimuthOf, emptyPlan, layoutIn, monthsText, noPumps, upgradePlan, wallRuns, type Plan, type PlanSystem, type XY } from '../plan'
 import { DOOR, changeWindow, crossing, setOpeningsIn, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
 import { cutZones } from '../ported/zones'
 import { fitRooms } from '../rooms'
@@ -296,6 +296,61 @@ describe('lighting from lux and the luminaires (Brief 112)', () => {
     expect(up.spaces.map((x) => [x.hot_water_basis, x.hot_water_litres])).toEqual([['per_person', 50], ['per_m2', 1]])
     expect(up.dhw).toMatchObject({ storage_c: 60, basis: null, litres: null })
     expect(upgradePlan(up)).toEqual(up)
+  })
+})
+
+describe('system capacity and design conditions (Brief 120 P6)', () => {
+  it('writes each system\'s kW, the water heater\'s store, the hot water a boiler heats first, and the design conditions', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    p = {
+      ...p,
+      spaces: [{ id: 's1', name: 'Office', use: 'office', occupancy: null, lighting: null, equipment: null, heat_c: 21 } as any],
+      systems: [{ id: 'y1', service: 'heating', name: 'Boiler', template: 'gas_boiler_heating', capacity_kw: 12, dhw_first: 'y2' }, { id: 'y2', service: 'dhw', name: 'Cylinder', template: 'gas_boiler_dhw', capacity_kw: null, storage_litres: null }],
+      rooms: p.rooms.map((r) => ({ ...r, space: 's1', systems: { heating: 'y1', dhw: 'y2' } })),
+      building: { q50: 5, tb_multiplier: 1, exposure: 'normal', design_outdoor: -3, warm_up_w_per_m2: null, vent_wind_m_s: null },
+    }
+    const doc = buildDocument(p).doc as any
+    const g = (s0: string) => doc.system_groups.find((x: any) => x.service === s0)
+    expect(g('heating')).toMatchObject({ capacity_kw: 12, dhw_priority_group_id: 'dhw_y2' })
+    expect(g('dhw')).toMatchObject({ capacity_kw: null, storage_litres: null })
+    expect(doc.building.design).toEqual({ outdoor: { stated_c: -3 }, warm_up_w_per_m2: null, vent_wind_m_s: null })
+    expect(doc.zones[0].design_internal_c).toBe('follow_heat_c')
+    const w = buildDocument({ ...p, systems: [{ ...p.systems[0]!, dhw_first: null }, { ...p.systems[1]!, capacity_kw: 3, storage_litres: 150 }], building: { ...p.building!, design_outdoor: 'heating_99_6' } })
+    expect(w.issues).toEqual([])
+    expect((w.doc as any).system_groups.find((x: any) => x.service === 'dhw')).toMatchObject({ capacity_kw: 3, storage_litres: 150 })
+    expect((w.doc as any).system_groups.find((x: any) => x.service === 'heating').dhw_priority_group_id ?? null).toBeNull()
+    expect((w.doc as any).building.design.outdoor).toEqual({ from_weather: 'heating_99_6' })
+    expect((buildDocument({ ...p, building: { ...p.building!, design_outdoor: null } }).doc as any).building.design ?? null).toBeNull()
+  })
+})
+
+describe('pumps, other loads and fan run modes (Brief 114 P4a)', () => {
+  it('writes a system\'s pumps and the building\'s other loads once stated, and a note for each that is not', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    p = {
+      ...p,
+      spaces: [{ id: 's1', name: 'Office', use: 'office', occupancy: null, lighting: null, equipment: null, heat_c: 21 } as any],
+      systems: [{ id: 'y1', service: 'heating', name: 'Boiler', template: 'gas_boiler_heating', pumps: { basis: 'w_per_m2', value: 0.5, speed: 'variable', runs: 'with_demand', schedule: null, default_from: 'NCM' } }],
+      rooms: p.rooms.map((r) => ({ ...r, space: 's1', systems: { heating: 'y1' } })),
+      other_loads: [{ id: 'l1', kind: 'lift', name: 'Lift', power_w: 2000, runs: 'continuous', schedule: null }, { id: 'l2', kind: 'external_lighting', name: 'Car park', power_w: null, runs: null, schedule: null }],
+    }
+    const b = buildDocument(p)
+    const doc = b.doc as any
+    expect(doc.system_groups.find((x: any) => x.service === 'heating').pumps).toEqual({ power: { w_per_m2: 0.5 }, speed: 'variable', runs: 'with_demand', schedule_ref: null, default_from: 'NCM' })
+    expect(doc.other_loads).toEqual([{ id: 'l1', kind: 'lift', label: 'Lift', power_w: 2000, runs: 'continuous', schedule_ref: null, default_from: null }])
+    expect(b.notes.join(' ')).toContain('Car park: needs its power, how it runs')
+    // Linzie 23:11: a continuous pump's season can be stated in months (written sorted, once each); none: the load's.
+    const season = buildDocument({ ...p, systems: [{ ...p.systems[0]!, pumps: { ...p.systems[0]!.pumps!, runs: 'continuous', season_months: [12, 1, 2, 10, 11, 3, 4, 1] } }] })
+    expect((season.doc as any).system_groups.find((x: any) => x.service === 'heating').pumps.season_months).toEqual([1, 2, 3, 4, 10, 11, 12])
+    expect(season.issues).toEqual([])
+    expect(monthsText([1, 2, 3, 4, 10, 11, 12])).toBe('Oct–Apr')
+    expect(monthsText([6, 8])).toBe('Jun, Aug')
+    const half = buildDocument({ ...p, systems: [{ ...p.systems[0]!, pumps: { ...noPumps(), basis: 'w', value: 80 } }], other_loads: [] }) as any
+    expect(half.doc.system_groups.find((x: any) => x.service === 'heating').pumps ?? null).toBeNull()
+    expect(half.doc.other_loads ?? null).toBeNull()
+    expect(half.notes.join(' ')).toContain('Boiler: its pumps need fixed or variable speed, how they run')
   })
 })
 

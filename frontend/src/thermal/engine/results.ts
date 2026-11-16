@@ -78,6 +78,16 @@ export interface ZoneResults {
     max_control_c: number
     /** Brief 119 review F4: the highest control temperature in use, °C (null: never in use). The mirror of min_control_in_use_c. */
     max_control_in_use_c: number | null
+    /**
+     * Brief 120 (review F3): of the hours in use below (above) the setpoint, those in which a system's capacity held the
+     * zone below its ask while the zone's own emitters (units) were not at their limit in that ask ("system short"), and
+     * those in which both were ("both"). The rest are the zone's own emitters or units, or warm-up. Null: no system with
+     * a capacity serves the zone.
+     */
+    system_short_heating_hours_in_use: number | null
+    system_short_cooling_hours_in_use: number | null
+    both_short_heating_hours_in_use: number | null
+    both_short_cooling_hours_in_use: number | null
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
   emitters: {
@@ -108,6 +118,54 @@ export interface ModelResults {
     active_set: { max_passes: number; hours_over_one: number } | null
   }
   run_ms: number
+  /** Brief 120: each heating or cooling system with a capacity, in the document's order (empty: none). */
+  plants: PlantResults[]
+}
+
+/**
+ * Brief 120: a system's capacity against what its zones asked of it. `ask` is each hour's heating (or cooling) the
+ * zones would have taken from it at their setpoints with only their own emitters' limits; `delivered` what it gave
+ * them. `asked_not_given_step_sum_kwh` (review F4) is Σ (ask − given) over its short steps, each ask at the setpoint
+ * from wherever the zone had fallen to, so a deficit carried over is counted again each step: it is not an energy, not
+ * the heat a bigger plant would have used, and is not shown to the person (the seam leaves it out).
+ */
+export interface PlantResults {
+  id: string
+  service: 'heating' | 'cooling'
+  cap_w: number
+  /**
+   * The highest step's ask, W, and the hours (fractions summed) the plant was short. The ask is at the setpoint from where
+   * the zones are, so a zone left cold asks for its whole recovery in one step (bounded only by its emitters): with a short
+   * plant and no emitter limit it can be many times the design heat loss. Not a sizing figure; not shown (the seam leaves
+   * it, and ask_kwh, out).
+   */
+  peak_ask_w: number
+  hours_short: number
+  ask_kwh: number
+  delivered_kwh: number
+  asked_not_given_step_sum_kwh: number
+  /** Hot water it heated first, kWh a year (0 without). */
+  reserved_kwh: number
+  /** The highest hour of that hot water, W (0 without). */
+  peak_reserved_w: number
+  /**
+   * Review F6: the hot water system it heats first (null: none). In an hour whose hot water is above its capacity the
+   * taps get `hot_water_given_frac` of it (null: never short) and the rooms nothing; the hours, and the heat the taps
+   * did not get, kWh a year. Systems serves only what the taps got.
+   */
+  hot_water_id: string | null
+  hot_water_given_frac: Float64Array | null
+  hot_water_short_hours: number
+  hot_water_short_kwh: number
+  /** asked_not_given_step_sum_kwh by calendar month, January first. */
+  asked_not_given_step_sum_kwh_by_month: number[]
+  /** Brief 120 P2b: the lowest flow temperature it fell to, °C (its design flow if never short); null when it does not feed wet emitters in every zone (shared in proportion to ask). */
+  min_flow_c: number | null
+  /**
+   * Review F1: what it gave each zone it serves, W each hour (Σ = what it delivered). With a short plant beside others,
+   * the zone's systems no longer give in fixed shares (the others top up); Systems reads each system's energy from here.
+   */
+  zones: { zone_id: string; share: number; given_w: Float64Array }[]
 }
 
 export const readZoneHeatingKwh = (r: ZoneResults) => r.annual.heating_kwh
