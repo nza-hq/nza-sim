@@ -8,14 +8,14 @@
 
 **Cases.** The boiler uncapped (1,000 kW), then at 100 %, 75 % and 50 % of its rooms' design heat loss (15.8 kW, read from the run's own design line, `design_heat_loss.systems`).
 
-| Boiler | Hours short | Peak ask | Lowest flow | Year's heating, building | Boiler gas | Unmet hours (system only / both / own): café, kitchen, WCs, hall |
-|---|---|---|---|---|---|---|
-| uncapped | 0 | 30.0 kW | 70 °C | 14,112 kWh | 11,990 kWh | 54 (0/0/54), 564 (0/0/564), 179 (0/0/179), 133 (0/0/133) |
-| 15.8 kW (design) | 398 | 30.1 kW | 48.1 °C | 13,909 kWh | 11,750 kWh | 140 (0/140/0), 673 (0/434/239), 295 (0/188/107), 246 (0/246/0) |
-| 11.9 kW (75 %) | 551 | 30.2 kW | 41.6 °C | 13,727 kWh | 11,534 kWh | 204 (0/204/0), 778 (0/586/192), 387 (0/279/108), 353 (0/353/0) |
-| 7.9 kW (50 %) | 875 | 30.5 kW | 34.0 °C | 13,299 kWh | 11,021 kWh | 385 (0/385/0), 960 (0/869/91), 589 (0/481/108), 559 (0/559/0) |
+| Boiler | Hours short | Lowest flow | Year's heating, building | Boiler gas | Unmet hours (system only / both / own): café, kitchen, WCs, hall |
+|---|---|---|---|---|---|
+| uncapped | 0 | 70 °C | 14,112 kWh | 11,990 kWh | 54 (0/0/54), 564 (0/0/564), 179 (0/0/179), 133 (0/0/133) |
+| 15.8 kW (design) | 398 | 48.1 °C | 13,909 kWh | 11,750 kWh | 140 (0/140/0), 673 (0/434/239), 295 (0/188/107), 246 (0/246/0) |
+| 11.9 kW (75 %) | 551 | 41.6 °C | 13,727 kWh | 11,534 kWh | 204 (0/204/0), 778 (0/586/192), 387 (0/279/108), 353 (0/353/0) |
+| 7.9 kW (50 %) | 875 | 34.0 °C | 13,299 kWh | 11,021 kWh | 385 (0/385/0), 960 (0/869/91), 589 (0/481/108), 559 (0/559/0) |
 
-Unmet hours split three ways (review F3): **system only** (the boiler held the room, and its own radiators were not at their limit), **both** (the boiler held it, and the room's own radiators were at their limit in its ask too), **own** (only the room's radiators). Re-run 16 Nov after review F1 and F3; the year's numbers did not move, since the boiler is the only heating system in these rooms.
+The peak ask column was removed (editor's finding, 16 Nov): a capped run's ask includes cold rooms asking for their whole recovery in one step, so it is not a sizing figure. The uncapped run's peak heating, 30 kW, is the real peak. Unmet hours split three ways (review F3): **system only** (the boiler held the room, and its own radiators were not at their limit), **both** (the boiler held it, and the room's own radiators were at their limit in its ask too), **own** (only the room's radiators). Re-run 16 Nov after review F1 and F3; the year's numbers did not move, since the boiler is the only heating system in these rooms.
 
 ## What it shows
 

@@ -212,16 +212,17 @@ export interface ShortSplit {
 /**
  * Brief 120 P3: one system's capacity against what its rooms asked of it (the engine's PlantResults, Rule 11), with its
  * name. `min_flow_c`: how far the water fell when short (a boiler feeding radiators in every room it serves), else null.
- * Review F4: the engine's asked-not-given step sum is not an energy and is not shown; the hours short and the peak ask
- * against the capacity are, and a year's difference needs two runs.
+ * Review F4: the engine's asked-not-given step sum is not an energy and is not shown. Nor are its ask figures (peak and
+ * year): a room below its setpoint asks for its whole recovery in one step, so with no emitter limit the peak ask can be
+ * many times the design heat loss (editor, 16 Nov: 306 kW against 31.3 kW on Bridgewater). Shown: the hours short at
+ * the stated capacity; a year's difference needs two runs.
  */
 export interface PlantSummary {
   id: string; label: string; service: 'heating' | 'cooling'
   capacity_kw: number
-  peak_ask_w: number
   /** Hours (in steps, summed) it gave all it had. */
   hours_short: number
-  ask_kwh: number; delivered_kwh: number
+  delivered_kwh: number
   /** Hot water it heated first, kWh a year (0 without); the hours its capacity could not cover it, and what the taps did not get, kWh (review F6). */
   hot_water_first_kwh: number
   hot_water_short_hours: number
@@ -551,7 +552,7 @@ export function simulate(
       const g = doc.system_groups.find((x) => x.id === p.id)!
       return {
         id: p.id, label: g.label || `${SERVICE_WORDS[p.service]} system`, service: p.service, capacity_kw: p.cap_w / 1000,
-        peak_ask_w: p.peak_ask_w, hours_short: p.hours_short, ask_kwh: p.ask_kwh, delivered_kwh: p.delivered_kwh,
+        hours_short: p.hours_short, delivered_kwh: p.delivered_kwh,
         hot_water_first_kwh: p.reserved_kwh, hot_water_short_hours: p.hot_water_short_hours, hot_water_short_kwh: p.hot_water_short_kwh, min_flow_c: p.min_flow_c,
       }
     }),

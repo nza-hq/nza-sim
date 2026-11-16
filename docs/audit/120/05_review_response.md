@@ -16,3 +16,5 @@
 | F10 | **Fixed (first seam).** `runSystems` refuses a run where a capped system's served kWh differs from what the run says it delivered. The design line stays summed in the seam (its only exposure). | `systems.ts` |
 | F11 | **Owed, recorded.** A held-out wet case (three rooms, 70/50, n = 1.3) needs the 108 EnergyPlus model extended past two rooms at 50/40; a cooling plant case is not built. Cooling capacity is shared in proportion to ask and is unrefereed; the panel should say so. | final report, STATUS |
 | F12 | **Shown.** A water heater result carries `short_without_store` when it left the taps short with no store stated, so the panel can say a hot water kW is now a water heater limit. | `systems.ts` |
+
+**After the review (editor thread, 16 Nov 20:14):** `peak_ask_w` has the same fault as F4: a room below its setpoint asks for its whole recovery in one step, so with no emitter limit it reached 306 kW on Bridgewater against a 31.3 kW design heat loss. It, and `ask_kwh`, are left out of the summary (seam test asserts it) and documented in the engine; the example's peak column is removed. The real peak is the uncapped run's.

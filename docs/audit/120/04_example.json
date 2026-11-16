@@ -19,7 +19,7 @@
  "design_kw": 15.8,
  "cases": {
   "uncapped_1000kw": {
-   "run_ms": 5342,
+   "run_ms": 4509,
    "steps_per_hour": 4,
    "eui": 96.9,
    "heating_kwh": 14112,
@@ -27,7 +27,6 @@
     {
      "label": "Gas boiler 1",
      "capacity_kw": 1000,
-     "peak_ask_kw": 30,
      "hours_short": 0,
      "delivered_kwh": 11031,
      "min_flow_c": 70
@@ -91,7 +90,7 @@
    ]
   },
   "capped_100pct_of_design": {
-   "run_ms": 1805,
+   "run_ms": 2117,
    "steps_per_hour": 4,
    "eui": 96.6,
    "heating_kwh": 13909,
@@ -99,7 +98,6 @@
     {
      "label": "Gas boiler 1",
      "capacity_kw": 15.8,
-     "peak_ask_kw": 30.1,
      "hours_short": 397.8,
      "delivered_kwh": 10810,
      "min_flow_c": 48.1
@@ -163,7 +161,7 @@
    ]
   },
   "capped_75pct_of_design": {
-   "run_ms": 1841,
+   "run_ms": 2057,
    "steps_per_hour": 4,
    "eui": 96.3,
    "heating_kwh": 13727,
@@ -171,7 +169,6 @@
     {
      "label": "Gas boiler 1",
      "capacity_kw": 11.9,
-     "peak_ask_kw": 30.2,
      "hours_short": 551,
      "delivered_kwh": 10611,
      "min_flow_c": 41.6
@@ -235,7 +232,7 @@
    ]
   },
   "capped_50pct_of_design": {
-   "run_ms": 1949,
+   "run_ms": 2414,
    "steps_per_hour": 4,
    "eui": 95.5,
    "heating_kwh": 13299,
@@ -243,7 +240,6 @@
     {
      "label": "Gas boiler 1",
      "capacity_kw": 7.9,
-     "peak_ask_kw": 30.5,
      "hours_short": 874.5,
      "delivered_kwh": 10140,
      "min_flow_c": 34

@@ -53,7 +53,7 @@ function run(doc: any) {
   if (!s.energy?.ok) throw new Error(JSON.stringify(s.energy))
   return {
     run_ms: Math.round(s.run_ms), steps_per_hour: s.steps_per_hour, eui: +s.energy.eui_kwh_per_m2.toFixed(1), heating_kwh: Math.round(s.building.heating_kwh),
-    plants: s.plants.map((p) => ({ label: p.label, capacity_kw: p.capacity_kw, peak_ask_kw: +(p.peak_ask_w / 1000).toFixed(1), hours_short: +p.hours_short.toFixed(1), delivered_kwh: Math.round(p.delivered_kwh), min_flow_c: p.min_flow_c == null ? null : +p.min_flow_c.toFixed(1) })),
+    plants: s.plants.map((p) => ({ label: p.label, capacity_kw: p.capacity_kw, hours_short: +p.hours_short.toFixed(1), delivered_kwh: Math.round(p.delivered_kwh), min_flow_c: p.min_flow_c == null ? null : +p.min_flow_c.toFixed(1) })),
     design: s.design_heat_loss?.ok ? s.design_heat_loss.systems.map((x) => ({ label: x.label, capacity_kw: x.capacity_w / 1000, rooms_kw: +(x.rooms_w / 1000).toFixed(1), hot_water_kw: +(x.hot_water_w / 1000).toFixed(1) })) : null,
     rooms: s.zones.filter((z) => z.short.heating).map((z) => ({ room: z.name, heating_kwh: Math.round(z.heating_kwh), ...z.short.heating! })),
     fuel: s.energy.systems.filter((g) => g.service === 'heating').map((g) => ({ label: g.label, fuel_kwh: Math.round(g.fuel_kwh) })),
