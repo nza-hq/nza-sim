@@ -36,3 +36,22 @@ With equal radiators both engines give each room half the plant in its short hou
 The brief's decision 1 shares a short plant in proportion to what each room asks. EnergyPlus does what a wet system does: the plant cannot hold its flow temperature, the water reaches every radiator cooler, and each radiator gives what its size gives at that cooler water. The room with the bigger radiator keeps more. The brief expected EnergyPlus to be "close to proportional" and asked P2 to measure how close: for equal rooms it is; for unequal rooms it is not, and the unmet hours move by 273 h and 125 h.
 
 No constant was changed to get closer (Rule 10). The next step is a method change, not a tuning: share a short plant through a common flow temperature (Part 2b).
+
+## Part 2b: a short plant shares through one lower flow temperature
+
+`network.ts` (`plantLimit`, `flowFor`), `emitters.ts` (`at_flow`), `model.ts`. A heating plant whose every zone has wet emitters on it now does what EnergyPlus's loop does. When it cannot give what the rooms ask, the water reaches every radiator at one lower flow temperature. That temperature is found so the radiators' own output at it, each room taking no more than it asks, equals what the plant has. Each radiator keeps its design water flow, as in Brief 108. A plant without radiators in every room it serves still shares in proportion to ask, and reports no flow temperature. Nothing was fitted: the radiators' EN 442 output at the cooler water is the same function 108 refereed.
+
+| Case | Room | EnergyPlus heat MWh / unmet h / share | Engine 2 heat MWh / unmet h / share | Heat | Unmet (tolerance) |
+|---|---|---|---|---|---|
+| binds | west | 1.883 / 487 / 0.503 | 1.815 / 459 / 0.500 | −3.6 % | −28 h (±48.7) ✓ |
+| | east | 1.880 / 485 / 0.503 | 1.815 / 461 / 0.500 | −3.4 % | −24 h (±48.5) ✓ |
+| free | west | 1.931 / 27 | 1.859 / 23 | −3.7 % | −4 h (±10) ✓ |
+| | east | 1.928 / 26 | 1.860 / 24 | −3.5 % | −2 h (±10) ✓ |
+| unequal | west (1600 W) | 1.927 / 173 / 0.561 | 1.857 / 158 / 0.561 | −3.7 % | −15 h (±17.3) ✓ |
+| | east (900 W) | 1.835 / 587 / 0.445 | 1.774 / 557 / 0.439 | −3.3 % | −30 h (±58.7) ✓ |
+
+Lowest flow temperature: binds EnergyPlus 35.8 °C, Engine 2 36.0 °C; unequal 33.7 °C and 33.9 °C. (In the free case EnergyPlus's loop drifts to 38.8 °C without being short; Engine 2 holds 50 °C.)
+
+**Gate verdict.** Unmet hours pass in every room and case. Annual heating fails its ±3 % in every room, by −3.3 % to −3.7 %, and it fails by the same amount in the free case, where the plant does nothing. That miss is Brief 108's hot-water case and Brief 104's open cooled-room gap, not the plant. What the plant does (binds minus free, and the unequal sharing) agrees. Plant short hours: Engine 2 675–676 against EnergyPlus 765–780 (−12 %), recorded open.
+
+Tests: `plant.test.ts` adds the unequal-radiator case (the bigger radiator keeps more than 0.53 of the plant in its short hours; proportional sharing gave 0.522 and fails it) and a plant without radiators in every room states no flow temperature.

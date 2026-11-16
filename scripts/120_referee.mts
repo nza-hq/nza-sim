@@ -56,19 +56,20 @@ for (const [name, c] of Object.entries<any>(SPEC.cases)) {
     const heatPct = pct(e.heat_mwh, p.heat_mwh)
     const unmetDiff = e.unmet_hours - p.unmet_hours
     const unmetTol = Math.max(G.unmet_hours_floor_h, (G.unmet_hours_pct / 100) * p.unmet_hours)
-    const ok = Math.abs(heatPct) <= G.annual_heating_pct && Math.abs(unmetDiff) <= unmetTol
+    const heatOk = Math.abs(heatPct) <= G.annual_heating_pct, unmetOk = Math.abs(unmetDiff) <= unmetTol
+    const ok = heatOk && unmetOk
     pass &&= ok
     rooms[z.zone_id] = {
       energyplus: { heat_mwh: r3(p.heat_mwh), unmet_hours: p.unmet_hours, min_c: r3(p.min_c), share_in_short: p.share_of_plant_in_short_steps == null ? null : r3(p.share_of_plant_in_short_steps) },
       engine2: { heat_mwh: r3(e.heat_mwh), unmet_hours: e.unmet_hours, min_c: r3(e.min_c), share_in_short: tookAll > 0 ? r3(took[z.zone_id] / tookAll) : null, closure_max_wh: z.closure.max_wh },
-      heating_pct: heatPct, unmet_diff_h: unmetDiff, unmet_tolerance_h: +unmetTol.toFixed(1), min_diff_k: +(e.min_c - p.min_c).toFixed(2), passes: ok,
+      heating_pct: heatPct, unmet_diff_h: unmetDiff, unmet_tolerance_h: +unmetTol.toFixed(1), min_diff_k: +(e.min_c - p.min_c).toFixed(2), heating_passes: heatOk, unmet_passes: unmetOk, passes: ok,
     }
   }
   out[name] = {
     plant_w: c.plant_w, radiators_w: caps,
     plant: {
       energyplus: { heat_mwh: r3(EP.runs[name].plant.heat_mwh), short_hours: EP.runs[name].plant.short_hours, min_flow_c: r3(EP.runs[name].plant.min_flow_c) },
-      engine2: { delivered_mwh: r3(plant.delivered_kwh / 1000), ask_mwh: r3(plant.ask_kwh / 1000), short_hours: +plant.hours_short.toFixed(1), short_hours_read_from_zones: shortH, peak_ask_w: +plant.peak_ask_w.toFixed(1), short_kwh: +plant.short_kwh.toFixed(1) },
+      engine2: { delivered_mwh: r3(plant.delivered_kwh / 1000), ask_mwh: r3(plant.ask_kwh / 1000), short_hours: +plant.hours_short.toFixed(1), short_hours_read_from_zones: shortH, peak_ask_w: +plant.peak_ask_w.toFixed(1), short_kwh: +plant.short_kwh.toFixed(1), min_flow_c: plant.min_flow_c == null ? null : r3(plant.min_flow_c) },
     },
     rooms,
   }

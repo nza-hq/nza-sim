@@ -138,6 +138,8 @@ export interface PlantResults {
   reserved_kwh: number
   /** short_kwh by calendar month, January first. */
   short_kwh_by_month: number[]
+  /** Brief 120 P2b: the lowest flow temperature it fell to, °C (its design flow if never short); null when it does not feed wet emitters in every zone (shared in proportion to ask). */
+  min_flow_c: number | null
 }
 
 export const readZoneHeatingKwh = (r: ZoneResults) => r.annual.heating_kwh

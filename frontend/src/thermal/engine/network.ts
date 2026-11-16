@@ -113,10 +113,17 @@ export interface NetworkInputs {
   /**
    * Brief 120: plant (system) capacity. Each step, the zones a plant serves draw at most `cap_w` from it, less
    * `reserved_w` that hour (hot water it heats first), summed over its share of each zone's heating (or cooling). When
-   * they ask for more, each zone's limit that step becomes its share of what is there, in proportion to what it asked
-   * for after its own emitters' limit (Linzie's decision 1), and the step is solved again with those limits (and again
-   * while the plant still draws more, as the zones' heat moves between them). A zone's share not on any listed plant
-   * is not limited by plant. Absent or empty: no plant limits (as before Brief 120).
+   * they ask for more:
+   * - a heating plant with `flow` (every zone it serves has wet emitters on it) cannot hold its flow temperature: the
+   *   water reaches every emitter at one lower flow temperature, found so that what the emitters give at it (each
+   *   zone taking no more than it asks) is what the plant has, and each zone's limit is its emitters' output at that
+   *   flow (Brief 120 P2b; EnergyPlus's plant loop does the same, docs/audit/120/02_referee.md). A room with bigger
+   *   emitters keeps more;
+   * - otherwise each zone's limit is its share of what is there, in proportion to what it asked for after its own
+   *   emitters' limit;
+   * and the step is solved again with those limits (and again while the plant still draws more, as the zones' heat
+   * moves between them). A zone's share not on any listed plant is not limited by plant. Absent or empty: no plant
+   * limits (as before Brief 120).
    */
   plants?: NetworkPlant[] | null
 }
@@ -129,6 +136,12 @@ export interface NetworkPlant {
   zones: { zone: number; share: number }[]
   /** Each hour, W of the capacity taken first by something else (hot water with priority); null: none. */
   reserved_w?: ArrayLike<number> | null
+  /**
+   * Brief 120 P2b: a heating plant feeding wet emitters. `design_c` is its flow temperature; `out[k]` the output of
+   * the emitters it feeds in `zones[k]` with the room at `room_c` and the water arriving at `flow_c`, W. Null: shares
+   * in proportion to ask.
+   */
+  flow?: { design_c: number; out: ((room_c: number, flow_c: number) => number)[] } | null
 }
 
 export interface NetworkPlantRun {
@@ -136,6 +149,8 @@ export interface NetworkPlantRun {
   ask_w: Float64Array
   delivered_w: Float64Array
   short: Float64Array
+  /** Brief 120 P2b: each hour's lowest flow temperature, °C (a plant with `flow`; its design flow when not short), else null. */
+  flow_c: Float64Array | null
 }
 
 export interface NetworkZoneRun {
@@ -202,6 +217,11 @@ function check(inp: NetworkInputs) {
     if (pl.reserved_w) {
       arr(pl.reserved_w, `${p}.reserved_w`)
       for (let h = 0; h < H; h++) if (pl.reserved_w[h] < 0) throw new NetworkError(`hour ${h} is negative`, `${p}.reserved_w`)
+    }
+    if (pl.flow) {
+      if (pl.service !== 'heating') throw new NetworkError('only a heating plant feeds emitters by flow temperature', `${p}.flow`)
+      if (!Number.isFinite(pl.flow.design_c)) throw new NetworkError('must be a temperature', `${p}.flow.design_c`)
+      if (pl.flow.out.length !== pl.zones.length || pl.flow.out.some((f) => typeof f !== 'function')) throw new NetworkError('one output function per zone served', `${p}.flow.out`)
     }
   })
   arr(inp.theta_e, 'theta_e')
@@ -752,7 +772,21 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
    */
   const PL = (inp.plants ?? []).length
   const plants = inp.plants ?? []
-  const plOut: NetworkPlantRun[] = plants.map(() => ({ ask_w: new Float64Array(H), delivered_w: new Float64Array(H), short: new Float64Array(H) }))
+  const plOut: NetworkPlantRun[] = plants.map((p) => ({ ask_w: new Float64Array(H), delivered_w: new Float64Array(H), short: new Float64Array(H), flow_c: p.flow ? new Float64Array(H).fill(p.flow.design_c) : null }))
+  const target = new Float64Array(PL), flowNow = new Float64Array(PL)
+  // The room temperature an emitter is rated at this step: the one it follows (heating_cap_at), else the setpoint.
+  const roomOf = (z: number) => (capAt[z] ? ctlPrev[z] : heatC[z])
+  /** Brief 120 P2b: the flow temperature at which plant p's emitters give `t` W (each zone at most its share of ask). */
+  const flowFor = (p: number, t: number) => {
+    const fl = plants[p].flow!
+    const give = (f: number) => { let q = 0; plants[p].zones.forEach(({ zone, share }, k) => { q += Math.min(share * Math.max(0, ask[zone]), fl.out[k](roomOf(zone), f)) }); return q }
+    let lo = Infinity
+    for (const { zone } of plants[p].zones) lo = Math.min(lo, roomOf(zone))
+    let hi = fl.design_c
+    if (!(lo < hi)) return hi
+    for (let i = 0; i < 60; i++) { const m = 0.5 * (lo + hi); if (give(m) > t) hi = m; else lo = m }
+    return lo
+  }
   const zLimited = plants.length ? inp.zones.map(() => new Float64Array(H)) : []
   const ask = new Float64Array(Z), baseW = new Float64Array(Z), baseC = new Float64Array(Z), frac = new Float64Array(PL), avail = new Float64Array(PL)
   const sign = plants.map((p) => (p.service === 'heating' ? 1 : -1))
@@ -765,6 +799,8 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       const a = drawOf(p, ask)
       frac[p] = a > avail[p] * (1 + 1e-9) + 1e-9 ? avail[p] / a : 1
       if (frac[p] < 1) short = true
+      target[p] = avail[p]
+      flowNow[p] = plants[p].flow ? plants[p].flow!.design_c : NaN
       if (record) plOut[p].ask_w[h] += w * a
     }
     let passes = 0
@@ -777,11 +813,14 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
           const lim = new Float64Array(Z), cover = new Float64Array(Z), any = new Uint8Array(Z)
           for (let p = 0; p < PL; p++) {
             if (sign[p] !== svc) continue
-            for (const { zone, share } of plants[p].zones) {
+            const fl = frac[p] < 1 && svc === 1 ? plants[p].flow : null
+            if (fl) flowNow[p] = flowFor(p, target[p])
+            plants[p].zones.forEach(({ zone, share }, k) => {
               const a = Math.max(0, svc * ask[zone])
-              lim[zone] += share * frac[p] * a; cover[zone] += share
+              lim[zone] += fl ? Math.min(share * a, fl.out[k](roomOf(zone), flowNow[p])) : share * frac[p] * a
+              cover[zone] += share
               if (frac[p] < 1) any[zone] = 1
-            }
+            })
           }
           for (let z = 0; z < Z; z++) {
             if (!any[z]) continue
@@ -793,7 +832,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
         let over = false
         for (let p = 0; p < PL; p++) {
           const d = drawOf(p, phi)
-          if (d > avail[p] * (1 + 1e-9) + 1e-6) { over = true; frac[p] *= avail[p] / d }
+          if (d > avail[p] * (1 + 1e-9) + 1e-6) { over = true; frac[p] *= avail[p] / d; target[p] *= avail[p] / d }
         }
         if (!over) break
         if (it > 50) throw new NetworkError(`plant limits did not settle in hour ${h}`, 'plants')
@@ -810,6 +849,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     if (record) for (let p = 0; p < PL; p++) {
       plOut[p].delivered_w[h] += w * drawOf(p, phi)
       if (frac[p] < 1) plOut[p].short[h] += w
+      if (plOut[p].flow_c && frac[p] < 1) plOut[p].flow_c![h] = Math.min(plOut[p].flow_c![h], flowNow[p])
     }
     return passes
   }

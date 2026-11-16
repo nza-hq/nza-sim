@@ -131,6 +131,30 @@ describe('Brief 120 P1 (document): capacity_kw limits the rooms a system serves'
     expect(bad((d) => { d.system_groups[0].dhw_priority_group_id = 'hw'; d.system_groups[0].capacity_kw = null })).toMatch(/needs its capacity/)
     expect(bad((d) => { d.system_groups[0].dhw_priority_group_id = 'hw' })).toBeUndefined()
   })
+  it('P2b: a short boiler feeding radiators lowers one flow temperature; the room with the bigger radiator keeps more', () => {
+    const c = cooledRoomDocument()
+    const d: any = structuredClone(c.doc)
+    const rads: Record<string, number> = { west: 1600, east: 900 }
+    d.system_groups = [{ id: 'lthw', service: 'heating', zones: Object.keys(rads), enabled: true, share_pct: 100, source: 'gas', efficiency_metric: 0.9, capacity_kw: 1.6, design_flow_c: 50, design_return_c: 40 }]
+    for (const z of d.zones) if (rads[z.id]) z.emitters = [{ id: `${z.id}_rad`, kind: 'radiator', count: 1, rated_output_w: rads[z.id], radiant_fraction: 0, system_group_id: 'lthw', rated_flow_c: 50, rated_return_c: 40, rated_room_c: 20, exponent_n: 1 }]
+    const r = runModel(ModelDocument.parse(d), W, c.lib, REFEREE_OPTIONS)
+    const p = r.plants[0]
+    expect(p.hours_short).toBeGreaterThan(100)
+    expect(p.min_flow_c!).toBeLessThan(45)
+    expect(p.min_flow_c!).toBeGreaterThan(20)
+    const [w, e] = ['west', 'east'].map((id) => r.zones.find((z) => z.zone_id === id)!)
+    let gw = 0, ge = 0
+    for (let h = 0; h < W.hours.count; h++) {
+      const sum = w.hourly.heating_w[h] + e.hourly.heating_w[h]
+      expect(sum).toBeLessThanOrEqual(1600 * (1 + 1e-9) + 1e-6)
+      if (sum >= 1599) { gw += w.hourly.heating_w[h]; ge += e.hourly.heating_w[h] }
+    }
+    expect(gw / (gw + ge)).toBeGreaterThan(0.53)
+    for (const z of [w, e]) expect(z.closure.max_wh).toBeLessThanOrEqual(1)
+  })
+  it('P2b: a plant with no radiators of its own in every room shares in proportion to ask, and states no flow temperature', () => {
+    expect(run(doc(1)).plants[0].min_flow_c).toBeNull()
+  })
   it('a 2.8 document upgrades with no hot water heated first', () => {
     const d: any = structuredClone(cooledRoomDocument().doc)
     d.schema_version = '2.8'

@@ -417,7 +417,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       }
       void i
     }
-    return { id: g.id, service: g.service as 'heating' | 'cooling', cap_w: g.capacity_kw! * 1000, zones: g.zones.map((z) => ({ zone: zIdx.get(z)!, share: g.share_pct / 100 })), reserved_w: reserved }
+    return { id: g.id, service: g.service as 'heating' | 'cooling', cap_w: g.capacity_kw! * 1000, zones: g.zones.map((z) => ({ zone: zIdx.get(z)!, share: g.share_pct / 100 })), reserved_w: reserved, flow: null }
   })
   // Brief 109: each zone's heating hours and setback, resolved into its hourly setpoints (null: one setpoint all year).
   const hoursOf = zoneSetpointHours(doc, weather.hours)
@@ -430,6 +430,17 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     if (e instanceof EmitterError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
     throw e
   }
+  // Brief 120 P2b: a heating plant whose every zone has wet emitters on it shares a shortfall through one lower flow
+  // temperature (the emitters' own output at it), as a wet system does; otherwise in proportion to ask.
+  plantGroups.forEach(({ g }, k) => {
+    if (g.service !== 'heating' || g.design_flow_c == null) return
+    const out = plants[k].zones.map(({ zone }) => {
+      const em = emit[zone]
+      if (!em || em.at_flow(0, g.design_flow_c!, g.id) == null) return null  // null: no wet emitter of this system in the zone
+      return (room_c: number, flow_c: number) => em.at_flow(room_c, flow_c, g.id)!
+    })
+    if (out.every((f) => f != null)) plants[k].flow = { design_c: g.design_flow_c, out: out as ((r: number, f: number) => number)[] }
+  })
   // Review F8: a mode parameter that is not one of its values is refused, never read as the default (CLAUDE.md lesson 11).
   if (options.emitter_limit != null && options.emitter_limit !== 'cap' && options.emitter_limit !== 'none') throw new ModelError(`unknown emitter_limit "${String(options.emitter_limit)}"`, 'options.emitter_limit')
   if (options.emitter_rating != null && options.emitter_rating !== 'room' && options.emitter_rating !== 'setpoint') throw new ModelError(`unknown emitter_rating "${String(options.emitter_rating)}"`, 'options.emitter_rating')
@@ -666,16 +677,18 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const cal = plants.length ? calendar(weather.hours) : null
   const plantResults: PlantResults[] = plants.map((p, k) => {
     const r = plantRun[k]
-    let peak = 0, hrs = 0, ask = 0, del = 0, res = 0
+    let peak = 0, hrs = 0, ask = 0, del = 0, res = 0, minFlow = Infinity
     const byMonth = new Array(12).fill(0)
     for (let h = 0; h < H; h++) {
       peak = Math.max(peak, r.ask_w[h]); hrs += r.short[h]; ask += r.ask_w[h]; del += r.delivered_w[h]
       res += p.reserved_w ? p.reserved_w[h] : 0
+      if (r.flow_c) minFlow = Math.min(minFlow, r.flow_c[h])
       if (r.short[h] > 0) byMonth[cal!.monthIdx[h]] += (r.ask_w[h] - r.delivered_w[h]) / 1000
     }
     return {
       id: p.id, service: p.service, cap_w: p.cap_w, peak_ask_w: peak, hours_short: hrs, ask_kwh: ask / 1000, delivered_kwh: del / 1000,
       short_kwh: byMonth.reduce((a, b) => a + b, 0), reserved_kwh: res / 1000, short_kwh_by_month: byMonth,
+      min_flow_c: r.flow_c ? minFlow : null,
     }
   })
   return { engine: network ? 'thermal-2' : 'thermal-1', zones, solver, run_ms, plants: plantResults }
