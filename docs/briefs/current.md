@@ -1,6 +1,7 @@
 # Current brief
 
-**No brief in progress.** Next: Brief 115 (windows and natural ventilation).
+**Brief 115 — Simulate v2: natural ventilation, opening windows and air leakage — IN PROGRESS on `chris/115-air-movement`.**
+Brief [`active/115_natural-ventilation-and-air-leakage.md`](active/115_natural-ventilation-and-air-leakage.md) (Linzie approved 16 Nov 15:06). P0 [`../audit/115/00_reconnaissance.md`](../audit/115/00_reconnaissance.md), P1 [`../audit/115/01_schema.md`](../audit/115/01_schema.md), P2/P3 engine `thermal/engine/airflow.ts` done; next P4 EnergyPlus referees, P5 speed, the community centre tests, then review. P6/P7 are the editor thread's.
 
 Previous:
 

@@ -24,6 +24,8 @@ const COLOUR: Record<string, string> = {
   infiltration: FABRIC_COLOURS.infiltration,
   permanent_vents: FABRIC_COLOURS.permanent_vents,
   mechanical_ventilation: FABRIC_COLOURS.ventilation,
+  window_ventilation: FABRIC_COLOURS.openings_window,
+  single_sided_turbulence: FABRIC_COLOURS.openings_louvre,
   solar_transmitted: SOLAR_COLOURS.south,
   glazing_solar_absorbed: SOLAR_COLOURS.west,
   opaque_solar_absorbed: SOLAR_COLOURS.east,

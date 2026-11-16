@@ -111,7 +111,7 @@ export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7' && from !== '2.8' && from !== '2.9') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7' && from !== '2.8' && from !== '2.9' && from !== '2.10') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
   if (from === '2.0' || from === '2.1') to22(doc)
   // Review F1 (Brief 112): from 2.3 on, a null gain input means "not stated" and stays null (the engine names it).
@@ -119,10 +119,13 @@ export function upgradeDocument(input: unknown): ModelDocument {
   to24(doc)
   to25(doc)
   to26(doc)
-  if (from !== '2.7') to27(doc)
-  if (from !== '2.8') to28(doc)
-  if (from !== '2.9') to29(doc)
+  // As before 2.11 for every older version; a 2.10 document has had all three.
+  const before210 = from !== '2.10'
+  if (before210 && from !== '2.7') to27(doc)
+  if (before210 && from !== '2.8') to28(doc)
+  if (before210 && from !== '2.9') to29(doc)
   to210(doc)
+  to211(doc)
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
 }
@@ -137,6 +140,16 @@ function to210(doc: Obj): void {
   for (const z of doc.zones as Obj[]) for (const v of z.ventilation as Obj[]) { v.runs ??= null; v.demand_min_fraction ??= null }
   doc.other_loads ??= []
   doc.controls ??= []
+}
+
+/**
+ * 2.10 → 2.11 (Brief 115): air stays today's method (n50/20 leakage, wind-only vents), written explicitly, so every
+ * older document, Bridgewater's included, gives exactly what it did. No terrain, no window temperatures.
+ */
+function to211(doc: Obj): void {
+  doc.building.air ??= { method: 'today', exponent: null, single_sided_turbulence: null }
+  doc.building.site.terrain ??= null
+  for (const c of (doc.controls ?? []) as Obj[]) c.open_above_c ??= null
 }
 
 /** 2.8 → 2.9 (Brief 120): no heating system heats hot water first and no hot water store is stated. Capacities already stated now limit (Linzie's decision 3), a hot water system's included. */

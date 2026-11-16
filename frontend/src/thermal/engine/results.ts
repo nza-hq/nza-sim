@@ -18,6 +18,8 @@ export interface BreakdownLine {
     | 'occupancy_gains' | 'lighting_gains' | 'equipment_gains' | 'auxiliary_gains'
     /** Mechanical or natural ventilation, one line per zone ventilation entry that runs (Brief 105 Part 3). */
     | 'mechanical_ventilation'
+    /** Brief 115, weather-driven air: windows opened by the zone's window rule, and EN 16798-7's single-sided term. */
+    | 'window_ventilation' | 'single_sided_turbulence'
   surface_id: string | null
   /** The profile a gains line comes from. */
   profile_id?: string
@@ -40,6 +42,11 @@ export interface ZoneResults {
     vents: { surface_id: string; area_m2: number; cd: number; flow_mode: string; m3s_per_ms: number }[]
     bridging: Bridging
   }
+  /**
+   * Brief 115: weather-driven air (absent under today's method). Each hour: the outdoor air that came in, kg/h, and
+   * how far the windows were open (0 to 1 of their widest, the hour's mean); and the hours any window was open.
+   */
+  air?: { inflow_kg_per_h: Float64Array; window_open_fraction: Float64Array; hours_windows_open: number }
   hourly: {
     theta_air_c: Float64Array
     theta_operative_c: Float64Array

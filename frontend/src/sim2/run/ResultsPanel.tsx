@@ -28,6 +28,7 @@ export const TERMS: Record<string, string> = {
   glazing_solar_absorbed: 'Sun absorbed in the glass', other_gains: 'Other gains', storage: 'Heat stored in the building',
   occupancy_gains: 'People', lighting_gains: 'Lighting', equipment_gains: 'Equipment', auxiliary_gains: 'Other equipment',
   mechanical_ventilation: 'Ventilation', interzone: 'From other zones',
+  window_ventilation: 'Open windows', single_sided_turbulence: 'Open windows (gusts, one side)',
 }
 const FUEL_WORDS: Record<string, string> = { electricity: 'Electricity', gas: 'Gas', oil: 'Oil', biomass: 'Biomass', district_heating: 'District heat', district_cooling: 'District cooling' }
 const END_USE_WORDS: Record<string, string> = {
