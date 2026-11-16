@@ -133,7 +133,12 @@ export interface PlantResults {
   id: string
   service: 'heating' | 'cooling'
   cap_w: number
-  /** The highest hour's ask, W, and the hours (fractions summed) the plant was short. */
+  /**
+   * The highest step's ask, W, and the hours (fractions summed) the plant was short. The ask is at the setpoint from where
+   * the zones are, so a zone left cold asks for its whole recovery in one step (bounded only by its emitters): with a short
+   * plant and no emitter limit it can be many times the design heat loss. Not a sizing figure; not shown (the seam leaves
+   * it, and ask_kwh, out).
+   */
   peak_ask_w: number
   hours_short: number
   ask_kwh: number
