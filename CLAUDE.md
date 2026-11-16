@@ -184,7 +184,8 @@ which of these scope items they affect.
   effectiveness / DHW point-of-use η), control mechanism, share of
   demand served
 - Proportional split across multiple systems serving the same demand
-  (no priority+capacity, no lead/lag, no schedule-based handoff)
+  (no lead/lag, no schedule-based handoff; capacity and top-up per
+  Brief 120 below)
 - Emitter capacity per zone (Brief 108, Linzie 15 Nov 2026): a zone's
   heating is limited to its emitters' output at the system's flow and
   return temperatures (EN 442), re-rated each hour at the room's
@@ -205,6 +206,17 @@ which of these scope items they affect.
   reported. Emitters may name a manufacturer catalogue item (Stelrad
   Vita Compact K2); the run checks the stated figures against it and
   never fills them. Simulate v2 only.
+- System capacity (Brief 120, Linzie 16 Nov 18:42 "We need the
+  capacity, not just of the heat emitters, but also of the system as
+  well"): a heating or cooling system's stated `capacity_kw` limits
+  what it gives its rooms each step. A short boiler feeding radiators
+  shares through one lowered flow temperature (refereed against
+  EnergyPlus); other plants in proportion to ask. What a short system
+  cannot give in a room is topped up by the room's other systems
+  (Linzie 19:48, "the boiler tops up"), with no order between them.
+  Hot water heated first takes the boiler's capacity before the rooms.
+  A dedicated water heater states its kW and store litres (Linzie
+  19:19). Simulate v2 only.
 - Comfort-vs-setpoint diagnostic: demand at envelope comfort vs
   delivered at service setpoint, per service, with the delta exposed
 - DHW tap-mix model: the boiler heats only the hot fraction of tap
@@ -236,8 +248,9 @@ which of these scope items they affect.
 - Heat networks at the network level (district heat / district cooling
   are modelled as sources with an efficiency + loss factor; network-
   side modelling is out of scope)
-- Capacity-based or schedule-based system stacking — proportional
-  split only
+- Lead/lag, sequencing or schedule-based system stacking. Systems
+  in one room keep their shares; a system's capacity only limits it,
+  and the others top up what it cannot give (Brief 120), in no order
 
 **Service-level vs system-level fields (Brief 42, 2026-05-20):**
 
