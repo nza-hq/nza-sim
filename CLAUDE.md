@@ -199,6 +199,12 @@ which of these scope items they affect.
   Issue 3.0 and the MCS calculator's public method (not the text of
   BS EN 12831-1), with an optional stated warm-up W/m², against the
   emitters' EN 442 output. Simulate v2 only.
+- Cooling limited by room units (Brief 119): fan coils, VRF indoor
+  units and other units state a fixed sensible cooling per unit; a
+  zone's cooling is capped at the sum and the hours above setpoint are
+  reported. Emitters may name a manufacturer catalogue item (Stelrad
+  Vita Compact K2); the run checks the stated figures against it and
+  never fills them. Simulate v2 only.
 - Comfort-vs-setpoint diagnostic: demand at envelope comfort vs
   delivered at service setpoint, per service, with the delta exposed
 - DHW tap-mix model: the boiler heats only the hot fraction of tap
