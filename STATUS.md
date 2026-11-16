@@ -2,6 +2,13 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔨 Brief 117 — Simulate v2: design heat loss for sizing — IN PROGRESS on `chris/117-static-heat-loss`
+
+- **Last completed:** P1 (16 Nov). Schema 2.6 adds `building.design` (the design outdoor temperature, stated or the weather file's 99.6 % / 99 %; a warm-up W/m², or none; the design wind speed for vents) and each zone's `design_internal_c` (stated, or `follow_heat_c`). Both default to null, and the 2.5 → 2.6 upgrade fills nothing. `thermal/engine/designHeatLoss.ts` returns each room's design heat loss as lines: fabric, bridging, ground, to_room, infiltration, vents, mechanical_ventilation, minimum_air_change (0.5 ach, MCS) and warm_up. It also returns the heated rooms' total. It reads the year's run's conductances (Rule 11). `groundTemperature(weather)` is now the one place the ground temperature is worked out.
+- **Method:** Linzie, 16 Nov: published UK sources (MCS MIS 3005-D and the MCS calculator's method, CIBSE design temperatures), not the text of BS EN 12831-1. That standard's further ground factors and its reheat table are not used.
+- **Checks:** 12 hand-calculation tests pass (`designHeatLoss.test.ts`). The full v2 suite passes (268), and `npm run build` is clean. No file of today's engine changed.
+- **Next:** P2 EnergyPlus design-day referee.
+
 ## ✅ Brief 109 — Simulate v2: heating hours and setbacks, morning warm-up, underfloor heating in the slab — CLOSED 16 Nov 2026 on `chris/109-dynamics` (PR awaiting Linzie)
 
 Brief [`docs/briefs/archive/109_dynamics_COMPLETED.md`](docs/briefs/archive/109_dynamics_COMPLETED.md); final report [`07_final_report.md`](docs/audit/109/07_final_report.md). Linzie, 15 Nov 23:57: "Keep going" (108's dynamics follow-up: heat does not arrive instantly).

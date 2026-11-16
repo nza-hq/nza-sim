@@ -250,7 +250,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     const v = (input as { schema_version?: unknown })?.schema_version
     const parsed = ModelDocument.safeParse(input)
     if (parsed.success) doc = parsed.data
-    else if (v === '2.3' || v === '2.4') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109); nothing is filled
+    else if (v === '2.3' || v === '2.4' || v === '2.5') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117); nothing is filled
     else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
       // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
       // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the

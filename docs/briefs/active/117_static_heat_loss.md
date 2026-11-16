@@ -45,10 +45,13 @@ Answer in writing (`docs/audit/117/00_reconnaissance.md`):
 - Schema 2.6: a building-level `design` block with:
   - outdoor_c, or `{ from_weather: 'heating_99_6' }`;
   - ground method inputs;
-  - reheat `{ setback_k, reheat_h }` or null.
+  - a warm-up allowance in W per m² of floor, or null; and the design wind speed for permanent vents, or null.
+  - (Changed 16 Nov after Linzie chose published UK sources over the text of BS EN 12831-1: the standard's reheat table
+    and temperature factors are not used. Ground uses the model's ground temperature, as MIS 3005-D cl. 3.4.1(c) does
+    for solid floors.)
 - Per zone:
   - the design internal temperature (stated, or `follow_heat_c`);
-  - for each adjacent unheated space, its design temperature or the standard's temperature factor.
+  - an unheated zone states the temperature it is taken to sit at.
 - The 2.5 → 2.6 upgrade fills nothing. Without a design block, the design mode is not shown and says what to state.
 - `frontend/src/thermal/engine/designHeatLoss.ts`: a pure function. Per room it returns every term as a line (Rule 9) and their sum, plus the building total, where heat between rooms cancels.
 - **Tests.** Hand calculations for one room and for two rooms with a partition between rooms at different design temperatures. Every refusal by name.
@@ -60,7 +63,7 @@ Answer in writing (`docs/audit/117/00_reconnaissance.md`):
 - **Gate (stated before running):**
   - each room's transmission plus ventilation is within ±3 % of EnergyPlus's steady load;
   - the building total is within ±2 %.
-- The ground term and the reheat allowance are not refereed this way. The ground term is checked by hand against the standard's worked example, and the reheat allowance against the standard's table.
+- The ground term and the warm-up allowance are not refereed this way. Each is checked by hand in the Part 1 tests (U·A·(θ_int − θ_g) and W/m² × floor area). The standard's worked example is not used (Linzie, 16 Nov: published UK sources).
 - **Commit:** `117 P2: referee`.
 
 ## Part 3 — Seam and panel
