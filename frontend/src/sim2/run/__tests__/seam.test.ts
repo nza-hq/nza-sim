@@ -11,7 +11,7 @@ import { logMeanDeltaT } from '../../../thermal/engine/emitters'
 import { fromBuildingConfig } from '../../../thermal/schema/fromBuildingConfig'
 import { MOS, readMos } from '../../../thermal/engine/__tests__/denver'
 import { bodyFromLibrary, CONSTRUCTIONS } from '../library'
-import { RUN_OPTIONS, simulate } from '../seam'
+import { facingOf, RUN_OPTIONS, simulate } from '../seam'
 import type { WeatherChoice } from '../weather'
 
 const repo = (p: string) => fileURLToPath(new URL(`../../../../../${p}`, import.meta.url))
@@ -60,6 +60,49 @@ describe('simulate', () => {
     expect(interzoneGross).toBeGreaterThan(0)
     expect(Math.abs(interzone)).toBeLessThan(1e-6 * interzoneGross)
     expect(r.summary.breakdown.some((l) => l.term === 'interzone')).toBe(false)
+  })
+  it('monthly, by surface kind, window sun by facing, and hourly on request: regroupings that sum back (Brief 109)', async () => {
+    const d = await doc()
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const s = r.summary
+    expect(s.hourly).toBeNull()
+    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
+    // Months sum to the year, for the building and each zone.
+    expect(s.building.monthly.heating_kwh).toHaveLength(12)
+    expect(sum(s.building.monthly.heating_kwh)).toBeCloseTo(s.building.heating_kwh, 6)
+    expect(sum(s.building.monthly.cooling_kwh)).toBeCloseTo(s.building.cooling_kwh, 6)
+    for (const z of s.zones) { expect(sum(z.monthly.heating_kwh)).toBeCloseTo(z.heating_kwh, 6); expect(sum(z.monthly.cooling_kwh)).toBeCloseTo(z.cooling_kwh, 6) }
+    expect(s.building.monthly.heating_kwh[0]).toBeGreaterThan(s.building.monthly.heating_kwh[6])  // January heats more than July
+    // By surface kind, plus the lines that name no surface, gives the breakdown term by term (Rule 9: same lines).
+    const check = (bySurface: typeof s.by_surface, breakdown: typeof s.breakdown, lines: { term: string; surface_id: string | null; kwh: number }[]) => {
+      for (const b of breakdown) {
+        const fromSurfaces = bySurface.filter((l) => l.term === b.term).reduce((x, l) => x + l.kwh, 0)
+        const noSurface = lines.filter((l) => l.term === b.term && l.surface_id == null).reduce((x, l) => x + l.kwh, 0)
+        expect(fromSurfaces + noSurface).toBeCloseTo(b.kwh, 6)
+      }
+    }
+    check(s.by_surface, s.breakdown, r.results.zones.flatMap((z) => z.breakdown).filter((l) => l.term !== 'interzone'))
+    r.results.zones.forEach((z, i) => check(s.zones[i].by_surface, s.zones[i].breakdown, z.breakdown))
+    expect(new Set(s.by_surface.map((l) => l.kind))).toEqual(new Set(['wall', 'roof', 'ground', 'glazing']))
+    expect(s.by_surface.some((l) => l.term === 'interzone')).toBe(false)
+    // An intermediate storey sees the slab below as its floor and the one above as its ceiling, from its own side.
+    const mid = s.zones[2].by_surface.filter((l) => l.term === 'interzone').map((l) => l.kind).sort()
+    expect(mid).toEqual(['ceiling', 'floor'])
+    // Window sun by facing sums to the window lines; Bridgewater has windows on four facades and no rooflights.
+    const tr = s.breakdown.find((l) => l.term === 'solar_transmitted')!.kwh
+    expect(s.window_solar.map((w) => w.facing)).toEqual(['N', 'E', 'S', 'W'])
+    expect(s.window_solar.reduce((x, w) => x + w.transmitted_kwh, 0)).toBeCloseTo(tr, 6)
+    // Per square metre of glass, the south-west (azimuth 222°, sector S) takes more sun than the north-east (42°, sector N).
+    const area = (f: string) => d.surfaces.filter((x: any) => x.kind === 'glazing' && facingOf(x) === f).reduce((a: number, x: any) => a + x.area_m2, 0)
+    const per = (f: string) => s.window_solar.find((w) => w.facing === f)!.transmitted_kwh / area(f)
+    expect(per('S')).toBeGreaterThan(1.5 * per('N'))
+    // Hourly on request: the building's 8,760 values, summing to the year and peaking at the stated peak.
+    const h = simulate(d, { weather: WEATHER, hourly: true })
+    if (!h.ok || !h.summary.hourly) throw new Error('no hourly')
+    expect(h.summary.hourly.heating_w).toHaveLength(8760)
+    expect(Array.from(h.summary.hourly.heating_w).reduce((x, y) => x + y, 0) / 1000).toBeCloseTo(s.building.heating_kwh, 6)
+    expect(Math.max(...h.summary.hourly.cooling_w)).toBeCloseTo(s.building.peak_cooling_w, 6)
   })
   it('energy used by the installed systems, and what they still need while demand still shows (Brief 107 P4)', async () => {
     const r = simulate(await doc(), { weather: WEATHER })

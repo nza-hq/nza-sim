@@ -19,9 +19,10 @@ import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine
 import { zoneSizing, type ZoneSizing } from '../../thermal/engine/emitters'
 import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
-  readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
+  readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingHourlyW, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
-import { ModelDocument } from '../../thermal/schema/model'
+import { ModelDocument, type Surface } from '../../thermal/schema/model'
+type SurfaceKind = Surface['kind']
 import { upgradeDocument } from '../../thermal/schema/upgrade'
 import { CONSTRUCTIONS, resolveConstructions, type LibraryItem, type Missing } from './library'
 import type { WeatherChoice } from './weather'
@@ -30,19 +31,40 @@ export type { Missing } from './library'
 
 export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'profiles', ventilation: 'document' }
 
+/** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */
+export interface Monthly { heating_kwh: number[]; cooling_kwh: number[] }
+/**
+ * The breakdown's lines that belong to a surface, grouped by the surface's kind and the term (Brief 109). A regrouping
+ * of the same lines, not a second calculation: with the lines that name no surface, they sum to `breakdown` term by term.
+ * An interzone floor or ceiling takes its kind from the zone's own side (one zone's floor is the other's ceiling).
+ */
+export interface SurfaceLine { kind: SurfaceKind; term: BreakdownLine['term']; kwh: number }
+/** Compass sector of a window's outward normal (N is 315° to 45°…), or `horizontal` when tilted less than 45°. */
+export type Facing = 'N' | 'E' | 'S' | 'W' | 'horizontal'
+/** Sun through windows by facing, kWh a year: transmitted into the room, and absorbed in the glass (Brief 109). */
+export interface WindowSolar { facing: Facing; transmitted_kwh: number; absorbed_kwh: number }
+
 export interface Summary {
   engine: ModelResults['engine']
   run_ms: number
   weather: { file_name: string; station: string; sha256: string }
-  building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number }
+  building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number; monthly: Monthly }
   /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
   zones: {
     id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; heated: boolean; cooled: boolean
     /** The zone's own balance by term, kWh a year (Brief 106 P2, review F3): every term, heat from the other zones included. */
     breakdown: { term: BreakdownLine['term']; kwh: number }[]
+    monthly: Monthly
+    by_surface: SurfaceLine[]
+    window_solar: WindowSolar[]
   }[]
   /** The building's balance by term, kWh a year: positive is heat into the building. Heating and cooling included. */
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
+  /** The building's surface lines by kind (heat between zones left out, as in `breakdown`). */
+  by_surface: SurfaceLine[]
+  window_solar: WindowSolar[]
+  /** The building's hourly heating and cooling, W, 8,760 values; only when the run asks for it (`hourly: true`), else null. */
+  hourly: { heating_w: Float64Array; cooling_w: Float64Array } | null
   /** Constructions used that are drafts awaiting review (not yet in the library), by display name. */
   drafts: string[]
   /**
@@ -165,7 +187,7 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
   return { missing, library: lib.library, drafts: lib.drafts }
 }
 
-export function simulate(input: unknown, deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; what_if?: WhatIf }): SimulateResult {
+export function simulate(input: unknown, deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; what_if?: WhatIf; hourly?: boolean }): SimulateResult {
   let doc: ModelDocument
   try {
     const v = (input as { schema_version?: unknown })?.schema_version
@@ -201,6 +223,36 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     for (const z of zs) for (const l of z.breakdown) if (interzone || l.term !== 'interzone') m.set(l.term, (m.get(l.term) ?? 0) + l.kwh)
     return [...m].map(([term, kwh]) => ({ term, kwh }))
   }
+  const surf = new Map(doc.surfaces.map((x) => [x.id, x]))
+  // A surface's kind from zone `zid`'s side: the zone_b side of an interzone floor is a ceiling, and the other way round.
+  const kindFor = (sid: string, zid: string): SurfaceKind => {
+    const x = surf.get(sid)
+    if (!x) throw new Error(`breakdown line names surface "${sid}", which the document does not have`)
+    if (x.zone_b === zid && x.zone_a !== zid) return x.kind === 'floor' ? 'ceiling' : x.kind === 'ceiling' ? 'floor' : x.kind
+    return x.kind
+  }
+  const bySurface = (zs: ModelResults['zones'], interzone: boolean): SurfaceLine[] => {
+    const m = new Map<string, SurfaceLine>()
+    for (const z of zs) for (const l of z.breakdown) {
+      if (l.surface_id == null || (!interzone && l.term === 'interzone')) continue
+      const kind = kindFor(l.surface_id, z.zone_id), key = `${kind}|${l.term}`
+      const e = m.get(key) ?? { kind, term: l.term, kwh: 0 }
+      e.kwh += l.kwh; m.set(key, e)
+    }
+    return [...m.values()]
+  }
+  const windowSolar = (zs: ModelResults['zones']): WindowSolar[] => {
+    const m = new Map<Facing, WindowSolar>()
+    for (const z of zs) for (const l of z.breakdown) {
+      if (l.surface_id == null || (l.term !== 'solar_transmitted' && l.term !== 'glazing_solar_absorbed')) continue
+      const facing = facingOf(surf.get(l.surface_id)!)
+      const e = m.get(facing) ?? { facing, transmitted_kwh: 0, absorbed_kwh: 0 }
+      if (l.term === 'solar_transmitted') e.transmitted_kwh += l.kwh; else e.absorbed_kwh += l.kwh
+      m.set(facing, e)
+    }
+    return FACINGS.filter((f) => m.has(f)).map((f) => m.get(f)!)
+  }
+  const bHeat = readBuildingHourlyW(results, 'heating'), bCool = readBuildingHourlyW(results, 'cooling')
   const summary: Summary = {
     engine: results.engine, run_ms: results.run_ms,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
@@ -208,15 +260,45 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
       floor_m2: readDocFloorM2(doc),
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
       peak_heating_w: readBuildingPeakW(results, 'heating'), peak_cooling_w: readBuildingPeakW(results, 'cooling'),
+      monthly: monthly(bHeat, bCool),
     },
-    zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh, heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true) })),
+    zones: results.zones.map((z, i) => ({
+      id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh,
+      heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true),
+      monthly: monthly(z.hourly.heating_w, z.hourly.cooling_w), by_surface: bySurface([z], true), window_solar: windowSolar([z]),
+    })),
     breakdown: byTerm(results.zones, false),
+    by_surface: bySurface(results.zones, false),
+    window_solar: windowSolar(results.zones),
+    hourly: deps.hourly ? { heating_w: bHeat, cooling_w: bCool } : null,
     drafts: pre.drafts,
     energy: energyOf(doc, results, weather),
     emitters: null,
   }
   summary.emitters = emitterSummary(doc, results, options, run, weather, deps.what_if ?? null)
   return { ok: true, results, summary }
+}
+
+const FACINGS: readonly Facing[] = ['N', 'E', 'S', 'W', 'horizontal']
+/** A window's facing: `horizontal` below 45° tilt (a rooflight), else the 90° sector its azimuth falls in. */
+export function facingOf(s: { azimuth_deg: number | null; tilt_deg: number }): Facing {
+  if (s.tilt_deg < 45 || s.azimuth_deg == null) return 'horizontal'
+  const a = ((s.azimuth_deg % 360) + 360) % 360
+  return a >= 315 || a < 45 ? 'N' : a < 135 ? 'E' : a < 225 ? 'S' : 'W'
+}
+
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+/** Hourly W (one non-leap year, 8,760 hours from 1 January) to kWh by month. */
+function monthly(heat: ArrayLike<number>, cool: ArrayLike<number>): Monthly {
+  if (heat.length !== 8760 || cool.length !== 8760) throw new Error(`monthly totals need 8,760 hours, not ${heat.length}`)
+  const out: Monthly = { heating_kwh: [], cooling_kwh: [] }
+  let h = 0
+  for (const d of MONTH_DAYS) {
+    let a = 0, b = 0
+    for (const end = h + d * 24; h < end; h++) { a += heat[h]; b += cool[h] }
+    out.heating_kwh.push(a / 1000); out.cooling_kwh.push(b / 1000)
+  }
+  return out
 }
 
 /** What the engine refused, named by its path; null for anything else (a fault, rethrown). */

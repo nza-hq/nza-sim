@@ -25,11 +25,14 @@ export class RunClient {
     this.send({ type: 'weather', bytes, file_name, source })
   }
   clearWeather() { this.send({ type: 'clear_weather' }) }
-  /** Runs `doc` after `delayMs` with no newer call; returns the run's number. `what_if`: a second flow/return pair (Brief 108). */
-  run(doc: unknown, delayMs = 250, what_if: WhatIf | null = null): number {
+  /**
+   * Runs `doc` after `delayMs` with no newer call; returns the run's number. `what_if`: a second flow/return pair
+   * (Brief 108). `hourly`: also send the building's 8,760 hourly heating and cooling values (Brief 109).
+   */
+  run(doc: unknown, delayMs = 250, what_if: WhatIf | null = null, opts: { hourly?: boolean } = {}): number {
     const id = ++this.seq
     if (this.timer) clearTimeout(this.timer)
-    this.timer = setTimeout(() => { this.timer = null; this.send({ type: 'run', id, doc, what_if }) }, delayMs)
+    this.timer = setTimeout(() => { this.timer = null; this.send({ type: 'run', id, doc, what_if, hourly: opts.hourly ?? false }) }, delayMs)
     return id
   }
   dispose() { if (this.timer) clearTimeout(this.timer); this.worker.terminate() }
