@@ -245,8 +245,22 @@ describe('hot water for the whole building', () => {
     p = { ...p, dhw: { storage_c: 60, tap_c: 43, cold_c: 10, basis: 'per_person', litres: 50, pump_w: 0 } }
     const b = buildDocument(p)
     expect(b.issues).toEqual([])
-    expect((b.doc as any).services.dhw).toMatchObject({ storage_setpoint_c: 60, tap_outlet_temp_c: 43, cold_supply_temp_c: 10, demand_basis: 'per_person', litres_per_person_per_day: 50, litres_per_m2_per_day: null, circulation_pump_w: 0, load_shape: 'flat' })
+    expect((b.doc as any).services.dhw).toMatchObject({ storage_setpoint_c: 60, tap_outlet_temp_c: 43, cold_supply_temp_c: 10, circulation_pump_w: 0, load_shape: 'flat' })
+    expect((b.doc as any).services.dhw).not.toHaveProperty('demand_basis')
     expect(b.notes.some((n) => /Hot water/.test(n))).toBe(false)
+  })
+
+  it('puts the daily use on each occupancy profile (schema 2.8), and notes a space with no people', () => {
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    const office = { id: 's1', name: 'Office', use: 'office', occupancy: 'office_occupancy', lighting: null, equipment: null, people_per_m2: 0.1 }
+    p = { ...p, spaces: [office as any], rooms: p.rooms.map((r) => ({ ...r, space: 's1' })), dhw: { storage_c: 60, tap_c: 43, cold_c: 10, basis: 'per_person', litres: 50, pump_w: 0 } }
+    const occ = (d: any) => d.profiles.find((x: any) => x.kind === 'occupancy')
+    expect(occ(buildDocument(p).doc).dhw).toEqual({ basis: 'per_person', litres_per_day: 50 })
+    const none = buildDocument({ ...p, spaces: [{ ...office, people_per_m2: null } as any], dhw: { ...p.dhw!, basis: 'per_m2', litres: 2 } })
+    expect(occ(none.doc)).toBeUndefined()
+    expect(none.notes).toContain('Office: hot water is 2 litres per m² a day, but the space has no people, so its hot water is not in the model until it has people')
+    expect(occ(buildDocument({ ...p, dhw: { ...p.dhw!, basis: null, litres: null } }).doc).dhw ?? null).toBeNull()
   })
 })
 

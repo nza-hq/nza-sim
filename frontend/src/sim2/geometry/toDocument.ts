@@ -338,6 +338,9 @@ export function buildDocument(plan: Plan): Built {
       return [id]
     }
     let occupancy: string | null = null
+    // Schema 2.8: hot water use lives on the occupancy profile (today one building-wide figure, copied to each).
+    const hw0 = plan.dhw ?? noDhw()
+    const hwUse = hw0.basis != null && hw0.litres != null ? { basis: hw0.basis, litres_per_day: hw0.litres } : null
     const perRoom = sp.people_basis === 'per_room'
     const dens = perRoom ? sp.people_per_room : sp.people_per_m2
     const allTime = sp.occupancy === ALWAYS
@@ -352,8 +355,12 @@ export function buildDocument(plan: Plan): Built {
         ...(sp.occupancy_rate != null ? { occupancy_rate: sp.occupancy_rate } : {}),
         ...(sp.sensible_w_per_person != null ? { sensible_w_per_person: sp.sensible_w_per_person } : {}),
         ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}),
+        ...(hwUse ? { dhw: hwUse } : {}),
       })
-    } else if (sp.occupancy) notes.push(`${sp.name}: occupancy needs people per ${perRoom ? 'room' : 'm²'} before it goes in the model`)
+    } else {
+      if (hwUse?.basis === 'per_m2') notes.push(`${sp.name}: hot water is ${hwUse.litres_per_day} litres per m² a day, but the space has no people, so its hot water is not in the model until it has people`)
+      if (sp.occupancy) notes.push(`${sp.name}: occupancy needs people per ${perRoom ? 'room' : 'm²'} before it goes in the model`)
+    }
     return { occupancy, lighting: gain('lighting'), equipment: gain('equipment'), auxiliary: [] }
   }
 
@@ -444,7 +451,7 @@ export function buildDocument(plan: Plan): Built {
     services: {
       heating: { setpoint_mode: 'follow_comfort', setpoint_c: null },
       cooling: { setpoint_mode: 'follow_comfort', setpoint_c: null },
-      dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, demand_basis: hw.basis, litres_per_person_per_day: hw.basis === 'per_person' ? hw.litres : null, litres_per_m2_per_day: hw.basis === 'per_m2' ? hw.litres : null, load_shape: hw.shape === undefined ? 'flat' : hw.shape, circulation_pump_w: hw.pump_w },
+      dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, load_shape: hw.shape === undefined ? 'flat' : hw.shape, circulation_pump_w: hw.pump_w },
     },
     profiles,
     weather_ref: { kind: 'legacy', id: 'unassigned' },
