@@ -1,4 +1,4 @@
-/** The steps of the Model workspace (plan agreed with Linzie, 15 Nov 21:53; Profiles added on her ask, 16 Nov 00:12)
+/** The steps of the Model workspace (plan agreed with Linzie, 15 Nov 21:53; Profiles added on her ask, 16 Nov 00:12; Controls by Brief 114, between Systems and Check)
  * and the shelf under them. */
 export const STEPS = [
   { id: 'site', n: 1, name: 'Site', line: 'Weather and exposure' },
@@ -7,8 +7,9 @@ export const STEPS = [
   { id: 'profiles', n: 4, name: 'Profiles', line: 'When things happen, hour by hour' },
   { id: 'spaces', n: 5, name: 'Spaces', line: 'What each room is used for' },
   { id: 'systems', n: 6, name: 'Systems', line: 'Heating, cooling, air, hot water' },
-  { id: 'check', n: 7, name: 'Check', line: 'Against the meters' },
-  { id: 'interventions', n: 8, name: 'Interventions', line: 'What to change, in order' },
+  { id: 'controls', n: 7, name: 'Controls', line: 'How the systems are told to run' },
+  { id: 'check', n: 8, name: 'Check', line: 'Against the meters' },
+  { id: 'interventions', n: 9, name: 'Interventions', line: 'What to change, in order' },
 ] as const
 export type StepId = (typeof STEPS)[number]['id']
 export const isStep = (s: string | null): s is StepId => STEPS.some((x) => x.id === s)
