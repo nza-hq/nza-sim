@@ -89,17 +89,17 @@ This brief works in the Systems module: service setpoints and the hours a heatin
   - The emitter's heat enters that layer's node (the floor's own conduction carries it up into the room and down into the ground, or into the room below).
   - The control is the zone's thermostat, as for every emitter.
   - The limit is the emitter's EN 442 output, re-rated at the room's temperature (Brief 108's `at()`). This is stated as an approximation and refereed below.
-- **Engine 1** refuses an underfloor emitter in a slab, by name (decision 5).
+- **Engine 1** refuses an underfloor emitter in a slab, by name (decision 5). *As built: a document with underfloor heating runs on Engine 2, one zone included, as sub-hourly steps and TARP already do (`03_ufh.md`).*
 - **Tests:**
   - closure every hour, with the heat put into the slab as its own breakdown line (Rule 9);
   - a steady state by hand: in a constant cold, heat in the slab equals the room's losses plus the downward loss;
   - a step response that lags an air-heated zone's.
-- **Referee:** `validation/energyplus/109_ufh_referee.py`. The cooled room, with its heated rooms' ground floors carrying `ZoneHVAC:LowTemperatureRadiant:VariableFlow` in the same layer, heated to Part 2's schedule. Same gate as Part 2.
+- **Referee:** `validation/energyplus/109_ufh_referee.py`. The cooled room, with its heated rooms' ground floors carrying `ZoneHVAC:LowTemperatureRadiant:VariableFlow` in the same layer *(as built: `ZoneHVAC:LowTemperatureRadiant:Electric`, a fixed limit, so the room-temperature rating is measured but not refereed; `03_ufh.md`)*, heated to Part 2's schedule. Same gate as Part 2.
 - **Commit:** `109 P3: underfloor heating in the slab`.
 
 ## Part 4 — Run seam and panel
 
-- **Files:** `sim2/run/seam.ts` (passes hours and setbacks; `explain` gains plain words for them), `sim2/run/EmitterSizing.tsx`.
+- **Files:** `sim2/run/seam.ts` (passes hours and setbacks; `explain` gains plain words for them), `sim2/run/EmitterSizing.tsx`. *As built: a separate `sim2/run/HeatingHours.tsx`; EmitterSizing changed in P5 (sizing on the year without the setback, in-use counts).*
 - **The panel shows:**
   - the hours below in use;
   - the morning peak and the steady peak, with the hour each happened;
