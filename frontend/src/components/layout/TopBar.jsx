@@ -395,8 +395,9 @@ export default function TopBar() {
     const height = 800
     const left   = window.screenX + window.outerWidth
     const top    = window.screenY
+    // Brief 110b: from the Model workspace, Pop Out shows the Model's results; everywhere else, today's.
     window.open(
-      '/popout',
+      window.location.pathname.startsWith('/model') ? '/model/popout' : '/popout',
       'nza-simulate-popout',
       `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`,
     )

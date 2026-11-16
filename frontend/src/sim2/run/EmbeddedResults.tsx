@@ -8,7 +8,8 @@
  *
  * Numbers come only from the run (CLAUDE.md rules 2 and 3).
  */
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { shareModel, type ModelShare } from './modelChannel'
 // @ts-expect-error untyped JS component from today's app (Brief 110b: reused, not redrawn)
 import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 import { createPortal } from '../workspace/portal'
@@ -42,6 +43,12 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   const ps = run.previewState.kind === 'done' ? run.previewState.summary : null
   useEffect(() => { onFigures?.(s, ps) }, [s, ps])
   useEffect(() => { if (step) run.setLevel(NATURAL[step]) }, [step])
+  // Brief 110b row 2: the Pop Out window shows this run.
+  const latest = useRef<ModelShare | null>(null)
+  latest.current = s ? { summary: s, level: run.level, fabric_heat_c: run.level === 'fabric' ? run.fabricC : null, weather: run.weather?.file_name ?? null } : null
+  const channel = useRef<ReturnType<typeof shareModel> | null>(null)
+  useEffect(() => { channel.current = shareModel(() => latest.current); return () => channel.current?.close() }, [])
+  useEffect(() => { channel.current?.post() }, [s])
   // The chosen zone's balance (heat from other zones included), or the building's.
   const zone = s && focusZone ? s.zones.find((z) => z.id === focusZone) ?? null : null
   const lines = useMemo(() => (s ? (zone ? balanceLines(zone.breakdown, zone.floor_m2) : balanceLines(s.breakdown, s.building.floor_m2)) : null), [s, zone])

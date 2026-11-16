@@ -250,7 +250,7 @@ export function WeatherPick({ run }: { run: Run }) {
  * The workspace's strip (Brief 110 P3): always visible above the centre tabs, the building's heating, cooling and
  * energy from the same run as the Heat flow tab, or what the run is waiting for. Numbers only from a run.
  */
-function stripItems(s: Summary, unit: 'kwh' | 'kwh_per_m2') {
+export function stripItems(s: Summary, unit: 'kwh' | 'kwh_per_m2') {
   const a = s.building.floor_m2
   const pair = (kwh: number) => (unit === 'kwh_per_m2'
     ? { value: perM2(kwh, a), unit: 'kWh/m²', sub: `${mwh(kwh)} MWh a year` }
@@ -284,7 +284,7 @@ export function previewItems(a: Summary, b: Summary, unit: 'kwh' | 'kwh_per_m2')
   return items
 }
 
-const LEVEL_NAMES: Record<Level, string> = { fabric: 'Fabric only', spaces: '+ Spaces', systems: '+ Systems' }
+export const LEVEL_NAMES: Record<Level, string> = { fabric: 'Fabric only', spaces: '+ Spaces', systems: '+ Systems' }
 /** Brief 111 P4: the "Results include" switch, and the level said in words. Fabric only's temperature is edited here,
  * inline with the figures it drives (110b row 8, as today's comfort card does). */
 export function LevelSwitch({ run }: { run: Run }) {
