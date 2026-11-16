@@ -331,7 +331,7 @@
 .ap-what { margin: 0; font-weight: 600; }
 .ap-now { margin: 0; font-size: 12px; color: var(--gl-soft); }
 .ap-why { margin: 0; font-size: 12px; color: var(--gl-soft); }
-.ap-apply { width: 100%; justify-self: stretch; justify-content: center; padding: 10px 12px; font-size: 14px; }
+.ap-apply { width: 100%; justify-self: stretch; justify-content: center; padding: 7px 12px; font-size: 13px; }
 .ap-foot .ap-link { justify-self: start; padding: 0; }
 .gl-doc > summary { cursor: pointer; list-style: none; }
 .gl-doc > summary::-webkit-details-marker { display: none; }
@@ -363,6 +363,8 @@
 .gl-root.embedded.giving .gl-bar, .gl-root.embedded.giving .gl-tip, .gl-root.embedded.giving .gl-viewswitch { left: 50%; }
 .gl-root.embedded .gl-key { max-width: calc(100% - 32px); }
 .gl-root.embedded .gl-compass { left: 16px; }
+.gl-root.embedded .gl-3d { inset: 0; }
+.gl-root.embedded .gl-3d-wait { left: 50%; }
 .gl-root.gl-pane { position: relative; inset: auto; height: 100%; background: #fff; overflow: hidden; display: flex; flex-direction: column; }
 .gl-root.gl-pane > * { flex: 1; min-height: 0; }
 .gl-root.gl-pane .gl-panel { position: static; inset: auto; width: auto; max-height: none; height: 100%; border-radius: 0; box-shadow: none; background: #fff; }

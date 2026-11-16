@@ -47,6 +47,7 @@ import ConfirmDialogHost from './components/shared/ConfirmDialog.jsx'
 const GeometryLab = lazy(() => import('./sim2/geometry/GeometryLab.tsx'))
 // Brief 110: the Model workspace, the editor's steps inside the app shell; also loaded only when visited.
 const ModelPage = lazy(() => import('./sim2/workspace/ModelPage.tsx'))
+const ModelPopout = lazy(() => import('./sim2/run/ModelPopout.tsx'))
 
 export default function App() {
   return (
@@ -59,6 +60,8 @@ export default function App() {
             <Routes>
               {/* Pop-out results window — standalone, no sidebar/topbar */}
               <Route path="/popout" element={<PopOutResults />} />
+              {/* Brief 110b: Pop Out from the Model workspace shows the Model's results */}
+              <Route path="/model/popout" element={<ErrorBoundary moduleName="Model results"><Suspense fallback={null}><ModelPopout /></Suspense></ErrorBoundary>} />
               <Route path="/sim2/geometry" element={<ErrorBoundary moduleName="Geometry prototype"><Suspense fallback={null}><GeometryLab /></Suspense></ErrorBoundary>} />
 
               <Route element={<AppShell />}>

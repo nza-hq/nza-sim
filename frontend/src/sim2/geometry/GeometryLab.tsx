@@ -1729,7 +1729,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
-      {embedded && slots && <EmbeddedResults doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview) => setFigs((f) => (f.now === now && f.preview === preview ? f : { now, preview }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview) => setFigs((f) => (f.now === now && f.preview === preview ? f : { now, preview }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
