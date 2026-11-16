@@ -117,7 +117,7 @@ export type Win = {
 export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition'
 /** A fabric type: a library construction (by key) and, optionally, a U-value the user typed over it (W/m²K). Both
  * null: not set yet, and the model document says so (`unassigned:…`). */
-export type FabricType = { id: string; element: FabricElement; name: string; construction: string | null; u: number | null }
+export type FabricType = { id: string; element: FabricElement; name: string; construction: string | null; u: number | null; /** Brief 118: the construction set it came from, until changed by hand. */ template?: string | null }
 /** A stretch [t0, t1] of run `wall` given fabric type `type` for an element on walls (walls, windows, doors; absent
  * element = wall). Later stretches win where they overlap. */
 export type TypeSpan = { wall: number; t0: number; t1: number; type: string; element?: 'wall' | 'glazing' | 'door'; at?: { a: XY; b: XY } }
@@ -189,6 +189,8 @@ export type Plan = {
   storey_height_m: number
   windows: Win[]
   fabric_types: FabricType[]
+  /** Brief 118: the construction set last given to the whole building (shown on the left). */
+  fabric_set?: string | null
   wall_spans: TypeSpan[]
   spaces: SpaceType[]
   /** The project's profiles (Brief 110b, Profiles step): library profile keys chosen for this project. Profiles a

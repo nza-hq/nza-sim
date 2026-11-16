@@ -44,6 +44,8 @@ import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type 
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
+import { CONSTRUCTION_SETS, SET_ELEMENTS } from '../library/sets'
+import { applySet, setById } from './applySet'
 import Spark from './Spark'
 import type { Slots } from '../workspace/ModelWorkspace'
 import type { StepId } from '../workspace/steps'
@@ -98,8 +100,9 @@ const TB_PRESETS = [
 ]
 
 /** The kinds the Fabric step gives: an element's types, or (air, bridge) a whole-building value. */
-type FabricKind = 'wall' | 'floor' | 'roof' | 'openings' | 'air' | 'bridge' | 'partition'
+type FabricKind = 'set' | 'wall' | 'floor' | 'roof' | 'openings' | 'air' | 'bridge' | 'partition'
 const FABRIC_KINDS: Array<Kind & { key: FabricKind }> = [
+  { key: 'set', name: 'Construction set', icon: 'building' },
   { key: 'wall', name: 'External wall', icon: 'wall' },
   { key: 'floor', name: 'Ground floor', icon: 'floor' },
   { key: 'roof', name: 'Roof', icon: 'roof' },
@@ -264,7 +267,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
   const [fkind, setFkind] = useState<FabricKind>('wall')
   const [opening, setOpening] = useState<'glazing' | 'door'>('glazing')
-  const elem: FabricElement = fkind === 'openings' ? opening : fkind === 'air' || fkind === 'bridge' ? 'wall' : fkind
+  const elem: FabricElement = fkind === 'openings' ? opening : fkind === 'air' || fkind === 'bridge' || fkind === 'set' ? 'wall' : fkind
   const [sysKind, setSysKind] = useState<SysKind>('heating')
   const service: Service = sysKind === 'emitters' ? 'heating' : sysKind
   const [activeEmit, setActiveEmit] = useState<string | null>(null)
@@ -272,6 +275,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [active, setActive] = useState<Partial<Record<FabricElement, string>>>({})
   const [activeSpace, setActiveSpace] = useState<string | null>(null)
   const [activeSys, setActiveSys] = useState<Partial<Record<Service, string>>>({})
+  const [activeSet, setActiveSet] = useState<string | null>(null)
   /** Brief 118: what the left navigates by; null follows the step (Fabric on Fabric, Systems on Systems…). */
   const [navBy, setNavBy] = useState<string | null>(null)
   useEffect(() => setNavBy(null), [mode])
@@ -919,7 +923,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const t: FabricType = from ? { ...from, id: `f_${e}${k}`, name: `${from.name} (copy)` } : { id: `f_${e}${k}`, element: e, name: `${FABRIC_ELEMENTS.find((x) => x.key === e)!.one} ${same.length + 1}`, construction: null, u: null }
     return { plan: { ...p, fabric_types: [...p.fabric_types, t] }, id: t.id }
   }
-  const setFT = (id: string, q: Partial<FabricType>) => commit({ ...plan, fabric_types: plan.fabric_types.map((x) => (x.id === id ? { ...x, ...q } : x)) })
+  const setFT = (id: string, q: Partial<FabricType>) => commit({ ...plan, fabric_types: plan.fabric_types.map((x) => (x.id === id ? { ...x, ...q, ...('construction' in q || 'u' in q ? { template: null } : {}) } : x)) })
   /** What a type is used on: wall metres, numbers of windows or doors, or roof / floor area. */
   const usage = (t: FabricType): { n: number; text: string } => {
     if (t.element === 'wall') {
@@ -941,7 +945,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const c = construction(t.construction)
     const u = t.u ?? c?.u
     if (!c && t.u == null) return 'Not set yet'
-    return [c ? short(c.name) : 'Typed U-value', u != null ? `U ${u}${t.u != null && c ? ' (typed)' : ''}` : ''].filter(Boolean).join(' · ')
+    const from = setById(t.template)
+    return [from ? `From ${from.name}` : '', c ? short(c.name) : 'Typed U-value', u != null ? `U ${u}${t.u != null && c ? ' (typed)' : ''}` : ''].filter(Boolean).join(' · ')
   }
   const showTypes = mode === 'fabric' && wallsKind
   const bandOf = (sp: Span) => typeColour(plan, typeOfSpan(plan, sp, onWalls(elem) ? elem : 'wall'))
@@ -1222,7 +1227,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const navSections = (): NavSection[] => {
     if (by === 'fabric') {
       const EL: Array<[FabricElement, string]> = [['wall', 'Outside walls'], ['glazing', 'Windows'], ['door', 'Doors'], ['roof', 'Roofs'], ['floor', 'Ground floors']]
-      return EL.map(([el, title]) => ({
+      const fs = setById(plan.fabric_set)
+      const whole: NavSection = { title: 'Construction set', items: fs ? [{ id: fs.id, name: fs.name, swatch: { colour: '#A1887F' }, rooms: allRooms(), active: mode === 'fabric' && fkind === 'set', onPick: mode === 'fabric' ? () => { setFkind('set'); setActiveSet(fs.id) } : undefined }] : [], onNew: mode === 'fabric' ? { label: fs ? 'Change the set' : '+ Choose a construction set', run: () => setFkind('set') } : undefined }
+      return [whole, ...EL.map(([el, title]) => ({
         title,
         items: plan.fabric_types.filter((t) => t.element === el).map((t) => ({
           id: t.id, name: t.name, swatch: fabricSwatch(t.id), onRename: (name: string) => setFT(t.id, { name }),
@@ -1231,7 +1238,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           onPick: mode === 'fabric' ? () => showFabric(el, t.id) : undefined,
         })),
         onNew: { label: `+ New ${({ wall: 'outside wall', glazing: 'window', door: 'door', roof: 'roof', floor: 'ground floor', partition: 'internal wall' } as const)[el]} type`, run: () => { const n = newType(plan, el); commit(n.plan); if (mode === 'fabric') showFabric(el, n.id) } },
-      }))
+      }))]
     }
     if (by === 'spaces') {
       return [{
@@ -1390,6 +1397,26 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const bi = plan.building ?? noBuildingInputs()
     const setBi = (q: Partial<BuildingInputs>) => commit({ ...plan, building: { ...bi, ...q } })
     const onKind = (x: string) => setFkind(x as FabricKind)
+    if (fkind === 'set') {
+      const cur = setById(activeSet) ?? setById(plan.fabric_set) ?? null
+      const items: Item[] = CONSTRUCTION_SETS.map((x) => ({ id: x.id, name: x.name, swatch: { colour: '#A1887F' }, line: x.line, used: plan.fabric_set === x.id ? 'whole building' : '', removable: false }))
+      return (
+        <GivePanel kinds={kinds} kind={fkind} onKind={onKind} title="Construction sets" icon="building" items={items} active={cur?.id ?? null} onActive={previewOnPick(setActiveSet)}
+          detail={cur ? (
+            <>
+              <h4>{cur.name}</h4>
+              {SET_ELEMENTS.map(({ key, name }) => {
+                const c = construction(cur[key])
+                return <div key={key} className="gl-row gl-typed"><span>{name}</span><span className="ap-setc" title={c?.name}>{c ? `${short(c.name)} · U ${c.u}` : 'Not in the library'}</span></div>
+              })}
+              <p className="gl-hint">Every value comes from NZA Sim's library. Apply puts these on the rooms chosen, or the whole building; change any room or wall afterwards on its own kind. Doors keep their own type (there is no door in the library yet).</p>
+              <p className="gl-hint">Sets for existing buildings by age need their constructions added to the library first, for Chris to check.</p>
+            </>
+          ) : <p className="gl-hint ap-pnone">Choose a set to see what it puts on each part.</p>}
+          give={giveFoot({ name: cur?.name ?? null, rooms: true, now: chosenSet.rooms.map((id) => setById(plan.fabric_set)?.name ?? `${typeName(roomType(plan, id, 'roof'))} roof`), onGive: (all) => cur && commit(applySet(plan, cur, all ? allRooms() : chosenSet.rooms)) })}
+        />
+      )
+    }
     if (fkind === 'air' || fkind === 'bridge') {
       return (
         <GivePanel kinds={kinds} kind={fkind} onKind={onKind} title={k.name} icon={k.icon} items={[]} active={null} onActive={() => undefined}
