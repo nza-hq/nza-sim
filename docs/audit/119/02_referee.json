@@ -1,0 +1,309 @@
+{
+ "source": "scripts/119_referee.mts",
+ "spec_sha256": "0367d6767d1d7558de91498646bf1749d36ecb23c753a0ecdf63943f3b06a809",
+ "gate": "each limited zone against EnergyPlus: annual cooling ±10 %, hours more than 0.5 K above the cooling setpoint ±20 % or ±50 h, highest air temperature ±1 K (108's heating gate, mirrored; the brief's ±5 % was replaced before any run so that the two limits are held to one gate)",
+ "cooled_room": {
+  "unlimited": {
+   "caps": null,
+   "middle": {
+    "engine2": {
+     "cool": 1.409,
+     "unmet": 0,
+     "max": 24,
+     "peak_w": 1411.414,
+     "hours_at_cap": 0
+    },
+    "energyplus": {
+     "cool": 1.348,
+     "unmet": 0,
+     "max": 24,
+     "ep_not_met": 0,
+     "peak_w": 1341.081,
+     "latent": 0.004
+    },
+    "cooling_pct": 4.5,
+    "unmet_diff_h": 0,
+    "max_diff_k": 0,
+    "pass": true
+   }
+  },
+  "tight": {
+   "caps": {
+    "middle": 800
+   },
+   "middle": {
+    "engine2": {
+     "cool": 1.368,
+     "unmet": 379,
+     "max": 28.22,
+     "peak_w": 800,
+     "hours_at_cap": 539
+    },
+    "energyplus": {
+     "cool": 1.318,
+     "unmet": 299,
+     "max": 27.297,
+     "ep_not_met": 309,
+     "peak_w": 800.047,
+     "latent": 0.004
+    },
+    "cooling_pct": 3.8,
+    "unmet_diff_h": 80,
+    "max_diff_k": 0.92,
+    "pass": false
+   }
+  },
+  "mild": {
+   "caps": {
+    "middle": 1100
+   },
+   "middle": {
+    "engine2": {
+     "cool": 1.405,
+     "unmet": 51,
+     "max": 25.954,
+     "peak_w": 1100,
+     "hours_at_cap": 120
+    },
+    "energyplus": {
+     "cool": 1.345,
+     "unmet": 33,
+     "max": 25.293,
+     "ep_not_met": 33.5,
+     "peak_w": 1100,
+     "latent": 0.004
+    },
+    "cooling_pct": 4.4,
+    "unmet_diff_h": 18,
+    "max_diff_k": 0.66,
+    "pass": true
+   }
+  }
+ },
+ "bridgewater_five_storeys": {
+  "unlimited": {
+   "caps": null,
+   "storeys": {
+    "Floor_1": {
+     "engine2": {
+      "cool": 10.143,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20415.043,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 7.876,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 18791.654,
+      "latent": 1.065
+     },
+     "cooling_pct": 28.8,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": false
+    },
+    "Floor_2": {
+     "engine2": {
+      "cool": 14.282,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20278.17,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 12.584,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 19656.663,
+      "latent": 1.257
+     },
+     "cooling_pct": 13.5,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": false
+    },
+    "Floor_3": {
+     "engine2": {
+      "cool": 14.567,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20323.579,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 13.363,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 19870.384,
+      "latent": 1.284
+     },
+     "cooling_pct": 9,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": true
+    },
+    "Floor_4": {
+     "engine2": {
+      "cool": 14.063,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20267.259,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 13.129,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 19983.243,
+      "latent": 1.277
+     },
+     "cooling_pct": 7.1,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": true
+    },
+    "Floor_5": {
+     "engine2": {
+      "cool": 9.67,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20366.926,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 10.432,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 21180.397,
+      "latent": 1.217
+     },
+     "cooling_pct": -7.3,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": true
+    }
+   },
+   "run_ms": 478
+  },
+  "limited": {
+   "caps": {
+    "Floor_3": 12000
+   },
+   "storeys": {
+    "Floor_1": {
+     "engine2": {
+      "cool": 10.148,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20430.337,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 7.882,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 18808.326,
+      "latent": 1.066
+     },
+     "cooling_pct": 28.8,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": false
+    },
+    "Floor_2": {
+     "engine2": {
+      "cool": 14.328,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20442.738,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 12.619,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 19786.208,
+      "latent": 1.259
+     },
+     "cooling_pct": 13.5,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": false
+    },
+    "Floor_3": {
+     "engine2": {
+      "cool": 14.392,
+      "unmet": 54,
+      "max": 24.838,
+      "peak_w": 12000,
+      "hours_at_cap": 265
+     },
+     "energyplus": {
+      "cool": 13.213,
+      "unmet": 43,
+      "max": 24.779,
+      "ep_not_met": 44.25,
+      "peak_w": 12000,
+      "latent": 0.87
+     },
+     "cooling_pct": 8.9,
+     "unmet_diff_h": 11,
+     "max_diff_k": 0.06,
+     "pass": true
+    },
+    "Floor_4": {
+     "engine2": {
+      "cool": 14.109,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20431.899,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 13.164,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 20113.178,
+      "latent": 1.279
+     },
+     "cooling_pct": 7.2,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": true
+    },
+    "Floor_5": {
+     "engine2": {
+      "cool": 9.675,
+      "unmet": 0,
+      "max": 24,
+      "peak_w": 20383.237,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "cool": 10.438,
+      "unmet": 0,
+      "max": 24,
+      "ep_not_met": 0,
+      "peak_w": 21198.514,
+      "latent": 1.217
+     },
+     "cooling_pct": -7.3,
+     "unmet_diff_h": 0,
+     "max_diff_k": 0,
+     "pass": true
+    }
+   },
+   "run_ms": 274
+  }
+ }
+}
