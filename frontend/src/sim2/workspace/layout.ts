@@ -6,6 +6,7 @@ export const RIGHT = { def: 380, min: 320, max: 520 }
 export const MODEL_CENTRE_TABS = [
   { id: 'drawing', label: 'Drawing' },
   { id: 'heat-flow', label: 'Heat flow' },
+  { id: 'monthly', label: 'Monthly' },
 ] as const
 export type CentreTab = (typeof MODEL_CENTRE_TABS)[number]['id']
 export type Layout = { left: number; right: number; centre: CentreTab }

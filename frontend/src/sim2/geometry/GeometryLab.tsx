@@ -2452,7 +2452,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
-      {mode === 'profiles' && centreTab !== 'heat-flow' && (() => {
+      {mode === 'profiles' && (centreTab ?? 'drawing') === 'drawing' && (() => {
         // Brief 118 P5: Profiles gets the full centre, with today's schedule editor (no drawing).
         const sel = profSel ? profile(profSel) : null
         const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
@@ -2469,7 +2469,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </div>
         )
       })()}
-      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} showMonthly={centreTab === 'monthly'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
@@ -2477,7 +2477,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </Suspense>
         </div>
       )}
-      {onControls && centreTab !== 'heat-flow' && controlMapView()}
+      {onControls && (centreTab ?? 'drawing') === 'drawing' && controlMapView()}
       {note && <div className="gl-note" role="status">{note}</div>}
       <div className="gl-viewswitch" role="group" aria-label="View">
         <button type="button" aria-pressed={shownLook === 'plan'} onClick={() => setLook('plan')}>Plan</button>

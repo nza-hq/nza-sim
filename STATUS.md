@@ -106,6 +106,7 @@ Brief [`docs/briefs/archive/110_model-workspace_COMPLETED.md`](docs/briefs/archi
 ## 🟢 Overnight fixes (16–17 Nov 2026, editor thread, on `sim2/overnight-fixes`)
 
 - **A drawn door no longer stops the run.** The library had no door, so a drawn door's type had no construction and the run asked "Choose a construction for the door." A draft `timber_door_solid` (44 mm solid timber leaf, U ≈ 2.0; `docs/audit/102/library_additions.json`, **awaiting Chris**) is now the library's door. Drawing a door gives any door type with no construction that door (`withDefaultDoor` in `facade.ts`, applied on every plan change in `GeometryLab`); a U typed on the type still overrides it; clearing it by hand sticks. Construction sets carry `door` too. Checked on the community centre: a 0.9 × 2.1 m door drawn on the first wall, document valid, run ok. 460 tests pass, build clean.
+- **Monthly tab** (Brief 110b row 3): a third centre tab beside Drawing and Heat flow. It shows today's `DivergingMonthlyChart` (imported; two additive legend props) fed by the run's monthly heating and cooling (the seam's `monthly`), cooling up, heating down, for the whole building or the room chosen. Σ badges and a line that checks the twelve months add up to the year on Heat flow (Rule 9). Without a run it says why. Also: the Controls step now opens at + Systems (it had no natural level). Community centre: 34.6 MWh heating, 16.3 MWh cooling, months add up.
 
 ## 🟡 Brief 118 — Simulate v2: the left navigator, templates first, systems own their emitters — IN PROGRESS on `sim2/118-navigator`
 

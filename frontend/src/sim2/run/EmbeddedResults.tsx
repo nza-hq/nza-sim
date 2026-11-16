@@ -15,6 +15,7 @@ import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 import { createPortal } from '../workspace/portal'
 import { DesignHeatLoss } from './DesignHeatLoss'
 import { EmitterSizing } from './EmitterSizing'
+import { MonthlyDemand } from './MonthlyDemand'
 import { balanceLines } from './balanceLines'
 import { LevelSwitch, ResultsBody, ResultsStrip, WeatherPick, useRun } from './ResultsPanel'
 import type { StepId } from '../workspace/steps'
@@ -23,9 +24,9 @@ import type { Summary } from './seam'
 import './run.css'
 
 /** Brief 111 P4: each step opens at its natural level; the person can change it at any time. */
-const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', check: 'systems', interventions: 'systems' }
+const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
 
-export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, focusZone, weatherEl, sizingEl = null, onOpen }: {
+export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */
   step?: StepId
   doc: unknown
@@ -37,6 +38,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   strip: HTMLElement
   centre: HTMLElement
   showBody: boolean
+  /** The Monthly centre tab: today's diverging monthly chart, fed by this run's months. */
+  showMonthly?: boolean
   focusZone: string | null
   weatherEl: HTMLElement | null
   /** Brief 118 P4: where a heating system's passport wants its design heat loss and emitter check. */
@@ -73,6 +76,15 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
               </div>
             )}
             <ResultsBody run={run} focusZone={focusZone} />
+          </div>
+        </div>,
+        centre,
+      )}
+      {showMonthly && createPortal(
+        <div className="rp-flow" role="tabpanel" aria-label="Monthly">
+          <div className="rp-flow-in">
+            <h2>Monthly heating and cooling{zone ? `, ${zone.name || zone.id}` : ', whole building'}</h2>
+            {s ? <MonthlyDemand summary={s} zone={zone} /> : <p className="gl-hint">{run.state.kind === 'missing' ? 'The months need a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The months need a run: choose a weather file on Site.'}</p>}
           </div>
         </div>,
         centre,
