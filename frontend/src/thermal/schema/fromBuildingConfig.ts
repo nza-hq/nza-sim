@@ -544,18 +544,21 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
   // Schema 2.8 (Brief 112): today's building-level hot water use goes onto the occupancy profiles, as the upgrade does.
   const dhw0 = { ...(draft.services as Obj).dhw }
   try { to28(draft) } catch (e) { throw new ConversionError((e as Error).message, `${V40}.dhw_demand_basis`) }
-  // The trace follows the move: basis and the litres of that basis are carried onto the (first) occupancy profile, the
-  // other basis's litres are read but not carried.
-  const occIdx = (draft.profiles as Obj[]).findIndex((p) => p.kind === 'occupancy' && p.dhw != null)
+  // The trace follows the move: basis and the litres of that basis are carried onto every occupancy profile (one
+  // trace line per copy, review F6), the other basis's litres are read but not carried.
+  const occIdx = (draft.profiles as Obj[]).flatMap((p, i) => (p.kind === 'occupancy' && p.dhw != null ? [i] : []))
+  const live = dhw0.demand_basis === 'per_person' ? 'litres_per_person_per_day' : dhw0.demand_basis === 'per_m2' ? 'litres_per_m2_per_day' : null
+  const extra: TraceEntry[] = []
   for (const t of src.trace) {
     if (!t.doc.startsWith('services.dhw.')) continue
     const k = t.doc.slice('services.dhw.'.length)
-    const live = dhw0.demand_basis === 'per_person' ? 'litres_per_person_per_day' : dhw0.demand_basis === 'per_m2' ? 'litres_per_m2_per_day' : null
-    if (k === 'demand_basis') { if (occIdx >= 0) t.doc = `profiles[${occIdx}].dhw.basis`; else t.kind = 'structural' }
-    else if (k === 'litres_per_person_per_day' || k === 'litres_per_m2_per_day') {
-      if (occIdx >= 0 && k === live) t.doc = `profiles[${occIdx}].dhw.litres_per_day`; else t.kind = 'structural'
-    }
+    const to = k === 'demand_basis' ? 'basis' : (k === 'litres_per_person_per_day' || k === 'litres_per_m2_per_day') && k === live ? 'litres_per_day' : null
+    if (k !== 'demand_basis' && k !== 'litres_per_person_per_day' && k !== 'litres_per_m2_per_day') continue
+    if (to == null || occIdx.length === 0) { t.kind = 'structural'; continue }
+    t.doc = `profiles[${occIdx[0]}].dhw.${to}`
+    for (const i of occIdx.slice(1)) extra.push({ src: t.src, doc: `profiles[${i}].dhw.${to}`, kind: 'value' })
   }
+  src.trace.push(...extra)
   const parsed = ModelDocument.safeParse(draft)
   if (!parsed.success) {
     const first = parsed.error.issues[0]

@@ -287,6 +287,18 @@ describe('simulate', () => {
     if (!r.ok || !now.ok) throw new Error(JSON.stringify(r))
     expect(r.summary.zones).toEqual(now.summary.zones)
   })
+  it('a 2.7 document runs, its hot water use moved onto the spaces and nothing filled (Brief 112 review F2)', async () => {
+    const d = await doc()
+    const now = simulate(d, { weather: WEATHER })
+    const hw = d.profiles.find((p: any) => p.kind === 'occupancy' && p.dhw)?.dhw
+    d.schema_version = '2.7'
+    if (hw) Object.assign(d.services.dhw, { demand_basis: hw.basis, [hw.basis === 'per_person' ? 'litres_per_person_per_day' : 'litres_per_m2_per_day']: hw.litres_per_day })
+    for (const p of d.profiles) { delete p.dhw; delete p.lux }
+    for (const g of d.system_groups) delete g.efficacy_w_m2_per_100lux
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok || !now.ok) throw new Error(JSON.stringify(r))
+    expect(r.summary.zones).toEqual(now.summary.zones)
+  })
   it('emitters: each zone\'s output against its peak, the rating that covers it, and the same rooms at 70/60 (Brief 108 P4)', async () => {
     expect((simulate(await doc(), { weather: WEATHER }) as any).summary.emitters).toBeNull()
     const withRads = async (rated: (zi: number) => number) => {

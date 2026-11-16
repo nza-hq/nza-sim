@@ -114,7 +114,8 @@ export function upgradeDocument(input: unknown): ModelDocument {
   if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
   if (from === '2.0' || from === '2.1') to22(doc)
-  if (from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
+  // Review F1 (Brief 112): from 2.3 on, a null gain input means "not stated" and stays null (the engine names it).
+  if (from === '2.0' || from === '2.1' || from === '2.2') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
   to24(doc)
   to25(doc)
   to26(doc)
