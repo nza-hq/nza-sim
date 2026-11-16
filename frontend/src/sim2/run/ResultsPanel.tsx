@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../../auth/AuthGate'
 import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
 import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
-import type { Summary, WhatIf } from './seam'
+import type { Level, Summary, WhatIf } from './seam'
 import { EmitterSizing } from './EmitterSizing'
 // @ts-expect-error untyped JS from today's app (Brief 110b: reused, not redrawn)
 import LiveResultsStrip from '../../components/shared/LiveResultsStrip.jsx'
@@ -95,6 +95,13 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
   const [whatIf, setWhatIf] = useState<WhatIf | null>(null)
   const latestWhatIf = useRef(whatIf)
   latestWhatIf.current = whatIf
+  // Brief 111 P4: what the results include. Fabric only heats every room to a temperature the person states (shown and
+  // editable beside the switch, never hidden); + Spaces and + Systems run the document's own setpoints.
+  const [level, setLevel] = useState<Level>('systems')
+  const [fabricC, setFabricC] = useState<number>(21)
+  const opts = () => ({ level: latestLevel.current.level, fabric_heat_c: latestLevel.current.level === 'fabric' ? latestLevel.current.c : null, what_if: latestWhatIf.current })
+  const latestLevel = useRef({ level, c: fabricC })
+  latestLevel.current = { level, c: fabricC }
 
   useEffect(() => {
     let c: RunClient
@@ -111,7 +118,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
         if (w.ok) { setWeather({ file_name: w.file_name, station: w.station }); setWeatherError(null) }
         else { setWeather(null); setWeatherError(w.error) }
         setState({ kind: 'running' })
-        c.run(latestDoc.current, 0, { what_if: latestWhatIf.current })
+        c.run(latestDoc.current, 0, opts())
       },
       failed,
       )
@@ -140,7 +147,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
           else if ('missing' in r) setPreviewState({ kind: 'missing', items: r.missing })
           else setPreviewState({ kind: 'error', message: r.error })
         },
-        (w: WeatherAnswer) => { if (w.ok && latestPreview.current) p.run(latestPreview.current, 0, { what_if: latestWhatIf.current }) },
+        (w: WeatherAnswer) => { if (w.ok && latestPreview.current) p.run(latestPreview.current, 0, opts()) },
         (why) => setPreviewState({ kind: 'error', message: why }),
       )
       preview.current = p
@@ -162,14 +169,14 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
     const p = previewClient()
     if (!p) return
     setPreviewState({ kind: 'running' })
-    if (weatherBytes.current) p.run(previewDoc, 0, { what_if: whatIf })
-  }, [previewDoc, whatIf])
+    if (weatherBytes.current) p.run(previewDoc, 0, opts())
+  }, [previewDoc, whatIf, level, fabricC])
 
   useEffect(() => {
     if (!client.current) return
     setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
-    client.current.run(doc, 250, { what_if: whatIf })
-  }, [doc, whatIf])
+    client.current.run(doc, 250, opts())
+  }, [doc, whatIf, level, fabricC])
 
   // The organisation's weather files, when signed in.
   useEffect(() => {
@@ -207,7 +214,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
     } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
-  return { auth, state, previewState, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+  return { auth, state, previewState, level, setLevel, fabricC, setFabricC, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
 }
 export type Run = ReturnType<typeof useRun>
 
@@ -275,6 +282,38 @@ export function previewItems(a: Summary, b: Summary, unit: 'kwh' | 'kwh_per_m2')
   ]
   if (a.energy?.ok && b.energy?.ok) items.push(move('Energy used', per(a, a.energy.total_kwh), per(b, b.energy.total_kwh), SYSTEMS_ACCENT))
   return items
+}
+
+const LEVEL_NAMES: Record<Level, string> = { fabric: 'Fabric only', spaces: '+ Spaces', systems: '+ Systems' }
+/** Brief 111 P4: the "Results include" switch, and the level said in words. Fabric only's temperature is edited here,
+ * inline with the figures it drives (110b row 8, as today's comfort card does). */
+export function LevelSwitch({ run }: { run: Run }) {
+  const { level, setLevel, fabricC, setFabricC } = run
+  const [typed, setTyped] = useState(String(fabricC))
+  useEffect(() => setTyped(String(fabricC)), [fabricC])
+  const commitC = () => {
+    const v = Number(typed)
+    if (typed.trim() !== '' && Number.isFinite(v) && v >= 5 && v <= 35) setFabricC(v)
+    else setTyped(String(fabricC))
+  }
+  return (
+    <div className="rp-level">
+      <span className="rp-level-label">Results include</span>
+      <div className="rp-level-seg" role="radiogroup" aria-label="Results include">
+        {(['fabric', 'spaces', 'systems'] as const).map((l) => (
+          <button key={l} type="button" role="radio" aria-checked={level === l} onClick={() => setLevel(l)}>{LEVEL_NAMES[l]}</button>
+        ))}
+      </div>
+      <span className="rp-level-says">
+        {level === 'fabric' ? (
+          <>The fabric alone: every room heated to{' '}
+            <input className="rp-level-c" aria-label="Every room heated to (°C)" inputMode="decimal" value={typed} onChange={(e) => setTyped(e.target.value)} onBlur={commitC} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />{' '}°C, no people, no cooling.</>
+        ) : level === 'spaces'
+          ? 'Adds people, lights and equipment from the space types, each at its own temperatures. No systems.'
+          : 'The whole model, through to energy used.'}
+      </span>
+    </div>
+  )
 }
 
 export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void }) {

@@ -1,7 +1,7 @@
 # Current brief
 
-**Brief 110 — Simulate v2: the Model workspace inside NZA Sim — CLOSED 15 Nov 2026 on `sim2/110-model-workspace` (stacked on `sim2/geometry-prototype`; PR open, awaiting Linzie).**
-`/model`: a seven-step rail, three resizable panes, the editor in them, the results strip and Heat flow tab (with emitter sizing), and plans saved as model versions (migration 0008, dev). Brief [`archive/110_model-workspace_COMPLETED.md`](archive/110_model-workspace_COMPLETED.md); close [`../audit/110/05_close.md`](../audit/110/05_close.md). **Next:** Brief 111 P3–P4 on the same branch.
+**Brief 110 — Simulate v2: the Model workspace inside NZA Sim — CLOSED 15 Nov 2026; MERGED to main 16 Nov (PR #35, with 110b so far).**
+`/model`: a seven-step rail, three resizable panes, the editor in them, the results strip and Heat flow tab (with emitter sizing), and plans saved as model versions (migration 0008, dev). Brief [`archive/110_model-workspace_COMPLETED.md`](archive/110_model-workspace_COMPLETED.md); close [`../audit/110/05_close.md`](../audit/110/05_close.md). **Next:** Brief 110b's remaining parts and Brief 111 P4 on `sim2/110b-carry-over`.
 
 **Brief 111 — Simulate v2: "Results include" levels and the heat flow view — Parts 1–2 ACTIVE 15 Nov 2026 on `chris/111-results-levels` (stacked on 108); Parts 3–4 the editor thread's.**
 Fabric only / + Spaces / + Systems as run copies of the document with objects removed (Rule 8), each with its per-zone breakdown; Fabric only checked against EnergyPlus. Brief [`active/111_results-include.md`](active/111_results-include.md). Claims (Parts 1–2): `frontend/src/sim2/run/seam.ts`, `frontend/src/sim2/run/__tests__/`, `validation/energyplus/111_*`, `docs/audit/111/`.
