@@ -1,0 +1,144 @@
+{
+ "source": "scripts/109_panel.mts",
+ "steps_per_hour": 4,
+ "zones": [
+  {
+   "name": "Storey 1",
+   "hours": {
+    "setpoint_c": 21,
+    "setback_c": 16,
+    "in_use_hours": 3132,
+    "unmet_in_use_hours": 0,
+    "min_in_use_c": 20.999999999999996,
+    "morning_peak": {
+     "w": 329105.34161115804,
+     "hour": 511
+    },
+    "later_peak": {
+     "w": 30137.249540656216,
+     "hour": 512
+    },
+    "limited": false,
+    "recovery": {
+     "mornings": 27,
+     "median_h": 0,
+     "not_reached": 0
+    }
+   }
+  },
+  {
+   "name": "Storey 2",
+   "hours": {
+    "setpoint_c": 21,
+    "setback_c": 16,
+    "in_use_hours": 3132,
+    "unmet_in_use_hours": 0,
+    "min_in_use_c": 20.999999999999993,
+    "morning_peak": {
+     "w": 295209.3568383944,
+     "hour": 511
+    },
+    "later_peak": {
+     "w": 26562.302394626437,
+     "hour": 512
+    },
+    "limited": false,
+    "recovery": {
+     "mornings": 24,
+     "median_h": 0,
+     "not_reached": 0
+    }
+   }
+  },
+  {
+   "name": "Storey 3",
+   "hours": {
+    "setpoint_c": 21,
+    "setback_c": 16,
+    "in_use_hours": 3132,
+    "unmet_in_use_hours": 0,
+    "min_in_use_c": 20.99999999999999,
+    "morning_peak": {
+     "w": 293553.341140372,
+     "hour": 511
+    },
+    "later_peak": {
+     "w": 26419.44001847006,
+     "hour": 512
+    },
+    "limited": false,
+    "recovery": {
+     "mornings": 23,
+     "median_h": 0,
+     "not_reached": 0
+    }
+   }
+  },
+  {
+   "name": "Storey 4",
+   "hours": {
+    "setpoint_c": 21,
+    "setback_c": 16,
+    "in_use_hours": 3132,
+    "unmet_in_use_hours": 149,
+    "min_in_use_c": 16.709010243201444,
+    "morning_peak": {
+     "w": 40000,
+     "hour": 31
+    },
+    "later_peak": {
+     "w": 40000,
+     "hour": 176
+    },
+    "limited": true,
+    "recovery": {
+     "mornings": 24,
+     "median_h": 3,
+     "not_reached": 0
+    }
+   }
+  },
+  {
+   "name": "Storey 5",
+   "hours": {
+    "setpoint_c": 21,
+    "setback_c": 16,
+    "in_use_hours": 3132,
+    "unmet_in_use_hours": 262,
+    "min_in_use_c": 16.324386482945684,
+    "morning_peak": {
+     "w": 40000,
+     "hour": 7
+    },
+    "later_peak": {
+     "w": 40000,
+     "hour": 32
+    },
+    "limited": true,
+    "recovery": {
+     "mornings": 28,
+     "median_h": 4,
+     "not_reached": 1
+    }
+   }
+  }
+ ],
+ "emitters": [
+  {
+   "name": "Storey 4",
+   "peak_w": 17852,
+   "cap_w": 40000,
+   "unmet_in_use_hours": 149,
+   "min_in_use_c": 16.71,
+   "in_use": true
+  },
+  {
+   "name": "Storey 5",
+   "peak_w": 22532,
+   "cap_w": 40000,
+   "unmet_in_use_hours": 262,
+   "min_in_use_c": 16.32,
+   "in_use": true
+  }
+ ]
+}

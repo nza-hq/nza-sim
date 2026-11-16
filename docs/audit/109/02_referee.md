@@ -75,8 +75,7 @@ Annual heating differs less between the schemes (Floor 1: 24.94 against 24.05 MW
 **Overnight cooling, Bridgewater.** Engine 2 cools more slowly overnight than EnergyPlus.
 - Floor 3, 22 Jan, 06:00: Engine 2 is at 16.58 °C against EnergyPlus's 16.00 °C. So the engine's morning step is 4.42 K, not 5 K.
 - Averaged over weekdays, the morning peak is 10–13 % low on Floors 1–4 and 4.5 % low on Floor 5.
-- On the cooled room, whose referee uses the engine's fixed ISO inside convection (flag `iso_conv`), the same line is within 1 % in the limited cases. Bridgewater's referee uses EnergyPlus's own inside convection.
-- The two differ, but which term causes the slower cooling has not been instrumented. It is left as an open item, not explained.
+- ~~On the cooled room, whose referee uses the engine's fixed ISO inside convection (flag `iso_conv`), the same line is within 1 % in the limited cases.~~ [Edit, review F4: in the limited cases the morning peak is the limit, so it agrees by construction. The unlimited cooled room, with convection matched, is also −10 % (west) and −9.9 % (east) at 1 step. Inside convection is unlikely to be the whole story; the runs that separate it are in `06_review_response.md`.]
 
 **Cooling, Bridgewater.** Not gated in this brief, which is about heating hours. Engine 2 is +30 % (Floor 1) to −4 % (Floor 5) against EnergyPlus. This is the open cooling-miss finding from Brief 103, not new.
 

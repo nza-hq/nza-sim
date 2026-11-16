@@ -35,7 +35,7 @@ function ZoneBlock({ z, other }: { z: EmitterZone; other: EmitterZone | null }) 
       {!other && <p className="es-line">Emitters give {kw(z.cap_w)} kW at {pair(z)}; the peak need is {kw(z.peak_w)} kW.</p>}
       {!other && short && (
         <p className="es-line">
-          {z.unmet_hours ?? 0} hours a year more than 0.5 °C below the setpoint; lowest {deg(z.min_c)} °C.
+          {z.unmet_hours ?? 0} hours {z.in_use ? 'in use' : 'a year'} more than 0.5 °C below the setpoint; lowest {z.in_use ? 'in use ' : ''}{deg(z.min_c)} °C.
         </p>
       )}
       {z.needed_rated_w != null && z.design && (
@@ -57,8 +57,8 @@ function ZoneBlock({ z, other }: { z: EmitterZone; other: EmitterZone | null }) 
             <tr><td>Peak need</td><td>{kw(z.peak_w)} kW</td><td>{kw(other.peak_w)} kW</td></tr>
             <tr><td>Emitters give</td><td>{kw(z.cap_w)} kW</td><td>{kw(other.cap_w)} kW</td></tr>
             <tr><td>Short</td><td>{shortKw(z.shortfall_w)} kW</td><td>{shortKw(other.shortfall_w)} kW</td></tr>
-            <tr><td>Hours below</td><td>{z.unmet_hours ?? 0}</td><td>{other.unmet_hours ?? 0}</td></tr>
-            <tr><td>Lowest</td><td>{deg(z.min_c)} °C</td><td>{deg(other.min_c)} °C</td></tr>
+            <tr><td>{z.in_use ? 'Hours below in use' : 'Hours below'}</td><td>{z.unmet_hours ?? 0}</td><td>{other.unmet_hours ?? 0}</td></tr>
+            <tr><td>{z.in_use ? 'Lowest in use' : 'Lowest'}</td><td>{deg(z.min_c)} °C</td><td>{deg(other.min_c)} °C</td></tr>
             {z.needed_rated_w != null && other.needed_rated_w != null && (
               <tr><td>Rating needed</td><td>{kw(z.needed_rated_w)} kW</td><td>{kw(other.needed_rated_w)} kW</td></tr>
             )}
@@ -94,8 +94,11 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
       {info && (
         <p className="rp-note">
           Each zone's emitters are rated to EN 442 at their heating system's flow and return temperatures, in the room at
-          its heating setpoint. The peak need is the zone's highest hourly heat with its emitters unlimited. Where the
-          emitters give less, the zone runs colder and the hours more than 0.5 °C below the setpoint are counted. The
+          its heating setpoint. The peak need is the zone's highest hourly heat with its emitters unlimited, heated to its
+          setpoint at every hour: a night setback is left out, so the emitters are not sized for warming up from it (the
+          heating hours show how long that takes with the emitters as they are). Where the
+          emitters give less, the zone runs colder and the hours more than 0.5 °C below the setpoint are counted (for a
+          zone heated to hours, the hours in use). The
           rating needed is what would cover the peak at those temperatures, given at 75/65/20 °C as catalogues list it.
           Each hour, wet emitters are re-rated at how warm the room is, at their design water flow: a colder room draws
           more from the same radiators. That is checked against EnergyPlus's hot-water radiator (the coldest hour within

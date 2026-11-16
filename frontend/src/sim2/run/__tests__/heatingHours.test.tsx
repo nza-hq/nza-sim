@@ -9,11 +9,11 @@ import type { Summary, ZoneHours } from '../seam'
 
 const hours = (over: Partial<ZoneHours> = {}): ZoneHours => ({
   setpoint_c: 21, setback_c: 16, in_use_hours: 3132, unmet_in_use_hours: 0, min_in_use_c: 20.99,
-  morning_peak: { w: 328462, hour: 21 * 24 + 7 }, steady_peak: { w: 30100, hour: 21 * 24 + 8 },
-  recovery: { mornings: 63, median_h: 0, not_reached: 0 }, ...over,
+  morning_peak: { w: 328462, hour: 21 * 24 + 7 }, later_peak: { w: 30100, hour: 21 * 24 + 8 },
+  limited: false, recovery: { mornings: 63, median_h: 0, not_reached: 0 }, ...over,
 })
 const summary = (zs: (ZoneHours | null)[]): Summary => ({
-  engine: 'thermal-2', run_ms: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
+  engine: 'thermal-2', run_ms: 1, steps_per_hour: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
   building: { floor_m2: 100, heating_kwh: 1, cooling_kwh: 0, peak_heating_w: 0, peak_cooling_w: 0, monthly: { heating_kwh: [], cooling_kwh: [] } },
   zones: zs.map((h, i) => ({ id: `z${i}`, name: `Storey ${i + 1}`, floor_m2: 1, heating_kwh: 1, cooling_kwh: 0, heated: true, cooled: false, breakdown: [], monthly: { heating_kwh: [], cooling_kwh: [] }, by_surface: [], window_solar: [], hours: h })),
   breakdown: [], by_surface: [], window_solar: [], hourly: null, drafts: [], energy: { ok: false, missing: [] }, emitters: null,
@@ -36,7 +36,8 @@ describe('HeatingHours', () => {
     expect(h).not.toContain('Storey 2')
     expect(h).toContain('holds its setpoint')
     expect(h).toContain('In use 3,132 hours a year; lowest in use 21.0 °C.')
-    expect(h).toContain('Morning peak 328.5 kW (Mon 22 Jan, 07:00); steady peak 30.1 kW (Mon 22 Jan, 08:00).')
+    expect(h).toContain('Heat to recover in the first hour 328.5 kW (Mon 22 Jan, 07:00); later peak 30.1 kW (Mon 22 Jan, 08:00).')
+    expect(html(summary([hours({ limited: true })]))).toContain('Morning peak 328.5 kW (Mon 22 Jan, 07:00); later peak')
     expect(h).toContain('On a cold morning it is back within 0.5 °C of 21.0 °C in the first hour.')
   })
   it('a zone that falls short: hours below, the time back, and the mornings it never gets there', () => {

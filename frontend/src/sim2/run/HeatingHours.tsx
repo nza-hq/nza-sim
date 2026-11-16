@@ -5,7 +5,7 @@
  * `<HeatingHours summary={summary} />`. It owns nothing of the editor's.
  *
  * Per zone: hours below the setpoint while in use and the lowest temperature then; the morning peak (bringing the room
- * back from its setback) and the steady peak, each with when it happened; and how long a cold morning takes to get
+ * back from its setback) and the later peak, each with when it happened; and how long a cold morning takes to get
  * back to the setpoint. Every figure is the engine's (Rule 1); the basis is behind ⓘ.
  */
 import { useState } from 'react'
@@ -45,15 +45,28 @@ export function HeatingHours({ summary }: { summary: Summary }) {
         <button type="button" className="rp-info" aria-expanded={info} onClick={() => setInfo((v) => !v)} aria-label="About the heating hours figures">ⓘ</button>
       </h3>
       {info && (
-        <p className="rp-note">
-          Each zone is heated to its setpoint in its hours and to its setback outside them. Hours below count the hours in
-          use more than 0.5 °C below the setpoint. The morning peak is the largest hour of heating at the start of the
-          hours, bringing the room back from its setback; the steady peak is the largest at any other hour in use. A cold
-          morning is one of the coldest quarter of days, by mean outdoor temperature, whose hours start with the room below
-          its setpoint; the time back is the middle value over those mornings, counted in whole hours. When heating is at
-          its limit, many hours share the same peak, and the first of them is shown. Underfloor heating
-          in a floor warms the floor first, so it brings a room back more slowly than radiators of the same output.
-        </p>
+        <div className="rp-note">
+          <p>
+            Each zone is heated to its setpoint in its hours, and outside them to its setback, or not at all if it has no
+            setback. Hours below count the hours in use more than 0.5 °C below the setpoint. When a zone's heating is
+            limited, the year is run in quarter hours and each hour's temperature is the mean of its four, so that a slow
+            morning is counted as it happens.
+          </p>
+          <p>
+            The morning peak is the largest hour of heating at the start of the hours, bringing the room back from its
+            setback; the later peak is the largest at any other hour in use. When heating is at its limit, many hours share
+            the same peak, and the first of them is shown. Where heating is not limited, the room is brought back within
+            the first hour, which puts back in one hour the heat its fabric and contents gave up overnight; most of that
+            first-hour figure is the room's contents, taken as 250 kJ/K for each m² of floor, so a real system would take
+            longer and need less. Emitter sizing is on the year without the setback.
+          </p>
+          <p>
+            Cold mornings are the coldest quarter, by mean outdoor temperature, of the days whose hours start with the room
+            below its setpoint; the time back is the middle value over those mornings, in whole hours. Underfloor heating
+            warms the floor first, so it brings a room back more slowly than radiators of the same output. Its output is
+            estimated at the room's temperature, so its hours below may be understated by up to about a tenth.
+          </p>
+        </div>
       )}
       <ul className="es-zones">
         {zones.map((z) => {
@@ -71,8 +84,8 @@ export function HeatingHours({ summary }: { summary: Summary }) {
               </p>
               {h.morning_peak && (
                 <p className="es-line">
-                  Morning peak {kw(h.morning_peak.w)} kW ({when(h.morning_peak.hour)})
-                  {h.steady_peak ? `; steady peak ${kw(h.steady_peak.w)} kW (${when(h.steady_peak.hour)})` : ''}.
+                  {h.limited ? 'Morning peak' : 'Heat to recover in the first hour'} {kw(h.morning_peak.w)} kW ({when(h.morning_peak.hour)})
+                  {h.later_peak ? `; later peak ${kw(h.later_peak.w)} kW (${when(h.later_peak.hour)})` : ''}.
                 </p>
               )}
               {h.recovery && <p className="es-line es-need">{recovery(h.recovery, h.setpoint_c)}</p>}

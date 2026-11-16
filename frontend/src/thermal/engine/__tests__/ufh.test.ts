@@ -11,7 +11,7 @@
  */
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { layerFaceNode, opaqueElement, type Layer } from '../elements'
+import { innerElement, layerFaceNode, opaqueElement, type Layer } from '../elements'
 import { REFEREE_OPTIONS, runModel, type RunOptions } from '../model'
 import { runNetwork } from '../network'
 import { ModelDocument } from '../../schema/model'
@@ -73,6 +73,43 @@ describe('(a) by hand: heat into the floor = the room\'s loss + the loss down', 
     // Less heat goes down when less goes into the floor: all > half > air-only.
     expect(all).toBeGreaterThan(half); expect(half).toBeGreaterThan(air)
     expect(Math.max(...run(0.5).zones[0].closure_wh)).toBeLessThanOrEqual(1e-6)
+  })
+})
+
+describe('(a2) a floor between two storeys, heated from the upper room (review F5)', () => {
+  // From the upper room's face (zone_b, node 0) down: carpet, screed, concrete, plaster. Pipes at the screed's top
+  // (layer 0's inside face), in the upper room's half. The lower room is not heated; both lose only to outside air.
+  const LAYERS: Layer[] = [
+    { kind: 'Material', thickness: 0.01, conductivity: 0.06, density: 200, specific_heat: 1300 },
+    { kind: 'Material', thickness: 0.065, conductivity: 0.41, density: 1200, specific_heat: 840 },
+    { kind: 'Material', thickness: 0.2, conductivity: 1.13, density: 2000, specific_heat: 1000 },
+    { kind: 'Material', thickness: 0.013, conductivity: 0.25, density: 900, specific_heat: 1000 },
+  ]
+  const slab = innerElement({ id: 'slab', area_m2: 50, tilt_deg: 0, layers: LAYERS, path: 'slab' })
+  const zone = (heat: number | null, src: { element: number; node: number; share: number } | null) => ({
+    air_capacity_j_per_k: 1e6, bridging_w_per_k: 40, ventilation_w_per_k: flat(60), solar_transmitted_w: flat(0), solar_beam_w: null,
+    other_gains: null, setpoints: { heat_c: heat, cool_c: null }, initial_c: 15, heating_source: src,
+  })
+  const run = (node: number) => runNetwork({
+    // zone 0: the lower room (zone_a, the slab's last node); zone 1: the upper room (zone_b, node 0), heated in the floor.
+    zones: [zone(null, null), zone(20, { element: 0, node, share: 1 })],
+    elements: [{ element: slab, zone_a: 0, zone_b: 1, solar_absorbed_w_per_m2: flat(0), inside_solar_absorptance: 0.6, inside_solar_absorptance_b: 0.6 }],
+    hours: H, theta_e: flat(0), theta_ground: 10, control: 'air', hc_convective_fraction: 1, solar_convective_fraction: 0, warmup_days: 200,
+  })
+  const node = layerFaceNode(LAYERS, 'zone', 0, 'slab')
+  it('the heat into the floor equals both rooms\' losses (1e-6), the upper room holds 20 °C, and both close every hour', () => {
+    const mid = Math.floor((slab.c.length - 2) / 2)
+    expect(node).toBeGreaterThanOrEqual(1); expect(node).toBeLessThanOrEqual(mid)  // the upper room's half
+    const r = run(node)
+    const lo = last(r.zones[0].theta_air), up = last(r.zones[1].theta_air)
+    expect(up).toBeCloseTo(20, 9)
+    expect(lo).toBeGreaterThan(5)  // the lower room is warmed through its ceiling, from the upper room's floor
+    expect(Math.abs(last(r.zones[1].heating_w) / (100 * (up - 0) + 100 * (lo - 0)) - 1)).toBeLessThan(1e-6)
+    expect(last(r.zones[0].heating_w)).toBe(0)
+    for (const z of r.zones) expect(Math.max(...z.closure_wh)).toBeLessThanOrEqual(1e-6)
+  })
+  it('a node in the lower room\'s half is refused for the upper room', () => {
+    expect(() => run(slab.c.length - 2)).toThrow(/the other zone's side of the floor/)
   })
 })
 

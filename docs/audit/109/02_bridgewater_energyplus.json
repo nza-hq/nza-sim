@@ -1,7 +1,7 @@
 {
  "source": "validation/energyplus/109_bridgewater_setback.py",
  "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
- "setback_spec_sha256": "330d97a842709b246f6afda534ef4c8bcdce6135b69c9c57e36fce4d96cf06df",
+ "setback_spec_sha256": "5288cdc65b50b77c6fa34cd40fdfac5291bc396b2b931df1f11f273bd185681c",
  "gains_csv_sha256": "55da387066d0488f75783ec712e5f5d7e45b780f019503826fec23a6e835f89f",
  "runs": {
   "ThirdOrderBackwardDifference": {
@@ -21,7 +21,7 @@
    "cooling_mwh": 54.281,
    "severe": 0,
    "warnings": 26,
-   "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.16 00:14",
+   "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.16 00:55",
    "zones": {
     "Floor_1": {
      "heat_mwh": 24.944449411885493,
@@ -252,7 +252,7 @@
    "cooling_mwh": 51.16,
    "severe": 0,
    "warnings": 26,
-   "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.16 00:14",
+   "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.16 00:55",
    "zones": {
     "Floor_1": {
      "heat_mwh": 24.049738275082763,

@@ -30,6 +30,16 @@ import type { WeatherChoice } from './weather'
 export type { Missing } from './library'
 
 export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'profiles', ventilation: 'document' }
+/**
+ * Brief 109 review F3: a zone that is both limited by its emitters and heated to hours is run in quarter hours. At one
+ * step an hour the hour's temperature is its end, the warmest point of a limited morning's recovery, and the hours
+ * below in use are undercounted (cooled room, mild: −54 h of EnergyPlus's 248 at 1 step, −31 h at 4; the gate is
+ * ±50 h). Every other document keeps one step an hour, Brief 104's speed budget.
+ */
+export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }
+export function runOptionsFor(doc: ModelDocument): RunOptions {
+  return doc.zones.some((z) => z.emitters.length > 0 && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
+}
 
 /** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */
 export interface Monthly { heating_kwh: number[]; cooling_kwh: number[] }
@@ -47,8 +57,9 @@ export interface WindowSolar { facing: Facing; transmitted_kwh: number; absorbed
 /**
  * Brief 109 Part 4: a zone heated to hours. Hours are numbered from 1 January 00:00 (0 to 8,759). The morning peak is
  * the largest hour of heating in the first in-use hour of any day (bringing the room back from its setback); the
- * steady peak is the largest in any other in-use hour. Recovery is over the cold mornings: days whose first in-use
- * hour starts from below the setpoint, coldest quarter by the day's mean outdoor temperature. Each morning counts the
+ * later peak is the largest in any other in-use hour of the same run (review F8: not the peak without the setback,
+ * which is the emitter sizing's `peak_w`). Recovery is over the cold mornings: of the days whose first in-use hour
+ * starts from below the setpoint, the coldest quarter by the day's mean outdoor temperature. Each morning counts the
  * hours until the control temperature is within UNMET_K of the setpoint (0: within the first hour); a morning that
  * never gets there that day is counted apart.
  */
@@ -60,13 +71,17 @@ export interface ZoneHours {
   unmet_in_use_hours: number | null
   min_in_use_c: number | null
   morning_peak: { w: number; hour: number } | null
-  steady_peak: { w: number; hour: number } | null
+  later_peak: { w: number; hour: number } | null
+  /** True when the zone's emitters limit its heating; false when heating is unlimited (review F2). */
+  limited: boolean
   recovery: { mornings: number; median_h: number | null; not_reached: number } | null
 }
 
 export interface Summary {
   engine: ModelResults['engine']
   run_ms: number
+  /** Steps the year was run in per hour: 1, or 4 when a limited zone is heated to hours (review F3, runOptionsFor). */
+  steps_per_hour: number
   weather: { file_name: string; station: string; sha256: string }
   building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number; monthly: Monthly }
   /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
@@ -115,10 +130,15 @@ export interface Summary {
 /** One zone's emitters: sizing (peak from a run with the emitters unlimited) and how the capped run went. */
 export type EmitterZone = ZoneSizing & {
   id: string; name: string
-  /** Hours the zone ran more than 0.5 K below its heating setpoint, in the capped run. */
+  /**
+   * Hours the zone ran more than 0.5 K below its heating setpoint, in the capped run. For a zone heated to hours
+   * (`in_use`), only the hours in use count (the engine's `unmet_heating_hours_in_use`; Brief 109 review F6).
+   */
   unmet_hours: number | null
-  /** The lowest control temperature of the year, °C, in the capped run. */
+  /** The lowest control temperature in the capped run, °C: of the year, or of the hours in use when `in_use`. */
   min_c: number
+  /** Brief 109 review F6: true when the zone is heated to hours, so the two lines above are of the hours in use. */
+  in_use: boolean
   /** Hours the emitters gave all they could, in the capped run. */
   hours_at_cap: number
 }
@@ -244,7 +264,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
   const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
   if (pre.missing.length) return { ok: false, missing: pre.missing }
   const weather = deps.weather!
-  const options = deps.options ?? RUN_OPTIONS
+  const options = deps.options ?? runOptionsFor(doc)
   const run = (d: ModelDocument, o: RunOptions) => runModel(d, weather.weather, pre.library, o)
   let results: ModelResults
   try {
@@ -292,7 +312,7 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
   const bHeat = readBuildingHourlyW(results, 'heating'), bCool = readBuildingHourlyW(results, 'cooling')
   const hoursOf = zoneSetpointHours(doc, weather.weather.hours)
   const summary: Summary = {
-    engine: results.engine, run_ms: results.run_ms,
+    engine: results.engine, run_ms: results.run_ms, steps_per_hour: options.time_step?.steps_per_hour ?? 1,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
     building: {
       floor_m2: readDocFloorM2(doc),
@@ -323,7 +343,7 @@ function zoneHours(z: ModelResults['zones'][number], set: { heat_c: number | nul
   const H = z.hourly.heating_w.length, q = z.hourly.heating_w
   const ctl = control === 'operative' ? z.hourly.theta_operative_c : z.hourly.theta_air_c
   const use = sh.in_use, sp = sh.hourly.heat_c
-  let morning: ZoneHours['morning_peak'] = null, steady: ZoneHours['steady_peak'] = null
+  let morning: ZoneHours['morning_peak'] = null, steady: ZoneHours['later_peak'] = null
   const starts: { day: number; h: number; tmean: number }[] = []
   for (let d = 0; d * 24 < H; d++) {
     let first = -1
@@ -358,7 +378,7 @@ function zoneHours(z: ModelResults['zones'][number], set: { heat_c: number | nul
   }
   return {
     setpoint_c: set.heat_c!, setback_c: set.setback_c ?? null, in_use_hours: z.annual.in_use_hours, unmet_in_use_hours: z.annual.unmet_heating_hours_in_use, min_in_use_c: z.annual.min_control_in_use_c,
-    morning_peak: morning, steady_peak: steady, recovery,
+    morning_peak: morning, later_peak: steady, limited: z.emitters != null, recovery,
   }
 }
 
@@ -396,20 +416,36 @@ function engineMissing(e: unknown, doc: ModelDocument): Missing | null {
  * Brief 108 Part 4. Sizing needs each zone's peak with its emitters unlimited: a second run of the same document,
  * the emitters' radiant share kept and their output not limited (`emitter_limit: 'none'`). The what-if changes only
  * the wet heating systems' design temperatures, runs capped and unlimited again, and reports the same lines.
+ *
+ * Brief 109 decision 4 (review F1): the sizing run is heated to the setpoint at every hour, with no hours and no
+ * setback. With them, the unlimited peak is the Monday-morning recovery (Bridgewater storey 1: 328.4 kW against
+ * 23.2 kW), and sizing to it would ask for emitters an order of magnitude too big. How the sized room recovers from
+ * its setback is the capped run's, shown by the heating hours panel.
  */
+export function steadyDocument(doc: ModelDocument): ModelDocument {
+  if (!doc.zones.some((z) => z.setpoints.hours_ref != null)) return doc
+  const d = structuredClone(doc)
+  for (const z of d.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null }
+  return d
+}
+
+/** Brief 108 Part 4: each zone's emitters sized on the steady run (see steadyDocument), and how the capped run went. */
 function emitterSummary(
   doc: ModelDocument, results: ModelResults, options: RunOptions, run: (d: ModelDocument, o: RunOptions) => ModelResults,
   weather: WeatherChoice, whatIf: WhatIf | null,
 ): EmitterSummary | null {
   if (!doc.zones.some((z) => z.emitters.length > 0)) return null
-  const unlimited = (d: ModelDocument) => run(d, { ...options, emitter_limit: 'none' })
+  const unlimited = (d: ModelDocument) => run(steadyDocument(d), { ...options, emitter_limit: 'none' })
   const sized = (d: ModelDocument, capped: ModelResults, free: ModelResults): EmitterZone[] =>
     capped.zones.flatMap((z, i) => {
       if (!z.emitters) return []
       return [{
         id: z.zone_id, name: d.zones[i].name,
         ...zoneSizing(d, i, z.emitters, free.zones[i].annual.peak_heating_w),
-        unmet_hours: z.annual.unmet_heating_hours, min_c: readZoneMinControlC(z), hours_at_cap: z.emitters.hours_at_cap,
+        ...(d.zones[i].setpoints.hours_ref != null
+          ? { unmet_hours: z.annual.unmet_heating_hours_in_use, min_c: z.annual.min_control_in_use_c ?? readZoneMinControlC(z), in_use: true }
+          : { unmet_hours: z.annual.unmet_heating_hours, min_c: readZoneMinControlC(z), in_use: false }),
+        hours_at_cap: z.emitters.hours_at_cap,
       }]
     })
   const free = unlimited(doc)

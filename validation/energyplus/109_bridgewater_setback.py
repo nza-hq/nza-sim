@@ -61,8 +61,11 @@ def build(fx, today, psi, tg, gdir: Path, algorithm: str):
     return ep, notes
 
 
-def one(a, fx, today, psi, tg, d: Path, alg: str) -> dict:
+def one(a, fx, today, psi, tg, d: Path, alg: str, iso_conv: bool = False) -> dict:
     ep, notes = build(fx, today, psi, tg, Path(a.gains), alg)
+    if iso_conv:
+        # Review F4: the engine's fixed inside and outside convection in place of EnergyPlus's own (104_attribution.py).
+        load("att", "104_attribution.py").iso_conv(ep, notes)
     SBR.add_air_outputs(ep)
     notes.append("heating and cooling: what entered the zone air (its heat balance's system terms), not the ideal-loads report")
     res = R.run_ep(a.energyplus, ep, d)
@@ -84,7 +87,8 @@ def one(a, fx, today, psi, tg, d: Path, alg: str) -> dict:
         tz = series("Zone Mean Air Temperature", z)
         if len(tz) != 8760 or len(heat) != 8760:
             raise SystemExit(f"{z}: {len(tz)} / {len(heat)} hourly values")
-        zones[z] = {**SBR.summarise(heat, tz, sp, [x == 1 for x in f], days, SB["unmet_tolerance_k"]), "cool_mwh": sum(cool) / 1e6,
+        jan = {"tz_jan": [round(v, 3) for v in tz[:744]]} if iso_conv or a.variant else {}
+        zones[z] = {**jan, **SBR.summarise(heat, tz, sp, [x == 1 for x in f], days, SB["unmet_tolerance_k"]), "cool_mwh": sum(cool) / 1e6,
                     "cooling_outside_hours_wh": sum(c for c, x in zip(cool, f) if x == 0),
                     "ideal_loads_reported": {"heat_mwh": sum(rep) / 1e6, "peak_w": max(rep), "weekday_morning_peak_w":
                                              SBR.summarise(rep, tz, sp, [x == 1 for x in f], days, SB["unmet_tolerance_k"])["weekday_morning_peak_w"]}}
@@ -100,19 +104,25 @@ def main() -> None:
     ap.add_argument("--energyplus", required=True)
     ap.add_argument("--gains", required=True)
     ap.add_argument("--runs", default=None)
+    # Review F4: 'iso_conv' (fixed convection, as the engine) or 'default' (EnergyPlus's own convection), EulerMethod only,
+    # with January's hourly air temperatures, each to its own file beside the gated one.
+    ap.add_argument("--variant", choices=["iso_conv", "default"], default=None)
     a = ap.parse_args()
     import yaml
     fx = yaml.safe_load(R.FIXTURE.read_text())
     today, psi, tg = R.today_constants(), R.iso14683_psi(), R.epw_mean_dry_bulb(R.EPW)
     root = Path(a.runs or tempfile.mkdtemp(prefix="109_bw_"))
     runs = {}
-    for alg in SBR.ALGORITHMS:
-        runs[alg] = one(a, fx, today, psi, tg, root / alg, alg)
+    if a.variant:
+        runs["EulerMethod"] = one(a, fx, today, psi, tg, root / a.variant, "EulerMethod", a.variant == "iso_conv")
+    else:
+        for alg in SBR.ALGORITHMS:
+            runs[alg] = one(a, fx, today, psi, tg, root / alg, alg)
     out = {"source": "validation/energyplus/109_bridgewater_setback.py", "epw_sha256": R.EPW_SHA,
            "setback_spec_sha256": hashlib.sha256((HERE / "109_setback_spec.json").read_bytes()).hexdigest(),
            "gains_csv_sha256": hashlib.sha256((Path(a.gains) / "gains.csv").read_bytes()).hexdigest(),
            "runs": runs}
-    OUT.write_text(json.dumps(out, indent=1) + "\n")
+    (OUT.with_name(f"02_bridgewater_{a.variant}_energyplus.json") if a.variant else OUT).write_text(json.dumps(out, indent=1) + "\n")
 
 
 if __name__ == "__main__":

@@ -11,5 +11,6 @@
  },
  "bridgewater": { "setback_c": 16.0, "heat_c": 21.0, "cool_c": 24.0 },
  "unmet_tolerance_k": 0.5,
- "gate": "annual heating +-10 %; the mean weekday morning peak +-15 %; hours below in use +-20 % or +-50 h; lowest temperature in use +-1 K; the mean weekday heating profile within 15 % of EnergyPlus's daily peak in every hour"
+ "gate": "annual heating +-10 %; the mean weekday morning peak +-15 %; hours below in use +-20 % or +-50 h; lowest temperature in use +-1 K; the mean weekday heating profile within 15 % of EnergyPlus's daily peak in every hour",
+ "referee": {"about": "Added 16 Nov 2026 (review F10), after the comparison in 0db9910: what the gate reads on the EnergyPlus side. Both choices move EnergyPlus's figures toward the engines'; each is the like-for-like quantity, measured in docs/audit/109/02_referee.md (the ideal-loads report over-reports a setpoint step by 158.5 kW in its first quarter hour; the third-order scheme overshoots a step by about 2.6 K).", "zone_air_algorithm_gated": "EulerMethod", "zone_air_algorithm_reported": "ThirdOrderBackwardDifference", "heating_read": "the zone air heat balance's System Air Transfer Rate + System Convective Heat Gain Rate, at time-step resolution, averaged to the hour (positive heating, negative cooling); Zone Ideal Loads Zone Sensible Heating kept beside it as ideal_loads_reported"}
 }
