@@ -51,28 +51,88 @@
  "heating": [
   {
    "name": "Storey 1",
-   "cap_w": 11384,
-   "peak_w": 23158
+   "cap_w": 11572,
+   "peak_w": 23158,
+   "needed_rated_w": 62406,
+   "catalogue": {
+    "catalogue": "stelrad-vita-compact",
+    "title": "Stelrad Vita Compact",
+    "item": "76602220",
+    "type": "K2 (Type 22, double panel double convector)",
+    "height_mm": 600,
+    "length_mm": 2000,
+    "output_w": 3465,
+    "count": 10,
+    "extra_rated_w": 31221.424717789872
+   }
   },
   {
    "name": "Storey 2",
-   "cap_w": 11384,
-   "peak_w": 18947
+   "cap_w": 11572,
+   "peak_w": 18947,
+   "needed_rated_w": 51060,
+   "catalogue": {
+    "catalogue": "stelrad-vita-compact",
+    "title": "Stelrad Vita Compact",
+    "item": "76602220",
+    "type": "K2 (Type 22, double panel double convector)",
+    "height_mm": 600,
+    "length_mm": 2000,
+    "output_w": 3465,
+    "count": 6,
+    "extra_rated_w": 19875.362126480948
+   }
   },
   {
    "name": "Storey 3",
-   "cap_w": 11384,
-   "peak_w": 18991
+   "cap_w": 11572,
+   "peak_w": 18991,
+   "needed_rated_w": 51177,
+   "catalogue": {
+    "catalogue": "stelrad-vita-compact",
+    "title": "Stelrad Vita Compact",
+    "item": "76602220",
+    "type": "K2 (Type 22, double panel double convector)",
+    "height_mm": 600,
+    "length_mm": 2000,
+    "output_w": 3465,
+    "count": 6,
+    "extra_rated_w": 19991.82873087321
+   }
   },
   {
    "name": "Storey 4",
-   "cap_w": 11384,
-   "peak_w": 19023
+   "cap_w": 11572,
+   "peak_w": 19023,
+   "needed_rated_w": 51264,
+   "catalogue": {
+    "catalogue": "stelrad-vita-compact",
+    "title": "Stelrad Vita Compact",
+    "item": "76602220",
+    "type": "K2 (Type 22, double panel double convector)",
+    "height_mm": 600,
+    "length_mm": 2000,
+    "output_w": 3465,
+    "count": 6,
+    "extra_rated_w": 20078.667574306783
+   }
   },
   {
    "name": "Storey 5",
-   "cap_w": 11384,
-   "peak_w": 24930
+   "cap_w": 11572,
+   "peak_w": 24930,
+   "needed_rated_w": 67181,
+   "catalogue": {
+    "catalogue": "stelrad-vita-compact",
+    "title": "Stelrad Vita Compact",
+    "item": "76602220",
+    "type": "K2 (Type 22, double panel double convector)",
+    "height_mm": 600,
+    "length_mm": 2000,
+    "output_w": 3465,
+    "count": 11,
+    "extra_rated_w": 35996.342823854604
+   }
   }
  ]
 }

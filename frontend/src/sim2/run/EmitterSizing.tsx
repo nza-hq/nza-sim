@@ -25,6 +25,7 @@ const kw = (w: number) => (w / 1000).toLocaleString('en-GB', { minimumFractionDi
 /** A shortfall: a few watts still counts as short (the zone does dip), so it never reads "0.0 kW". */
 const shortKw = (w: number) => (w > 0 && w < 50 ? 'under 0.1' : kw(w))
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const whole = (w: number) => Math.round(w).toLocaleString('en-GB')
 const deg = (c: number) => c.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const pair = (z: EmitterZone) => (z.design ? `${z.design.flow_c}/${z.design.return_c} °C` : 'their stated output')
 
@@ -57,6 +58,12 @@ function ZoneBlock({ z, other, mode }: { z: EmitterZone; other: EmitterZone | nu
         <p className="es-line es-need">
           {short ? `Needs ${shortKw(z.shortfall_w)} kW more at ${pair(z)}: ` : 'At these temperatures, '}
           {kw(z.needed_rated_w)} kW rated at ΔT 50 (75/65/20 °C){z.rated_now_w != null ? `, against ${kw(z.rated_now_w)} kW there now` : ''}.
+        </p>
+      )}
+      {z.catalogue && (
+        <p className="es-line es-need">
+          From {z.catalogue.title}: add {z.catalogue.count} × {z.catalogue.height_mm} × {z.catalogue.length_mm} mm {z.catalogue.type.split(' (')[0]}
+          {' '}({whole(z.catalogue.output_w)} W each at ΔT 50) for the {whole(z.catalogue.extra_rated_w)} W still needed.
         </p>
       )}
       {z.note && <p className="es-line es-muted">{z.note}</p>}
@@ -160,6 +167,13 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
           0.2 K, and the same rise over a fixed output). The peak is the coldest hour of the chosen weather file, not a design-day
           calculation (BS EN 12831). The emitters' radiant share changes the heat needed: its annual heat is checked against
           EnergyPlus (within 4 %), its hours below are not yet. A heat pump's efficiency does not yet change with the flow temperature.
+        </p>
+      )}
+      {info && zones.some((z) => z.catalogue) && (
+        <p className="rp-note">
+          Where a room's radiators were picked from a catalogue, the suggestion is that catalogue's smallest radiator at the
+          same height that adds the rating still needed (or the fewest of its largest), with the outputs as the catalogue
+          prints them at ΔT 50. Stelrad Vita Compact: the maker's published table, EN 442 tested.
         </p>
       )}
       {info && cooling.length > 0 && (

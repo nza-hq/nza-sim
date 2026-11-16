@@ -37,4 +37,4 @@ Decisions:
 
 ## 5. Linzie's answers
 
-(pending)
+- 16 Nov 14:49, on the card "Which radiator catalogue should the standard sizes come from first?": **Stelrad Vita Compact** (the recommended option: the published double-panel table as printed, with its source recorded; other makes later).

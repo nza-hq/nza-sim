@@ -9,7 +9,7 @@ import type { CoolingZone, EmitterZone, Summary } from '../seam'
 
 const zone = (over: Partial<EmitterZone> = {}): EmitterZone => ({
   id: 'z1', name: 'Storey 1', cap_w: 10400, peak_w: 23200, shortfall_w: 12800, design: { flow_c: 50, return_c: 40, room_c: 21 },
-  rated_now_w: 27400, needed_rated_w: 61000, note: null, unlisted_systems: [], unmet_hours: 634, min_c: 18.04, in_use: false, hours_at_cap: 1200, ...over,
+  rated_now_w: 27400, needed_rated_w: 61000, note: null, unlisted_systems: [], unmet_hours: 634, min_c: 18.04, in_use: false, hours_at_cap: 1200, catalogue: null, ...over,
 })
 const summary = (emitters: Summary['emitters']): Summary => ({
   engine: 'thermal-2', run_ms: 1, steps_per_hour: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
@@ -73,5 +73,9 @@ describe('EmitterSizing', () => {
     const ok = html(summary({ zones: [zone()], cooling: [{ ...c, cap_w: 2000, shortfall_w: 0, unmet_hours: 0, max_c: 24 }], what_if: null }))
     expect(ok).toContain('All 1 zones with cooling units have enough cooling.')
     expect(ok).not.toContain('above the setpoint')
+  })
+  it('Brief 119: the catalogue\'s suggestion for a short room', () => {
+    const h = html(summary({ cooling: [], zones: [zone({ catalogue: { catalogue: 'stelrad-vita-compact', title: 'Stelrad Vita Compact', item: '76602220', type: 'K2 (Type 22, double panel double convector)', height_mm: 600, length_mm: 2000, output_w: 3465, count: 2, extra_rated_w: 6100 } })], what_if: null }))
+    expect(h).toContain('From Stelrad Vita Compact: add 2 × 600 × 2000 mm K2 (3,465 W each at ΔT 50) for the 6,100 W still needed.')
   })
 })

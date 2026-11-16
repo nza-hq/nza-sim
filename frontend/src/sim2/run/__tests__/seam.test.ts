@@ -469,3 +469,36 @@ describe('Brief 119: cooling units in the emitter summary', () => {
     expect(c.unmet_hours).toBeGreaterThan(0)
   })
 })
+
+describe('Brief 119: radiators from the catalogue', () => {
+  const fromCatalogue = async (count: number, over: Record<string, unknown> = {}) => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 50; hp.design_return_c = 40
+    d.zones[0].emitters = [{ id: 'k2', kind: 'radiator', count, rated_output_w: 3465, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.33, catalogue_ref: { catalogue: 'stelrad-vita-compact', item: '76602220' }, ...over }]
+    return d
+  }
+  it('a short room: the smallest item that adds the rating still needed, from the engine\'s own sizing', async () => {
+    const r = simulate(await fromCatalogue(4), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const z = r.summary.emitters!.zones[0]
+    expect(z.shortfall_w).toBeGreaterThan(0)
+    expect(z.rated_now_w).toBeCloseTo(4 * 3465, 6)
+    const c = z.catalogue!
+    expect(c.extra_rated_w).toBeCloseTo(z.needed_rated_w! - z.rated_now_w!, 9)
+    expect(c).toMatchObject({ catalogue: 'stelrad-vita-compact', title: 'Stelrad Vita Compact', height_mm: 600 })
+    if (c.count === 1) expect(c.output_w).toBeGreaterThanOrEqual(c.extra_rated_w)
+    else expect(c.count * c.output_w).toBeGreaterThanOrEqual(c.extra_rated_w)
+  })
+  it('enough: no suggestion; typed-in radiators: none either', async () => {
+    const r = simulate(await fromCatalogue(40), { weather: WEATHER })
+    expect(r.ok && r.summary.emitters!.zones[0].catalogue).toBeNull()
+    const t = simulate(await fromCatalogue(4, { catalogue_ref: null }), { weather: WEATHER })
+    expect(t.ok && t.summary.emitters!.zones[0].catalogue).toBeNull()
+  })
+  it('a figure that differs from the item is refused by name, never filled', async () => {
+    const r = simulate(await fromCatalogue(4, { rated_output_w: 3500 }), { weather: WEATHER })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.missing[0]).toMatchObject({ path: 'zones[0].emitters[0].rated_output_w', what: expect.stringContaining('states 3500, but the output of Stelrad Vita Compact 76602220 is 3465') })
+  })
+})

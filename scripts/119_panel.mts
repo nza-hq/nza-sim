@@ -1,7 +1,7 @@
 /**
  * Brief 119 Part 4: the emitter panel with cooling units on Bridgewater's five storeys, through the product's seam as
- * the editor runs it (anchor EPW). Radiators of 30 kW a storey at 75/65/20 °C on the heat pump at 50/40 °C (as Brief
- * 117's check), and cooling-only VRF indoor units: four of 3 kW on storeys 1 to 4, six of 4 kW on storey 5. Writes
+ * the editor runs it (anchor EPW). Nine Stelrad Vita Compact K2 600 × 2000 mm radiators a storey (31.2 kW at ΔT 50,
+ * picked from the catalogue, Part 3) on the heat pump at 50/40 °C, and cooling-only VRF indoor units: four of 3 kW on storeys 1 to 4, six of 4 kW on storey 5. Writes
  * docs/audit/119/04_panel_summary.json and a static page of the panel for the browser check.
  *
  * Run from frontend/:  npx vite-node ../scripts/119_panel.mts <page.html>
@@ -30,7 +30,7 @@ const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source 
 hp.design_flow_c = 50; hp.design_return_c = 40
 d.zones.forEach((z: any, i: number) => {
   z.emitters = [
-    { id: `${z.id}_rads`, kind: 'radiator', count: 1, rated_output_w: 30000, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 },
+    { id: `${z.id}_rads`, kind: 'radiator', count: 9, rated_output_w: 3465, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.33, catalogue_ref: { catalogue: 'stelrad-vita-compact', item: '76602220' } },
     { id: `${z.id}_vrf`, kind: 'vrf_indoor', count: i === 4 ? 6 : 4, heats: false, cooling_output_w: i === 4 ? 4000 : 3000, rated_output_w: null, radiant_fraction: null, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null },
   ]
 })
@@ -40,7 +40,7 @@ const s = r.summary
 writeFileSync(path.join(root, 'docs/audit/119/04_panel_summary.json'), JSON.stringify({
   source: 'scripts/119_panel.mts', cooling_kwh: +s.building.cooling_kwh.toFixed(0),
   cooling: s.emitters!.cooling.map((z) => ({ name: z.name, cap_w: z.cap_w, peak_w: +z.peak_w.toFixed(0), short_w: +z.shortfall_w.toFixed(0), hours_above: z.unmet_hours, max_c: +z.max_c.toFixed(2), hours_at_cap: z.hours_at_cap })),
-  heating: s.emitters!.zones.map((z) => ({ name: z.name, cap_w: +z.cap_w.toFixed(0), peak_w: +z.peak_w.toFixed(0) })),
+  heating: s.emitters!.zones.map((z) => ({ name: z.name, cap_w: +z.cap_w.toFixed(0), peak_w: +z.peak_w.toFixed(0), needed_rated_w: z.needed_rated_w && +z.needed_rated_w.toFixed(0), catalogue: z.catalogue })),
 }, null, 1) + '\n')
 const css = ['frontend/src/design-system/tokens.css', 'frontend/src/sim2/run/run.css', 'frontend/src/sim2/run/emitters.css'].map((p) => read(p).toString()).join('\n')
 const body = renderToStaticMarkup(createElement(EmitterSizing, { summary: s, whatIf: null, onWhatIf: () => {} }))
