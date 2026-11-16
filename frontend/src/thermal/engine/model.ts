@@ -358,9 +358,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   }
 
   // Air, bridging and ground, per zone.
-  let tg = 0
-  for (let h = 0; h < H; h++) tg += weather.hours.dry_bulb[h]
-  tg /= H  // building.site.ground.method === 'annual_mean_outdoor' (the only method the schema allows)
+  const tg = groundTemperature(weather)
   const air = doc.zones.map((zone, zi) => {
     const Z = built.zones[zi]
     const path = `zones[${zi}]`
@@ -609,6 +607,18 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     return r
   })
   return { engine: network ? 'thermal-2' : 'thermal-1', zones, solver, run_ms }
+}
+
+/**
+ * The ground's boundary temperature, °C: building.site.ground.method 'annual_mean_outdoor' (the only method the schema
+ * allows), the weather file's mean dry bulb. The one place it is worked out (Rule 11): the year's run and the design
+ * heat loss (Brief 117) both read it here.
+ */
+export function groundTemperature(weather: Weather): number {
+  const H = weather.hours.count
+  let tg = 0
+  for (let h = 0; h < H; h++) tg += weather.hours.dry_bulb[h]
+  return tg / H
 }
 
 /** One zone's results (Engine 1's entry point, kept): runModel on a one-zone document. */

@@ -14,7 +14,7 @@ const zone = (over: Partial<EmitterZone> = {}): EmitterZone => ({
 const summary = (emitters: Summary['emitters']): Summary => ({
   engine: 'thermal-2', run_ms: 1, steps_per_hour: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
   building: { floor_m2: 100, heating_kwh: 111800, cooling_kwh: 0, peak_heating_w: 0, peak_cooling_w: 0 },
-  zones: [], breakdown: [], drafts: [], energy: { ok: false, missing: [] }, emitters,
+  zones: [], breakdown: [], drafts: [], energy: { ok: false, missing: [] }, emitters, design_heat_loss: null,
 })
 const html = (s: Summary, whatIf = null) => renderToStaticMarkup(<EmitterSizing summary={s} whatIf={whatIf} onWhatIf={() => {}} />)
 

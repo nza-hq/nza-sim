@@ -194,6 +194,11 @@ which of these scope items they affect.
   setpoint follows its schedule between heat_c and setback_c, and
   cooling runs only in its hours; underfloor heating can put its heat
   into a floor layer. Simulate v2 only.
+- Design heat loss per room (Brief 117): steady transmission and air
+  heat loss at a stated design outdoor temperature, after MCS MIS 3005-D
+  Issue 3.0 and the MCS calculator's public method (not the text of
+  BS EN 12831-1), with an optional stated warm-up W/m², against the
+  emitters' EN 442 output. Simulate v2 only.
 - Comfort-vs-setpoint diagnostic: demand at envelope comfort vs
   delivered at service setpoint, per service, with the delta exposed
 - DHW tap-mix model: the boiler heats only the hot fraction of tap

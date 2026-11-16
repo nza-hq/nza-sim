@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import { runModel } from '../../../thermal/engine/model'
 import { logMeanDeltaT } from '../../../thermal/engine/emitters'
+import { designHeatLoss } from '../../../thermal/engine/designHeatLoss'
+import { ModelDocument } from '../../../thermal/schema/model'
 import { fromBuildingConfig } from '../../../thermal/schema/fromBuildingConfig'
 import { MOS, readMos } from '../../../thermal/engine/__tests__/denver'
 import { bodyFromLibrary, CONSTRUCTIONS } from '../library'
@@ -367,6 +369,72 @@ describe('simulate', () => {
     const r = simulate({ schema_version: '2.3', zones: [] }, { weather: WEATHER })
     expect(r.ok).toBe(false)
     expect(simulate({ schema_version: '9.9' }, { weather: WEATHER })).toEqual({ ok: false, missing: [expect.objectContaining({ path: 'schema_version' })] })
+  })
+})
+
+describe('Brief 117: the design heat loss in the summary', () => {
+  const design = async (over: (d: any) => void = () => {}) => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 50; hp.design_return_c = 40
+    d.zones.forEach((z: any) => {
+      z.emitters = [{ id: `${z.id}_rads`, kind: 'radiator', count: 1, rated_output_w: 30000, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 }]
+      z.design_internal_c = 'follow_heat_c'
+    })
+    d.building.design = { outdoor: { stated_c: -3 }, warm_up_w_per_m2: 5, vent_wind_m_s: 4 }
+    over(d)
+    return d
+  }
+  it('only on the full run: the fabric and spaces copies have none', async () => {
+    const d = await design()
+    for (const level of ['fabric', 'spaces'] as const) {
+      const r = simulate(d, { weather: WEATHER, level, fabric_heat_c: 21 })
+      if (!r.ok) throw new Error(JSON.stringify(r.missing))
+      expect(r.summary.design_heat_loss).toBeNull()
+    }
+    const r = simulate(d, { weather: WEATHER })
+    expect(r.ok && r.summary.design_heat_loss?.ok).toBe(true)
+  })
+  it('none without design conditions', async () => {
+    const r = simulate(await doc(), { weather: WEATHER })
+    expect(r.ok && r.summary.design_heat_loss).toBeNull()
+  })
+  it('the engine\'s own figures (Rule 11), terms summing to each room (Rule 9), and the emitters against them', async () => {
+    const d = await design()
+    const r = simulate(d, { weather: WEATHER, what_if: { design_flow_c: 70, design_return_c: 60 } })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const dh = r.summary.design_heat_loss!
+    if (!dh.ok) throw new Error(JSON.stringify(dh.missing))
+    const direct = designHeatLoss(ModelDocument.parse(d), r.results.zones, W)
+    expect(dh.building_w).toBe(direct.building_w)
+    expect(dh).toMatchObject({ outdoor_c: -3, outdoor_source: 'stated', warm_up_w_per_m2: 5, what_if: { design_flow_c: 70, design_return_c: 60 } })
+    const f = (fl: number, rt: number) => Math.pow(logMeanDeltaT(fl, rt, 21) / logMeanDeltaT(75, 65, 20), 1.3)
+    dh.zones.forEach((z, i) => {
+      expect(z.total_w).toBe(direct.zones[i].total_w)
+      expect(z.terms.reduce((s, t) => s + t.w, 0)).toBeCloseTo(z.total_w, 6)
+      expect(z.terms.find((t) => t.term === 'warm_up')!.w).toBeCloseTo(5 * z.floor_m2, 9)
+      expect(z.emitters!.peak_w).toBe(z.total_w)
+      expect(z.emitters!.cap_w).toBeCloseTo(30000 * f(50, 40), 6)
+      expect(z.emitters!.design).toEqual({ flow_c: 50, return_c: 40, room_c: 21 })
+      expect(z.emitters!.needed_rated_w).toBeCloseTo(z.total_w / f(50, 40), 6)
+      expect(z.what_if_emitters!.cap_w).toBeCloseTo(30000 * f(70, 60), 6)
+    })
+  })
+  it('a design temperature away from the setpoint rates the emitters at it', async () => {
+    const r = simulate(await design((d) => { d.zones[0].design_internal_c = 18 }), { weather: WEATHER })
+    if (!r.ok || !r.summary.design_heat_loss?.ok) throw new Error('no design heat loss')
+    const z = r.summary.design_heat_loss.zones[0]
+    expect(z).toMatchObject({ internal_c: 18, internal_source: 'stated' })
+    expect(z.emitters!.design!.room_c).toBe(18)
+    expect(z.emitters!.cap_w).toBeCloseTo(30000 * Math.pow(logMeanDeltaT(50, 40, 18) / logMeanDeltaT(75, 65, 20), 1.3), 6)
+  })
+  it('what it still needs, in words; the year\'s results are still there', async () => {
+    const r = simulate(await design((d) => { d.zones[1].design_internal_c = null }), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.design_heat_loss).toEqual({ ok: false, missing: [{ path: 'zones[1].design_internal_c', what: 'State the design temperature for "Storey 2", or let it follow its heating setpoint.' }] })
+    expect(r.summary.emitters).not.toBeNull()
+    const v = simulate(await design((d) => { d.building.design.vent_wind_m_s = null }), { weather: WEATHER })
+    expect(v.ok && v.summary.design_heat_loss).toEqual({ ok: false, missing: [{ path: 'building.design.vent_wind_m_s', what: 'State the wind speed at which the permanent vents are counted for the design heat loss.' }] })
   })
 })
 
