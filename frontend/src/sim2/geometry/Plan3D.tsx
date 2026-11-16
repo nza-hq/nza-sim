@@ -8,8 +8,8 @@
  * fetch from a CDN, and this has to work offline in the published preview.
  */
 import { Html, OrbitControls } from '@react-three/drei'
-import { Canvas, type ThreeEvent } from '@react-three/fiber'
-import { type ReactElement, useMemo, useState } from 'react'
+import { Canvas, type ThreeEvent, useThree } from '@react-three/fiber'
+import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { type Plan, type PlacedWindow, type Span, type WallRun, type XY, edgesOf } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
@@ -107,9 +107,30 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
       ))}
 
+      <FitToPane target={target} radius={start.r * 0.72} />
       <OrbitControls target={target} enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI / 2 - 0.05} minDistance={3} maxDistance={start.r * 6} makeDefault />
     </Canvas>
   )
+}
+
+/** Keeps the whole building in view when the pane is narrow: sets the camera's distance (never its angle) so a
+ * sphere round the building fits both across and up the view. Runs when the view opens and when the pane changes shape. */
+function FitToPane({ target, radius }: { target: [number, number, number]; radius: number }) {
+  const { camera, size } = useThree()
+  const aspect = size.width / Math.max(1, size.height)
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera
+    if (!cam.isPerspectiveCamera) return
+    const vHalf = THREE.MathUtils.degToRad(cam.fov / 2)
+    const hHalf = Math.atan(Math.tan(vHalf) * aspect)
+    const dist = radius / Math.sin(Math.min(vHalf, hHalf))
+    const t = new THREE.Vector3(...target)
+    const dir = cam.position.clone().sub(t).normalize()
+    cam.position.copy(t.add(dir.multiplyScalar(dist)))
+    cam.updateProjectionMatrix()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aspect])
+  return null
 }
 
 function shapeOf(ring: readonly XY[]) {
