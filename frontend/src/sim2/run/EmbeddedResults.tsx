@@ -13,6 +13,8 @@ import { shareModel, type ModelShare } from './modelChannel'
 // @ts-expect-error untyped JS component from today's app (Brief 110b: reused, not redrawn)
 import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 import { createPortal } from '../workspace/portal'
+import { DesignHeatLoss } from './DesignHeatLoss'
+import { EmitterSizing } from './EmitterSizing'
 import { balanceLines } from './balanceLines'
 import { LevelSwitch, ResultsBody, ResultsStrip, WeatherPick, useRun } from './ResultsPanel'
 import type { StepId } from '../workspace/steps'
@@ -23,25 +25,29 @@ import './run.css'
 /** Brief 111 P4: each step opens at its natural level; the person can change it at any time. */
 const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', check: 'systems', interventions: 'systems' }
 
-export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, focusZone, weatherEl, onOpen }: {
+export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */
   step?: StepId
   doc: unknown
   /** The document with the previewed change made (preview, then apply); null when nothing is previewed. */
   previewDoc?: unknown
   /** Hears the run's summary now and the previewed one, for the apply card. */
-  onFigures?: (now: Summary | null, preview: Summary | null) => void
+  /** The run's figures and the previewed change's; `why` says why the preview has none (inputs unset, or it failed). */
+  onFigures?: (now: Summary | null, preview: Summary | null, why?: string | null) => void
   strip: HTMLElement
   centre: HTMLElement
   showBody: boolean
   focusZone: string | null
   weatherEl: HTMLElement | null
+  /** Brief 118 P4: where a heating system's passport wants its design heat loss and emitter check. */
+  sizingEl?: HTMLElement | null
   onOpen: () => void
 }) {
   const run = useRun(doc, previewDoc)
   const s = run.state.kind === 'done' ? run.state.summary : null
   const ps = run.previewState.kind === 'done' ? run.previewState.summary : null
-  useEffect(() => { onFigures?.(s, ps) }, [s, ps])
+  const pwhy = run.previewState.kind === 'missing' ? 'This change leaves inputs unset: no figures for it yet.' : run.previewState.kind === 'error' ? 'The preview could not run.' : null
+  useEffect(() => { onFigures?.(s, ps, pwhy) }, [s, ps, pwhy])
   useEffect(() => { if (step) run.setLevel(NATURAL[step]) }, [step])
   // Brief 110b row 2: the Pop Out window shows this run.
   const latest = useRef<ModelShare | null>(null)
@@ -72,6 +78,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
         centre,
       )}
       {weatherEl && createPortal(<WeatherPick run={run} />, weatherEl)}
+      {sizingEl && createPortal(!s ? <p className="gl-hint">{run.state.kind === 'missing' ? 'The emitter check needs a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The emitter check needs a run: choose a weather file on Site.'}</p> : !s.emitters && !s.design_heat_loss ? <p className="gl-hint">Give the rooms emitters (with their rated output) to see whether they meet each room's need.</p> : <><DesignHeatLoss summary={s} /><EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} /></>, sizingEl)}
     </>
   )
 }

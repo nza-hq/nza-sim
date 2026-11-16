@@ -1,0 +1,24 @@
+/**
+ * Brief 118 P3: construction sets, the fabric template a building starts from. Each set is a bundle of constructions
+ * already in NZA Sim's library (snapshot.json), by key, so every U-value still comes from the library (rule 3) and a
+ * set adds no figure of its own. Doors are not in the library yet, so a set leaves them as they are.
+ *
+ * Sets for existing buildings by age (solid brick, unfilled cavity, single glazing…) need their constructions added
+ * to the library first, as items Chris checks (docs/audit/102/library_additions.json); they are not here until then.
+ */
+export type SetElement = 'wall' | 'glazing' | 'roof' | 'floor'
+export type ConstructionSet = { id: string; name: string; line: string } & Record<SetElement, string>
+
+export const CONSTRUCTION_SETS: readonly ConstructionSet[] = [
+  { id: 'set_standard', name: 'Standard new build', line: 'Insulated cavity wall, double low-e glazing, flat roof, slab floor', wall: 'cavity_wall_standard', glazing: 'double_low_e', roof: 'flat_roof_standard', floor: 'ground_floor_slab' },
+  { id: 'set_enhanced', name: 'Enhanced fabric', line: '150 mm PIR cavity, triple glazing, 200 mm PIR roof, 150 mm XPS floor', wall: 'cavity_wall_enhanced', glazing: 'triple_glazing', roof: 'flat_roof_enhanced', floor: 'ground_floor_enhanced' },
+  { id: 'set_timber', name: 'Timber frame, pitched roof', line: 'Timber frame wall, double low-e glazing, pitched roof, slab floor', wall: 'timber_frame_standard', glazing: 'double_low_e', roof: 'pitched_roof_standard', floor: 'ground_floor_slab' },
+  { id: 'set_bridgwater', name: 'Bridgwater hotel (BRUKL)', line: 'The constructions from the Bridgwater BRUKL', wall: 'bridgwater_ext_wall', glazing: 'bridgwater_glazing', roof: 'bridgwater_roof', floor: 'bridgwater_ground_floor' },
+]
+
+export const SET_ELEMENTS: ReadonlyArray<{ key: SetElement; name: string }> = [
+  { key: 'wall', name: 'Outside walls' },
+  { key: 'glazing', name: 'Windows' },
+  { key: 'roof', name: 'Roofs' },
+  { key: 'floor', name: 'Ground floors' },
+]

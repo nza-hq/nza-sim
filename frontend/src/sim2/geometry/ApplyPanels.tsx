@@ -8,7 +8,7 @@
  *
  * These are the two panels' frames; what goes in a type's detail is the step's own (GeometryLab).
  */
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import Icon, { type IconName } from '../icons/Icon'
 
 export type Swatch = { colour: string; unset?: boolean }
@@ -27,14 +27,28 @@ export function ChooseList(props: {
   extra?: ReactNode
   onChoose: (ids: string[], add: boolean) => void
   onNone: () => void
+  /** Navigate by: rooms (the list below), or the project's things of one kind, each with the rooms it reaches. */
+  nav?: { by: string; tabs: Array<{ key: string; name: string; icon?: IconName }>; onBy: (k: string) => void; sections: NavSection[] }
+  /** Brief 118 P2: zones are made, filled and named here. */
+  onNewZone?: () => void
+  onMoveTo?: (zone: string) => void
+  onRenameZone?: (id: string, name: string) => void
+  onRenameRoom?: (id: string, name: string) => void
+  onRemoveZone?: (id: string) => void
 }) {
-  const { rows, zones, chosen } = props
+  const { rows, zones, chosen, nav } = props
   const all = rows.length > 0 && rows.every((r) => chosen.has(r.id))
   const tick = (on: boolean, part = false) => <span className={`ap-tick${on ? ' on' : part ? ' part' : ''}`} aria-hidden="true" />
   const add = (e: React.MouseEvent) => e.shiftKey || e.ctrlKey || e.metaKey
   return (
     <div className="gl-sec ap-choose">
+      {nav && (
+        <div className="ap-navby" role="tablist" aria-label="Navigate by">
+          {nav.tabs.map((t) => <button key={t.key} type="button" role="tab" aria-selected={nav.by === t.key} onClick={() => nav.onBy(t.key)} title={t.name}>{t.icon && <Icon name={t.icon} size={18} />}<span>{t.name}</span></button>)}
+        </div>
+      )}
       <h3>Choose <small>{chosen.size ? `${chosen.size} of ${rows.length} rooms` : 'nothing yet'}{chosen.size > 0 && <button type="button" className="ap-link" onClick={props.onNone}>Clear</button>}</small></h3>
+      {nav && nav.by !== 'rooms' ? <NavItems sections={nav.sections} rows={rows} chosen={chosen} onChoose={props.onChoose} /> : (
       <div className="ap-rows" role="listbox" aria-multiselectable="true" aria-label="Rooms">
         <div className="ap-row ap-whole" role="option" aria-selected={all} onClick={() => props.onChoose(all ? [] : rows.map((r) => r.id), false)}>
           {tick(all, chosen.size > 0)}
@@ -44,20 +58,24 @@ export function ChooseList(props: {
         </div>
         {zones.map((z) => {
           const rs = rows.filter((r) => r.zone === z.id)
-          if (!rs.length) return null
-          const on = rs.every((r) => chosen.has(r.id))
+          if (!rs.length && !props.onNewZone) return null
+          const on = rs.length > 0 && rs.every((r) => chosen.has(r.id))
+          const canMove = !!props.onMoveTo && chosen.size > 0 && [...chosen].some((id) => rows.find((r) => r.id === id)?.zone !== z.id)
           return (
             <div key={z.id} className="ap-zone">
-              {zones.length > 1 && (
+              {(zones.length > 1 || props.onNewZone) && (
                 <div className="ap-row ap-zonehead" role="option" aria-selected={on} onClick={(e) => props.onChoose(rs.map((r) => r.id), add(e))}>
                   {tick(on, rs.some((r) => chosen.has(r.id)))}
-                  <span>{z.name}</span>
+                  <EditName name={z.name} onRename={props.onRenameZone && ((n) => props.onRenameZone!(z.id, n))} />
+                  {!rs.length && <small className="ap-empty">no rooms yet</small>}
+                  {!rs.length && props.onRemoveZone && <button type="button" className="gl-x small" title="Remove this empty zone" onClick={(e) => { e.stopPropagation(); props.onRemoveZone!(z.id) }}>×</button>}
+                  {canMove && <button type="button" className="ap-link ap-move" onClick={(e) => { e.stopPropagation(); props.onMoveTo!(z.id) }}>Move chosen here</button>}
                 </div>
               )}
               {rs.map((r) => (
                 <div key={r.id} className={`ap-row ap-room${zones.length > 1 ? ' in' : ''}`} role="option" aria-selected={chosen.has(r.id)} onClick={(e) => props.onChoose([r.id], add(e))}>
                   {tick(chosen.has(r.id))}
-                  <span className="ap-name">{r.name}<small>{r.area}</small></span>
+                  <span className="ap-name"><EditName name={r.name} onRename={props.onRenameRoom && ((n) => props.onRenameRoom!(r.id, n))} /><small>{r.area}</small></span>
                   {r.has ? <span className="ap-has" title={r.has.name}><Sw s={r.has.swatch} />{r.has.name}</span> : <span className="ap-has none">—</span>}
                 </div>
               ))}
@@ -65,8 +83,53 @@ export function ChooseList(props: {
           )
         })}
       </div>
+      )}
+      {props.onNewZone && (!nav || nav.by === 'rooms') && (
+        <button type="button" className="gl-btn quiet ap-new" onClick={props.onNewZone}>{chosen.size ? `+ New zone from the ${chosen.size === 1 ? 'room' : `${chosen.size} rooms`} chosen` : '+ New zone'}</button>
+      )}
       {props.extra}
-      <p className="gl-hint">Tap a room here or on the drawing; Ctrl or Shift adds more. Esc lets go.</p>
+      <p className="gl-hint">Tap a room here or on the drawing; Ctrl or Shift adds more. Esc lets go. Double-click a name to rename it.</p>
+    </div>
+  )
+}
+
+export type NavItem = { id: string; name: string; swatch: Swatch; rooms: string[]; active?: boolean; onPick?: () => void; onRename?: (name: string) => void; /** Instead of choosing its rooms (walls choose their wall parts). */ choose?: () => void; count?: number; what?: string }
+export type NavSection = { title?: string; items: NavItem[]; onNew?: { label: string; run: () => void } }
+
+/** A name that a double-click turns into a box: Enter or leaving it keeps the change, Esc drops it. */
+export function EditName({ name, onRename }: { name: string; onRename?: (name: string) => void }) {
+  const [ed, setEd] = useState(false)
+  if (!ed || !onRename) return <span className="ap-nm" onDoubleClick={onRename ? (e) => { e.stopPropagation(); setEd(true) } : undefined} title={onRename ? 'Double-click to rename' : undefined}>{name}</span>
+  const done = (v: string) => { setEd(false); const t = v.trim(); if (t && t !== name) onRename(t) }
+  return <input className="ap-rename" autoFocus defaultValue={name} aria-label="Name" onFocus={(e) => e.currentTarget.select()} onClick={(e) => e.stopPropagation()} onBlur={(e) => done(e.currentTarget.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = name; setEd(false) } }} />
+}
+
+/** The navigator's list: each thing with the rooms it reaches. A tap chooses its rooms (and shows it on the right);
+ * Ctrl or Shift adds them to what is chosen. Rooms with none of the kind are listed last, so they can be chosen too. */
+function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]; rows: Row[]; chosen: ReadonlySet<string>; onChoose: (ids: string[], add: boolean) => void }) {
+  const tick = (on: boolean, part = false) => <span className={`ap-tick${on ? ' on' : part ? ' part' : ''}`} aria-hidden="true" />
+  const nameOf = (id: string) => rows.find((r) => r.id === id)?.name ?? id
+  if (!sections.some((s) => s.items.length || s.onNew)) return <p className="gl-hint">Nothing of this kind in the project yet.</p>
+  return (
+    <div className="ap-rows" role="listbox" aria-multiselectable="true" aria-label="Navigate">
+      {sections.map((s, i) => (!s.items.length && !s.onNew ? null : (
+        <div key={s.title ?? i} className="ap-zone">
+          {s.title && <div className="ap-navsec">{s.title}</div>}
+          {s.items.map((it) => {
+            const on = it.rooms.length > 0 && it.rooms.every((id) => chosen.has(id))
+            return (
+              <div key={it.id} className={`ap-row ap-navit${it.active ? ' active' : ''}`} role="option" aria-selected={on}
+                onClick={(e) => { if (it.choose) it.choose(); else onChoose(it.rooms, e.shiftKey || e.ctrlKey || e.metaKey); it.onPick?.() }}>
+                {tick(on, it.rooms.some((id) => chosen.has(id)))}
+                <Sw s={it.swatch} />
+                <span className="ap-name"><EditName name={it.name} onRename={it.onRename} /><small>{it.rooms.length ? it.rooms.map(nameOf).join(', ') : it.count ? '' : 'not used'}</small></span>
+                <span className="ap-count" title={it.what ? `${it.count} ${it.what}s` : `${it.rooms.length} rooms`}>{it.what ? it.count : it.rooms.length}</span>
+              </div>
+            )
+          })}
+          {s.onNew && <button type="button" className="ap-link ap-newin" onClick={s.onNew.run}>{s.onNew.label}</button>}
+        </div>
+      )))}
     </div>
   )
 }
