@@ -14,6 +14,7 @@
     "short_steps": 3118,
     "short_hours": 779.5,
     "min_flow_c": 35.847680356671596,
+    "min_flow_c_short_steps": 35.847680356671596,
     "steps": 35040
    },
    "rooms": {
@@ -43,6 +44,7 @@
     "short_steps": 0,
     "short_hours": 0.0,
     "min_flow_c": 38.75745341206002,
+    "min_flow_c_short_steps": null,
     "steps": 35040
    },
    "rooms": {
@@ -72,6 +74,7 @@
     "short_steps": 3061,
     "short_hours": 765.25,
     "min_flow_c": 33.738370431720604,
+    "min_flow_c_short_steps": 33.738370431720604,
     "steps": 35040
    },
    "rooms": {

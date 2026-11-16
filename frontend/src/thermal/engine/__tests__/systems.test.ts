@@ -259,6 +259,10 @@ describe('Brief 120: a dedicated water heater, its kW and its store (Linzie, 16 
     expect([r.stored_kwh[1], r.stored_kwh[2]]).toEqual([0, 4])
     expect(r.stored_kwh[3]).toBeCloseTo(usable, 9)
     // No store: whatever is above the heater is short, every hour.
+    // Review F5(d): a store drawn down at the year's end starts the year as it ended, not full.
+    const late = waterHeater([0, 0, 0, 0, 10000], 4000, 100, 60, 10)
+    expect(late.stored_kwh[0]).toBeCloseTo(4, 9)
+    expect(late.short_w[4]).toBeCloseTo(6000 - usable * 1000, 6)
     const bare = waterHeater(draw, 4000, 0, 60, 10)
     expect(Array.from(bare.short_w)).toEqual([0, 6000, 0, 0, 0])
   })
@@ -287,8 +291,11 @@ describe('Brief 120: a dedicated water heater, its kW and its store (Linzie, 16 
     const wh = ok(d).water_heaters[0]
     const usable = 300 * 50 * WATER_KWH_PER_L_K
     expect(wh.usable_kwh).toBeCloseTo(usable, 9)
-    expect(wh.hours_short).toBe(H - Math.floor(usable * 1000 / (drawW * 0.1)))  // full at the start, 10 % a hour from it
+    // Review F5(d): the year starts as it ended, and a heater always below the draw ends it empty, so every hour is short.
+    expect(wh.hours_short).toBe(H)
     expect(wh.min_stored_kwh).toBe(0)
+    expect(wh.short_without_store).toBe(false)
+    expect(wh.assumes).toContain('no standing loss')
   })
 
   it('refused by name: a store on another service, a store with no heater output, and a store or a capacity on a boiler\'s priority circuit', () => {

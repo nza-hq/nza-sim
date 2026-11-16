@@ -101,6 +101,13 @@ export interface WaterHeaterResult {
   delivered_kwh: number
   /** The least heat left in the store in any hour, kWh. */
   min_stored_kwh: number
+  /** Review F5: what this result assumes, in words, to show beside it. */
+  assumes: string[]
+  /**
+   * Review F12: a hot water capacity stated before schema 2.9 was not modelled; it is now a water heater. True when it
+   * left the taps short and no store is stated, so the panel can say what changed.
+   */
+  short_without_store: boolean
 }
 
 /** Thrown when what the systems serve differs from the demand the model computed (Rule 9, review F2). */
@@ -316,11 +323,20 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     for (let h = 0; h < H; h++) if (Math.abs(rest[h]) < 1e-6 * (Math.abs(d.w[h]) + 1)) rest[h] = 0
     if (fs > 0) for (const g of free) put(g, rest.map((x) => (x * g.share) / fs))
   }
+  // Review F10 (Rule 11): a system with a capacity serves exactly what the run says it delivered; one quantity, checked.
+  for (const p of results.plants ?? []) {
+    const g = groups.find((x) => x.id === p.id)
+    const served = g ? out.get(g.i)?.served_kwh ?? 0 : 0
+    if (Math.abs(served - p.delivered_kwh) > SERVED_TOL(p.delivered_kwh)) throw new ServedError(`"${p.id}" serves ${served} kWh, but the run says it delivered ${p.delivered_kwh} kWh`)
+  }
   // Brief 120: a hot water system with its heater's output takes its share of every zone's draw into one store; the
   // others serve each zone's draw as before. What a short heater's taps did not get is not served (Rule 9: it is
   // taken off the need below, and shown).
   const heaterOf = (g: G) => { const sg = doc.system_groups[g.i]; return g.service === 'dhw' && sg.capacity_kw != null ? sg : null }
   const draws = new Map<number, Float64Array>()
+  const priorityFrac = new Map<string, Float64Array>()
+  for (const p of results.plants ?? []) if (p.hot_water_id && p.hot_water_given_frac) priorityFrac.set(p.hot_water_id, p.hot_water_given_frac)
+  let dhwShortW = 0
   for (const d of dhwDemand) {
     zone_demand.push({ zone_id: doc.zones[d.zi].id, service: 'dhw', kwh: d.kwh })
     for (const g of covering('dhw', d.zi)) {
@@ -333,12 +349,20 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
         continue
       }
       const r = groupOut(g)
-      r.served_kwh += d.kwh * f
-      for (let h = 0; h < H; h++) r.fuel_w[h] += (d.w[h] * f) / g.eff!
+      // Review F6: hot water heated first by a plant gets only what the plant had that hour.
+      const gf = priorityFrac.get(g.id)
+      if (!gf) {
+        r.served_kwh += d.kwh * f
+        for (let h = 0; h < H; h++) r.fuel_w[h] += (d.w[h] * f) / g.eff!
+        continue
+      }
+      let k = 0
+      for (let h = 0; h < H; h++) { const w = d.w[h] * f * gf[h]; k += w; r.fuel_w[h] += w / g.eff!; dhwShortW += d.w[h] * f - w }
+      r.served_kwh += k / 1000
     }
   }
   const water_heaters: WaterHeaterResult[] = []
-  let dhwShortKwh = 0
+  let dhwShortKwh = dhwShortW / 1000
   for (const g of groups) {
     const draw = draws.get(g.i)
     const sg = heaterOf(g)
@@ -354,9 +378,13 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     }
     r.served_kwh += (drawn - short) / 1000
     dhwShortKwh += short / 1000
+    // Review F5: what the store calculation assumes, shown beside its result; a stated store's standing loss is not modelled.
+    if (sg.storage_litres != null) not_modelled.push({ path: `system_groups[${g.i}].storage_litres`, what: 'store standing loss' })
     water_heaters.push({
+      assumes: ['all of the store usable at the store temperature', 'each hour\'s draw spread evenly over the hour (a burst inside an hour is not seen, so short hours are a floor)', 'no standing loss', 'the year starts as it ends'],
       id: g.id, cap_w: sg.capacity_kw! * 1000, storage_litres: sg.storage_litres ?? null, usable_kwh: run.usable_kwh,
       peak_draw_w: peak, hours_short: hrs, short_kwh: short / 1000, draw_kwh: drawn / 1000, delivered_kwh: (drawn - short) / 1000, min_stored_kwh: H ? minS : 0,
+      short_without_store: hrs > 0 && sg.storage_litres == null,
     })
   }
   checkServed([...out.values()], readBuildingHeatingKwh(results), readBuildingCoolingKwh(results), dhwNeeded - dhwShortKwh)

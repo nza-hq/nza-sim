@@ -208,6 +208,8 @@ export interface ShortSplit {
 /**
  * Brief 120 P3: one system's capacity against what its rooms asked of it (the engine's PlantResults, Rule 11), with its
  * name. `min_flow_c`: how far the water fell when short (a boiler feeding radiators in every room it serves), else null.
+ * Review F4: the engine's asked-not-given step sum is not an energy and is not shown; the hours short and the peak ask
+ * against the capacity are, and a year's difference needs two runs.
  */
 export interface PlantSummary {
   id: string; label: string; service: 'heating' | 'cooling'
@@ -215,10 +217,11 @@ export interface PlantSummary {
   peak_ask_w: number
   /** Hours (in steps, summed) it gave all it had. */
   hours_short: number
-  ask_kwh: number; delivered_kwh: number; short_kwh: number
-  short_kwh_by_month: number[]
-  /** Hot water it heated first, kWh a year (0 without). */
+  ask_kwh: number; delivered_kwh: number
+  /** Hot water it heated first, kWh a year (0 without); the hours its capacity could not cover it, and what the taps did not get, kWh (review F6). */
   hot_water_first_kwh: number
+  hot_water_short_hours: number
+  hot_water_short_kwh: number
   min_flow_c: number | null
 }
 
@@ -544,8 +547,8 @@ export function simulate(
       const g = doc.system_groups.find((x) => x.id === p.id)!
       return {
         id: p.id, label: g.label || `${SERVICE_WORDS[p.service]} system`, service: p.service, capacity_kw: p.cap_w / 1000,
-        peak_ask_w: p.peak_ask_w, hours_short: p.hours_short, ask_kwh: p.ask_kwh, delivered_kwh: p.delivered_kwh, short_kwh: p.short_kwh,
-        short_kwh_by_month: p.short_kwh_by_month, hot_water_first_kwh: p.reserved_kwh, min_flow_c: p.min_flow_c,
+        peak_ask_w: p.peak_ask_w, hours_short: p.hours_short, ask_kwh: p.ask_kwh, delivered_kwh: p.delivered_kwh,
+        hot_water_first_kwh: p.reserved_kwh, hot_water_short_hours: p.hot_water_short_hours, hot_water_short_kwh: p.hot_water_short_kwh, min_flow_c: p.min_flow_c,
       }
     }),
     breakdown: byTerm(results.zones, false),

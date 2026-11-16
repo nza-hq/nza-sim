@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { opaqueElement, type Element, type Layer } from '../elements'
 import { REFEREE_OPTIONS, runModel } from '../model'
 import { runNetwork, type NetworkInputs, type NetworkPlant } from '../network'
+import { runSystems } from '../systems'
 import { ModelDocument } from '../../schema/model'
 import { upgradeDocument } from '../../schema/upgrade'
 import { cooledRoomDocument } from './cooledRoom'
@@ -116,7 +117,14 @@ describe('Brief 120 P1 (document): capacity_kw limits the rooms a system serves'
     const r = run(doc(1))
     const rooms = r.zones.reduce((s, z) => s + z.annual.heating_kwh, 0)
     expect(r.plants[0].delivered_kwh).toBeCloseTo(rooms, 6)
-    expect(r.plants[0].short_kwh).toBeCloseTo(r.plants[0].short_kwh_by_month.reduce((a, b) => a + b, 0), 9)
+    const p = r.plants[0]
+    expect(p.asked_not_given_step_sum_kwh).toBeCloseTo(p.asked_not_given_step_sum_kwh_by_month.reduce((a, b) => a + b, 0), 9)
+    // Review F4: it is Σ (ask − given) over the short steps (outside them the plant gives all it is asked), and it is far
+    // above what the cap takes off the year's heating, because a cold room asks again each step: not an energy.
+    expect(p.asked_not_given_step_sum_kwh).toBeCloseTo(p.ask_kwh - p.delivered_kwh, 6)
+    expect(p.asked_not_given_step_sum_kwh).toBeGreaterThan(0)
+    const free = run(doc(null)).zones.reduce((s, z) => s + z.annual.heating_kwh, 0)
+    expect(p.asked_not_given_step_sum_kwh).toBeGreaterThan(free - rooms)
     for (const z of r.zones) expect(z.closure.max_wh).toBeLessThanOrEqual(1)
   })
   it('a capacity of 0 is refused by name; emitter_limit none lifts it', () => {
@@ -151,6 +159,33 @@ describe('Brief 120 P1 (document): capacity_kw limits the rooms a system serves'
     }
     expect(gw / (gw + ge)).toBeGreaterThan(0.53)
     for (const z of [w, e]) expect(z.closure.max_wh).toBeLessThanOrEqual(1)
+    // Review F8: pinned to the P2 referee's unequal case (docs/audit/120/02_referee.json; EnergyPlus 173 and 587 h,
+    // shares 0.56 / 0.44), so a change to the sharing that moves a room is seen here.
+    expect([w.annual.unmet_heating_hours, e.annual.unmet_heating_hours]).toEqual([158, 557])
+    expect(gw / (gw + ge)).toBeCloseTo(0.561, 3)
+  })
+  it('review F8: a room asking less than its radiator gives at the lowered flow takes only its ask; the plant still gives all it has', () => {
+    const c = cooledRoomDocument()
+    const d: any = structuredClone(c.doc)
+    const rads: Record<string, number> = { west: 1600, east: 900 }
+    d.system_groups = [{ id: 'lthw', service: 'heating', zones: Object.keys(rads), enabled: true, share_pct: 100, source: 'gas', efficiency_metric: 0.9, capacity_kw: 1.6, design_flow_c: 50, design_return_c: 40 }]
+    for (const z of d.zones) if (rads[z.id]) z.emitters = [{ id: `${z.id}_rad`, kind: 'radiator', count: 1, rated_output_w: rads[z.id], radiant_fraction: 0, system_group_id: 'lthw', rated_flow_c: 50, rated_return_c: 40, rated_room_c: 20, exponent_n: 1 }]
+    // The west room, with the bigger radiator, is kept only at 12 °C: it asks less than its radiator gives.
+    for (const z of d.zones) if (z.id === 'west') z.setpoints = { ...z.setpoints, heat_c: 12 }
+    const r = runModel(ModelDocument.parse(d), W, c.lib, REFEREE_OPTIONS)
+    const p = r.plants[0]
+    expect(p.hours_short).toBeGreaterThan(50)
+    const [w, e] = ['west', 'east'].map((id) => r.zones.find((z) => z.zone_id === id)!)
+    let full = 0, wAbove = 0
+    for (let h = 0; h < W.hours.count; h++) {
+      const sum = w.hourly.heating_w[h] + e.hourly.heating_w[h]
+      if (sum >= 1600 * 0.999) full++
+      if (w.hourly.heating_w[h] > 0 && w.hourly.theta_air_c[h] > 12.5) wAbove++
+    }
+    // Counted as EnergyPlus counts them (F9): the hours it gave all it had are its short hours.
+    expect(Math.abs(full - p.hours_short)).toBeLessThanOrEqual(0.02 * p.hours_short + 2)
+    expect(wAbove).toBe(0)
+    expect(w.annual.unmet_heating_hours).toBe(0)
   })
   it('P2b: a plant with no radiators of its own in every room shares in proportion to ask, and states no flow temperature', () => {
     expect(run(doc(1)).plants[0].min_flow_c).toBeNull()
@@ -202,6 +237,38 @@ describe('Brief 120 P1 (document): capacity_kw limits the rooms a system serves'
       if (gb > 0.4 * rooms + 1) boilerAboveShare++
     }
     expect(boilerAboveShare).toBeGreaterThan(1000)
+  })
+  it('review F6: hot water heated first above the boiler\'s capacity is short, shown, and the rooms get nothing that hour', () => {
+    const c = cooledRoomDocument()
+    const d: any = structuredClone(c.doc)
+    for (const z of d.zones) z.setpoints = { ...z.setpoints, heat_c: 20, cool_c: null }
+    const zs = d.zones.map((z: any) => z.id)
+    d.system_groups = [
+      { id: 'boiler', service: 'heating', zones: zs, enabled: true, share_pct: 100, source: 'gas', efficiency_metric: 0.9, capacity_kw: 3, dhw_priority_group_id: 'hw' },
+      { id: 'hw', service: 'dhw', zones: zs, enabled: true, share_pct: 100, source: 'gas', efficiency_metric: 0.9 },
+    ]
+    d.services.dhw = { storage_setpoint_c: 60, tap_outlet_temp_c: 40, cold_supply_temp_c: 10, load_shape: 'follow_occupancy', circulation_pump_w: 0 }
+    // Hot water only from 7 to 9 each morning, at more than the boiler's 3 kW.
+    const sched = Array.from({ length: 24 }, (_, h) => (h >= 7 && h < 9 ? 1 : 0))
+    d.profiles.push({ id: 'occ', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: sched, saturday: sched, sunday: sched }, dhw: { basis: 'per_m2', litres_per_day: 6 } })
+    for (const z of d.zones) z.profile_refs.occupancy = 'occ'
+    const doc = ModelDocument.parse(d)
+    const r = runModel(doc, W, c.lib, { ...REFEREE_OPTIONS, internal_gains: 'profiles' })
+    const p = r.plants[0]
+    expect(p.hot_water_id).toBe('hw')
+    expect(p.hot_water_short_hours).toBeGreaterThan(300)
+    expect(p.hot_water_short_kwh).toBeGreaterThan(0)
+    for (let h = 0; h < W.hours.count; h++) {
+      if (p.hot_water_given_frac![h] < 1) expect(p.zones.reduce((a, z) => a + z.given_w[h], 0)).toBe(0)
+      expect(p.zones.reduce((a, z) => a + z.given_w[h], 0)).toBeLessThanOrEqual(3000 * (1 + 1e-9) + 1e-6)
+    }
+    // Systems serves only what the taps got (Rule 9 holds inside runSystems), and the shortfall is the plant's.
+    const a = runSystems(doc, r, W.hours)
+    if (!a.ok) throw new Error(JSON.stringify(a.missing))
+    const s = a.systems
+    const hw = s.groups.find((x) => x.id === 'hw')!
+    expect(s.dhw!.demand_kwh - hw.served_kwh).toBeCloseTo(p.hot_water_short_kwh, 3)
+    expect(p.reserved_kwh).toBeCloseTo(hw.served_kwh, 3)
   })
   it('a 2.8 document upgrades with no hot water heated first', () => {
     const d: any = structuredClone(cooledRoomDocument().doc)

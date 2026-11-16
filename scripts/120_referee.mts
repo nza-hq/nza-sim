@@ -40,13 +40,13 @@ for (const [name, c] of Object.entries<any>(SPEC.cases)) {
   const r = runModel(ModelDocument.parse(d), W, lib, REFEREE_OPTIONS)
   const plant = r.plants.find((p) => p.id === 'lthw')!
   const zs = Object.keys(caps).map((zid) => r.zones.find((x) => x.zone_id === zid)!)
-  // The plant's short hours, read from the zones' own hourly heating: what they took sums to the capacity.
+  // The plant's short hours, read from what it gave (review F9: counted as EnergyPlus counts them, given >= 99.9 % of capacity).
   const H = zs[0].hourly.heating_w.length
   let shortH = 0
   const took: Record<string, number> = Object.fromEntries(zs.map((z) => [z.zone_id, 0]))
   for (let h = 0; h < H; h++) {
-    const sum = zs.reduce((s, z) => s + z.hourly.heating_w[h], 0)
-    if (sum >= c.plant_w - 1) { shortH++; for (const z of zs) took[z.zone_id] += z.hourly.heating_w[h] }
+    const sum = plant.zones.reduce((s, z) => s + z.given_w[h], 0)
+    if (sum >= c.plant_w * 0.999) { shortH++; for (const z of zs) took[z.zone_id] += z.hourly.heating_w[h] }
   }
   const tookAll = Object.values(took).reduce((a, b) => a + b, 0)
   const rooms: Record<string, unknown> = {}
@@ -68,8 +68,8 @@ for (const [name, c] of Object.entries<any>(SPEC.cases)) {
   out[name] = {
     plant_w: c.plant_w, radiators_w: caps,
     plant: {
-      energyplus: { heat_mwh: r3(EP.runs[name].plant.heat_mwh), short_hours: EP.runs[name].plant.short_hours, min_flow_c: r3(EP.runs[name].plant.min_flow_c) },
-      engine2: { delivered_mwh: r3(plant.delivered_kwh / 1000), ask_mwh: r3(plant.ask_kwh / 1000), short_hours: +plant.hours_short.toFixed(1), short_hours_read_from_zones: shortH, peak_ask_w: +plant.peak_ask_w.toFixed(1), short_kwh: +plant.short_kwh.toFixed(1), min_flow_c: plant.min_flow_c == null ? null : r3(plant.min_flow_c) },
+      energyplus: { heat_mwh: r3(EP.runs[name].plant.heat_mwh), short_hours: EP.runs[name].plant.short_hours, min_flow_c: r3(EP.runs[name].plant.min_flow_c), min_flow_c_short_steps: EP.runs[name].plant.min_flow_c_short_steps == null ? null : r3(EP.runs[name].plant.min_flow_c_short_steps) },
+      engine2: { delivered_mwh: r3(plant.delivered_kwh / 1000), ask_mwh: r3(plant.ask_kwh / 1000), short_hours: +plant.hours_short.toFixed(1), short_hours_read_from_zones: shortH, peak_ask_w: +plant.peak_ask_w.toFixed(1), asked_not_given_step_sum_kwh: +plant.asked_not_given_step_sum_kwh.toFixed(1), min_flow_c: plant.min_flow_c == null ? null : r3(plant.min_flow_c) },
     },
     rooms,
   }

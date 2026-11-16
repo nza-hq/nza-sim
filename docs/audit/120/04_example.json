@@ -19,7 +19,7 @@
  "design_kw": 15.8,
  "cases": {
   "uncapped_1000kw": {
-   "run_ms": 5542,
+   "run_ms": 5342,
    "steps_per_hour": 4,
    "eui": 96.9,
    "heating_kwh": 14112,
@@ -29,7 +29,6 @@
      "capacity_kw": 1000,
      "peak_ask_kw": 30,
      "hours_short": 0,
-     "short_kwh": 0,
      "delivered_kwh": 11031,
      "min_flow_c": 70
     }
@@ -48,6 +47,7 @@
      "heating_kwh": 1353,
      "unmet_hours": 54,
      "system_short_hours": 0,
+     "both_short_hours": 0,
      "own_short_hours": 54
     },
     {
@@ -55,6 +55,7 @@
      "heating_kwh": 3231,
      "unmet_hours": 564,
      "system_short_hours": 0,
+     "both_short_hours": 0,
      "own_short_hours": 564
     },
     {
@@ -62,6 +63,7 @@
      "heating_kwh": 1977,
      "unmet_hours": 179,
      "system_short_hours": 0,
+     "both_short_hours": 0,
      "own_short_hours": 179
     },
     {
@@ -69,6 +71,7 @@
      "heating_kwh": 4470,
      "unmet_hours": 133,
      "system_short_hours": 0,
+     "both_short_hours": 0,
      "own_short_hours": 133
     }
    ],
@@ -88,7 +91,7 @@
    ]
   },
   "capped_100pct_of_design": {
-   "run_ms": 2017,
+   "run_ms": 1805,
    "steps_per_hour": 4,
    "eui": 96.6,
    "heating_kwh": 13909,
@@ -98,7 +101,6 @@
      "capacity_kw": 15.8,
      "peak_ask_kw": 30.1,
      "hours_short": 397.8,
-     "short_kwh": 4151,
      "delivered_kwh": 10810,
      "min_flow_c": 48.1
     }
@@ -116,28 +118,32 @@
      "room": "Café",
      "heating_kwh": 1358,
      "unmet_hours": 140,
-     "system_short_hours": 140,
+     "system_short_hours": 0,
+     "both_short_hours": 140,
      "own_short_hours": 0
     },
     {
      "room": "Kitchen",
      "heating_kwh": 3043,
      "unmet_hours": 673,
-     "system_short_hours": 434,
+     "system_short_hours": 0,
+     "both_short_hours": 434,
      "own_short_hours": 239
     },
     {
      "room": "WCs",
      "heating_kwh": 1968,
      "unmet_hours": 295,
-     "system_short_hours": 188,
+     "system_short_hours": 0,
+     "both_short_hours": 188,
      "own_short_hours": 107
     },
     {
      "room": "Main hall",
      "heating_kwh": 4441,
      "unmet_hours": 246,
-     "system_short_hours": 246,
+     "system_short_hours": 0,
+     "both_short_hours": 246,
      "own_short_hours": 0
     }
    ],
@@ -157,7 +163,7 @@
    ]
   },
   "capped_75pct_of_design": {
-   "run_ms": 1917,
+   "run_ms": 1841,
    "steps_per_hour": 4,
    "eui": 96.3,
    "heating_kwh": 13727,
@@ -167,7 +173,6 @@
      "capacity_kw": 11.9,
      "peak_ask_kw": 30.2,
      "hours_short": 551,
-     "short_kwh": 7712,
      "delivered_kwh": 10611,
      "min_flow_c": 41.6
     }
@@ -185,28 +190,32 @@
      "room": "Café",
      "heating_kwh": 1355,
      "unmet_hours": 204,
-     "system_short_hours": 204,
+     "system_short_hours": 0,
+     "both_short_hours": 204,
      "own_short_hours": 0
     },
     {
      "room": "Kitchen",
      "heating_kwh": 2883,
      "unmet_hours": 778,
-     "system_short_hours": 586,
+     "system_short_hours": 0,
+     "both_short_hours": 586,
      "own_short_hours": 192
     },
     {
      "room": "WCs",
      "heating_kwh": 1955,
      "unmet_hours": 387,
-     "system_short_hours": 279,
+     "system_short_hours": 0,
+     "both_short_hours": 279,
      "own_short_hours": 108
     },
     {
      "room": "Main hall",
      "heating_kwh": 4419,
      "unmet_hours": 353,
-     "system_short_hours": 353,
+     "system_short_hours": 0,
+     "both_short_hours": 353,
      "own_short_hours": 0
     }
    ],
@@ -226,7 +235,7 @@
    ]
   },
   "capped_50pct_of_design": {
-   "run_ms": 2613,
+   "run_ms": 1949,
    "steps_per_hour": 4,
    "eui": 95.5,
    "heating_kwh": 13299,
@@ -236,7 +245,6 @@
      "capacity_kw": 7.9,
      "peak_ask_kw": 30.5,
      "hours_short": 874.5,
-     "short_kwh": 15171,
      "delivered_kwh": 10140,
      "min_flow_c": 34
     }
@@ -254,28 +262,32 @@
      "room": "Café",
      "heating_kwh": 1310,
      "unmet_hours": 385,
-     "system_short_hours": 385,
+     "system_short_hours": 0,
+     "both_short_hours": 385,
      "own_short_hours": 0
     },
     {
      "room": "Kitchen",
      "heating_kwh": 2567,
      "unmet_hours": 960,
-     "system_short_hours": 869,
+     "system_short_hours": 0,
+     "both_short_hours": 869,
      "own_short_hours": 91
     },
     {
      "room": "WCs",
      "heating_kwh": 1889,
      "unmet_hours": 589,
-     "system_short_hours": 481,
+     "system_short_hours": 0,
+     "both_short_hours": 481,
      "own_short_hours": 108
     },
     {
      "room": "Main hall",
      "heating_kwh": 4374,
      "unmet_hours": 559,
-     "system_short_hours": 559,
+     "system_short_hours": 0,
+     "both_short_hours": 559,
      "own_short_hours": 0
     }
    ],

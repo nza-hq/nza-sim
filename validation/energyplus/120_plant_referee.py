@@ -10,7 +10,8 @@ room by 108's documented method (rating()).
 
 Reported per room: annual heating, unmet hours (hourly zone air more than 0.5 K below 20 C), lowest air temperature;
 per plant step: the source's heat rate and each room's baseboard rate, so the sharing in the short steps can be
-compared. Usage: python3 -I validation/energyplus/120_plant_referee.py --energyplus <path> [--runs <dir>]
+compared. The lowest flow temperature is reported over every step and over the short steps only (review F7: with the
+pump off the node drifts, so only the short steps compare with the engine's lowered flow). Usage: python3 -I validation/energyplus/120_plant_referee.py --energyplus <path> [--runs <dir>]
 Writes docs/audit/120/02_energyplus.json. Nothing touches data/ or a database.
 """
 from __future__ import annotations
@@ -83,7 +84,7 @@ def run(energyplus: str, ep: dict, case: dict, epw: Path, d: Path) -> dict:
     short = [i for i, q in enumerate(src) if q >= cap * 0.999]
     out = {"warnings": len(re.findall(r"\*\* Warning \*\*", err)), "steps_per_hour": n, "plant_w": cap,
            "plant": {"heat_mwh": sum(src) / n / 1e6, "peak_w": max(src), "short_steps": len(short), "short_hours": len(short) / n,
-                     "min_flow_c": min(tsup), "steps": len(src)}, "rooms": {}}
+                     "min_flow_c": min(tsup), "min_flow_c_short_steps": min((tsup[i] for i in short), default=None), "steps": len(src)}, "rooms": {}}
     for z in rooms:
         hourly = [sum(tz[z][i * n:(i + 1) * n]) / n for i in range(8760)]
         given = sum(rate[z][i] for i in short)

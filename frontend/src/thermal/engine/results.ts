@@ -125,8 +125,9 @@ export interface ModelResults {
 /**
  * Brief 120: a system's capacity against what its zones asked of it. `ask` is each hour's heating (or cooling) the
  * zones would have taken from it at their setpoints with only their own emitters' limits; `delivered` what it gave
- * them. `short_kwh` is asked less given over the hours it was short (the zones then float, so it is not the heat that a
- * bigger plant would have used over the year, which also counts the recovery after).
+ * them. `asked_not_given_step_sum_kwh` (review F4) is Σ (ask − given) over its short steps, each ask at the setpoint
+ * from wherever the zone had fallen to, so a deficit carried over is counted again each step: it is not an energy, not
+ * the heat a bigger plant would have used, and is not shown to the person (the seam leaves it out).
  */
 export interface PlantResults {
   id: string
@@ -137,13 +138,22 @@ export interface PlantResults {
   hours_short: number
   ask_kwh: number
   delivered_kwh: number
-  short_kwh: number
+  asked_not_given_step_sum_kwh: number
   /** Hot water it heated first, kWh a year (0 without). */
   reserved_kwh: number
   /** The highest hour of that hot water, W (0 without). */
   peak_reserved_w: number
-  /** short_kwh by calendar month, January first. */
-  short_kwh_by_month: number[]
+  /**
+   * Review F6: the hot water system it heats first (null: none). In an hour whose hot water is above its capacity the
+   * taps get `hot_water_given_frac` of it (null: never short) and the rooms nothing; the hours, and the heat the taps
+   * did not get, kWh a year. Systems serves only what the taps got.
+   */
+  hot_water_id: string | null
+  hot_water_given_frac: Float64Array | null
+  hot_water_short_hours: number
+  hot_water_short_kwh: number
+  /** asked_not_given_step_sum_kwh by calendar month, January first. */
+  asked_not_given_step_sum_kwh_by_month: number[]
   /** Brief 120 P2b: the lowest flow temperature it fell to, °C (its design flow if never short); null when it does not feed wet emitters in every zone (shared in proportion to ask). */
   min_flow_c: number | null
   /**

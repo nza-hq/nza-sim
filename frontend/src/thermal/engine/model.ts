@@ -402,7 +402,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   }
   // Brief 120: the plants, with the hot water a heating system heats first (hotWater.ts, the one calculation).
   const zIdx = new Map(doc.zones.map((z, i) => [z.id, i]))
-  const plants: (NetworkPlant & { id: string })[] = plantGroups.map(({ g, i }) => {
+  const plants: (NetworkPlant & { id: string; hw_group: string | null; hw_frac: Float64Array | null })[] = plantGroups.map(({ g, i }) => {
     let reserved: Float64Array | null = null
     if (g.dhw_priority_group_id != null) {
       const d = doc.system_groups.find((x) => x.id === g.dhw_priority_group_id)!
@@ -417,7 +417,14 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       }
       void i
     }
-    return { id: g.id, service: g.service as 'heating' | 'cooling', cap_w: g.capacity_kw! * 1000, zones: g.zones.map((z) => ({ zone: zIdx.get(z)!, share: g.share_pct / 100 })), reserved_w: reserved, flow: null }
+    // Review F6: hot water heated first takes at most the plant's capacity; above it, the taps get that hour's share
+    // `hw_frac` (Systems serves only that, and the rest is shown short). The rooms then get nothing that hour.
+    let hwFrac: Float64Array | null = null
+    if (reserved) {
+      const cap = g.capacity_kw! * 1000
+      for (let h = 0; h < H; h++) if (reserved[h] > cap) { hwFrac ??= new Float64Array(H).fill(1); hwFrac[h] = cap / reserved[h]; reserved[h] = cap }
+    }
+    return { id: g.id, service: g.service as 'heating' | 'cooling', cap_w: g.capacity_kw! * 1000, zones: g.zones.map((z) => ({ zone: zIdx.get(z)!, share: g.share_pct / 100 })), reserved_w: reserved, flow: null, hw_group: g.dhw_priority_group_id ?? null, hw_frac: hwFrac }
   })
   // Review F1 (Linzie, 16 Nov 19:48): each zone's share of heating (cooling) on enabled systems with no capacity; they
   // top up a short plant's deficit in the zone.
@@ -701,9 +708,12 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       if (r.flow_c) minFlow = Math.min(minFlow, r.flow_c[h])
       if (r.short[h] > 0) byMonth[cal!.monthIdx[h]] += (r.ask_w[h] - r.delivered_w[h]) / 1000
     }
+    let hwHrs = 0, hwShort = 0
+    if (p.hw_frac) for (let h = 0; h < H; h++) if (p.hw_frac[h] < 1) { hwHrs++; hwShort += (p.reserved_w![h] / p.hw_frac[h] - p.reserved_w![h]) / 1000 }
     return {
+      hot_water_id: p.hw_group, hot_water_given_frac: p.hw_frac, hot_water_short_hours: hwHrs, hot_water_short_kwh: hwShort,
       id: p.id, service: p.service, cap_w: p.cap_w, peak_ask_w: peak, hours_short: hrs, ask_kwh: ask / 1000, delivered_kwh: del / 1000,
-      short_kwh: byMonth.reduce((a, b) => a + b, 0), reserved_kwh: res / 1000, peak_reserved_w: resPeak, short_kwh_by_month: byMonth,
+      asked_not_given_step_sum_kwh: byMonth.reduce((a, b) => a + b, 0), reserved_kwh: res / 1000, peak_reserved_w: resPeak, asked_not_given_step_sum_kwh_by_month: byMonth,
       min_flow_c: r.flow_c ? minFlow : null,
       zones: p.zones.map(({ zone, share }, j) => ({ zone_id: doc.zones[zone].id, share, given_w: r.zone_w[j] })),
     }

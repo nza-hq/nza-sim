@@ -27,7 +27,7 @@ Linzie wants the second kind of answer at every level: room, emitter and plant.
 This brief adds one thing: a **capacity limit per system**. A heating or cooling system delivers at most its stated kW in any hour, summed over the rooms it serves. The rooms then float below (or above) their setpoint, and the shortfall is reported.
 
 Still out of scope, until a later brief:
-- Lead/lag and sequencing between two systems serving the same room. When two systems share a room, each keeps its share, and each share is capped by its own system's capacity.
+- Lead/lag and sequencing between two systems serving the same room. When two systems share a room, each keeps its share, and each share is capped by its own system's capacity. **Amended by review F1 (Linzie, 16 Nov 19:48, "Yes, the boiler tops up"):** what a short system cannot give in a room is covered by the room's other systems, those with no capacity first and in full, then those with spare capacity in proportion to their shares, up to their spare. Nothing comes first, so this is still not lead/lag; each system has only its capacity.
 - Priority or hand-off between systems.
 - Part-load efficiency curves.
 
@@ -42,6 +42,13 @@ The P7 close updates the CLAUDE.md Systems scope text, with Linzie's 18:42 messa
    Recommended: (a), as a stated `dhw_priority` on the system, with "none" allowed.
 3. **Documents converted from today's tool already carry `capacity_kw`** (Bridgewater does). Recommended: capacity applies only when it is stated, so Bridgewater's v2 runs change only if its stated kW binds. P3 reports by how much, and the 133.2 anchor (today's engine) is untouched either way.
 4. **Cooling.** Same rule for cooling systems, such as a VRF outdoor unit's kW. Recommended: yes, in the same brief, because 119's caps are the room half of it.
+
+**Answers (recorded at review, F2).** Linzie's P0 card was closed as "Yes, all four" on her 19:19 reply, which also added a dedicated water heater with its own kW and storage volume (built: `storage_litres`, `waterHeater`).
+- **Decision 1 is overtaken.** The P2 EnergyPlus referee showed that sharing in proportion to ask is wrong for unequal radiators: when a boiler is short the water runs cooler everywhere, and bigger radiators keep more. P2b shares a wet plant that way, through one lowered flow temperature (02_referee.md). Proportional sharing stays only for a plant without wet emitters in every room it serves (and for cooling plants, not refereed: F11). Linzie was told in plain words on 16 Nov. The spec's `about` still describes the old rule; it is left as fixed before the run (its sha is checked by the referee), and this note supersedes it.
+- **Decision 2 (a), hot water first:** built; since review F6 the hot water itself is limited to the boiler's capacity, and its shortfall shown.
+- **Decision 3, only where stated:** built; Bridgewater states none.
+- **Decision 4, cooling too:** built; cooling referee owed (F11).
+- **Two systems in one room:** Linzie, 16 Nov 19:48, "Yes, the boiler tops up" (review F1).
 
 ## Parts
 

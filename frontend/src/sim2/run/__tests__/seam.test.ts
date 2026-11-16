@@ -551,7 +551,8 @@ describe('Brief 120 P3: system capacity in the summary', () => {
     const s = r.summary
     expect(s.plants).toHaveLength(1)
     const p = s.plants[0], eng = r.results.plants[0]
-    expect([p.id, p.service, p.capacity_kw, p.peak_ask_w, p.hours_short, p.short_kwh, p.min_flow_c]).toEqual([hp.id, 'heating', 30, eng.peak_ask_w, eng.hours_short, eng.short_kwh, eng.min_flow_c])
+    expect([p.id, p.service, p.capacity_kw, p.peak_ask_w, p.hours_short, p.min_flow_c, p.hot_water_short_hours]).toEqual([hp.id, 'heating', 30, eng.peak_ask_w, eng.hours_short, eng.min_flow_c, eng.hot_water_short_hours])
+    expect('asked_not_given_step_sum_kwh' in p).toBe(false)
     expect(p.hours_short).toBeGreaterThan(0)
     expect(p.min_flow_c!).toBeLessThan(50)
     const share = hp.share_pct / 100

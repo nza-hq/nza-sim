@@ -82,8 +82,8 @@ export interface WaterHeaterRun {
 /**
  * Brief 120 (Linzie, 16 Nov 19:19): a dedicated water heater of `cap_w` refilling a store of `litres` at the store
  * temperature. The store holds litres × (store − cold) × 4.18 kJ/(l·K), all of it usable (as if fully stratified: the
- * hot water above the incoming cold is drawn off at the store temperature); it starts the year full and loses nothing
- * standing. Each hour the taps draw `draw_w`: the heater gives up to its output, the store covers the rest while it
+ * hot water above the incoming cold is drawn off at the store temperature) and loses nothing standing. Review F5(d): it
+ * starts the year as it ended it (one warm-up pass from full), so a shortfall at the year's end is refilled within it. Each hour the taps draw `draw_w`: the heater gives up to its output, the store covers the rest while it
  * has any, and what is left is short. When the draw is below the output the heater refills the store with the
  * difference. The draw is hourly (the load shape's), so a burst inside one hour is not seen.
  */
@@ -92,7 +92,7 @@ export function waterHeater(draw_w: ArrayLike<number>, cap_w: number, litres: nu
   const usable = litres * (store_c - cold_c) * WATER_KWH_PER_L_K
   const heater_w = new Float64Array(H), short_w = new Float64Array(H), stored_kwh = new Float64Array(H)
   let s = usable
-  for (let h = 0; h < H; h++) {
+  for (let pass = 0; pass < 2; pass++) for (let h = 0; h < H; h++) {
     const d = draw_w[h]
     if (d <= cap_w) {
       const refill = Math.min(cap_w - d, (usable - s) * 1000)
