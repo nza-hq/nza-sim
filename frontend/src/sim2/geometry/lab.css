@@ -468,3 +468,9 @@
 .gl-root .ap-months { display: flex; gap: 2px; }
 .gl-root .ap-months button { width: 20px; height: 22px; border: 1px solid #DCE2DF; border-radius: 4px; background: #fff; font: 600 11px var(--gl-detail, inherit); color: #4B5A55; cursor: pointer; padding: 0; }
 .gl-root .ap-months button[aria-pressed='true'] { background: #235546; border-color: #235546; color: #fff; }
+/* Brief 118 P5: Profiles' full centre, today's schedule editor. */
+.gl-profedit { position: absolute; inset: 0; z-index: 30; overflow: auto; background: #fff; }
+.gl-profnone { padding: 32px; color: #58595B; }
+.gl-profnone h3 { font: 600 16px var(--gl-detail, inherit); color: #235546; margin: 0 0 8px; }
+/* Today's editor lays out side by side; below its width the centre scrolls rather than clipping the heatmap. */
+.gl-profedit > .p-4 { min-width: 960px; }
