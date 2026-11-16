@@ -22,6 +22,11 @@ const TERMS: Record<string, string> = {
   occupancy_gains: 'People', lighting_gains: 'Lighting', equipment_gains: 'Equipment', auxiliary_gains: 'Other equipment',
   mechanical_ventilation: 'Ventilation', interzone: 'From other zones',
 }
+const FUEL_WORDS: Record<string, string> = { electricity: 'Electricity', gas: 'Gas', oil: 'Oil', biomass: 'Biomass', district_heating: 'District heat', district_cooling: 'District cooling' }
+const END_USE_WORDS: Record<string, string> = {
+  heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', dhw_circulation: 'Hot water pump', fans: 'Fans', lighting: 'Lighting',
+  small_power: 'Small power', auxiliary: 'Other electrical',
+}
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const signed = (kwh: number) => `${kwh >= 0 ? '+' : '−'}${mwh(Math.abs(kwh))}`
 const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
@@ -210,6 +215,44 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
             </div>
           </div>
 
+          <h3>Energy used <i>estimate</i></h3>
+          {s.energy.ok ? (
+            <>
+              <div className="rp-totals">
+                <div>
+                  <span className="rp-label">EUI</span>
+                  <span className="rp-metric">{Math.round(s.energy.eui_kwh_per_m2).toLocaleString('en-GB')} <small>kWh/m² a year</small></span>
+                  <span className="rp-sub">{mwh(s.energy.total_kwh)} MWh a year</span>
+                </div>
+                <div>
+                  <span className="rp-label">By fuel</span>
+                  {s.energy.by_fuel.map((f) => <span key={f.fuel} className="rp-sub">{FUEL_WORDS[f.fuel] ?? f.fuel} {mwh(f.kwh)} MWh</span>)}
+                </div>
+              </div>
+              <table className="rp-table">
+                <thead><tr><th>End use</th><th>Fuel</th><th>MWh</th></tr></thead>
+                <tbody>
+                  {s.energy.end_uses.map((l) => <tr key={`${l.end_use}|${l.fuel}`}><td>{END_USE_WORDS[l.end_use] ?? l.end_use}</td><td>{FUEL_WORDS[l.fuel] ?? l.fuel}</td><td>{mwh(l.kwh)}</td></tr>)}
+                </tbody>
+              </table>
+              {s.energy.no_hot_water && <p className="rp-none">No hot water system stated: hot water is not included.</p>}
+              {s.energy.not_modelled.length > 0 && <p className="rp-none">Stated but not used yet: {s.energy.not_modelled.join('; ')}.</p>}
+              {s.energy.systems.length > 0 && (
+                <table className="rp-table">
+                  <thead><tr><th>System</th><th>Serves MWh</th><th>Uses MWh</th></tr></thead>
+                  <tbody>
+                    {s.energy.systems.map((g) => <tr key={g.id}><td>{g.label}{g.efficiency != null ? <span className="rp-eff"> · {g.efficiency}</span> : null}</td><td>{mwh(g.served_kwh)}</td><td>{mwh(g.fuel_kwh)}</td></tr>)}
+                  </tbody>
+                </table>
+              )}
+            </>
+          ) : (
+            <div className="rp-missing" role="status">
+              <p>To show energy use, the systems need:</p>
+              <ul>{s.energy.missing.map((m) => <li key={m.path + m.what}>{m.what}</li>)}</ul>
+            </div>
+          )}
+
           <h3>
             By zone <i>estimate</i>
             <button type="button" className="rp-info" aria-expanded={info} onClick={() => setInfo((v) => !v)} aria-label="About these figures">ⓘ</button>
@@ -219,8 +262,11 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
               Demand to hold each zone's setpoints, from the multi-room engine. The building total is checked against
               EnergyPlus on a five-storey hotel (heating within 4 %, cooling within 10 %, with the same air density;
               with EnergyPlus's default outdoor air density, −11 % and +10 %). Figures for single zones and
-              rooms are not yet validated: storeys differed from EnergyPlus by up to 31 % for cooling. Delivered energy,
-              fuel and carbon are not included yet.
+              rooms are not yet validated: storeys differed from EnergyPlus by up to 31 % for cooling. Energy used is
+              that demand through each system's share and efficiency, plus hot water, fans, lighting and equipment. On the
+              Bridgewater test building, given the same demand, it matches today's tool to the kWh; fans follow their
+              schedule here. Lighting and equipment controls act through the gains; a control factor only splits
+              electricity between systems sharing a zone. Carbon is not included yet.
             </p>
           )}
           <table className="rp-table">

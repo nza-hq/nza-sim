@@ -16,6 +16,7 @@
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine/model'
+import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingPeakW, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
@@ -43,6 +44,22 @@ export interface Summary {
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
   /** Constructions used that are drafts awaiting review (not yet in the library), by display name. */
   drafts: string[]
+  /**
+   * Energy the installed systems use (Brief 107), or what they still need. Demand shows either way. The EUI here is
+   * v2's own boundary (Rule 11), read once through readSystemsEui.
+   */
+  energy:
+    | {
+        ok: true; eui_kwh_per_m2: number; total_kwh: number
+        by_fuel: { fuel: Fuel; kwh: number }[]
+        end_uses: { end_use: EndUse; fuel: Fuel; kwh: number }[]
+        systems: { id: string; label: string; service: EndUse; fuel: Fuel; efficiency: number | null; served_kwh: number; fuel_kwh: number }[]
+        /** Inputs stated but not used yet, in words (review F4). */
+        not_modelled: string[]
+        /** True when no hot water system or hot water use is stated, so hot water is not in the total (review F1). */
+        no_hot_water: boolean
+      }
+    | { ok: false; missing: Missing[] }
 }
 
 export type SimulateResult =
@@ -140,13 +157,70 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     engine: results.engine, run_ms: results.run_ms,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
     building: {
-      floor_m2: doc.zones.reduce((s, z) => s + z.area_m2, 0),
+      floor_m2: readDocFloorM2(doc),
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
       peak_heating_w: readBuildingPeakW(results, 'heating'), peak_cooling_w: readBuildingPeakW(results, 'cooling'),
     },
     zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh, heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true) })),
     breakdown: byTerm(results.zones, false),
     drafts: pre.drafts,
+    energy: energyOf(doc, results, weather),
   }
   return { ok: true, results, summary }
+}
+
+const SERVICE_WORDS: Record<string, string> = { heating: 'heating', cooling: 'cooling', dhw: 'hot water', lighting: 'lighting', small_power: 'small power', auxiliary: 'auxiliary' }
+
+/** A systems gap in plain words, naming the system or zone. */
+function explainSystems(path: string, message: string, doc: ModelDocument): Missing {
+  const g = path.match(/^system_groups\[(\d+)\]\.(\w+)$/)
+  if (g) {
+    const sg = doc.system_groups[Number(g[1])]
+    const name = `"${sg?.label || sg?.id}"`
+    const what: Record<string, string> = {
+      efficiency_metric: sg?.service === 'cooling' ? 'its SEER' : 'its efficiency or SCOP', source: 'what it runs on (gas, electricity, air source…)',
+      share_pct: 'a share from 0 to 100 %', control_factor: 'a control factor of 0 or more',
+    }
+    if (message.startsWith('unknown source') || message.endsWith('runs on electricity')) return { path, what: `The system ${name}: ${message}.` }
+    return { path, what: `The system ${name} needs ${what[g[2]] ?? g[2].replace(/_/g, ' ')}.` }
+  }
+  if (path === 'services.dhw') return { path, what: 'Hot water use is stated, but no hot water system is chosen to heat it.' }
+  const z = path.match(/^zones\[(\d+)\]\.dhw$/)
+  if (z) return { path, what: `Choose a hot water system for ${zoneName(doc, z[1])}.` }
+  const d = path.match(/^services\.dhw\.(\w+)$/)
+  if (d) {
+    const what: Record<string, string> = {
+      storage_setpoint_c: 'the hot water store temperature', tap_outlet_temp_c: 'the tap outlet temperature', cold_supply_temp_c: 'the cold supply temperature',
+      demand_basis: 'how hot water use is counted (per person or per m²)', litres_per_person_per_day: 'litres per person a day', litres_per_m2_per_day: 'litres per m² a day',
+      load_shape: 'when hot water is used (flat, or following occupancy)', circulation_pump_w: 'the circulation pump power (0 if none)',
+    }
+    return { path, what: message.startsWith('required') ? `Hot water needs ${what[d[1]] ?? d[1]}.` : `Hot water: ${what[d[1]] ?? d[1]} ${message}.` }
+  }
+  const v = path.match(/^zones\[(\d+)\]\.ventilation\[(\d+)\]\.sfp_w_per_l_s$/)
+  if (v) return { path, what: `Set the fan power (SFP) for the ventilation in ${zoneName(doc, v[1])}.` }
+  return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
+}
+
+function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
+  let a: ReturnType<typeof runSystems>
+  try { a = runSystems(doc, results, weather.weather.hours) } catch (e) {
+    // The served-equals-demand check (Rule 9) failing is a fault in the tool, never a number to show.
+    if (e instanceof ServedError) return { ok: false, missing: [{ path: 'systems', what: `The energy check failed (${e.message}). This is a fault in the tool; please report it.` }] }
+    throw e
+  }
+  if (!a.ok) return { ok: false, missing: a.missing.map((m) => explainSystems(m.path, m.message, doc)) }
+  const s = a.systems
+  return {
+    ok: true, eui_kwh_per_m2: readSystemsEui(s), total_kwh: readSystemsTotalKwh(s),
+    by_fuel: FUELS.filter((f) => s.by_fuel[f] > 0).map((fuel) => ({ fuel, kwh: s.by_fuel[fuel] })),
+    end_uses: s.end_uses.filter((l) => l.kwh > 0),
+    systems: s.groups.map((g) => ({ id: g.id, label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system`, service: g.service, fuel: g.fuel, efficiency: g.efficiency, served_kwh: g.served_kwh, fuel_kwh: g.fuel_kwh })),
+    not_modelled: s.not_modelled.map((n) => {
+      const m = n.path.match(/^system_groups\[(\d+)\]/)
+      const v = n.path.match(/^zones\[(\d+)\]\.ventilation/)
+      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : n.path
+      return `${owner}: ${n.what}`
+    }),
+    no_hot_water: s.dhw == null,
+  }
 }

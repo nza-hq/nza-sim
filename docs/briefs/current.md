@@ -1,5 +1,8 @@
 # Current brief
 
+**Brief 107 — Simulate v2 Engine 4: systems by zone group, delivered energy by end use and fuel — CLOSED 15 Nov 2026 on `chris/107-systems` (stacked on 106; PR open, awaiting Linzie).**
+Each zone's demand through its systems' shares and efficiencies, hot water by the tap-mix, fans, and lighting, small power and auxiliary from the gains' electricity: end uses, fuels, hourly electricity and v2's EUI, shown in the results panel. Fed today's demand on Bridgewater, every end use equals today's to ≤ 0.4 kWh; on Engine 2's five-storey demand the EUI is 131.89 against 133.2, all of it demand. Served is checked against the model's demand every run (Rule 9). Independent review addressed. No change to today's engine (anchor 133.2). Brief [`archive/107_systems_COMPLETED.md`](archive/107_systems_COMPLETED.md); final report [`../audit/107/07_final_report.md`](../audit/107/07_final_report.md). **Next:** Brief 108, emitters per room.
+
 **Brief 106 — Simulate v2: the room-by-room breakdown and pinned constructions — CLOSED 15 Nov 2026 on `chris/106-zone-breakdown` (PR open, awaiting Linzie).**
 Review F3 and F6 from Brief 105. Each zone's row in the results panel opens to its own balance, every term including heat from the other zones (zone lines close; interzone lines cancel across the building). A construction the document does not pin to its library version is refused and named. Run seam and panel only; anchor 133.2. Brief [`archive/106_zone-breakdown_COMPLETED.md`](archive/106_zone-breakdown_COMPLETED.md); evidence [`../audit/106/`](../audit/106/). **Next:** systems by zone group (design note Engine 4).
 

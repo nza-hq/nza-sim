@@ -58,7 +58,7 @@ export function organisationFileName(name: string): string {
 export async function saveToOrganisation(supabase: SupabaseClient, orgId: string, bytes: Uint8Array, name: string): Promise<string> {
   await parseEpw(bytes)  // only a file the engine can read is saved
   const file = organisationFileName(name)
-  const { error } = await supabase.storage.from(BUCKET).upload(`${orgId}/${file}`, new Blob([bytes]), { upsert: false, contentType: 'text/plain' })
+  const { error } = await supabase.storage.from(BUCKET).upload(`${orgId}/${file}`, new Blob([bytes as BlobPart]), { upsert: false, contentType: 'text/plain' })
   if (error) throw new Error(/exist|duplicate/i.test(error.message) ? `your organisation already has a file called ${file}` : error.message)
   return file
 }

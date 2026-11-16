@@ -1,0 +1,103 @@
+{
+ "source": "scripts/107_gate.mts",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "floor_m2": 4215.96,
+ "path_by_path": {
+  "heating_electricity": {
+   "today": 37.657,
+   "v2": 37.657,
+   "diff_kwh": -0.3
+  },
+  "cooling_electricity": {
+   "today": 30.8,
+   "v2": 30.8,
+   "diff_kwh": 0
+  },
+  "dhw_electricity": {
+   "today": 41.174,
+   "v2": 41.174,
+   "diff_kwh": -0.4
+  },
+  "dhw_gas": {
+   "today": 157.428,
+   "v2": 157.428,
+   "diff_kwh": 0.3
+  },
+  "dhw_circulation": {
+   "today": 1.051,
+   "v2": 1.051,
+   "diff_kwh": 0.2
+  },
+  "fans": {
+   "today": 40.613,
+   "v2": 40.613,
+   "diff_kwh": 0.1
+  },
+  "lighting": {
+   "today": 39.014,
+   "v2": 39.014,
+   "diff_kwh": 0.3
+  },
+  "small_power": {
+   "today": 186.136,
+   "v2": 186.136,
+   "diff_kwh": 0.3
+  },
+  "auxiliary": {
+   "today": 27.699,
+   "v2": 27.699,
+   "diff_kwh": 0
+  },
+  "electricity": {
+   "today": 404.144,
+   "v2": 404.144,
+   "diff_kwh": 0
+  },
+  "gas": {
+   "today": 157.428,
+   "v2": 157.428,
+   "diff_kwh": 0.3
+  },
+  "eui": {
+   "today": 133.2,
+   "v2": 133.202
+  },
+  "dhw_demand": {
+   "today": 257.335,
+   "v2": 257.335,
+   "diff_kwh": -0.3
+  }
+ },
+ "engine2_five_storeys": {
+  "end_uses": {
+   "heating_electricity": 42,
+   "cooling_electricity": 20.908,
+   "dhw_electricity": 41.174,
+   "dhw_gas": 157.428,
+   "dhw_circulation": 1.051,
+   "fans": 40.613,
+   "lighting": 39.014,
+   "small_power": 186.136,
+   "auxiliary": 27.699,
+   "electricity": 398.596,
+   "gas": 157.428,
+   "eui": 131.886,
+   "dhw_demand": 257.335
+  },
+  "eui": 131.89,
+  "today_eui": 133.2,
+  "attribution": {
+   "heating_demand_mwh": {
+    "today": 102.7,
+    "engine2": 114.546,
+    "eui": 1.03
+   },
+   "cooling_demand_mwh": {
+    "today": 92.4,
+    "engine2": 62.725,
+    "eui": -2.35
+   },
+   "everything_else_eui": 0
+  }
+ }
+}
