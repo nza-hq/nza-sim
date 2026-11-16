@@ -159,6 +159,18 @@ export const typeAt = (plan: Plan, run: number, t: number, e: WallElement = 'wal
 export const typeOfSpan = (plan: Plan, s: Span, e: WallElement = 'wall') => typeAt(plan, s.run, (s.t0 + s.t1) / 2, e)
 
 /** Give spans `ss` fabric type `type` (of its element; stretches it now hides are dropped). */
+/**
+ * A drawn door must be able to run: when a change adds doors, every door type that names no construction takes the
+ * library's door (DEFAULT_DOOR, a draft awaiting Chris, shown by name on the type). A U typed on the type still
+ * overrides it. Nothing changes when no door was added, so clearing a door type's construction by hand sticks.
+ */
+export function withDefaultDoor(prev: Plan, next: Plan, door: string): Plan {
+  const n = (p: Plan) => p.windows.filter((w) => w.door).length
+  if (n(next) <= n(prev)) return next
+  if (!next.fabric_types.some((t) => t.element === 'door' && !t.construction)) return next
+  return { ...next, fabric_types: next.fabric_types.map((t) => (t.element === 'door' && !t.construction ? { ...t, construction: door } : t)) }
+}
+
 export function setTypeOn(plan: Plan, ss: readonly Span[], type: string): Plan {
   const e = (plan.fabric_types.find((t) => t.id === type)?.element ?? 'wall') as FabricElement
   if (e === 'roof' || e === 'floor') return plan

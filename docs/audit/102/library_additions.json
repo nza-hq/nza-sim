@@ -54,6 +54,44 @@
     "library_type": "construction",
     "display_name": "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)"
    }
+  },
+  {
+   "kind": "construction",
+   "key": "timber_door_solid",
+   "body": {
+    "name": "timber_door_solid",
+    "type": "door",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "light",
+    "description": "External door: solid timber leaf, 44 mm",
+    "epjson": {
+     "Material": {
+      "Door_TimberLeaf": {
+       "roughness": "MediumSmooth",
+       "thickness": 0.044,
+       "conductivity": 0.13,
+       "density": 650,
+       "specific_heat": 1700
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "timber_door_solid": {
+       "outside_layer": "Door_TimberLeaf"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 editor thread), so a drawn door can run (the library has no door)",
+    "basis": "One new number, the 44 mm leaf thickness (the usual external door leaf). The material copies TF_Std_OSB from timber_frame_standard, a row of Chris's library (k 0.13, 650 kg/m3, 1700 J/kgK). U about 2.0 W/m2K with the standard surface resistances (0.13 + 0.04); a U typed on the door type overrides it.",
+    "review": "Chris: confirm, edit or replace (e.g. an insulated composite door), then add to the library",
+    "library_type": "construction",
+    "display_name": "External door: solid timber, 44 mm (draft, awaiting Chris)"
+   }
   }
  ]
 }

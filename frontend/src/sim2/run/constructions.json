@@ -4,7 +4,7 @@
  "source_sha256": "c3891d6632c605671a54843cc4cc0e50b66f0ec2ecfc544b8b9c7f9d96d6b9f0",
  "exported_at": "2026-11-14T19:36:56+00:00",
  "additions": "docs/audit/102/library_additions.json",
- "additions_sha256": "30bcb08bfd432965d8e4be37742073420878c5d5304f44be831eac9105975c13",
+ "additions_sha256": "5002e99c6198a1990d871439e9b6d1a31ef9d57fc9dc1f3b4c2eab3783bb17d1",
  "constructions": [
   {
    "key": "bridgwater_ext_wall",
@@ -756,6 +756,37 @@
     }
    },
    "draft": "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)"
+  },
+  {
+   "key": "timber_door_solid",
+   "body_hash": "3bf95d8d797c27af438b38b99e71ed67d937c56d4f16bc2388e9c82b09a79454",
+   "body": {
+    "name": "timber_door_solid",
+    "type": "door",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "light",
+    "description": "External door: solid timber leaf, 44 mm",
+    "epjson": {
+     "Material": {
+      "Door_TimberLeaf": {
+       "roughness": "MediumSmooth",
+       "thickness": 0.044,
+       "conductivity": 0.13,
+       "density": 650,
+       "specific_heat": 1700
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "timber_door_solid": {
+       "outside_layer": "Door_TimberLeaf"
+      }
+     }
+    }
+   },
+   "draft": "External door: solid timber, 44 mm (draft, awaiting Chris)"
   }
  ]
 }

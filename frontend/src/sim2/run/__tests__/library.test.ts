@@ -18,7 +18,7 @@ describe('epJSON layers to engine layers', () => {
   const exported = CONSTRUCTIONS.filter((c) => !c.draft)
   it('the library has the fixture\'s fifteen constructions, and the drafts on top', () => {
     expect(exported.map((c) => c.key).sort()).toEqual([...fx.keys()].sort())
-    expect(CONSTRUCTIONS.filter((c) => c.draft).map((c) => c.key)).toEqual(['interior_wall_block_plastered'])
+    expect(CONSTRUCTIONS.filter((c) => c.draft).map((c) => c.key)).toEqual(['interior_wall_block_plastered', 'timber_door_solid'])
   })
   it('the draft internal wall: plaster, 100 mm block, plaster, copied from library rows', () => {
     const got = bodyFromLibrary(CONSTRUCTIONS.find((c) => c.draft)!.body, 'draft')
