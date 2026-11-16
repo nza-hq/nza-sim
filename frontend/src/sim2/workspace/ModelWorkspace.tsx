@@ -1,7 +1,9 @@
 /**
  * The Model workspace (Brief 110): Simulate v2's steps inside NZA Sim, laid out the way today's Building page is.
  *
- *   left    the step rail, then what you are choosing (whole building, zones, rooms)
+ *   top     the steps as tabs across the top, in build order, with the shelf at the right end (Linzie, 16 Nov 00:22:
+ *           "happy for the modules to be across the top if that frees up our space on the left")
+ *   left    what you are choosing (whole building, zones, rooms)
  *   centre  what you see: the results strip, then the centre tabs (Drawing, Heat flow). The main window.
  *   right   what you give: kinds, the project's types, the detail, Apply
  *
@@ -73,10 +75,11 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
   const later = LATER[step]
 
   return (
-    <div className="mw-root flex h-[calc(100vh-3rem)] relative">
+    <div className="mw-root flex flex-col h-[calc(100vh-3rem)]">
+     <StepRail step={step} onStep={onStep} />
+     <div className="flex flex-1 min-h-0 relative">
       <aside className="mw-left flex-shrink-0 bg-white border-r border-light-grey flex flex-col min-h-0" style={{ width: layout.left }}>
         {header}
-        <StepRail step={step} onStep={onStep} />
         <div className="mw-slot flex-1 min-h-0 overflow-auto" ref={setLeftEl} />
       </aside>
       <ResizeHandle onResize={setLeft} />
@@ -106,6 +109,7 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
       <ResizeHandle onResize={setRight} />
       <aside className="mw-right flex-shrink-0 bg-white border-l border-light-grey min-h-0 overflow-hidden" style={{ width: layout.right }} ref={setRightEl} />
       {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: layout.centre, setCentre })}
+     </div>
     </div>
   )
 }

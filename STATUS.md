@@ -37,6 +37,8 @@ Brief [`docs/briefs/active/110b_carry_over_from_today.md`](docs/briefs/active/11
   - Spaces and Systems list the project's profiles first, then the rest of the library.
   - Not yet: making a project's own profile (it needs custom profiles in the document), and heating hours and setback (Brief 109).
   - Linzie asked whether lighting and equipment should move to Systems. That is held for her answer: the journey thread recommends keeping the gains on Spaces, with the electricity and controls in Systems.
+- **Steps across the top (Linzie, 16 Nov 00:22):** "happy for the modules to be across the top if that frees up our space on the left". The steps are now tabs in one row above the three panes, each with today's module accent, and the shelf (today's profiles, Library, Reports) sits at the right end. The left pane is only what you choose. Today's app sidebar is unchanged: folding it inside a model touches the navigation shell, so it waits for its own brief.
+- **Spaces and Systems boundary (Linzie, 16 Nov 00:22; table drafted by the journey thread):** Profiles say when; Spaces say what is in the room and what it needs (people, equipment and luminaire W/m², comfort needed, fresh air, hot water); Systems say how the kit meets it (plant, emitters, efficiency, the setpoints it is set to, ventilation kit, water heater, lighting controls). Lighting and equipment W/m² stay on Spaces. Awaiting her confirmation of the table.
 
 ## 🟡 Brief 111 — Simulate v2: "Results include" levels (Parts 1–2 here; 3–4 the editor's) — IN PROGRESS on `chris/111-results-levels` (stacked on 108)
 
