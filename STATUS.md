@@ -2,7 +2,7 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🟡 Brief 120 — Simulate v2: system (plant) capacity limits — ACTIVE 16 Nov 2026 on `chris/120-plant-capacity` (stacked on 112)
+## ✅ Brief 120 — Simulate v2: system (plant) capacity limits — CLOSED 16 Nov 2026 on `chris/120-plant-capacity` (stacked on 112)
 
 Brief [`docs/briefs/archive/120_plant-capacity_COMPLETED.md`](docs/briefs/archive/120_plant-capacity_COMPLETED.md). Linzie 16 Nov 18:42: "We need the capacity, not just of the heat emitters, but also of the system as well." P0 decisions asked on a card 16 Nov ~18:57; closed "Yes, all four" on her 19:19 reply; decision 1 (proportional) since overtaken by P2b for wet plants (review F2).
 
