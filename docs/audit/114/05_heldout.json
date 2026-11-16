@@ -1,0 +1,153 @@
+{
+ "source": "scripts/114_heldout.mts",
+ "spec_sha256": "297dd2bb365f0fa3b393ab7b44822a5d9fb5f32eaddc7144c65258577e8747d0",
+ "gate": {
+  "annual_heating_pct": 3,
+  "unmet_hours_pct": 10,
+  "unmet_hours_floor_h": 10,
+  "note": "As 120_plant_spec.json: per room, annual heating within +/-3 %; unmet hours within +/-10 % or +/-10 h, whichever is larger. Shares in the plant's short hours reported, not gated."
+ },
+ "passes": false,
+ "cases": {
+  "heldout": {
+   "plant_w": 1300,
+   "radiators_w": {
+    "west": 1500,
+    "east": 700
+   },
+   "plant": {
+    "energyplus": {
+     "heat_mwh": 3.575,
+     "short_hours": 1445.25,
+     "min_flow_c": 36.117,
+     "min_flow_c_short_steps": 41.931
+    },
+    "engine2": {
+     "delivered_mwh": 3.471,
+     "ask_mwh": 3.9,
+     "short_hours": 1310,
+     "short_hours_read_from_zones": 1313,
+     "peak_ask_w": 2507.7,
+     "asked_not_given_step_sum_kwh": 428.7,
+     "min_flow_c": 42.553
+    }
+   },
+   "rooms": {
+    "west": {
+     "energyplus": {
+      "heat_mwh": 1.913,
+      "unmet_hours": 423,
+      "min_c": 14.295,
+      "share_in_short": 0.592
+     },
+     "engine2": {
+      "heat_mwh": 1.848,
+      "unmet_hours": 371,
+      "min_c": 14.606,
+      "share_in_short": 0.595,
+      "closure_max_wh": 3.7061909097246826e-11
+     },
+     "heating_pct": -3.4,
+     "unmet_diff_h": -52,
+     "unmet_tolerance_h": 42.3,
+     "min_diff_k": 0.31,
+     "heating_passes": false,
+     "unmet_passes": false,
+     "passes": false
+    },
+    "east": {
+     "energyplus": {
+      "heat_mwh": 1.676,
+      "unmet_hours": 1279,
+      "min_c": 9.552,
+      "share_in_short": 0.413
+     },
+     "engine2": {
+      "heat_mwh": 1.623,
+      "unmet_hours": 1235,
+      "min_c": 9.582,
+      "share_in_short": 0.405,
+      "closure_max_wh": 3.5427660804998595e-11
+     },
+     "heating_pct": -3.2,
+     "unmet_diff_h": -44,
+     "unmet_tolerance_h": 127.9,
+     "min_diff_k": 0.03,
+     "heating_passes": false,
+     "unmet_passes": true,
+     "passes": false
+    }
+   }
+  },
+  "heldout_free": {
+   "plant_w": 100000,
+   "radiators_w": {
+    "west": 1500,
+    "east": 700
+   },
+   "plant": {
+    "energyplus": {
+     "heat_mwh": 3.78,
+     "short_hours": 0,
+     "min_flow_c": 36.117,
+     "min_flow_c_short_steps": null
+    },
+    "engine2": {
+     "delivered_mwh": 3.646,
+     "ask_mwh": 3.646,
+     "short_hours": 0,
+     "short_hours_read_from_zones": 0,
+     "peak_ask_w": 2217.3,
+     "asked_not_given_step_sum_kwh": 0,
+     "min_flow_c": 70
+    }
+   },
+   "rooms": {
+    "west": {
+     "energyplus": {
+      "heat_mwh": 1.941,
+      "unmet_hours": 0,
+      "min_c": 19.998,
+      "share_in_short": null
+     },
+     "engine2": {
+      "heat_mwh": 1.87,
+      "unmet_hours": 0,
+      "min_c": 20,
+      "share_in_short": null,
+      "closure_max_wh": 3.7061909097246826e-11
+     },
+     "heating_pct": -3.7,
+     "unmet_diff_h": 0,
+     "unmet_tolerance_h": 10,
+     "min_diff_k": 0,
+     "heating_passes": false,
+     "unmet_passes": true,
+     "passes": false
+    },
+    "east": {
+     "energyplus": {
+      "heat_mwh": 1.849,
+      "unmet_hours": 705,
+      "min_c": 13.847,
+      "share_in_short": null
+     },
+     "engine2": {
+      "heat_mwh": 1.776,
+      "unmet_hours": 748,
+      "min_c": 13.71,
+      "share_in_short": null,
+      "closure_max_wh": 3.5427660804998595e-11
+     },
+     "heating_pct": -4,
+     "unmet_diff_h": 43,
+     "unmet_tolerance_h": 70.5,
+     "min_diff_k": -0.14,
+     "heating_passes": false,
+     "unmet_passes": true,
+     "passes": false
+    }
+   }
+  }
+ }
+}

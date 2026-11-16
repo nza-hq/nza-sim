@@ -8,7 +8,7 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { REFEREE_OPTIONS, runModel } from '../model'
-import { runSystems } from '../systems'
+import { readEntryKwh, runSystems } from '../systems'
 import { ModelDocument } from '../../schema/model'
 import { cooledRoomDocument } from './cooledRoom'
 import { MOS, readMos } from './denver'
@@ -39,9 +39,9 @@ describe('Brief 114 P2: pumps against EnergyPlus', () => {
       d.system_groups[0].pumps = { power: { w: SPEC.pump_w }, speed: v.speed, runs: v.runs }
       const r = runSystems(ModelDocument.parse(d), results, W.hours)
       if (!r.ok) throw new Error(JSON.stringify(r.missing))
-      const p = r.systems.pumps[0]
+      const p = r.systems.pumps[0], kwh = readEntryKwh(r.systems, 'pumps', p.id)
       const ep = EP.runs[name]
-      out[name] = { engine_kwh: p.kwh, engine_hours_run: p.hours_run, engine_design_w: p.design_w, ep_kwh: ep.pump_kwh, ep_hours_on: ep.hours_pump_on, diff: p.kwh / ep.pump_kwh - 1 }
+      out[name] = { engine_kwh: kwh, engine_hours_run: p.hours_run, engine_design_w: p.design_w, ep_kwh: ep.pump_kwh, ep_hours_on: ep.hours_pump_on, diff: kwh / ep.pump_kwh - 1 }
     }
     fs.writeFileSync(repo('docs/audit/114/02_engine.json'), JSON.stringify(out, null, 1) + '\n')
     // fixed_continuous fails its gate as written (-25 %), recorded in 02_referee.md: EnergyPlus's Continuous pump runs

@@ -151,6 +151,15 @@ describe('(d2) review F9: the cases the mutations got through', () => {
     const west = designHeatLoss(doc, run.zones, W).zones[0]
     expect(line(west, 'mechanical_ventilation')[0].w).toBeCloseTo(K.rho_c_air * 0.03 * 25, 6)
   })
+  it('Brief 114 review F10: fans on demand at their full flow, however few people the room has', () => {
+    const { doc, run } = build((d) => {
+      d.profiles.push({ id: 'few', kind: 'occupancy', density: { value: 0.01, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: Array(24).fill(0.1), saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+      d.zones[0].profile_refs.occupancy = 'few'
+      d.zones[0].ventilation = [{ id: 'mev', kind: 'mev', enabled: true, flow_rate: 30, flow_rate_basis: 'constant', recovery_sensible_pct: null, control_schedule_ref: 'always_on', runs: 'demand', demand_min_fraction: 0.1, legacy_v25: {} }]
+    })
+    const west = designHeatLoss(doc, run.zones, W).zones[0]
+    expect(line(west, 'mechanical_ventilation')[0].w).toBeCloseTo(K.rho_c_air * 0.03 * 25, 6)
+  })
   it('vents that lift the room above 0.5 air changes: no top-up', () => {
     const { doc, run } = build((d) => {
       d.building.design.vent_wind_m_s = 4

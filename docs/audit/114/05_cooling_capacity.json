@@ -1,0 +1,56 @@
+{
+ "source": "scripts/114_cooling_capacity.mts",
+ "spec_sha256": "0367d6767d1d7558de91498646bf1749d36ecb23c753a0ecdf63943f3b06a809",
+ "energyplus": "docs/audit/119/02_energyplus.json",
+ "passes": false,
+ "cases": {
+  "tight": {
+   "cap_w": 800,
+   "plant_limited": {
+    "cool_mwh": 1.368,
+    "unmet_h": 379,
+    "max_c": 28.22
+   },
+   "unit_limited": {
+    "cool_mwh": 1.368,
+    "unmet_h": 379,
+    "max_c": 28.22
+   },
+   "energyplus": {
+    "cool_mwh": 1.3176321698446576,
+    "unmet_h": 299,
+    "max_c": 27.296815298616572
+   },
+   "cooling_pct": 3.8,
+   "unmet_diff_h": 80,
+   "max_diff_k": 0.92,
+   "passes": false,
+   "plant_hours_short": 539,
+   "plant_equals_unit": true
+  },
+  "mild": {
+   "cap_w": 1100,
+   "plant_limited": {
+    "cool_mwh": 1.4046,
+    "unmet_h": 51,
+    "max_c": 25.954
+   },
+   "unit_limited": {
+    "cool_mwh": 1.4046,
+    "unmet_h": 51,
+    "max_c": 25.954
+   },
+   "energyplus": {
+    "cool_mwh": 1.3454303508290222,
+    "unmet_h": 33,
+    "max_c": 25.29260318224045
+   },
+   "cooling_pct": 4.4,
+   "unmet_diff_h": 18,
+   "max_diff_k": 0.66,
+   "passes": true,
+   "plant_hours_short": 120,
+   "plant_equals_unit": true
+  }
+ }
+}

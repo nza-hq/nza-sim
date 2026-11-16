@@ -1,0 +1,31 @@
+{
+ "about": "Owed from Brief 120 (review F11): a held-out wet case for system capacity, chosen before any run and not used to set anything. Brief 120's referee (120_plant_spec.json) at different water temperatures, radiator sizes and capacity: flow 70 C, return 50 C (120: 50/40), unequal radiators 1,500 W west and 700 W east (120: 1,100/1,100 and 1,600/900), plant 1,300 W (120: 1,600 and 2,600). Exponent 1 and all convective, because EnergyPlus's water baseboard is effectiveness-NTU at a fixed UA, which is exponent 1: the review's n = 1.3 cannot be represented in EnergyPlus, so it is not refereed here. Two heated rooms, because the cooled room's middle room is cooled; a third heated room would change 104's referee model. Same gate as 120.",
+ "flow_c": 70.0,
+ "return_c": 50.0,
+ "rated_room_c": 20.0,
+ "exponent_n": 1.0,
+ "radiant_fraction": 0.0,
+ "cases": {
+  "heldout": {
+   "radiators": {
+    "west": 1500,
+    "east": 700
+   },
+   "plant_w": 1300
+  },
+  "heldout_free": {
+   "radiators": {
+    "west": 1500,
+    "east": 700
+   },
+   "plant_w": 100000
+  }
+ },
+ "gate": {
+  "annual_heating_pct": 3.0,
+  "unmet_hours_pct": 10.0,
+  "unmet_hours_floor_h": 10,
+  "note": "As 120_plant_spec.json: per room, annual heating within +/-3 %; unmet hours within +/-10 % or +/-10 h, whichever is larger. Shares in the plant's short hours reported, not gated."
+ },
+ "added_after_first_run": "heldout_free (the same radiators, a plant far above any ask) was added after the first run missed the heating gate by 0.2-0.4 points, to attribute the miss to the plant or to the rooms; it is reported, and the first result stands as reported."
+}

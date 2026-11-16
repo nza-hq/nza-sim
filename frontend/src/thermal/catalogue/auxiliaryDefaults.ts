@@ -6,10 +6,14 @@
  * Read 16 Nov 2026 through a text extraction (the container's proxy blocks the file, so no sha256 yet; to check on
  * IT15 against the page, as the Stelrad catalogue was in Brief 119).
  *
- * - Table 14 (p. 31), pump power density by pump configuration, W/m² of floor, "LTHW only" and "Both LTHW and CHW".
- *   NCM multiplies it by the heating system's hours (para 62: hours when the heating setpoint is above setback).
- * - Para 67 (p. 23), local mechanical exhaust: 0.40 W per l/s with the fan in the zone, 0.60 W per l/s remote.
- * - Para 66 (p. 23), ventilation that provides no heating or cooling: 0.90 W per l/s, supply and extract.
+ * - Table 14 (p. 32), pump power density by pump configuration, W/m² of floor, "LTHW only" and "Both LTHW and CHW".
+ *   For the Actual building NCM multiplies it by the heating system's hours (para 103: the hours when the heating
+ *   setpoint is above the setback; para 62 is the same rule for the Notional building). Review F2: the W/m² is only
+ *   NCM's figure when paired with those hours, so "Use defaults" pairs them (see `defaultPumps`).
+ * - Paras 66–67 (p. 23): the **Notional building's** specific fan powers (0.90 W per l/s for ventilation that provides
+ *   no heating or cooling, supply and extract; 0.40 / 0.60 W per l/s for local exhaust in the zone / remote). They are
+ *   a reference building's values, not measured or typical ones; shown as such.
+ * - Para 58(d): the Notional building's secondary hot water circulation pump (not filled here; see below).
  *
  * How they are used here (each one is filled as a stated value, shown as "default, from <source>" until edited):
  * - A pump's rated power is Table 14's **constant speed** row, as `power: { w_per_m2 }`. A variable-speed pump keeps
@@ -17,10 +21,11 @@
  *   variable-speed rows are lower densities that already include that saving, so using them as well would count it
  *   twice; they are listed for comparison only.
  * - A cooling system's own pumps (chilled water) are Table 14's "Both" less "LTHW only": the table gives no CHW-only
- *   column, so this is a stated subtraction, not a printed figure.
+ *   column, so this is a stated subtraction, not a printed figure, and running it over the cooling hours is this
+ *   tool's own pairing (NCM counts the whole "Both" figure over the heating hours). Review F2.
  * - Nothing is filled at run time; the engine refuses a missing value by name.
  */
-export const NCM_SOURCE = 'NCM Modelling Guide 2021 (England), Table 14 / paras 66–67'
+export const NCM_SOURCE = 'NCM Modelling Guide 2021 (England), Table 14 (p. 32), para 103; Notional SFPs paras 66–67'
 
 export const NCM_PUMP_W_PER_M2 = {
   /** Table 14, LTHW only / Both LTHW and CHW, W/m². */
@@ -32,9 +37,9 @@ export const NCM_PUMP_W_PER_M2 = {
 
 /**
  * The rated pump power a "Use defaults" fills, W/m² of the floor the system serves (constant-speed row; see above).
- * Null for hot water: Table 14 is for space heating and cooling circuits, and the NCM counts a secondary hot water
- * circulation pump separately (para 69; here `services.dhw.circulation_pump_w`), so there is no published default to
- * fill and the user states it.
+ * Null for hot water: Table 14 is for space heating and cooling circuits. A hot water system's `pumps` are its primary
+ * pumps; the secondary circulation pump is `services.dhw.circulation_pump_w` (NCM gives only the Notional building's,
+ * para 58(d)), so there is no published default to fill and the user states it.
  */
 export function defaultPumpWPerM2(service: 'heating' | 'cooling' | 'dhw'): number | null {
   const c = NCM_PUMP_W_PER_M2.constant_speed
@@ -43,7 +48,7 @@ export function defaultPumpWPerM2(service: 'heating' | 'cooling' | 'dhw'): numbe
   return null
 }
 
-/** Para 66 and 67, W per l/s. */
+/** Paras 66–67, W per l/s: the Notional building's SFPs (a reference building's, not typical or measured). */
 export const NCM_SFP_W_PER_L_S = {
   local_exhaust_in_zone: 0.4,
   local_exhaust_remote: 0.6,
@@ -71,11 +76,24 @@ export function hasWaterCircuit(doc: { zones: { id: string; emitters: { kind: st
   return null
 }
 
-/** What "Use defaults" fills for a system's pumps, or null (no water circuit known, or no published figure). */
-export function defaultPumps(doc: Parameters<typeof hasWaterCircuit>[0], groupId: string) {
+type DefaultsDoc = Parameters<typeof hasWaterCircuit>[0] & { zones: { id: string; setpoints?: { hours_ref: string | null } }[] }
+
+/**
+ * What "Use defaults" fills for a system's pumps, or null (no water circuit known, or no published figure).
+ *
+ * Review F2, the hours: NCM's W/m² goes with the heating hours (para 103). When every room the system serves has the
+ * same heating hours (`setpoints.hours_ref`, Brief 109), the pumps run to that schedule. When they do not, there is no
+ * one set of hours to pair, so they run with demand, and `default_from` says so (the user can change it).
+ */
+export function defaultPumps(doc: DefaultsDoc, groupId: string) {
   const g = doc.system_groups.find((x) => x.id === groupId)
   if (!g || (g.service !== 'heating' && g.service !== 'cooling')) return null
   const w = defaultPumpWPerM2(g.service)
   if (w == null || hasWaterCircuit(doc, groupId) !== true) return null
-  return { power: { w_per_m2: w }, speed: 'fixed' as const, runs: 'with_demand' as const, schedule_ref: null, default_from: NCM_SOURCE }
+  const refs = new Set(doc.zones.filter((z) => g.zones.includes(z.id)).map((z) => z.setpoints?.hours_ref ?? null))
+  const shared = refs.size === 1 ? [...refs][0] : null
+  const cooling = g.service === 'cooling' ? '; chilled water = Both − LTHW only over the cooling hours (this tool\'s pairing, not NCM\'s)' : ''
+  if (shared != null) return { power: { w_per_m2: w }, speed: 'fixed' as const, runs: 'schedule' as const, schedule_ref: shared, default_from: `${NCM_SOURCE}; hours: the rooms' ${g.service} hours${cooling}` }
+  return { power: { w_per_m2: w }, speed: 'fixed' as const, runs: 'with_demand' as const, schedule_ref: null,
+    default_from: `${NCM_SOURCE}; hours: with demand, as the rooms served have no one set of ${g.service} hours (NCM pairs the W/m² with the heating hours)${cooling}` }
 }

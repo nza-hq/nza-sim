@@ -173,6 +173,8 @@ export function designHeatLoss(doc: ModelDocument, zones: readonly ZoneResults[]
     for (const m of mech[zi]) {
       let h = 0, run = 0
       for (let k = 0; k < m.h_w_per_k.length; k++) { if (m.h_w_per_k[k] > h) h = m.h_w_per_k[k]; if (m.running[k] > run) run = m.running[k] }
+      // Brief 114 review F10: fans on demand are sized at their full design flow, whatever the people in the year's run.
+      if (zone.ventilation.find((v) => v.id === m.id)?.runs === 'demand') { h = K.rho_c_air * m.flow_m3s * (1 - m.recovery); run = 1 }
       lines.push({ term: 'mechanical_ventilation', ventilation_id: m.id, h_w_per_k: h, delta_t_k: dte, w: h * dte })
       ach += (m.flow_m3s * run * 3600) / V
     }
@@ -193,4 +195,16 @@ export function designHeatLoss(doc: ModelDocument, zones: readonly ZoneResults[]
     outdoor_c, outdoor_source, ground_c, vent_wind_m_s: d.vent_wind_m_s, warm_up_w_per_m2: d.warm_up_w_per_m2,
     zones: out, building_w: out.reduce((s, z) => s + (z.heated ? z.total_w : 0), 0),
   }
+}
+
+/**
+ * A heating system's share of its heated rooms' design heat loss, W: each heated room's total × the system's share.
+ * One place (Rule 11): the seam's design line per system and the pumps' design load (Brief 114 review F4) read it.
+ */
+export function systemRoomsDesignW(doc: ModelDocument, r: DesignHeatLoss, groupId: string): number {
+  const g = doc.system_groups.find((x) => x.id === groupId)
+  if (!g) return 0
+  let rooms = 0
+  for (const zid of g.zones) { const z = r.zones.find((x) => x.zone_id === zid); if (z?.heated) rooms += (g.share_pct / 100) * z.total_w }
+  return rooms
 }
