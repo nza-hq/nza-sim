@@ -44,7 +44,7 @@ import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type 
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
-import { CONSTRUCTION_SETS, SET_ELEMENTS } from '../library/sets'
+import { CONSTRUCTION_SETS, DEFAULT_DOOR, SET_ELEMENTS } from '../library/sets'
 import { applySet, setById } from './applySet'
 import { BUILDING_USES, applyUse, roomKindsOf, useById } from './applyUse'
 import Spark from './Spark'
@@ -74,7 +74,7 @@ const UnifiedScheduleEditor = lazy(() => import('../../components/shared/schedul
 import { GAIN_COLOURS } from '../../components/modules/gains/gainColours.js'
 // @ts-expect-error untyped JS from today's app
 import GlazingInspector from '../../components/library/GlazingInspector.jsx'
-import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
+import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
@@ -239,7 +239,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [future, setFuture] = useState<Plan[]>([])
   /** While a preview is worked out, a give writes here instead of to the plan (preview, then apply). */
   const capture = useRef<{ plan: Plan | null } | null>(null)
-  const commit = (next: Plan) => {
+  const commit = (next0: Plan) => {
+    const next = withDefaultDoor(plan, next0, DEFAULT_DOOR)
     if (capture.current) { capture.current.plan = next; return }
     setPast((p) => [...p.slice(-100), plan])
     setFuture([])

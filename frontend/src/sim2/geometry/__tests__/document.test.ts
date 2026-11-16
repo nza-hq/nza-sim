@@ -424,3 +424,18 @@ describe('the Profiles step (Brief 110b)', () => {
     expect(JSON.stringify(b.doc)).toBe(JSON.stringify(a.doc))
   })
 })
+
+describe('a drawn door can run (overnight fix)', () => {
+  it('drawing a door gives a door type with no construction the library door, keeping a typed U', async () => {
+    const { withDefaultDoor } = await import('../facade')
+    const { emptyPlan } = await import('../plan')
+    const p0 = emptyPlan()
+    const doorType = { id: 'ft_door', element: 'door' as const, name: 'Doors', construction: null, u: 1.8 }
+    const prev = { ...p0, fabric_types: [...p0.fabric_types, doorType as any] }
+    const next = { ...prev, windows: [...prev.windows, { door: true } as any] }
+    const out = withDefaultDoor(prev, next, 'timber_door_solid')
+    expect(out.fabric_types.find((t) => t.id === 'ft_door')).toMatchObject({ construction: 'timber_door_solid', u: 1.8 })
+    // No door added: a cleared door type stays cleared.
+    expect(withDefaultDoor(next, next, 'timber_door_solid')).toBe(next)
+  })
+})
