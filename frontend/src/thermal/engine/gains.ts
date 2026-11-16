@@ -25,6 +25,7 @@
  */
 import type { ModelDocument, Profile } from '../schema/model'
 import type { Weather } from './types'
+import { lightingWm2, zoneEfficacy } from './lighting'
 
 export class GainsError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'GainsError' }
@@ -218,8 +219,13 @@ export function zoneGains(doc: ModelDocument, hours: Weather['hours']): (ZoneGai
       if (isEquip) {
         base = watts(need(g.baseload, `${pp}.baseload`), g.id, `${pp}.baseload`) * areaShare
         act = watts(need(g.active, `${pp}.active`), g.id, `${pp}.active`) * areaShare
+      } else if (kind === 'lighting' && g.lux != null) {
+        // Brief 112: lux on the space, efficacy on the lighting system; lightingWm2 is the one derivation.
+        const eff = zoneEfficacy(doc, zi)
+        if (!eff.ok) throw new GainsError(eff.message, eff.path)
+        act = lightingWm2(g.lux, eff.efficacy) * A * areaShare
       } else {
-        act = watts(need(g.magnitude, `${pp}.magnitude`), g.id, `${pp}.magnitude`) * areaShare
+        act = watts(need(g.magnitude, `${pp}.magnitude`, kind === 'lighting' ? 'required: the lux needed (with the lighting system\'s efficacy), or a W/m² stated directly' : 'required'), g.id, `${pp}.magnitude`) * areaShare
       }
       const w = new Float64Array(H)
       const e = new Float64Array(H)

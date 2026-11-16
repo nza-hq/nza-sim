@@ -20,7 +20,7 @@
  */
 import { canonicalJSON, sha256Hex } from './canonical'
 import { FACADES, ModelDocument, SCHEMA_VERSION } from './model'
-import { TODAY, stateTodaysGainInputs } from './upgrade'
+import { TODAY, stateTodaysGainInputs, to28 } from './upgrade'
 import type { LibraryRef } from './model'
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
@@ -540,6 +540,21 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
       libraryRefs.push({ kind: 'construction', key, version: null, body_hash: await sha256Hex(canonicalJSON(body)) })
     }
     draft = perStorey(draft, { storeys, area_m2: length * width, interior_key: key })
+  }
+  // Schema 2.8 (Brief 112): today's building-level hot water use goes onto the occupancy profiles, as the upgrade does.
+  const dhw0 = { ...(draft.services as Obj).dhw }
+  try { to28(draft) } catch (e) { throw new ConversionError((e as Error).message, `${V40}.dhw_demand_basis`) }
+  // The trace follows the move: basis and the litres of that basis are carried onto the (first) occupancy profile, the
+  // other basis's litres are read but not carried.
+  const occIdx = (draft.profiles as Obj[]).findIndex((p) => p.kind === 'occupancy' && p.dhw != null)
+  for (const t of src.trace) {
+    if (!t.doc.startsWith('services.dhw.')) continue
+    const k = t.doc.slice('services.dhw.'.length)
+    const live = dhw0.demand_basis === 'per_person' ? 'litres_per_person_per_day' : dhw0.demand_basis === 'per_m2' ? 'litres_per_m2_per_day' : null
+    if (k === 'demand_basis') { if (occIdx >= 0) t.doc = `profiles[${occIdx}].dhw.basis`; else t.kind = 'structural' }
+    else if (k === 'litres_per_person_per_day' || k === 'litres_per_m2_per_day') {
+      if (occIdx >= 0 && k === live) t.doc = `profiles[${occIdx}].dhw.litres_per_day`; else t.kind = 'structural'
+    }
   }
   const parsed = ModelDocument.safeParse(draft)
   if (!parsed.success) {

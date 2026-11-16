@@ -284,7 +284,7 @@ export type SimulateResult =
   | { ok: true; results: ModelResults; summary: Summary }
   | { ok: false; missing: Missing[] }
 
-const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null) => string][] = [
+const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null, message: string) => string][] = [
   [/^zones$/, () => 'Draw the building and put its rooms in at least one zone.'],
   [/^zones\[(\d+)\]\.setpoints\.heat_c$/, (m, d) => `Set the heating setpoint for ${zoneName(d, m[1])}.`],
   [/^zones\[(\d+)\]\.setpoints\.cool_c$/, (m, d) => `Set the cooling setpoint for ${zoneName(d, m[1])}.`],
@@ -295,11 +295,14 @@ const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null) => string
   [/^zones\[(\d+)\]\.ventilation\[(\d+)\]\.recovery_sensible_pct$/, (m, d) => `Set the MVHR heat recovery for ${zoneName(d, m[1])}.`],
   [/^building\.thermal_bridging\./, () => 'Set the thermal bridging for the building.'],
   [/^building\.site\.exposure$/, () => 'Set the site exposure (sheltered, normal or exposed).'],
+  [/^system_groups\[(\d+)\]\.efficacy_w_m2_per_100lux$/, (m, d, msg) => msg.startsWith('required: ')
+    ? `The lighting system "${d?.system_groups[Number(m[1])]?.label || d?.system_groups[Number(m[1])]?.id}" needs its efficacy (W/m² per 100 lux): ${msg.slice(10).split(',')[0]}.`
+    : `${msg.charAt(0).toUpperCase()}${msg.slice(1)}.`],
   [/^profiles\[(\d+)\]\.(\w+)/, (m, d) => `The space type "${profileLabel(d, m[1])}" needs ${FIELD[m[2]] ?? m[2].replace(/_/g, ' ')}.`],
 ]
 const FIELD: Record<string, string> = {
   radiant_fraction: 'a radiant fraction', sensible_w_per_person: 'heat per person', occupancy_rate: 'an occupancy rate',
-  magnitude: 'a lighting power (W/m²)', active: 'an equipment power (W/m²)', baseload: 'an always-on equipment power (W/m²)',
+  magnitude: 'its lighting level (lux), or a lighting power stated in W/m²', active: 'an equipment power (W/m²)', baseload: 'an always-on equipment power (W/m²)',
   relationship_to_occupancy: 'how it follows occupancy', gain_fraction: 'a gain fraction', area_share: 'an area share',
   daylight_factor: 'a daylight factor', standby_factor: 'a standby factor', schedule: 'a schedule', density: 'a density',
 }
@@ -330,7 +333,7 @@ export function explain(path: string, message: string, doc: ModelDocument | null
   if (dt) return { path, what: `The schedule "${profileLabel(doc, dt[1])}", ${message.replace(/^\w+ hour/, (x) => `${x.split(' ')[0]}, hour`)}.` }
   for (const [re, f] of WORDS) {
     const m = path.match(re)
-    if (m) return { path, what: f(m, doc) }
+    if (m) return { path, what: f(m, doc, message) }
   }
   // Brief 108: emitters and their system's design temperatures, in words; the engine's reason kept when it is not "required".
   const sentence = (head: string, field: string) => ({ path, what: message.startsWith('required') ? `Set ${field} for ${head}.` : `${head.charAt(0).toUpperCase()}${head.slice(1)}: ${message.replace(/^required: /, '')}.` })
@@ -718,14 +721,13 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
     if (message.startsWith('unknown source') || message.endsWith('runs on electricity')) return { path, what: `The system ${name}: ${message}.` }
     return { path, what: `The system ${name} needs ${what[g[2]] ?? g[2].replace(/_/g, ' ')}.` }
   }
-  if (path === 'services.dhw') return { path, what: 'Hot water use is stated, but no hot water system is chosen to heat it.' }
+  if (path === 'services.dhw') return { path, what: message.startsWith('a hot water system') ? 'A hot water system is chosen, but no space states how much hot water it uses.' : 'Hot water use is stated on a space, but no hot water system is chosen to heat it.' }
   const z = path.match(/^zones\[(\d+)\]\.dhw$/)
   if (z) return { path, what: `Choose a hot water system for ${zoneName(doc, z[1])}.` }
   const d = path.match(/^services\.dhw\.(\w+)$/)
   if (d) {
     const what: Record<string, string> = {
       storage_setpoint_c: 'the hot water store temperature', tap_outlet_temp_c: 'the tap outlet temperature', cold_supply_temp_c: 'the cold supply temperature',
-      demand_basis: 'how hot water use is counted (per person or per m²)', litres_per_person_per_day: 'litres per person a day', litres_per_m2_per_day: 'litres per m² a day',
       load_shape: 'when hot water is used (flat, or following occupancy)', circulation_pump_w: 'the circulation pump power (0 if none)',
     }
     return { path, what: message.startsWith('required') ? `Hot water needs ${what[d[1]] ?? d[1]}.` : `Hot water: ${what[d[1]] ?? d[1]} ${message}.` }

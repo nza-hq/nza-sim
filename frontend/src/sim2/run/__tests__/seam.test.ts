@@ -359,7 +359,7 @@ describe('simulate', () => {
     const i = d.profiles.findIndex((p: any) => p.kind === 'lighting')
     d.profiles[i].magnitude = undefined
     const r = simulate(d, { weather: WEATHER })
-    expect(r).toEqual({ ok: false, missing: [{ path: `profiles[${i}].magnitude`, what: 'The space type "Lighting" needs a lighting power (W/m²).' }] })
+    expect(r).toEqual({ ok: false, missing: [{ path: `profiles[${i}].magnitude`, what: 'The space type "Lighting" needs its lighting level (lux), or a lighting power stated in W/m².' }] })
     const v = await doc()
     v.zones[0].ventilation[0].control_schedule_ref = null
     const rv = simulate(v, { weather: WEATHER })

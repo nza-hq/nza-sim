@@ -2,6 +2,12 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 112 — Simulate v2: the demand/energy split (Spaces = demand, Systems = energy) — ACTIVE 16 Nov 2026 on `chris/112-demand-energy-split`
+
+Brief [`docs/briefs/active/112_demand-energy-split.md`](docs/briefs/active/112_demand-energy-split.md). Linzie 16 Nov 00:22/00:41 ("space is demand, systems is energy"). Parts 1–4 here, 5 the editor's. Then Brief 120 (system capacity, Linzie 18:42), then 114, 115.
+
+- **P1 schema 2.8:** a lighting profile states `lux` (demand) or `magnitude` (a W/m² stated directly), not both; a lighting system states `efficacy_w_m2_per_100lux` (refused on other services). W/m² = lux ÷ 100 × efficacy in one place, `thermal/engine/lighting.ts` (`lightingWm2`, `zoneEfficacy`); never stored. Two lighting systems with different efficacies in one lux zone are refused for now. Hot water use moves to the occupancy profile (`dhw: {basis, litres_per_day}`); `services.dhw` keeps the temperatures, load shape and pump. The 2.7 upgrade (and today's converter) copy the building litres onto every occupancy profile and guess no lux; per m² with a zone without occupancy is refused by name. A hot water system with no space stating use is named. Bridgewater unchanged (v2 tests as before; anchor 133.2). The editor's `toDocument.ts` move is the editor thread's, on this branch. Tests: `demandSplit.test.ts` (10) and systems. Next: P2 (one derivation, enforced by a test).
+
 ## ✅ Brief 119 — Simulate v2: cooling limited by the room's units, and emitters picked from standard sizes — CLOSED 16 Nov 2026 on `chris/119-cooling-emitters`
 
 Brief [`docs/briefs/archive/119_cooling-emitters_COMPLETED.md`](docs/briefs/archive/119_cooling-emitters_COMPLETED.md). Linzie, 16 Nov 11:11 (agreed as ours 11:16); 12:21 "merge and resolve" put 109 and 117 in main first.
