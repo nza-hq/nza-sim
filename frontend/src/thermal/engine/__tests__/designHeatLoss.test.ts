@@ -141,6 +141,47 @@ describe('(d) ventilation and the minimum air change', () => {
   })
 })
 
+describe('(d2) review F9: the cases the mutations got through', () => {
+  const HOURS = JSON.parse(fs.readFileSync(new URL('../../../../../validation/energyplus/109_setback_spec.json', import.meta.url), 'utf8')).hours
+  it('ventilation on a schedule: its full flow (the largest hour), not its mean', () => {
+    const { doc, run } = build((d) => {
+      d.profiles.push({ id: 'office', kind: 'schedule', day_types: HOURS })
+      d.zones[0].ventilation = [{ id: 'mev', kind: 'mev', enabled: true, flow_rate: 30, flow_rate_basis: 'constant', recovery_sensible_pct: null, control_schedule_ref: 'office', legacy_v25: {} }]
+    })
+    const west = designHeatLoss(doc, run.zones, W).zones[0]
+    expect(line(west, 'mechanical_ventilation')[0].w).toBeCloseTo(K.rho_c_air * 0.03 * 25, 6)
+  })
+  it('vents that lift the room above 0.5 air changes: no top-up', () => {
+    const { doc, run } = build((d) => {
+      d.building.design.vent_wind_m_s = 4
+      d.surfaces.find((x: any) => x.id === 'west_north').openings = [{ kind: 'permanent_vent', area_m2: 0.05, cd: 0.6, flow_mode: 'single_sided' }]
+    })
+    const west = designHeatLoss(doc, run.zones, W).zones[0]
+    const V = 4 * D * H, q = 0.025 * 0.05 * 4
+    expect(west.ach).toBeCloseTo(SPEC.infiltration_ach_sea_level_air + (q * 3600) / V, 9)
+    expect(west.ach).toBeGreaterThan(MIN_DESIGN_ACH)
+    expect(line(west, 'minimum_air_change')).toHaveLength(0)
+  })
+  it('a room with no outside surface: no top-up', () => {
+    const { doc, run } = build((d) => {
+      const gone = new Set(['middle_south', 'middle_north', 'middle_roof', 'middle_floor', 'middle_window'])
+      d.surfaces = d.surfaces.filter((x: any) => !gone.has(x.id))
+      d.zones[1].surfaces = d.zones[1].surfaces.filter((id: string) => !gone.has(id))
+    })
+    const middle = designHeatLoss(doc, run.zones, W).zones[1]
+    expect(middle.ach).toBeLessThan(MIN_DESIGN_ACH)
+    expect(line(middle, 'minimum_air_change')).toHaveLength(0)
+    expect(line(middle, 'fabric')).toHaveLength(0)
+  })
+  it('stated bridging is a line at the outdoor temperature difference', () => {
+    const { doc, run } = build((d) => { d.building.thermal_bridging = { mode: null, multiplier: null, alpha_pct: 10 } })
+    const west = designHeatLoss(doc, run.zones, W).zones[0]
+    const tb = run.zones[0].conductances.bridging.total_w_per_k
+    expect(tb).toBeGreaterThan(0)
+    expect(line(west, 'bridging')[0].w).toBeCloseTo(tb * 25, 9)
+  })
+})
+
 describe('(e) refusals, by name', () => {
   const refuse = (over: (d: any) => void, path: string, msg: RegExp) => {
     const { doc, run } = build(over)

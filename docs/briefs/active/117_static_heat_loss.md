@@ -1,6 +1,6 @@
-# Brief 117 — Simulate v2: design heat loss per room (BS EN 12831-1) and whether the emitters meet it
+# Brief 117 — Simulate v2: design heat loss per room (MCS MIS 3005-D) and whether the emitters meet it
 
-Written 16 Nov 2026 by Linzie's project agent. Linzie, 10:57: "We need a static heat loss calculation that oversizes the radiators to warm the room up quickly. We also need to know, for lowering flow temperatures from a boiler at 80° to a heat pump at 55°, whether the existing radiators give us enough heat output." At 10:58 she chose to build it next, before Brief 112.
+Written 16 Nov 2026 by Linzie's project agent. Renamed after review F5: the method rests on MCS MIS 3005-D and published UK sources, not the text of BS EN 12831-1 (Linzie, 16 Nov 11:38). Linzie, 10:57: "We need a static heat loss calculation that oversizes the radiators to warm the room up quickly. We also need to know, for lowering flow temperatures from a boiler at 80° to a heat pump at 55°, whether the existing radiators give us enough heat output." At 10:58 she chose to build it next, before Brief 112.
 
 **Where it comes from.**
 - Brief 108 sizes emitters on the weather file's coldest hour, from an hourly run, with no warm-up allowance. Its review (F4) already noted that this is not a design-day calculation.
@@ -81,7 +81,7 @@ A separate thread reviews the brief against the standard, the code, the referee 
 ## Part 5 — Close
 
 - STATUS, `current.md`, the archive, and the design note in Notion.
-- CLAUDE.md gets a Systems scope line: "Design heat loss per room (Brief 117): BS EN 12831-1 transmission, ventilation and reheat at a stated design outdoor temperature, against the emitters' EN 442 output. Simulate v2 only."
+- CLAUDE.md gets a Systems scope line (wording corrected after review F5): "Design heat loss per room (Brief 117): steady transmission and air heat loss at a stated design outdoor temperature, after MCS MIS 3005-D Issue 3.0 and the MCS calculator's public method (not the text of BS EN 12831-1), with an optional stated warm-up W/m², against the emitters' EN 442 output. Simulate v2 only."
 - A PR, merged only with Linzie's approval.
 - **Commit:** `117 P5: close`.
 

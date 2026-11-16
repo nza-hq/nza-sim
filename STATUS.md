@@ -9,7 +9,13 @@
 - **Checks:** 12 hand-calculation tests pass (`designHeatLoss.test.ts`). The full v2 suite passes (268), and `npm run build` is clean. No file of today's engine changed.
 - **P2 (16 Nov):** EnergyPlus held steady at the design condition (`validation/energyplus/117_design_referee.py`, `docs/audit/117/02_referee.md`). The gated run uses the method's own films and passes: every room within −1.75 %, the cooled room −0.42 %, Bridgewater −1.68 %. The first run used the engine's year-run surface physics (air-only heating, long-wave between faces). It passed at Bridgewater (−0.26 %) and failed in the cooled room (+9.9 % / −14.1 %), all of it fabric: faces colder than the method's combined film assumes. Recorded as a judgement made after seeing the result. For sizing, the method sits on the safe side by up to about 10 % for a room heated by warm air.
 - **P3 (16 Nov):** `summary.design_heat_loss` in the seam; new `sim2/run/DesignHeatLoss.tsx` (`<DesignHeatLoss summary={summary} />`, for the editor to place); the emitter panel gains a "Design heat loss | Year-round check" switch when design conditions are stated, with its props unchanged. Browser check on Bridgewater: `docs/audit/117/03_panel.md`/`.png`. The v2 tests pass.
-- **Next:** P4 independent review.
+- **P4 (16 Nov):** independent review `docs/audit/117/04_independent_review.md`, response `05_review_response.md`. Every finding is accepted and answered.
+  - **F1:** the "safe side by a tenth" claim is withdrawn. A new operative-temperature EnergyPlus run, with its gate stated first, fails at Bridgewater (−3.1 % building, storeys down to −4.3 %). The cause is almost all air: a warm-air room held at a felt temperature keeps its air warmer. The panel says "within about 4 %".
+  - **F2–F8:** labels and wording (MIS 3005-D Issue 3.0 cl. 5.5.1; 0.5 ach from the MCS calculator; suspended floors understated; vent wind printed).
+  - **F9:** four tests added.
+  - **F10:** anchor 133.2 on this branch.
+- **Suggestions:** a floor-type field (solid or suspended), so a suspended floor is counted against the design outdoor temperature (MIS 3005-D cl. 5.5.1(d)); review F2.
+- **Next:** P5 close.
 
 ## ✅ Brief 109 — Simulate v2: heating hours and setbacks, morning warm-up, underfloor heating in the slab — CLOSED 16 Nov 2026 on `chris/109-dynamics` (PR awaiting Linzie)
 

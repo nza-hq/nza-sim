@@ -24,6 +24,6 @@ Bridgewater, five storeys (`scripts/117_panel.mts`, anchor EPW). Radiators of 30
 
 The building total is 136.0 kW. For comparison, the year-round check's peaks (the coldest hour, unlimited) are in the same JSON.
 
-**Sense check:** 30 kW rated at ΔT 50 gives 25.4 kW at 70/60 with the room at 21 °C, because (44.0/49.8)^1.3 = 0.851. At 50/40 it gives 11.4 kW, because (23.9/49.8)^1.3 = 0.384. Both match the panel.
+**Sense check:** 30 kW rated at ΔT 50 gives 25.4 kW at 70/60 with the room at 21 °C, because (43.8/49.83)^1.3 = 0.846. At 50/40 it gives 11.4 kW, because (23.65/49.83)^1.3 = 0.379 (log-mean ΔT as `emitters.ts` takes it; corrected after review, which found the printed ΔTs slightly off). Both match the panel.
 
 The terms list opens on a tap, so it does not show in a static render. Its numbers are covered by the seam test (the terms sum to each room's total).

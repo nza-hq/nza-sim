@@ -50,3 +50,9 @@ The anchor EPW (Yeovilton TMYx 2011–2025): the 0.4 % coldest hour (99.6 %) is 
 ## 5. Linzie's answer (16 Nov 11:38)
 
 On the card "Can we get a copy of BS EN 12831-1:2017 for the heat loss method?", Linzie chose "No, use published UK sources". So the method rests on MCS MIS 3005-D and the MCS calculator's public method, with CIBSE design temperatures. Decision 4 (ground) stays as MIS 3005-D cl. 3.4.1(c) gives it: ΔT to the annual mean outdoor temperature, with the construction's U. EN 12831's further ground factors are left out, and the panel names that. Decision 5 (infiltration) stays as the model's own n with the 0.5 ach minimum. Decision 6 (warm-up) is a stated W/m² of floor, or none. The standard's own factor is not used.
+
+## 6. Corrections after the review (16 Nov, 04_independent_review.md)
+
+- **F3:** the current MIS 3005-D is Issue 3.0 (05/12/2025), and its heat load rules are in cl. 5.5.1 (a) design outdoor temperature from Table 2, (c) solid floors, (d) suspended floors. They are not in cl. 3.4.1 as §2 says. The code and the schema now cite Issue 3.0 cl. 5.5.1.
+- **F4:** the 0.5 ach minimum is the MCS Heat Load Calculator's, from CIBSE Domestic Heating Design Guide 2026 Table 2-18. It is not in MIS 3005-D. The code and the panel now say so.
+- **F2:** under 5.5.1(d) a suspended floor is counted against the design outdoor temperature. Here it is counted as solid, and the panel now says its loss is understated.

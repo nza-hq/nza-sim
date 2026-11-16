@@ -431,8 +431,9 @@ export type WeatherRef = z.infer<typeof WeatherRef>
 export const DESIGN_FROM_WEATHER = ['heating_99_6', 'heating_99'] as const
 
 /**
- * Schema 2.6 (Brief 117): the conditions of the design heat loss (MCS MIS 3005-D; Linzie 16 Nov: published UK sources).
- * - `outdoor`: a stated design outdoor temperature (CIBSE Guide A Table 2.5, as MCS asks), or the weather file's.
+ * Schema 2.6 (Brief 117): the conditions of the design heat loss (MCS MIS 3005-D Issue 3.0 cl. 5.5.1; Linzie 16 Nov:
+ * published UK sources).
+ * - `outdoor`: a stated design outdoor temperature (MIS 3005-D Issue 3.0 Table 2, from CIBSE Guide A, as MCS asks), or the weather file's.
  * - `warm_up_w_per_m2`: an allowance for warming the room up after a setback, W per m² of floor; null for none.
  * - `vent_wind_m_s`: the wind speed at which permanent vents are counted; required only when a zone has vents.
  */

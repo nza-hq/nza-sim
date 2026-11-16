@@ -1,26 +1,28 @@
 /**
  * Brief 117 Part 1: the design heat loss of each room, for sizing heat emitters and plant.
  *
- * A steady calculation at one design outdoor temperature, with no sun and no internal gains, as MCS MIS 3005-D asks
- * (cl. 3.4.1; Linzie 16 Nov 2026: published UK sources, not the text of BS EN 12831-1). Every term is a line, and
+ * A steady calculation at one design outdoor temperature, with no sun and no internal gains, as MCS MIS 3005-D Issue 3.0
+ * (05/12/2025) asks in cl. 5.5.1 (Linzie 16 Nov 2026: published UK sources, not the text of BS EN 12831-1). Every term is a line, and
  * the lines sum to the room's design heat loss (Rule 9). The conductances are the year's run's own
  * (`ZoneResults.conductances`, Rule 11): this file never works out an area, a U-value or a bridging total again.
  *
  *   fabric       U·A · (θ_int − θ_e)          each element facing outside, windows by their whole U
  *   bridging     H_tb · (θ_int − θ_e)         the zone's bridging total, as the year's run applies it
  *   ground       U·A · (θ_int − θ_g)          θ_g the model's ground temperature, the weather file's annual mean
- *                                             (MIS 3005-D cl. 3.4.1(c), solid floors)
+ *                                             (MIS 3005-D Issue 3.0 cl. 5.5.1(c), solid floors)
  *   to_room      U·A · (θ_int − θ_other)      each surface shared with another zone at its design temperature
  *   infiltration ρc · n · V · (θ_int − θ_e)   n the model's own (q50 / 20, or a stated ach)
  *   vents        ρc · Σ c · v_d · (θ_int − θ_e)  each permanent vent at the stated design wind speed v_d
  *   mechanical   H_max · (θ_int − θ_e)        each ventilation entry at its largest hourly conductance (its full
  *                                             flow, after heat recovery)
  *   minimum_air  ρc · (0.5 − n_total) · V · ΔT  a top-up to 0.5 air changes an hour in a room with an outside surface
- *                                             (MCS), where infiltration, vents and ventilation give less
+ *                                             (the MCS Heat Load Calculator's minimum, from CIBSE DHDG 2026
+ *                                             Table 2-18; not in MIS 3005-D), where infiltration, vents and ventilation give less
  *   warm_up      w · A_floor                  a stated allowance per m² of floor, or none
  *
  * Not included, and named on screen: the further ground factors of BS EN 12831-1 (its text is not used); a suspended
- * floor is taken as solid, against the ground temperature, as the year's run takes it.
+ * floor is taken as solid, against the ground temperature, as the year's run takes it (MIS 3005-D cl. 5.5.1(d) counts a
+ * suspended floor against the design outdoor temperature, so its loss is understated here; review F2).
  *
  * The building total is the heated rooms' sum. Heat between two heated rooms cancels in it; heat to an unheated zone
  * does not, because the unheated zone's own loss is not a heating load.
@@ -36,7 +38,11 @@ export class DesignError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'DesignError' }
 }
 
-/** MCS: rooms with an outside surface get at least this many air changes an hour in the design heat loss. */
+/**
+ * The MCS Heat Load Calculator's minimum (CIBSE Domestic Heating Design Guide 2026, Table 2-18; review F4): rooms with an
+ * outside surface get at least this many air changes an hour. MIS 3005-D itself states no minimum; it is a domestic
+ * guide's figure, applied here to every zone with an outside surface.
+ */
 export const MIN_DESIGN_ACH = 0.5
 /** The share of the year's hours colder than each weather-file design temperature (CIBSE Guide A's 99.6 % and 99 %). */
 const COLD_SHARE = { heating_99_6: 0.004, heating_99: 0.01 } as const

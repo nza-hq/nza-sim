@@ -127,7 +127,7 @@ export interface Summary {
    */
   emitters: EmitterSummary | null
   /**
-   * Brief 117: the design heat loss of each room at the design outdoor temperature, for sizing (MCS MIS 3005-D), and
+   * Brief 117: the design heat loss of each room at the design outdoor temperature, for sizing (MCS MIS 3005-D Issue 3.0 cl. 5.5.1), and
    * each zone's emitters against it. Null when the document states no design conditions (`building.design`).
    */
   design_heat_loss: DesignSummary | null

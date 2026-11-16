@@ -44,18 +44,21 @@ export function DesignHeatLoss({ summary }: { summary: Summary }) {
         <div className="rp-note">
           <p>
             The heat each room loses, steadily, at the design outdoor temperature with no sun and no one in it: the
-            standard calculation for sizing heat emitters (MCS MIS 3005-D). Walls, roofs, floors and windows lose heat by
-            their U-values, the bridging by the building's thermal bridging, and a floor on the ground to the ground's
-            temperature, the weather file's average over the year. Air leaks at the room's own rate, permanent vents at
-            the stated wind speed, and ventilation at its full flow after any heat recovery. A room with an outside wall
-            gets at least 0.5 air changes an hour. Heat to a room at a different temperature is counted in both rooms,
-            and cancels in the building total. An unheated room is shown, but is not in the total.
+            standard calculation for sizing heat emitters (MCS MIS 3005-D, clause 5.5.1). Walls, roofs, floors and
+            windows lose heat by their U-values, the bridging by the building's thermal bridging, and a floor on the
+            ground to the ground's temperature, the weather file's average over the year. A suspended floor is counted
+            the same way, so its loss is understated: MCS counts it against the design outdoor temperature. Air leaks at
+            the room's own rate, permanent vents at the stated wind speed, and ventilation at its full flow after any heat
+            recovery. A room with an outside wall gets at least 0.5 air changes an hour, the MCS heat load calculator's
+            minimum. Heat to a room at a different temperature is counted in both rooms, and cancels in the building
+            total. An unheated room is shown, but is not in the total.
           </p>
           <p>
-            The U-values take each room's surfaces to be at the room's temperature, as the standard method does. In a room
-            heated only by warm air, the surfaces sit colder and less heat crosses them, so this figure is on the safe side
-            by up to about a tenth (checked against EnergyPlus). The further ground factors and the reheat table of BS EN
-            12831-1 are not used. A warm-up allowance, when stated, is added per m² of floor.
+            The design temperature is the temperature the room should feel. A room heated by warm air alone keeps its air
+            a little warmer than that, and loses a little more through its air: against EnergyPlus held at the design
+            temperature that way, the figure here is within about 4 % per room. For an MCS design, state the outdoor
+            temperature MIS 3005-D Table 2 gives for the site rather than the weather file's. The further ground factors
+            and the reheat table of BS EN 12831-1 are not used. A warm-up allowance, when stated, is added per m² of floor.
           </p>
         </div>
       )}
@@ -64,7 +67,8 @@ export function DesignHeatLoss({ summary }: { summary: Summary }) {
       ) : (
         <>
           <p className="es-sum">
-            {kw(d.building_w)} kW for the building, at {deg(d.outdoor_c)} °C outside ({OUTDOOR_WORDS[d.outdoor_source]}).
+            {kw(d.building_w)} kW for the building, at {deg(d.outdoor_c)} °C outside ({OUTDOOR_WORDS[d.outdoor_source]})
+            {d.vent_wind_m_s != null ? `, vents at ${deg(d.vent_wind_m_s)} m/s` : ''}.
           </p>
           <ul className="es-zones">
             {d.zones.map((z) => (
