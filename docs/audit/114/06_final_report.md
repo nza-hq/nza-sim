@@ -7,7 +7,7 @@ Asked by Linzie, 16 Nov 00:57: "a place to put in … back-of-house auxiliary en
 ## What was built
 
 **Schema 2.10.** Older documents upgrade with nothing filled.
-- **Pumps on each heating, cooling or hot water system.**
+- **Pumps on each heating, cooling or hot water system.** The season months are offered on Controls and shown as "stated" or "from the load" (editor f12ebdc; Bridgewater Oct–Apr: 5,088 h, 2,632 kWh at 517 W).
   - Power is given as W, W per kW, or W per m² of the floor served.
   - Speed is fixed or variable (inverter).
   - They run continuously in the system's season, with demand, or to a schedule.
@@ -49,4 +49,3 @@ Asked by Linzie, 16 Nov 00:57: "a place to put in … back-of-house auxiliary en
 - The NCM PDF's sha256 is still to be recorded on IT15.
 - Sharing cooling capacity between rooms has no EnergyPlus referee.
 - Window control rules wait for Brief 115. Their shape in `controls[]` is agreed.
-- The pumps block should offer the season months (`season_months`). This is a small editor follow-up.
