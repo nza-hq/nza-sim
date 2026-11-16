@@ -12,8 +12,8 @@
  *
  * The run: Engine 2 on REFEREE_OPTIONS (the configuration the EnergyPlus gates were passed on), with internal gains
  * from the document's profiles and the document's ventilation (Parts 2 and 3). It reports demand, heating and
- * cooling, per zone and for the building, and the building's breakdown (Rule 9: every term, summed over the zones;
- * heat between zones cancels and is left out).
+ * cooling, per zone and for the building, the building's breakdown (Rule 9: every term, summed over the zones;
+ * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, type RunOptions } from '../../thermal/engine/model'
 import {
@@ -34,7 +34,11 @@ export interface Summary {
   weather: { file_name: string; station: string; sha256: string }
   building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number }
   /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
-  zones: { id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; heated: boolean; cooled: boolean }[]
+  zones: {
+    id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; heated: boolean; cooled: boolean
+    /** The zone's own balance by term, kWh a year (Brief 106 P2, review F3): every term, heat from the other zones included. */
+    breakdown: { term: BreakdownLine['term']; kwh: number }[]
+  }[]
   /** The building's balance by term, kWh a year: positive is heat into the building. Heating and cooling included. */
   breakdown: { term: BreakdownLine['term']; kwh: number }[]
   /** Constructions used that are drafts awaiting review (not yet in the library), by display name. */
@@ -126,8 +130,12 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     }
     throw e
   }
-  const byTerm = new Map<BreakdownLine['term'], number>()
-  for (const z of results.zones) for (const l of z.breakdown) if (l.term !== 'interzone') byTerm.set(l.term, (byTerm.get(l.term) ?? 0) + l.kwh)
+  // By term, summed over the given zones' lines. The building leaves heat between zones out (it cancels); a zone keeps it.
+  const byTerm = (zs: ModelResults['zones'], interzone: boolean) => {
+    const m = new Map<BreakdownLine['term'], number>()
+    for (const z of zs) for (const l of z.breakdown) if (interzone || l.term !== 'interzone') m.set(l.term, (m.get(l.term) ?? 0) + l.kwh)
+    return [...m].map(([term, kwh]) => ({ term, kwh }))
+  }
   const summary: Summary = {
     engine: results.engine, run_ms: results.run_ms,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
@@ -136,8 +144,8 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
       peak_heating_w: readBuildingPeakW(results, 'heating'), peak_cooling_w: readBuildingPeakW(results, 'cooling'),
     },
-    zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh, heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null })),
-    breakdown: [...byTerm].map(([term, kwh]) => ({ term, kwh })),
+    zones: results.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh, heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true) })),
+    breakdown: byTerm(results.zones, false),
     drafts: pre.drafts,
   }
   return { ok: true, results, summary }

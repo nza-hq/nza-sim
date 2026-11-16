@@ -79,7 +79,7 @@ const SURFACE_WORDS: Record<string, string> = {
 
 /**
  * The library the engine needs for this document, keyed by construction key, or what is missing. Every surface's key
- * must name a library construction; where the document pins the construction's body hash (`library_refs`), the
+ * must name a library construction, the document must pin its body hash (`library_refs`, Brief 106 P1), and the
  * library's body must be that one.
  */
 export function resolveConstructions(doc: ModelDocument, items: readonly LibraryItem[] = CONSTRUCTIONS): { library: Record<string, ConstructionBody>; missing: Missing[]; drafts: string[] } {
@@ -105,7 +105,12 @@ export function resolveConstructions(doc: ModelDocument, items: readonly Library
       return
     }
     const pin = pinned.get(key)
-    if (pin && pin !== item.body_hash) {
+    if (!pin) {
+      // Brief 106 P1 (review F6): a run uses only a construction whose version the document records.
+      if (!said.has(key)) { said.add(key); missing.push({ path, what: `Choose the construction "${key}" again, so the version used is recorded.` }) }
+      return
+    }
+    if (pin !== item.body_hash) {
       if (!said.has(key)) { said.add(key); missing.push({ path, what: `The construction "${key}" has changed in the library since it was chosen. Choose it again.` }) }
       return
     }

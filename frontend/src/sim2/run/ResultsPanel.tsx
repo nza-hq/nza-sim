@@ -20,13 +20,42 @@ const TERMS: Record<string, string> = {
   solar_transmitted: 'Sun through windows', solar_lost_through_glazing: 'Sun lost back out through windows',
   glazing_solar_absorbed: 'Sun absorbed in the glass', other_gains: 'Other gains', storage: 'Heat stored in the building',
   occupancy_gains: 'People', lighting_gains: 'Lighting', equipment_gains: 'Equipment', auxiliary_gains: 'Other equipment',
-  mechanical_ventilation: 'Ventilation',
+  mechanical_ventilation: 'Ventilation', interzone: 'From other zones',
 }
 const mwh = (kwh: number) => (kwh / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const signed = (kwh: number) => `${kwh >= 0 ? '+' : '−'}${mwh(Math.abs(kwh))}`
 const FABRIC = ['conduction', 'opaque_solar_absorbed', 'sky_longwave']
 interface Row { key: string; label: string; kwh: number; parts?: Row[] }
 const perM2 = (kwh: number, m2: number) => (m2 > 0 ? Math.round(kwh / m2).toLocaleString('en-GB') : '–')
+
+/**
+ * A balance as rows, largest in first (Rule 9: every term). The outside faces' three terms (sun on them, radiation to
+ * the sky, conduction) are large and mostly cancel, so they show as one net line for walls, roof and floor, opened to
+ * see the three.
+ */
+function balanceRows(lines: { term: string; kwh: number }[]): Row[] {
+  const parts = lines.filter((l) => FABRIC.includes(l.term))
+  const rows: Row[] = lines.filter((l) => !FABRIC.includes(l.term)).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh }))
+  if (parts.length) rows.push({ key: 'fabric', label: 'Walls, roof and floor', kwh: parts.reduce((a, l) => a + l.kwh, 0), parts: [...parts].sort((a, b) => b.kwh - a.kwh).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh })) })
+  return rows.sort((a, b) => b.kwh - a.kwh)
+}
+
+function BalanceRows({ lines, indent = false }: { lines: { term: string; kwh: number }[]; indent?: boolean }) {
+  const [fabricOpen, setFabricOpen] = useState(false)
+  const rows = useMemo(() => balanceRows(lines), [lines])
+  const cls = indent ? 'rp-zone-line' : undefined
+  return <>{rows.flatMap((l) => [
+    <tr key={l.key} className={cls}>
+      <td>{l.parts
+        ? <button type="button" className="rp-expand" aria-expanded={fabricOpen} onClick={() => setFabricOpen(!fabricOpen)}>{fabricOpen ? '▾' : '▸'} {l.label}</button>
+        : l.label}</td>
+      <td className={l.kwh >= 0 ? 'in' : 'out'} colSpan={indent ? 2 : undefined}>{signed(l.kwh)}</td>
+    </tr>,
+    ...(l.parts && fabricOpen ? l.parts.map((q) => (
+      <tr key={q.key} className={indent ? 'rp-part rp-zone-line' : 'rp-part'}><td>{q.label}</td><td className={q.kwh >= 0 ? 'in' : 'out'} colSpan={indent ? 2 : undefined}>{signed(q.kwh)}</td></tr>
+    )) : []),
+  ])}</>
+}
 
 type State =
   | { kind: 'idle' }
@@ -123,16 +152,7 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
   }
 
   const s = state.kind === 'done' ? state.summary : null
-  // Every term is listed (Rule 9). The outside faces' three terms (sun on them, radiation to the sky, conduction) are
-  // large and mostly cancel, so they show as one net line for walls, roof and floor, opened to see the three.
-  const [fabricOpen, setFabricOpen] = useState(false)
-  const breakdown = useMemo(() => {
-    if (!s) return []
-    const parts = s.breakdown.filter((l) => FABRIC.includes(l.term))
-    const rows: Row[] = s.breakdown.filter((l) => !FABRIC.includes(l.term)).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh }))
-    if (parts.length) rows.push({ key: 'fabric', label: 'Walls, roof and floor', kwh: parts.reduce((a, l) => a + l.kwh, 0), parts: parts.sort((a, b) => b.kwh - a.kwh).map((l) => ({ key: l.term, label: TERMS[l.term] ?? l.term, kwh: l.kwh })) })
-    return rows.sort((a, b) => b.kwh - a.kwh)
-  }, [s])
+  const [zoneOpen, setZoneOpen] = useState<string | null>(null)
 
   if (!open) {
     return <button type="button" className="rp-tab" style={{ right }} onClick={() => setOpen(true)}>Results{s ? ` · ${mwh(s.building.heating_kwh)} MWh heating` : state.kind === 'missing' ? ` · ${state.items.length} to set` : ''}</button>
@@ -206,25 +226,20 @@ export default function ResultsPanel({ doc, right = 16 }: { doc: unknown; right?
           <table className="rp-table">
             <thead><tr><th>Zone</th><th>Heating MWh</th><th>Cooling MWh</th></tr></thead>
             <tbody>
-              {s.zones.map((z) => <tr key={z.id}><td>{z.name || z.id}</td><td>{z.heated ? mwh(z.heating_kwh) : <span className="rp-none">not heated</span>}</td><td>{z.cooled ? mwh(z.cooling_kwh) : <span className="rp-none">not cooled</span>}</td></tr>)}
+              {s.zones.flatMap((z) => [
+                <tr key={z.id}>
+                  <td><button type="button" className="rp-expand" aria-expanded={zoneOpen === z.id} onClick={() => setZoneOpen(zoneOpen === z.id ? null : z.id)}>{zoneOpen === z.id ? '▾' : '▸'} {z.name || z.id}</button></td>
+                  <td>{z.heated ? mwh(z.heating_kwh) : <span className="rp-none">not heated</span>}</td>
+                  <td>{z.cooled ? mwh(z.cooling_kwh) : <span className="rp-none">not cooled</span>}</td>
+                </tr>,
+                ...(zoneOpen === z.id ? [<BalanceRows key={`${z.id}-balance`} lines={z.breakdown} indent />] : []),
+              ])}
             </tbody>
           </table>
 
           <h3>Where the heat goes <i>estimate</i></h3>
           <table className="rp-table rp-breakdown">
-            <tbody>
-              {breakdown.flatMap((l) => [
-                <tr key={l.key}>
-                  <td>{l.parts
-                    ? <button type="button" className="rp-expand" aria-expanded={fabricOpen} onClick={() => setFabricOpen(!fabricOpen)}>{fabricOpen ? '▾' : '▸'} {l.label}</button>
-                    : l.label}</td>
-                  <td className={l.kwh >= 0 ? 'in' : 'out'}>{signed(l.kwh)}</td>
-                </tr>,
-                ...(l.parts && fabricOpen ? l.parts.map((q) => (
-                  <tr key={q.key} className="rp-part"><td>{q.label}</td><td className={q.kwh >= 0 ? 'in' : 'out'}>{signed(q.kwh)}</td></tr>
-                )) : []),
-              ])}
-            </tbody>
+            <tbody><BalanceRows lines={s.breakdown} /></tbody>
           </table>
           {s.drafts.length > 0 && <p className="rp-draft">Uses a draft construction, awaiting Chris: {s.drafts.join('; ')}.</p>}
           <p className="rp-foot">MWh a year; + into the building, − out. Ran in {Math.round(state.kind === 'done' ? state.ms : 0)} ms.</p>

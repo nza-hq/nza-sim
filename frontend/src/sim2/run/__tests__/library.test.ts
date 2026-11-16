@@ -65,6 +65,14 @@ describe('resolveConstructions', () => {
     expect(r.missing).toEqual([])
     expect(Object.keys(r.library).sort()).toEqual([...new Set(d.surfaces.map((s) => s.construction_ref.key))].sort())
   })
+  it('refuses a construction the document does not pin (Brief 106 P1, review F6)', async () => {
+    const d: any = repin(await doc())
+    const roof = d.surfaces.find((s: any) => s.kind === 'roof').construction_ref.key
+    d.library_refs = d.library_refs.filter((r: any) => r.key !== roof)
+    const r = resolveConstructions(d)
+    expect(r.missing).toEqual([expect.objectContaining({ what: `Choose the construction "${roof}" again, so the version used is recorded.` })])
+    expect(r.library[roof]).toBeUndefined()
+  })
   it('names unassigned, unknown and changed constructions once each', async () => {
     const d: any = repin(await doc())
     const w = d.surfaces.findIndex((s: any) => s.kind === 'wall')

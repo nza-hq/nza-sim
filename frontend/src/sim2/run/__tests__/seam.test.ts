@@ -43,6 +43,23 @@ describe('simulate', () => {
     expect(r.summary.breakdown.map((l) => l.term)).toEqual(expect.arrayContaining(['occupancy_gains', 'mechanical_ventilation', 'heating', 'cooling']))
     expect(r.summary.weather.file_name).toBe('denver.mos')
   })
+  it('each zone\'s own breakdown closes, shows heat from the other zones, and those lines cancel across the building (Brief 106 P2)', async () => {
+    const r = simulate(await doc(), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    let interzone = 0, interzoneGross = 0
+    for (const z of r.summary.zones) {
+      const sum = z.breakdown.reduce((s, l) => s + l.kwh, 0)
+      const gross = z.breakdown.reduce((s, l) => s + Math.abs(l.kwh), 0)
+      expect(Math.abs(sum)).toBeLessThan(1e-6 * gross)
+      expect(z.breakdown.find((l) => l.term === 'heating')?.kwh ?? 0).toBeCloseTo(z.heating_kwh, 6)
+      const iz = z.breakdown.find((l) => l.term === 'interzone')
+      expect(iz).toBeDefined()
+      interzone += iz!.kwh; interzoneGross += Math.abs(iz!.kwh)
+    }
+    expect(interzoneGross).toBeGreaterThan(0)
+    expect(Math.abs(interzone)).toBeLessThan(1e-6 * interzoneGross)
+    expect(r.summary.breakdown.some((l) => l.term === 'interzone')).toBe(false)
+  })
   it('every missing input at once, in plain words, and no number', async () => {
     const d = await doc()
     d.surfaces.forEach((s: any) => { if (s.kind === 'roof') s.construction_ref.key = 'unassigned:roof' })
@@ -83,6 +100,7 @@ describe('simulate', () => {
     // Two storeys joined by an internal wall of the draft construction (each storey's share of a 30 m² wall).
     d.surfaces.push({ ...structuredClone(d.surfaces.find((s: any) => s.kind === 'ceiling')), id: 'iw', kind: 'partition', tilt_deg: 90, area_m2: 30, construction_ref: { key: draft.key } })
     d.zones[0].surfaces.push('iw'); d.zones[1].surfaces.push('iw')
+    d.library_refs.push({ kind: 'construction', key: draft.key, version: null, body_hash: draft.body_hash })
     const r = simulate(d, { weather: WEATHER })
     if (!r.ok) throw new Error(JSON.stringify(r.missing))
     expect(r.summary.drafts).toEqual([draft.draft])
