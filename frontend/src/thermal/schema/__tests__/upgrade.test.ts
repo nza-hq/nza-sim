@@ -51,10 +51,10 @@ function downgrade(d: any) {
   return o
 }
 
-describe('schema 2.1, 2.2, 2.3 and 2.4', () => {
+describe('schema 2.1 to 2.6', () => {
   it('the converter writes today\'s constants into the document', async () => {
     const d = await anchor()
-    expect(d.schema_version).toBe('2.4')
+    expect(d.schema_version).toBe('2.6')
     for (const s of d.surfaces) {
       if (s.kind === 'wall') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.6, 0.9, null])
       if (s.kind === 'roof') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.7, 0.9, null])
@@ -148,7 +148,7 @@ describe('schema 2.1, 2.2, 2.3 and 2.4', () => {
     const e = structuredClone(d); e.surfaces[glz].inside_solar_absorptance = 0.5
     expect(() => ModelDocument.parse(e)).toThrow('not inside_solar_absorptance')
     expect(() => upgradeDocument({ ...d, schema_version: '1.0' })).toThrow('schema version "1.0"')
-    expect(SCHEMA_VERSION).toBe('2.4')
+    expect(SCHEMA_VERSION).toBe('2.6')
     expect(TODAY.inside_solar_absorptance).toBe(0.7)
     expect(TODAY.internal_heat_capacity_j_per_k_m2).toBe(250_000)
   })

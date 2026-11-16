@@ -285,6 +285,14 @@ export const Emitter = z
     rated_room_c: finite.nullable(),
     /** EN 442 exponent n (about 1.3 panel radiators, 1.1 underfloor, 1.0 fan coils). */
     exponent_n: finite.nullable(),
+    /**
+     * Schema 2.5 (Brief 109): underfloor heating only, and required for it: the floor (or ground) surface its pipes are
+     * in, and the layer whose inside face they run along (layers counted from the surface's first, zone_b or outside,
+     * layer, 0-based; EnergyPlus's "thermal source present after layer number" is this plus 1). Null for every other kind.
+     * Left out reads as null (not stated), so an emitter written before 2.5 still reads; nothing is filled.
+     */
+    source_surface_id: id.nullable().default(null),
+    source_layer_index: z.number().int().nonnegative().nullable().default(null),
   })
   .strict()
 export type Emitter = z.infer<typeof Emitter>
@@ -339,6 +347,12 @@ export const Zone = z
     surfaces: z.array(id).min(1, 'a zone must have at least one surface'),
     /** Schema 2.4 (Brief 108): the zone's terminal units. Empty: heating is not limited (ideal loads). */
     emitters: z.array(Emitter),
+    /**
+     * Schema 2.6 (Brief 117): the zone's internal temperature for the design heat loss, °C, or 'follow_heat_c' (its
+     * heating setpoint). Null: not stated; the design heat loss then names it. An unheated zone states the temperature
+     * it is taken to sit at, for the heat lost to it from the rooms next to it. Left out reads as null; nothing is filled.
+     */
+    design_internal_c: z.union([finite, z.literal('follow_heat_c')]).nullable().default(null),
   })
   .strict()
 export type Zone = z.infer<typeof Zone>
@@ -413,6 +427,28 @@ export const WeatherRef = z.discriminatedUnion('kind', [
 ])
 export type WeatherRef = z.infer<typeof WeatherRef>
 
+/** The weather file's design heating temperatures (Brief 117): the coldest 0.4 % or 1 % of the year's hours. */
+export const DESIGN_FROM_WEATHER = ['heating_99_6', 'heating_99'] as const
+
+/**
+ * Schema 2.6 (Brief 117): the conditions of the design heat loss (MCS MIS 3005-D Issue 3.0 cl. 5.5.1; Linzie 16 Nov:
+ * published UK sources).
+ * - `outdoor`: a stated design outdoor temperature (MIS 3005-D Issue 3.0 Table 2, from CIBSE Guide A, as MCS asks), or the weather file's.
+ * - `warm_up_w_per_m2`: an allowance for warming the room up after a setback, W per m² of floor; null for none.
+ * - `vent_wind_m_s`: the wind speed at which permanent vents are counted; required only when a zone has vents.
+ */
+export const DesignConditions = z
+  .object({
+    outdoor: z.union([
+      z.object({ stated_c: finite }).strict(),
+      z.object({ from_weather: z.enum(DESIGN_FROM_WEATHER) }).strict(),
+    ]),
+    warm_up_w_per_m2: nonNeg.nullable(),
+    vent_wind_m_s: nonNeg.nullable(),
+  })
+  .strict()
+export type DesignConditions = z.infer<typeof DesignConditions>
+
 export const Building = z
   .object({
     id,
@@ -443,6 +479,11 @@ export const Building = z
       })
       .strict(),
     thermal_mass: z.object({ mode: z.string().nullable(), category: z.string().nullable() }).strict(),
+    /**
+     * Schema 2.6 (Brief 117): the design heat loss's conditions, for sizing. Null: not stated, so no design heat loss is
+     * worked out. Left out reads as null; nothing is filled.
+     */
+    design: DesignConditions.nullable().default(null),
     /** Building-wide opening defaults the engine still reads as fallbacks (retired by Brief 42; usually absent). */
     opening_defaults: z
       .object({ cd: finite.optional(), flow_mode: z.string().optional(), schedule: z.unknown().optional() })
@@ -450,7 +491,7 @@ export const Building = z
   })
   .strict()
 
-export const SCHEMA_VERSION = '2.4' as const
+export const SCHEMA_VERSION = '2.6' as const
 
 export const ModelDocument = z
   .object({

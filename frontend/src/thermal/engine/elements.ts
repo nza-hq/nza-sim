@@ -72,6 +72,19 @@ export function iso6946Films(tiltDeg: number, boundary: 'outside' | 'ground') {
   return { R_si, R_se: boundary === 'ground' ? 0 : K.R_se }
 }
 
+/**
+ * Brief 109: the node at the inside face of layer `layer` (0-based, outside first), where underfloor heating's pipes put
+ * their heat, in an element built from these layers against `boundary`. Nodes sit between segments; against the ground
+ * the first segment's outer end is the ground itself, so the count starts one lower. The last layer's inside face is
+ * the room surface, not inside the floor, and is refused.
+ */
+export function layerFaceNode(layers: Layer[], boundary: 'outside' | 'ground' | 'zone', layer: number, path: string): number {
+  if (!(layer >= 0 && layer < layers.length - 1)) throw new ElementError(`layer ${layer} is not inside the construction: its ${layers.length} layers are 0 to ${layers.length - 1}, and the pipes must sit below the last`, path)
+  const segs = layerSegments(layers, path)
+  const through = segs.filter((sg) => sg.layer <= layer).length
+  return boundary === 'ground' ? through - 1 : through
+}
+
 /** ISO 6946 U of a layer stack: 1 / (R_se + Σ R_layers + R_si). The hand value analytic case (b) checks. */
 export function iso6946U(layers: Layer[], tiltDeg: number, boundary: 'outside' | 'ground', path = 'layers'): number {
   const { R_si, R_se } = iso6946Films(tiltDeg, boundary)

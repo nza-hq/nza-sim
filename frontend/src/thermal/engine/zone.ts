@@ -40,6 +40,11 @@ export interface ZoneInputs {
    */
   other_gains: { w: ArrayLike<number>; convective_fraction: number | ArrayLike<number> } | null
   setpoints: { heat_c: number | null; cool_c: number | null }
+  /**
+   * Brief 109: each hour's setpoints, °C, in place of setpoints (NaN: that service is off in that hour). Null or absent:
+   * setpoints all year. The warm-up reads hours 0–23, as it repeats the first day.
+   */
+  setpoint_hours?: { heat_c: ArrayLike<number>; cool_c: ArrayLike<number> } | null
   /** The temperature the setpoints apply to. EnergyPlus's thermostat controls air; ISO 52016-1 uses operative. */
   control: 'air' | 'operative'
   /** Share of heating/cooling delivered to the air (1 = ideal convective, as EnergyPlus IdealLoads). */
@@ -138,6 +143,7 @@ function check(inp: ZoneInputs) {
   for (let i = 0; i < hours; i++) if (inp.ventilation_w_per_k[i] < 0) throw new ZoneError(`hour ${i} is negative`, 'ventilation_w_per_k')
   const { heat_c, cool_c } = inp.setpoints
   if (heat_c != null && cool_c != null && heat_c > cool_c) throw new ZoneError(`heating ${heat_c} above cooling ${cool_c}`, 'setpoints')
+  checkSetpointHours(inp.setpoint_hours, hours, ZoneError, 'setpoint_hours')
   if (!(inp.air_capacity_j_per_k >= 0)) throw new ZoneError('must be ≥ 0', 'air_capacity_j_per_k')
   if (!(inp.bridging_w_per_k >= 0)) throw new ZoneError('must be ≥ 0', 'bridging_w_per_k')
   if (!(inp.hc_convective_fraction >= 0 && inp.hc_convective_fraction <= 1)) throw new ZoneError('must be 0 to 1', 'hc_convective_fraction')
@@ -307,7 +313,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   const byFlow = inp.inside_convection === 'by_heat_flow'
   const beamIn = inp.solar_beam_w ?? null
   const ground = els.map((e) => e.boundary === 'ground')
-  const { heat_c, cool_c } = inp.setpoints
+  const sh = inp.setpoint_hours ?? null
   const fsc = inp.solar_convective_fraction ?? K.solar_convective_fraction
   if (!(fsc >= 0 && fsc <= 1)) throw new ZoneError('solar_convective_fraction must be in [0, 1]', 'solar_convective_fraction')
   const og = inp.other_gains
@@ -378,6 +384,8 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     let phi = 0
     const capNow = capAt ? capAt(ctlPrev) : capH
     let w = wHC, wA = (hv * wHC[0]) / den
+    // Brief 109: the hour's own setpoints; NaN (off) compares false, so that service does nothing.
+    const heat_c = sh ? sh.heat_c[h] : inp.setpoints.heat_c, cool_c = sh ? sh.cool_c[h] : inp.setpoints.cool_c
     if (heat_c != null && ctl0 < heat_c) {
       w = wH; wA = (hv * wH[0]) / den
       phi = Math.min((heat_c - ctl0) / (ctl_wH - ctl_uAir * wA), capNow)  // Brief 108: at most the emitters' output
@@ -420,4 +428,21 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   for (let d = 0; d < inp.warmup_days; d++) for (let h = 0; h < 24; h++) step(h, false)
   for (let h = 0; h < H; h++) step(h, true)
   return out
+}
+
+/**
+ * Brief 109: hourly setpoints are one array per service, at least `hours` long, each value a number or NaN (off), and
+ * heating never above cooling in the same hour. Shared by Engines 1 and 2.
+ */
+export function checkSetpointHours(
+  sh: { heat_c: ArrayLike<number>; cool_c: ArrayLike<number> } | null | undefined, hours: number,
+  E: new (message: string, path: string) => Error, p: string,
+): void {
+  if (sh == null) return
+  for (const k of ['heat_c', 'cool_c'] as const) {
+    const a = sh[k]
+    if (!a || a.length < hours) throw new E(`needs ${hours} hourly values`, `${p}.${k}`)
+    for (let i = 0; i < hours; i++) if (!(Number.isFinite(a[i]) || Number.isNaN(a[i]))) throw new E(`hour ${i} is not a number`, `${p}.${k}`)
+  }
+  for (let i = 0; i < hours; i++) if (sh.heat_c[i] > sh.cool_c[i]) throw new E(`hour ${i}: heating ${sh.heat_c[i]} above cooling ${sh.cool_c[i]}`, p)
 }
