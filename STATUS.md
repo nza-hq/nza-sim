@@ -2,6 +2,13 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🟡 Brief 109 — Simulate v2: heating hours and setbacks, morning warm-up, underfloor heating in the slab — IN PROGRESS on `chris/109-dynamics` (stacked on 108)
+
+Brief [`docs/briefs/active/109_dynamics.md`](docs/briefs/active/109_dynamics.md). Linzie, 15 Nov 23:57: "Keep going" (108's dynamics follow-up: heat does not arrive instantly).
+
+- **P0 recon** ([`00_reconnaissance.md`](docs/audit/109/00_reconnaissance.md)): where the engines assume one setpoint; six decisions (setback_c + f·(heat_c − setback_c); cooling only in hours; hours below in use; recovery peak shown as found; underfloor in the slab Engine 2 only with ideal control and the throttling range stated; a radiator's own heat capacity ~13 min, not modelled, stated).
+- **P1 hours and setbacks** ([`01_hours.md`](docs/audit/109/01_hours.md)): hourly setpoints on Engines 1 and 2; hours below against each hour's setpoint and in use. Hand recursion to 0.01 K on both engines; all-1s schedule identical to none; refusals by name. 236 tests pass. Next: P2 EnergyPlus referee.
+
 ## ✅ Brief 108 — Simulate v2: emitters per room, capped heat output — CLOSED 15 Nov 2026 on `chris/108-emitters` (stacked on 107; PR awaiting Linzie)
 
 Brief [`docs/briefs/archive/108_emitters_COMPLETED.md`](docs/briefs/archive/108_emitters_COMPLETED.md); final report [`10_final_report.md`](docs/audit/108/10_final_report.md). Linzie, 15 Nov 21:28: a sizing tool. Each room's radiators cap its heat, re-rated at heat pump flow temperatures.

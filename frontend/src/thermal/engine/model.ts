@@ -19,7 +19,7 @@ import { simpleGlazingAngular, simpleGlazingOptics } from './glazing'
 import type { Weather } from './types'
 import { runZone } from './zone'
 import type { ModelDocument } from '../schema/model'
-import { GainsError, zoneGains, type ZoneGains } from './gains'
+import { calendar, GainsError, zoneGains, type ZoneGains } from './gains'
 import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
 import { EmitterError, zoneEmitters, type ZoneEmitters } from './emitters'
 
@@ -393,11 +393,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   } else if (options.internal_gains != null && options.internal_gains !== 'none') {
     throw new ModelError(`unknown value ${JSON.stringify(options.internal_gains)} ('none' or 'profiles')`, 'options.internal_gains')
   }
-  // A setback (a lower heating setpoint outside stated hours) is not modelled until Brief 109: refused, not ignored.
-  doc.zones.forEach((z, zi) => {
-    if (z.setpoints.setback_c != null) throw new ModelError('setbacks (a lower night setpoint) are not modelled yet', `zones[${zi}].setpoints.setback_c`)
-    if (z.setpoints.hours_ref != null) throw new ModelError('setpoints that change by the hour are not modelled yet', `zones[${zi}].setpoints.hours_ref`)
-  })
+  // Brief 109: each zone's heating hours and setback, resolved into its hourly setpoints (null: one setpoint all year).
+  const hoursOf = zoneSetpointHours(doc, weather.hours)
   // Emitters per zone (Brief 108): a zone that states them is limited to their output, and their radiant share sets
   // how heating reaches the room. A zone that states none is not limited, as before.
   let emit: (ZoneEmitters | null)[]
@@ -428,7 +425,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       bridging_w_per_k: a.bridging.total_w_per_k, hours: H, theta_e: weather.hours.dry_bulb, theta_ground: tg,
       ventilation_w_per_k: a.Hve, solar_absorbed_w_per_m2: absorbed, solar_transmitted_w: Z.solarTransmitted,
       inside_solar_absorptance: insideAlpha, solar_convective_fraction: options.solar_convective_fraction,
-      other_gains: options.other_gains ?? gainsIn(0), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
+      other_gains: options.other_gains ?? gainsIn(0), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c }, setpoint_hours: hoursOf[0]?.hourly ?? null,
       control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
       heating_cap_w: capOf(0), heating_cap_at: capAtOf(0), heating_convective_fraction: hcfHeatOf(0),
       warmup_days: options.warmup_days,
@@ -457,7 +454,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         air_capacity_j_per_k: K.rho_c_air * air[zi].volume + zone.internal_heat_capacity_j_per_k_m2 * zone.area_m2,
         bridging_w_per_k: air[zi].bridging.total_w_per_k, ventilation_w_per_k: air[zi].Hve,
         solar_transmitted_w: built.zones[zi].solarTransmitted, solar_beam_w: sp?.beam_on_floor ? built.zones[zi].solarBeam : null,
-        other_gains: options.other_gains ?? gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
+        other_gains: options.other_gains ?? gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c }, setpoint_hours: hoursOf[zi]?.hourly ?? null,
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
         heating_cap_w: capOf(zi), heating_cap_at: capAtOf(zi), heating_convective_fraction: hcfHeatOf(zi),
       })),
@@ -542,14 +539,20 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     }
     // Brief 108: hours the control temperature is more than UNMET_K below the heating setpoint, and hours at the cap.
     const ctlT = options.control === 'operative' ? run.theta_op : run.theta_air
-    const hsp = zone.setpoints.heat_c
-    let unmet = 0, minCtl = Infinity, atCap = 0
+    // Brief 109: against each hour's own setpoint (NaN: heating off, never unmet), and "in use" (decision 3): hours at
+    // the full heating setpoint, more than UNMET_K below it.
+    const heated = zone.setpoints.heat_c != null
+    const sh = hoursOf[zi]
+    let unmet = 0, unmetUse = 0, minCtl = Infinity, minUse = Infinity, atCap = 0
     const em = emit[zi]
     for (let h = 0; h < H; h++) {
+      const hsp = sh ? sh.hourly.heat_c[h] : zone.setpoints.heat_c ?? NaN
+      const inUse = sh ? sh.in_use[h] === 1 : true
       minCtl = Math.min(minCtl, ctlT[h])
-      if (hsp != null && ctlT[h] < hsp - UNMET_K) unmet++
+      if (inUse) minUse = Math.min(minUse, ctlT[h])
+      if (ctlT[h] < hsp - UNMET_K) { unmet++; if (inUse) unmetUse++ }
       const capH = run.heating_cap_w ? run.heating_cap_w[h] : em?.cap_w ?? Infinity  // review F1: the hour's own limit
-      if (em && run.heating_w[h] >= capH * (1 - 1e-9) && (capH > 0 || (hsp != null && ctlT[h] < hsp - 1e-6))) atCap++
+      if (em && !Number.isNaN(hsp) && run.heating_w[h] >= capH * (1 - 1e-9) && (capH > 0 || ctlT[h] < hsp - 1e-6)) atCap++
     }
     let closure
     try { closure = checkClosure(lines, maxClosure) } catch (e) {
@@ -569,7 +572,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         heating_kwh: kwh(run.heating_w), cooling_kwh: kwh(run.cooling_w),
         peak_heating_w: Math.max(...run.heating_w), peak_cooling_w: Math.max(...run.cooling_w),
         theta_air_c: { min: mn, max: mx, mean },
-        unmet_heating_hours: hsp == null ? null : unmet, min_control_c: minCtl,
+        unmet_heating_hours: heated ? unmet : null, min_control_c: minCtl,
+        in_use_hours: sh ? sh.in_use_hours : H,
+        unmet_heating_hours_in_use: heated ? unmetUse : null, min_control_in_use_c: Number.isFinite(minUse) ? minUse : null,
       },
       emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters } : null,
       breakdown: lines,
@@ -606,4 +611,55 @@ export function checkClosure(lines: readonly BreakdownLine[], maxHourlyWh: numbe
   const tol = 1e-9 * gross + 1e-3
   if (!(Math.abs(sum) <= tol)) throw new ModelError(`the breakdown lines sum to ${sum} kWh, not zero (tolerance ${tol}): a term is missing from the display or from the balance`, 'closure.sum_kwh')
   return { max_wh: maxHourlyWh, sum_kwh: sum }
+}
+
+export interface ZoneSetpointHours {
+  /** Each hour's setpoints, °C; NaN where that service is off. */
+  hourly: { heat_c: Float64Array; cool_c: Float64Array }
+  /** 1 where the schedule is at 1 (the zone is in use), else 0. */
+  in_use: Uint8Array
+  in_use_hours: number
+}
+
+/**
+ * Brief 109 (decisions 1 and 2, docs/audit/109/00_reconnaissance.md): a zone's hourly setpoints from setpoints.hours_ref
+ * (a profile of kind 'schedule', f from 0 to 1 by hour) and setback_c. Heating: setback_c + f·(heat_c − setback_c); with
+ * no setback, f is 0 (off) or 1 (heat_c). Cooling: cool_c where f > 0, off where f = 0. Null for a zone with neither.
+ * Every gap is refused by name; nothing is defaulted.
+ */
+export function zoneSetpointHours(doc: ModelDocument, hours: Weather['hours']): (ZoneSetpointHours | null)[] {
+  let cal: ReturnType<typeof calendar> | null = null
+  return doc.zones.map((z, zi) => {
+    const sp = z.setpoints, p = `zones[${zi}].setpoints`
+    if (sp.hours_ref == null) {
+      if (sp.setback_c != null) throw new ModelError('a setback needs the hours it applies outside (hours_ref)', `${p}.hours_ref`)
+      return null
+    }
+    const prof = doc.profiles.find((q) => q.id === sp.hours_ref)
+    if (!prof) throw new ModelError(`no profile "${sp.hours_ref}"`, `${p}.hours_ref`)
+    const pi = doc.profiles.indexOf(prof)
+    if (prof.kind !== 'schedule') throw new ModelError(`profile "${prof.id}" is ${prof.kind}, not a schedule`, `${p}.hours_ref`)
+    if (sp.heat_c == null && sp.cool_c == null) throw new ModelError('hours are given, but neither a heating nor a cooling setpoint', p)
+    if (sp.setback_c != null) {
+      if (sp.heat_c == null) throw new ModelError('a setback needs a heating setpoint to set back from', `${p}.heat_c`)
+      if (sp.setback_c > sp.heat_c) throw new ModelError(`the setback (${sp.setback_c} °C) is above the heating setpoint (${sp.heat_c} °C)`, `${p}.setback_c`)
+    }
+    for (const dt of ['weekday', 'saturday', 'sunday'] as const) {
+      prof.day_types[dt].forEach((f, hr) => {
+        if (!(f >= 0 && f <= 1)) throw new ModelError(`${dt} hour ${hr}: ${f} must be 0 to 1`, `profiles[${pi}].day_types.${dt}`)
+        if (sp.setback_c == null && sp.heat_c != null && f !== 0 && f !== 1) throw new ModelError(`${dt} hour ${hr}: a part value (${f}) needs a setback to scale from; give 0 (off) or 1 (on), or state setback_c`, `profiles[${pi}].day_types.${dt}`)
+      })
+    }
+    cal ??= calendar(hours)
+    const H = hours.count
+    const heat = new Float64Array(H), cool = new Float64Array(H), use = new Uint8Array(H)
+    let n = 0
+    for (let h = 0; h < H; h++) {
+      const f = prof.day_types[cal.day[h]][cal.hourOfDay[h]]
+      heat[h] = sp.heat_c == null ? NaN : sp.setback_c != null ? sp.setback_c + f * (sp.heat_c - sp.setback_c) : f > 0 ? sp.heat_c : NaN
+      cool[h] = sp.cool_c != null && f > 0 ? sp.cool_c : NaN
+      if (f === 1) { use[h] = 1; n++ }
+    }
+    return { hourly: { heat_c: heat, cool_c: cool }, in_use: use, in_use_hours: n }
+  })
 }

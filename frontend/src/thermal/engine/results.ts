@@ -64,6 +64,12 @@ export interface ZoneResults {
      * which is the air node's statistic and is not read for this anywhere.
      */
     min_control_c: number
+    /** Brief 109: hours the zone is in use (its schedule at 1; every hour when it states none). */
+    in_use_hours: number
+    /** Brief 109: of those, hours more than 0.5 K below the heating setpoint (null: not heated). What an occupant feels. */
+    unmet_heating_hours_in_use: number | null
+    /** Brief 109: the lowest control temperature in use, °C (null: never in use). */
+    min_control_in_use_c: number | null
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
   emitters: { cap_w: number; radiant_fraction: number; hours_at_cap: number; emitters: { id: string; kind: string; output_w: number; rated_w: number; exponent_n: number | null }[] } | null

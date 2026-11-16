@@ -27,6 +27,7 @@ import { ENGINE_CONSTANTS as K, heatFlowDirection } from './constants'
 import type { Element } from './elements'
 import { luFactor, luFactorInto, luSolve, type LU } from './linalg'
 import { sparseLuFactor, sparseLuSolve, type SparseLU } from './sparse'
+import { checkSetpointHours } from './zone'
 
 export interface NetworkZone {
   /** C_int: air ρ·c·V plus the zone's internal heat capacity, J/K. */
@@ -41,6 +42,8 @@ export interface NetworkZone {
   solar_beam_w: ArrayLike<number> | null
   other_gains: { w: ArrayLike<number>; convective_fraction: number | ArrayLike<number> } | null
   setpoints: { heat_c: number | null; cool_c: number | null }
+  /** Brief 109: each hour's setpoints in place of setpoints (NaN: off that hour); as Engine 1's. */
+  setpoint_hours?: { heat_c: ArrayLike<number>; cool_c: ArrayLike<number> } | null
   /** Brief 108: the most heat the zone's emitters can give, W (null or absent: unlimited, ideal loads). */
   heating_cap_w?: number | null
   /**
@@ -164,6 +167,7 @@ function check(inp: NetworkInputs) {
     if (!(z.bridging_w_per_k >= 0)) throw new NetworkError('must be ≥ 0', `${p}.bridging_w_per_k`)
     const { heat_c, cool_c } = z.setpoints
     if (heat_c != null && cool_c != null && heat_c > cool_c) throw new NetworkError(`heating ${heat_c} above cooling ${cool_c}`, `${p}.setpoints`)
+    checkSetpointHours(z.setpoint_hours, H, NetworkError, `${p}.setpoint_hours`)
     if (!Number.isFinite(z.initial_c)) throw new NetworkError('required', `${p}.initial_c`)
     if (z.heating_cap_w != null && !(z.heating_cap_w >= 0)) throw new NetworkError('must be ≥ 0', `${p}.heating_cap_w`)
     if (z.heating_cap_at != null && z.heating_cap_w != null) throw new NetworkError('give a fixed limit or one that follows the room, not both', `${p}.heating_cap_at`)
@@ -467,6 +471,9 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   }
   const heatC = Float64Array.from(inp.zones, (z) => z.setpoints.heat_c ?? NaN)
   const coolC = Float64Array.from(inp.zones, (z) => z.setpoints.cool_c ?? NaN)
+  // Brief 109: zones whose setpoints change by the hour; read at the start of each hour's steps.
+  const spH = inp.zones.map((z) => z.setpoint_hours ?? null)
+  const anySpH = spH.some((x) => x != null)
   const ventIn = inp.zones.map((z) => z.ventilation_w_per_k), solIn = inp.zones.map((z) => z.solar_transmitted_w)
   const beamIn = inp.zones.map((z, i) => (z.solar_beam_w && hasFloor[i] ? z.solar_beam_w : null))
   const ogIn = inp.zones.map((z) => (z.other_gains ? z.other_gains.w : null))
@@ -619,6 +626,14 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const sub = (h: number, te: number, record: boolean, w: number) => {
     if (tarp) tarpCoefficients()
     if (anyCapAt) for (let z = 0; z < Z; z++) { const f = capAt[z]; if (f) { capW[z] = f(ctlPrev[z]); if (record) capRec[z]![h] += w * capW[z] } }
+    if (anySpH) for (let z = 0; z < Z; z++) {
+      const sp = spH[z]
+      if (!sp) continue
+      heatC[z] = sp.heat_c[h]; coolC[z] = sp.cool_c[h]
+      // A service switched off this hour lets go of the zone; the active set then starts it free.
+      if ((mode[z] === 1 || mode[z] === 2) && Number.isNaN(heatC[z])) mode[z] = 0
+      if (mode[z] === -1 && Number.isNaN(coolC[z])) mode[z] = 0
+    }
     for (let i = 0; i < n; i++) bF[i] = capDT[i] * xF[i]
     const zi0 = h * Z * 3
     for (let z = 0; z < Z; z++) {
