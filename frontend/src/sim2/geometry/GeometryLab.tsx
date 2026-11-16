@@ -1198,38 +1198,54 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     title: SERVICES.find((x) => x.key === sv)!.name,
     items: [
       ...systemsOf(sv).map((x) => ({
-        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: !x.template }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id),
+        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: !x.template }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
         active: mode === 'systems' && sysKind === sv && curSys?.id === x.id,
         onPick: mode === 'systems' ? () => { setSysKind(sv); setActiveSys((a) => ({ ...a, [sv]: x.id })) } : undefined,
       })),
       ...noneItem(`none-${sv}`, `No ${SERVICES.find((x) => x.key === sv)!.name.toLowerCase()}`, roomsWhere((r) => !systemsOf(sv).some((x) => x.id === r.systems?.[sv]))),
     ],
+    onNew: { label: `+ New ${SERVICES.find((x) => x.key === sv)!.one.toLowerCase()} system`, run: () => newSystemFor(sv) },
   })
+  const newSystemFor = (sv: Service) => {
+    let k = plan.systems.length + 1
+    while (plan.systems.some((x) => x.id === `y${k}`)) k++
+    const one = SERVICES.find((x) => x.key === sv)!.one
+    const x: PlanSystem = { id: `y${k}`, service: sv, name: `${one} ${systemsOf(sv).length + 1}`, template: null, ...(sv === 'ventilation' ? { flow: null, schedule: null } : {}) }
+    commit({ ...plan, systems: [...plan.systems, x] })
+    setActiveSys((a) => ({ ...a, [sv]: x.id }))
+    if (mode === 'systems') setSysKind(sv)
+  }
+  const showFabric = (el: FabricElement, id: string) => {
+    if (el === 'glazing' || el === 'door') { setFkind('openings'); setOpening(el) } else setFkind(el as FabricKind)
+    setActive((a) => ({ ...a, [el]: id }))
+  }
   const navSections = (): NavSection[] => {
     if (by === 'fabric') {
       const EL: Array<[FabricElement, string]> = [['wall', 'Outside walls'], ['glazing', 'Windows'], ['door', 'Doors'], ['roof', 'Roofs'], ['floor', 'Ground floors']]
       return EL.map(([el, title]) => ({
         title,
         items: plan.fabric_types.filter((t) => t.element === el).map((t) => ({
-          id: t.id, name: t.name, swatch: fabricSwatch(t.id),
+          id: t.id, name: t.name, swatch: fabricSwatch(t.id), onRename: (name: string) => setFT(t.id, { name }),
           rooms: roomsWhere((r) => (el === 'roof' || el === 'floor' ? roomType(plan, r.id, el) === t.id : piecesOfRooms(plan, [r.id]).some((p) => typeOfSpan(plan, p, el) === t.id))),
           active: mode === 'fabric' && elem === el && activeOf(el) === t.id,
-          onPick: mode === 'fabric' ? () => { if (el === 'glazing' || el === 'door') { setFkind('openings'); setOpening(el) } else setFkind(el as FabricKind); setActive((a) => ({ ...a, [el]: t.id })) } : undefined,
+          onPick: mode === 'fabric' ? () => showFabric(el, t.id) : undefined,
         })),
+        onNew: { label: `+ New ${({ wall: 'outside wall', glazing: 'window', door: 'door', roof: 'roof', floor: 'ground floor', partition: 'internal wall' } as const)[el]} type`, run: () => { const n = newType(plan, el); commit(n.plan); if (mode === 'fabric') showFabric(el, n.id) } },
       }))
     }
     if (by === 'spaces') {
       return [{
         items: [
-          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), active: mode === 'spaces' && curSpace?.id === sp.id, onPick: mode === 'spaces' ? () => setActiveSpace(sp.id) : undefined })),
+          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), active: mode === 'spaces' && curSpace?.id === sp.id, onPick: mode === 'spaces' ? () => setActiveSpace(sp.id) : undefined, onRename: (name: string) => setSpace(sp.id, { name }) })),
           ...noneItem('none-space', 'No space type', roomsWhere((r) => !plan.spaces.some((sp) => sp.id === r.space))),
         ],
+        onNew: { label: '+ New space type', run: () => newSpace() },
       }]
     }
     if (by === 'systems') {
       return [
         sysSection('heating'),
-        { title: 'Emitters', items: emitterTypes.map((t) => ({ id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: mode === 'systems' && sysKind === 'emitters' && activeEmit === t.id, onPick: mode === 'systems' ? () => { setSysKind('emitters'); setActiveEmit(t.id) } : undefined })) },
+        { title: 'Emitters', onNew: { label: '+ New emitter type', run: () => { newEmitter(); if (mode === 'systems') setSysKind('emitters') } }, items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: mode === 'systems' && sysKind === 'emitters' && activeEmit === t.id, onPick: mode === 'systems' ? () => { setSysKind('emitters'); setActiveEmit(t.id) } : undefined })) },
         sysSection('cooling'),
         sysSection('dhw'),
       ]
@@ -1253,6 +1269,15 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const chooseList = () => (
     <ChooseList
       nav={{ by, tabs: NAV_TABS, onBy: setNavBy, sections: navSections() }}
+      onNewZone={() => {
+        const z = blankZone(plan.next.zone)
+        const p = { ...plan, zones: [...plan.zones, z], next: { ...plan.next, zone: plan.next.zone + 1 } }
+        commit(chosenSet.rooms.length ? assignZone(p, chosenSet.rooms, z.id) : p)
+      }}
+      onMoveTo={(zid) => commit(assignZone(plan, chosenSet.rooms, zid))}
+      onRenameZone={(id, name) => commit({ ...plan, zones: plan.zones.map((z) => (z.id === id ? { ...z, name } : z)) })}
+      onRemoveZone={(id) => commit({ ...plan, zones: plan.zones.filter((z) => z.id !== id) })}
+      onRenameRoom={(id, name) => commit({ ...plan, rooms: plan.rooms.map((r) => (r.id === id ? { ...r, name } : r)) })}
       rows={plan.rooms.map((r) => ({ id: r.id, name: r.name, zone: r.zone, area: `${f1(ringArea(r.ring))} m²`, has: hasOf(r) }))}
       zones={plan.zones}
       chosen={new Set(chosenSet.rooms)}
