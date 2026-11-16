@@ -449,3 +449,23 @@ describe('saving weather to the organisation', () => {
     expect(organisationFileName('x'.repeat(300))).toMatch(ok)
   })
 })
+
+describe('Brief 119: cooling units in the emitter summary', () => {
+  it('the engine\'s own cap, the unlimited run\'s peak, the limited run\'s hours above (Rule 11)', async () => {
+    const d = await doc()
+    const z3 = d.zones[2]
+    z3.emitters = [{ id: 'z3_vrf', kind: 'vrf_indoor', count: 4, heats: false, cooling_output_w: 3000, rated_output_w: null, radiant_fraction: null, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const em = r.summary.emitters!
+    expect(em.zones).toEqual([])  // a cooling-only unit is not a heating emitter
+    expect(em.cooling).toHaveLength(1)
+    const c = em.cooling[0], z = r.results.zones[2]
+    const free = simulate(d, { weather: WEATHER, options: { ...RUN_OPTIONS, emitter_limit: 'none' } })
+    if (!free.ok) throw new Error('free run')
+    expect(c).toMatchObject({ id: z3.id, cap_w: 12000, unmet_hours: z.annual.unmet_cooling_hours, max_c: z.annual.max_control_c, hours_at_cap: z.cooling_units!.hours_at_cap })
+    expect(c.peak_w).toBe(free.results.zones[2].annual.peak_cooling_w)
+    expect(c.shortfall_w).toBeCloseTo(c.peak_w - 12000, 9)
+    expect(c.unmet_hours).toBeGreaterThan(0)
+  })
+})

@@ -13,9 +13,12 @@
  * design heat loss (for sizing, the standard calculation) or against the year-round check above (the coldest hour of
  * the weather file, and how the rooms then run). Without design conditions the year-round check is shown alone, with
  * one line saying what to state.
+ *
+ * Brief 119: zones whose units cool (fan coils, VRF indoor units) show their cooling against the cooling peak, the
+ * hours above the cooling setpoint and the highest temperature, below the heating zones.
  */
 import { useState } from 'react'
-import type { DesignZoneSummary, EmitterZone, Summary, WhatIf } from './seam'
+import type { CoolingZone, DesignZoneSummary, EmitterZone, Summary, WhatIf } from './seam'
 import './emitters.css'
 
 const kw = (w: number) => (w / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -81,6 +84,27 @@ function ZoneBlock({ z, other, mode }: { z: EmitterZone; other: EmitterZone | nu
   )
 }
 
+function CoolingBlock({ z }: { z: CoolingZone }) {
+  const short = z.shortfall_w > 0
+  return (
+    <li className={short ? 'es-zone es-short' : 'es-zone'}>
+      <div className="es-zone-head">
+        <strong>{z.name}</strong>
+        <span>{short ? `${shortKw(z.shortfall_w)} kW short` : 'enough'}</span>
+      </div>
+      <div className="es-bar es-bar-cool" aria-hidden="true">
+        <span style={{ width: `${Math.min(100, (z.cap_w / Math.max(z.peak_w, z.cap_w, 1)) * 100)}%` }} />
+      </div>
+      <p className="es-line">Units give {kw(z.cap_w)} kW of cooling; the peak need is {kw(z.peak_w)} kW.</p>
+      {(short || z.unmet_hours > 0) && (
+        <p className="es-line">
+          {z.unmet_hours} hours {z.in_use ? 'in use' : 'a year'} more than 0.5 °C above the setpoint; highest {deg(z.max_c)} °C.
+        </p>
+      )}
+    </li>
+  )
+}
+
 export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary; whatIf: WhatIf | null; onWhatIf: (w: WhatIf | null) => void }) {
   const [info, setInfo] = useState(false)
   const [flow, setFlow] = useState(String(whatIf?.design_flow_c ?? 70))
@@ -90,6 +114,8 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
   const [mode, setMode] = useState<Mode>(dh?.ok ? 'design' : 'year')
   if (!em) return null
   const wi = em.what_if
+  const cooling = em.cooling
+  const coolShort = cooling.filter((z) => z.shortfall_w > 0).length
   // Brief 117: in the design view the zones are the design heat loss's, with the same what-if pair rated alongside.
   const design = dh?.ok ? dh.zones.filter((z) => z.emitters) : null
   const showDesign = mode === 'design' && design != null
@@ -136,7 +162,16 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
           EnergyPlus (within 4 %), its hours below are not yet. A heat pump's efficiency does not yet change with the flow temperature.
         </p>
       )}
-      {design != null ? (
+      {info && cooling.length > 0 && (
+        <p className="rp-note">
+          Cooling units (fan coils, VRF indoor units) give their stated sensible cooling, held the same in every hour; moisture
+          removal is not counted. The peak need is the zone's highest hourly cooling with its units unlimited. Where the units
+          give less, the zone runs warmer and the hours more than 0.5 °C above the cooling setpoint are counted. Checked
+          against EnergyPlus: with units well below the need (about 55 %), this counts up to about a quarter more of those
+          hours, because its cooling peak is about 5 % above EnergyPlus's; nearer the need it is within 20 hours.
+        </p>
+      )}
+      {zones.length > 0 && (design != null ? (
         <div className="es-mode" role="group" aria-label="Size against">
           <button type="button" className="rp-btn" aria-pressed={showDesign} onClick={() => setMode('design')}>Design heat loss</button>
           <button type="button" className="rp-btn" aria-pressed={!showDesign} onClick={() => setMode('year')}>Year-round check</button>
@@ -145,19 +180,19 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
         <p className="es-line es-muted">
           {dh && !dh.ok ? 'For the design heat loss, see what it still needs above.' : 'To size against a design heat loss, state the design outdoor temperature.'}
         </p>
-      )}
-      <p className="es-sum">
+      ))}
+      {zones.length > 0 && <p className="es-sum">
         {shortCount === 0 ? `All ${zones.length} zones with emitters have enough output${showDesign ? ' for their design heat loss' : ''}.` : `${shortCount} of ${zones.length} zones with emitters are short of output${showDesign ? ' for their design heat loss' : ''}.`}
-      </p>
+      </p>}
 
-      <form className="es-whatif" onSubmit={(e) => { e.preventDefault(); if (valid) onWhatIf({ design_flow_c: f, design_return_c: r }) }}>
+      {zones.length > 0 && <form className="es-whatif" onSubmit={(e) => { e.preventDefault(); if (valid) onWhatIf({ design_flow_c: f, design_return_c: r }) }}>
         <span className="rp-label">Compare at another flow / return</span>
         <span className="es-hint">Every heating system with flow and return temperatures moves to this pair; the systems and their efficiency stay as they are.</span>
         <label>Flow <input type="number" inputMode="decimal" value={flow} onChange={(e) => setFlow(e.target.value)} aria-label="Flow temperature, °C" /> °C</label>
         <label>Return <input type="number" inputMode="decimal" value={ret} onChange={(e) => setRet(e.target.value)} aria-label="Return temperature, °C" /> °C</label>
         <button type="submit" className="rp-btn" disabled={!valid}>Compare</button>
         {whatIf && <button type="button" className="rp-btn" onClick={() => onWhatIf(null)}>Clear</button>}
-      </form>
+      </form>}
       {wi && !wi.ok && (
         <div className="rp-missing"><p>{wi.flow_c}/{wi.return_c} °C cannot be compared:</p><ul>{wi.missing.map((m) => <li key={m.path}>{m.what}</li>)}</ul></div>
       )}
@@ -184,6 +219,15 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
       <ul className="es-zones">
         {zones.map((z, i) => <ZoneBlock key={z.id} z={z} other={others ? others[i] : null} mode={showDesign ? 'design' : 'year'} />)}
       </ul>
+      {cooling.length > 0 && (
+        <>
+          <h4 className="es-sub">Cooling</h4>
+          <p className="es-sum">
+            {coolShort === 0 ? `All ${cooling.length} zones with cooling units have enough cooling.` : `${coolShort} of ${cooling.length} zones with cooling units are short of cooling.`}
+          </p>
+          <ul className="es-zones">{cooling.map((z) => <CoolingBlock key={z.id} z={z} />)}</ul>
+        </>
+      )}
     </section>
   )
 }

@@ -1,0 +1,78 @@
+{
+ "source": "scripts/119_panel.mts",
+ "cooling_kwh": 62426,
+ "cooling": [
+  {
+   "name": "Storey 1",
+   "cap_w": 12000,
+   "peak_w": 20415,
+   "short_w": 8415,
+   "hours_above": 41,
+   "max_c": 24.83,
+   "hours_at_cap": 215
+  },
+  {
+   "name": "Storey 2",
+   "cap_w": 12000,
+   "peak_w": 20278,
+   "short_w": 8278,
+   "hours_above": 67,
+   "max_c": 24.89,
+   "hours_at_cap": 268
+  },
+  {
+   "name": "Storey 3",
+   "cap_w": 12000,
+   "peak_w": 20324,
+   "short_w": 8324,
+   "hours_above": 69,
+   "max_c": 24.9,
+   "hours_at_cap": 271
+  },
+  {
+   "name": "Storey 4",
+   "cap_w": 12000,
+   "peak_w": 20267,
+   "short_w": 8267,
+   "hours_above": 58,
+   "max_c": 24.86,
+   "hours_at_cap": 264
+  },
+  {
+   "name": "Storey 5",
+   "cap_w": 24000,
+   "peak_w": 20367,
+   "short_w": 0,
+   "hours_above": 0,
+   "max_c": 24,
+   "hours_at_cap": 0
+  }
+ ],
+ "heating": [
+  {
+   "name": "Storey 1",
+   "cap_w": 11384,
+   "peak_w": 23158
+  },
+  {
+   "name": "Storey 2",
+   "cap_w": 11384,
+   "peak_w": 18947
+  },
+  {
+   "name": "Storey 3",
+   "cap_w": 11384,
+   "peak_w": 18991
+  },
+  {
+   "name": "Storey 4",
+   "cap_w": 11384,
+   "peak_w": 19023
+  },
+  {
+   "name": "Storey 5",
+   "cap_w": 11384,
+   "peak_w": 24930
+  }
+ ]
+}
