@@ -24,8 +24,8 @@
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
 import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
 import { CATALOGUES, checkCatalogueRefs, suggestItem } from '../../thermal/catalogue'
-import { DesignError, designHeatLoss, type DesignTerm } from '../../thermal/engine/designHeatLoss'
-import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel, type OtherLoadResult, type PumpResult, type WaterHeaterResult } from '../../thermal/engine/systems'
+import { DesignError, designHeatLoss, systemRoomsDesignW, type DesignTerm } from '../../thermal/engine/designHeatLoss'
+import { FUELS, readDocFloorM2, readEntryKwh, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel, type OtherLoadResult, type PumpResult, type WaterHeaterResult } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingHourlyW, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
 } from '../../thermal/engine/results'
@@ -179,9 +179,9 @@ export interface Summary {
         /** Brief 120: each hot water system with its water heater's output stated: its draw against the heater and store. */
         water_heaters: (WaterHeaterResult & { label: string })[]
         /** Brief 114: each system's pumps (rated power and where it came from, how they run, hours, kWh). */
-        pumps: (PumpResult & { label: string })[]
+        pumps: (PumpResult & { label: string; kwh: number })[]
         /** Brief 114: lifts, external lighting and other loads outside the rooms. */
-        other_loads: OtherLoadResult[]
+        other_loads: (OtherLoadResult & { kwh: number })[]
       }
     | { ok: false; missing: Missing[] }
     /** Brief 111: no systems at this level, so no energy. */
@@ -771,8 +771,7 @@ function designSummary(doc: ModelDocument, results: ModelResults, weather: Weath
     warm_up_w_per_m2: r.warm_up_w_per_m2, vent_wind_m_s: r.vent_wind_m_s, building_w: r.building_w, what_if: whatIf,
     systems: results.plants.filter((p) => p.service === 'heating').map((p) => {
       const g = doc.system_groups.find((x) => x.id === p.id)!
-      let rooms = 0
-      for (const zid of g.zones) { const z = r.zones.find((x) => x.zone_id === zid); if (z?.heated) rooms += (g.share_pct / 100) * z.total_w }
+      const rooms = systemRoomsDesignW(doc, r, p.id)
       return { id: p.id, label: g.label || 'heating system', capacity_w: p.cap_w, rooms_w: rooms, hot_water_w: p.peak_reserved_w, total_w: rooms + p.peak_reserved_w }
     }),
     zones: r.zones.map((z, i) => {
@@ -826,7 +825,16 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
 
 function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
   let a: ReturnType<typeof runSystems>
-  try { a = runSystems(doc, results, weather.weather.hours) } catch (e) {
+  // Brief 114 review F4: a heating system's pumps with no capacity are sized on its rooms' design heat loss, when the
+  // building states its design conditions (one calculation, designHeatLoss; a refusal there is the design line's).
+  let design: Map<string, number> | null = null
+  if (doc.building.design != null && doc.system_groups.some((g) => g.pumps != null && g.capacity_kw == null && g.service === 'heating')) {
+    try {
+      const r = designHeatLoss(doc, results.zones, weather.weather)
+      design = new Map(doc.system_groups.filter((g) => g.service === 'heating').map((g) => [g.id, systemRoomsDesignW(doc, r, g.id)]))
+    } catch (e) { if (!(e instanceof DesignError)) throw e }
+  }
+  try { a = runSystems(doc, results, weather.weather.hours, design) } catch (e) {
     // The served-equals-demand check (Rule 9) failing is a fault in the tool, never a number to show.
     if (e instanceof ServedError) return { ok: false, missing: [{ path: 'systems', what: `The energy check failed (${e.message}). This is a fault in the tool; please report it.` }] }
     throw e
@@ -847,7 +855,8 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
     }),
     no_hot_water: s.dhw == null,
     water_heaters: s.water_heaters.map((w) => ({ ...w, label: doc.system_groups.find((g) => g.id === w.id)!.label || 'hot water system' })),
-    pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
-    other_loads: s.other_loads,
+    // Review F8: the kWh is the end-use line's (Rule 11), read through readEntryKwh.
+    pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, kwh: readEntryKwh(s, 'pumps', p.id), label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
+    other_loads: s.other_loads.map((o) => ({ ...o, kwh: readEntryKwh(s, 'auxiliary', o.id) })),
   }
 }

@@ -3,14 +3,15 @@
  * external lighting), hour by hour. Electricity, at "+ Systems" (Rule 8). Pump heat into the water is not counted.
  *
  * Pumps (`system_groups[].pumps`, schema 2.10):
- *   rated W     power.w; or power.w_per_kw_capacity × the system's capacity_kw (with none, its busiest hour's heat);
+ *   rated W     power.w; or power.w_per_kw_capacity × the system's capacity_kw (with none, a heating system's design
+ *               heat loss when the building states design conditions; otherwise refused, review F4);
  *               or power.w_per_m2 × the floor it serves (each zone's area × the system's share)
  *   running r   'continuous': 1 in every hour of the months in which the system has any load (its season)
  *               'with_demand': 1 in the hours its load is above zero, else 0
  *               'schedule': the schedule profile's fraction of the hour
  *   fixed       P = rated × r
  *   variable    P = rated × r × curve(x), x = the hour's load ÷ its design load (its capacity_kw, or with none its
- *               busiest hour), held to 0..1
+ *               design heat loss, or with neither its busiest hour, shown as such), held to 0..1
  *
  * The part-load curve is EnergyPlus's Pump:VariableSpeed with its default coefficients (Input Output Reference,
  * Pump:VariableSpeed, "Coefficient 1–4 of the Part Load Performance Curve": 0, 1, 0, 0), so the fraction of full
@@ -26,6 +27,11 @@ import type { Weather } from './types'
 export const PUMP_CURVE = {
   coefficients: [0, 1, 0, 0] as const,
   source: 'EnergyPlus Pump:VariableSpeed default part-load coefficients (Input Output Reference)',
+  /**
+   * Brief 114 review F3: what the panel shows beside a variable-speed pump. An ideal pump: its saving (about 60 % on
+   * the referee and Bridgewater) is larger than NCM Table 14's variable-speed rows imply (17–50 % below constant speed).
+   */
+  note: 'ideal: power in proportion to load, no minimum speed (EnergyPlus default); NCM Table 14 implies a 17–50 % saving',
 }
 
 export const pumpCurve = (x: number) => {

@@ -266,8 +266,9 @@ export const Ventilation = z
     /**
      * Schema 2.10 (Brief 114): how the fans are told to run. 'continuous': every hour (`control_schedule_ref` left
      * empty or 'always_on'). 'schedule': the fraction of each hour in its `control_schedule_ref` schedule. 'demand'
-     * (CO₂ or presence): the flow follows the people in the zone, each hour's share of its occupancy profile's people,
-     * never below `demand_min_fraction`. Null: not stated, so the schedule decides, as before 2.10.
+     * (CO₂ or presence): inside the hours `control_schedule_ref` gives (a schedule, or 'always_on'), the flow follows
+     * the people in the zone, each hour's share of its occupancy profile's people, never below `demand_min_fraction`;
+     * outside them the fans are off (review F1). Null: not stated, so the schedule decides, as before 2.10.
      */
     runs: z.enum(['continuous', 'schedule', 'demand']).nullable().default(null),
     /** Schema 2.10: with `runs: 'demand'` only, and required for it: the least share of the flow, 0 to 1. */
@@ -819,7 +820,7 @@ export const ModelDocument = z
       if (v.runs !== 'demand' && v.demand_min_fraction != null) ctx.addIssue({ code: 'custom', path: [...at, 'demand_min_fraction'], message: 'only for fans on demand; leave empty' })
       if (v.runs === 'continuous' && v.control_schedule_ref != null && v.control_schedule_ref !== 'always_on') ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans that run continuously have no schedule; leave empty' })
       if (v.runs === 'schedule' && (v.control_schedule_ref == null || !schedIds.has(v.control_schedule_ref))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans that run to a schedule need a schedule profile' })
-      if (v.runs === 'demand' && v.control_schedule_ref != null) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans on demand follow the people, not a schedule; leave empty' })
+      if (v.runs === 'demand' && (v.control_schedule_ref == null || (v.control_schedule_ref !== 'always_on' && !schedIds.has(v.control_schedule_ref)))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans on demand need the hours they may run: always_on or a schedule profile' })
     }))
     // Brief 114: the control map. One entry per target, which must exist; window fields only on a window entry.
     const ventIds = new Set(doc.zones.flatMap((z0) => z0.ventilation.map((v) => v.id)))

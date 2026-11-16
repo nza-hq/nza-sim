@@ -98,15 +98,20 @@ export interface SystemsResults {
 export interface PumpResult {
   id: string
   rated_w: number
-  /** Where the rated power came from: stated W, W per kW of the capacity or of the busiest hour, or W per m² served. */
-  rated_from: 'w' | 'capacity' | 'peak' | 'floor'
-  /** The load at which a variable-speed pump draws its rated power, W: the capacity, or with none the busiest hour. */
+  /** Where the rated power came from: stated W, W per kW of the capacity or of the design heat loss, or W per m² served. */
+  rated_from: 'w' | 'capacity' | 'design_heat_loss' | 'floor'
+  /**
+   * The load at which a variable-speed pump draws its rated power, W: the capacity; or a heating system's share of its
+   * rooms' design heat loss (Brief 117), when the building states design conditions; or the busiest hour (review F4:
+   * with setbacks that is a morning warm-up, so it is shown, never silent).
+   */
   design_w: number
-  design_from: 'capacity' | 'peak'
+  design_from: 'capacity' | 'design_heat_loss' | 'peak'
   speed: 'fixed' | 'variable'
   runs: 'continuous' | 'with_demand' | 'schedule'
   hours_run: number
-  kwh: number
+  /** The months of its season, 1–12 (runs 'continuous'): those with any load. */
+  season_months: number[] | null
   /** The named source, when "Use defaults" filled the figures. */
   default_from: string | null
 }
@@ -118,7 +123,6 @@ export interface OtherLoadResult {
   power_w: number
   runs: string
   hours_run: number
-  kwh: number
   default_from: string | null
 }
 
@@ -169,10 +173,17 @@ export const readSystemsTotalKwh = (s: SystemsResults) => FUELS.reduce((a, f) =>
 /** The v2 delivered-energy EUI, kWh/m² a year (Rule 11: read only here; not the instant engine's, not EnergyPlus's). */
 export const readSystemsEui = (s: SystemsResults) => readSystemsTotalKwh(s) / s.floor_m2  // runSystems refuses a zero floor
 export const readEndUseKwh = (s: SystemsResults, u: EndUse) => s.end_uses.filter((l) => l.end_use === u).reduce((a, l) => a + l.kwh, 0)
+/** One entry's energy (a system's pumps, an other load, a fan), kWh: its end-use line (Brief 114 review F8, Rule 11). */
+export const readEntryKwh = (s: SystemsResults, u: EndUse, entryId: string) => s.ungrouped.filter((l) => l.end_use === u && l.entry_id === entryId).reduce((a, l) => a + l.kwh, 0)
 
 const sum = (a: Float64Array) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return s }
 
-export function runSystems(doc: ModelDocument, results: ModelResults, hours: Weather['hours']): SystemsAnswer {
+/**
+ * `designW` (Brief 114 review F4): each heating system's share of its rooms' design heat loss, W, when the building
+ * states design conditions (designHeatLoss.ts `systemRoomsDesignW`); the pumps of a system with no capacity are sized
+ * on it. Null or absent: not available.
+ */
+export function runSystems(doc: ModelDocument, results: ModelResults, hours: Weather['hours'], designW: ReadonlyMap<string, number> | null = null): SystemsAnswer {
   const H = hours.count
   const missing: SystemsMissing[] = []
   const miss = (path: string, message: string) => { if (!missing.some((m) => m.path === path)) missing.push({ path, message }) }
@@ -316,14 +327,25 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     not_modelled.push({ path: `controls[${i}].controller`, what: 'controller (recorded, not yet used in the calculation)' })
     if (c.target.kind === 'window') not_modelled.push({ path: `controls[${i}]`, what: 'window rule (Brief 115)' })
   })
-  // Brief 114, no double count: an old auxiliary "Pumps" load beside system pumps is refused by name.
-  if (doc.system_groups.some((g) => g.enabled && g.pumps != null)) {
+  // Brief 114, no double count (review F6): an old auxiliary load named for pumps (or circulators) beside system pumps,
+  // or for lifts or external lighting beside an other load of that kind, is refused by name. Names are all an old
+  // auxiliary profile has to go on; one named otherwise is not caught, and the Controls view lists both side by side.
+  {
     const used = new Set(doc.zones.flatMap((z) => z.profile_refs.auxiliary))
+    const anyPumps = doc.system_groups.some((g) => g.enabled && g.pumps != null)
+    const kinds = new Set(doc.other_loads.map((o) => o.kind))
+    const checks: [boolean, RegExp, string][] = [
+      [anyPumps, /pump|circulat/i, 'pumps, and the systems state their own pumps'],
+      [kinds.has('lift'), /lift|elevator/i, 'lifts, and an other building load is a lift'],
+      [kinds.has('external_lighting'), /extern|outdoor|car ?park/i, 'external lighting, and an other building load is external lighting'],
+    ]
     doc.profiles.forEach((p, i) => {
-      if (p.kind === 'auxiliary' && used.has(p.id) && /pump/i.test(`${p.id} ${p.label ?? ''}`)) {
-        miss(`profiles[${i}]`, `the auxiliary load "${p.label ?? p.id}" counts pumps, and the systems state their own pumps: pump energy would be counted twice; remove one`)
-      }
+      if (p.kind !== 'auxiliary' || !used.has(p.id)) return
+      const name = `${p.id} ${p.label ?? ''}`
+      for (const [on, re, what] of checks) if (on && re.test(name)) miss(`profiles[${i}]`, `the auxiliary load "${p.label ?? p.id}" counts ${what}: it would be counted twice; remove one`)
     })
+    // Review F7: the pumps' heat into the water is not counted (Brief 114); stated whenever pumps are.
+    if (anyPumps) not_modelled.push({ path: 'system_groups[].pumps', what: 'pump heat into the water (not counted)' })
   }
 
   if (missing.length) return { ok: false, missing }
@@ -461,10 +483,16 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     let peak = 0
     for (let h = 0; h < H; h++) peak = Math.max(peak, load[h])
     const capW = sg.capacity_kw != null && (g.service === 'heating' || g.service === 'cooling' || g.service === 'dhw') ? sg.capacity_kw * 1000 : null
-    const design_w = capW ?? peak
+    const dhlW = g.service === 'heating' ? designW?.get(g.id) ?? null : null
+    const design_w = capW ?? (dhlW != null && dhlW > 0 ? dhlW : peak)
+    const design_from: PumpResult['design_from'] = capW != null ? 'capacity' : dhlW != null && dhlW > 0 ? 'design_heat_loss' : 'peak'
     let rated_w: number, rated_from: PumpResult['rated_from']
     if ('w' in pu.power) { rated_w = pu.power.w; rated_from = 'w' }
-    else if ('w_per_kw_capacity' in pu.power) { rated_w = (pu.power.w_per_kw_capacity * design_w) / 1000; rated_from = capW != null ? 'capacity' : 'peak' }
+    else if ('w_per_kw_capacity' in pu.power) {
+      // Review F4: never rated on the busiest hour (with setbacks, a warm-up about twice the design size).
+      if (design_from === 'peak') { pumpMissing.push({ path: `${p}.power`, message: g.service === 'heating' ? 'W per kW needs the system\'s capacity (kW), or the building\'s design conditions for its design heat loss' : 'W per kW needs the system\'s capacity (kW)' }); continue }
+      rated_w = (pu.power.w_per_kw_capacity * design_w) / 1000; rated_from = design_from === 'capacity' ? 'capacity' : 'design_heat_loss'
+    }
     else { rated_w = pu.power.w_per_m2 * g.zones.reduce((a, zi) => a + doc.zones[zi].area_m2, 0) * (g.share / 100); rated_from = 'floor' }
     let sched: Float64Array | null = null
     if (pu.runs === 'schedule') {
@@ -472,9 +500,10 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       try { sched = scheduleFractions(doc, pu.schedule_ref, hours, `${p}.schedule_ref`) } catch (e) { if (e instanceof ScheduleError) { pumpMissing.push({ path: e.path, message: e.message.slice(e.path.length + 2) }); continue } throw e }
     }
     const run = runPumps(rated_w, pu.speed, pu.runs, load, design_w, hours.month, sched)
-    const kwh = sum(run.w) / 1000
-    ungrouped.push({ end_use: 'pumps', zone_id: null, entry_id: g.id, kwh, w: run.w })
-    pumps.push({ id: g.id, rated_w, rated_from, design_w, design_from: capW != null ? 'capacity' : 'peak', speed: pu.speed, runs: pu.runs, hours_run: run.hours_run, kwh, default_from: pu.default_from })
+    ungrouped.push({ end_use: 'pumps', zone_id: null, entry_id: g.id, kwh: sum(run.w) / 1000, w: run.w })
+    let season: number[] | null = null
+    if (pu.runs === 'continuous') { const m = new Set<number>(); for (let h = 0; h < H; h++) if (load[h] > 0) m.add(hours.month[h]); season = [...m].sort((a, b) => a - b) }
+    pumps.push({ id: g.id, rated_w, rated_from, design_w, design_from, speed: pu.speed, runs: pu.runs, hours_run: run.hours_run, season_months: season, default_from: pu.default_from })
   }
   // ── Brief 114: other loads outside the rooms (lifts, external lighting); their heat warms no room ─────────────────
   const other_loads: OtherLoadResult[] = []
@@ -491,9 +520,8 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
       w[h] = o.power_w * r
       hrs += r
     }
-    const kwh = sum(w) / 1000
-    ungrouped.push({ end_use: 'auxiliary', zone_id: null, entry_id: o.id, kwh, w })
-    other_loads.push({ id: o.id, kind: o.kind, label: o.label ?? null, power_w: o.power_w, runs: o.runs, hours_run: hrs, kwh, default_from: o.default_from })
+    ungrouped.push({ end_use: 'auxiliary', zone_id: null, entry_id: o.id, kwh: sum(w) / 1000, w })
+    other_loads.push({ id: o.id, kind: o.kind, label: o.label ?? null, power_w: o.power_w, runs: o.runs, hours_run: hrs, default_from: o.default_from })
   })
   if (pumpMissing.length) return { ok: false, missing: pumpMissing }
 

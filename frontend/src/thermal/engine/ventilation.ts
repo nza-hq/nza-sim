@@ -107,11 +107,21 @@ export function zoneVentilation(doc: ModelDocument, hours: Weather['hours']): Zo
         return
       }
       if (v.runs === 'demand') {
+        // Review F1: demand runs inside the fans' hours (its schedule, or always on); within them the flow follows the
+        // people, never below the least share; outside them the fans are off.
         const m = v.demand_min_fraction
         if (m == null) throw new VentilationError('required: the least share of the flow (0 to 1)', `${p}.demand_min_fraction`)
+        if (ref == null) throw new VentilationError(`required: the hours the fans may run ('${ALWAYS_ON}' or a schedule profile)`, `${p}.control_schedule_ref`)
+        const sp = sched.get(ref)
+        if (!sp && ref !== ALWAYS_ON) throw new VentilationError(`schedule profile "${ref}" does not exist`, `${p}.control_schedule_ref`)
         const presence = (presenceOf ??= zonePresence(doc, hours))[zi]
         if (!presence) throw new VentilationError('fans on demand follow the people: the zone needs an occupancy profile', `zones[${zi}].profile_refs.occupancy`)
-        for (let h = 0; h < H; h++) { const f = Math.min(1, Math.max(m, presence[h])); hw[h] = h0 * f; run[h] = f }
+        for (let h = 0; h < H; h++) {
+          const on = sp ? sp.p.day_types[c.day[h]][c.hourOfDay[h]] : 1
+          if (!(on >= 0 && on <= 1)) throw new VentilationError(`hour ${c.hourOfDay[h]} of ${c.day[h]} must be 0 to 1`, `profiles[${sp!.i}].day_types`)
+          const f = on * Math.min(1, Math.max(m, presence[h]))
+          hw[h] = h0 * f; run[h] = f
+        }
         out.push({ id: v.id, kind: v.kind, flow_m3s: q, recovery: eta, h_w_per_k: hw, running: run })
         return
       }

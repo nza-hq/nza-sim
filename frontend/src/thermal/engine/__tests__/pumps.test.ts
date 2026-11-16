@@ -13,7 +13,7 @@ import { calendar } from '../gains'
 import type { ModelResults } from '../results'
 import { pumpCurve, PUMP_CURVE, runPumps } from '../pumps'
 import { defaultPumps, defaultPumpWPerM2, NCM_SOURCE } from '../../catalogue/auxiliaryDefaults'
-import { readEndUseKwh, runSystems, type SystemsResults } from '../systems'
+import { readEndUseKwh, readEntryKwh, runSystems, type SystemsResults } from '../systems'
 import { zoneVentilation } from '../ventilation'
 import { cooledRoomDocument } from './cooledRoom'
 import { MOS, readMos } from './denver'
@@ -45,9 +45,9 @@ function results(doc: any, months: number[] | null = null): ModelResults {
     return { zone_id: z.id, hourly: { heating_w: hw, cooling_w: cw }, annual: { heating_kwh: hw.reduce((a, b) => a + b, 0) / 1000, cooling_kwh: (demand[z.id][1] * H) / 1000 } }
   }) } as unknown as ModelResults
 }
-const run = (doc: any, months: number[] | null = null) => runSystems(ModelDocument.parse(doc), results(doc, months), W.hours)
-const ok = (doc: any, months: number[] | null = null): SystemsResults => {
-  const r = run(doc, months)
+const run = (doc: any, months: number[] | null = null, design: Map<string, number> | null = null) => runSystems(ModelDocument.parse(doc), results(doc, months), W.hours, design)
+const ok = (doc: any, months: number[] | null = null, design: Map<string, number> | null = null): SystemsResults => {
+  const r = run(doc, months, design)
   if (!r.ok) throw new Error(JSON.stringify(r.missing))
   return r.systems
 }
@@ -103,13 +103,18 @@ describe('Brief 114 P2: pumps in the systems run', () => {
     delete d.system_groups[0].capacity_kw
     expect(readEndUseKwh(ok(d), 'pumps')).toBeCloseTo((100 * H) / 1000, 9)  // every hour is the busiest
   })
-  it('W per kW of capacity (or of the busiest hour), and W per m² of the floor served at the system\'s share', () => {
+  it('W per kW of capacity or of the design heat loss (review F4: never of the busiest hour), and W per m² served', () => {
     const d = setup()
     d.system_groups[0].capacity_kw = 2
     d.system_groups[0].pumps = { power: { w_per_kw_capacity: 5 }, speed: 'fixed', runs: 'with_demand' }
     expect(pump(ok(d), 'hp')).toMatchObject({ rated_w: 10, rated_from: 'capacity' })
     delete d.system_groups[0].capacity_kw
-    expect(pump(ok(d), 'hp')).toMatchObject({ rated_w: 4.5, rated_from: 'peak' })
+    expect(missing(d)).toEqual([expect.objectContaining({ path: 'system_groups[0].pumps.power', message: expect.stringContaining('design conditions') })])
+    const s = ok(d, null, new Map([['hp', 3000]]))
+    expect(pump(s, 'hp')).toMatchObject({ rated_w: 15, rated_from: 'design_heat_loss', design_w: 3000, design_from: 'design_heat_loss' })
+    // A stated W keeps its busiest-hour design load, shown as such.
+    d.system_groups[0].pumps.power = { w: 100 }
+    expect(pump(ok(d), 'hp')).toMatchObject({ design_w: 900, design_from: 'peak' })
     d.system_groups[0].pumps.power = { w_per_m2: 0.6 }
     const area = d.zones.filter((z: any) => z.id !== 'middle').reduce((a: number, z: any) => a + z.area_m2, 0)
     expect(pump(ok(d), 'hp').rated_w).toBeCloseTo(0.6 * area * 0.6, 12)
@@ -146,7 +151,9 @@ describe('Brief 114 P2: pumps in the systems run', () => {
     let e = 0
     for (let h = 0; h < H; h++) e += s.electricity_w[h]
     expect(e / 1000).toBeCloseTo(s.by_fuel.electricity, 4)
-    expect(readEndUseKwh(s, 'pumps')).toBeCloseTo(s.pumps.reduce((a, p) => a + p.kwh, 0), 9)
+    // Review F8: one exposure; the entry's kWh is read from its line.
+    expect(s.pumps[0]).not.toHaveProperty('kwh')
+    expect(readEndUseKwh(s, 'pumps')).toBeCloseTo(readEntryKwh(s, 'pumps', 'hp') + readEntryKwh(s, 'pumps', 'boiler'), 9)
   })
   it('a hot water system\'s pumps move what its heater gives', () => {
     const d = setup()
@@ -166,6 +173,22 @@ describe('Brief 114 P2: what is refused, by name', () => {
     expect(ok(d).pumps).toEqual([])  // alone it still runs, as stated
     d.system_groups[0].pumps = { power: { w: 100 }, speed: 'fixed', runs: 'with_demand' }
     expect(missing(d)).toEqual([expect.objectContaining({ path: `profiles[${d.profiles.length - 1}]`, message: expect.stringContaining('counted twice') })])
+    d.profiles[d.profiles.length - 1].label = 'Heating circulators'  // review F6: named otherwise, still caught
+    expect(missing(d)).toHaveLength(1)
+  })
+  it('review F6: an old auxiliary lift or external lighting load beside an other load of that kind', () => {
+    const d = setup()
+    d.profiles.push({ id: 'aux_lift', kind: 'auxiliary', label: 'Lift', relationship_to_occupancy: 'always_on', area_share: 1, gain_fraction: 1, magnitude: { value: 1, unit: 'w_per_m2' }, radiant_fraction: 0.3 })
+    d.zones[0].profile_refs.auxiliary = ['aux_lift']
+    expect(ok(d).other_loads).toEqual([])
+    d.other_loads = [{ id: 'lift', kind: 'lift', power_w: 2000, runs: 'continuous' }]
+    expect(missing(d)).toEqual([expect.objectContaining({ message: expect.stringContaining('counted twice') })])
+  })
+  it('review F7: with pumps stated, their heat into the water is listed as not counted', () => {
+    const d = setup()
+    expect(ok(d).not_modelled.some((n) => /pump heat/.test(n.what))).toBe(false)
+    d.system_groups[0].pumps = { power: { w: 100 }, speed: 'fixed', runs: 'with_demand' }
+    expect(ok(d).not_modelled).toContainEqual({ path: 'system_groups[].pumps', what: 'pump heat into the water (not counted)' })
   })
   it('the schema: pumps on a lighting system, a schedule for pumps that run with demand, a missing schedule', () => {
     const issues = (d: any) => { const r = ModelDocument.safeParse(d); return r.success ? [] : r.error.issues.map((i) => i.path.join('.')) }
@@ -187,12 +210,12 @@ describe('Brief 114 P2: fans by how they run', () => {
     expect(Array.from(b.running)).toEqual(Array.from(a.running))
     expect(Array.from(b.h_w_per_k)).toEqual(Array.from(a.h_w_per_k))
   })
-  it('demand: the share of the people present, never below the least share; the same as a schedule of that shape', () => {
+  it('demand (always on): the share of the people present, never below the least share; the same as a schedule of that shape', () => {
     const d = setup()
     const occ = Array(24).fill(0).map((_, h) => (h >= 9 && h < 17 ? 0.8 : 0))
     d.profiles.push({ id: 'people', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: occ, saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
     d.zones[0].profile_refs.occupancy = 'people'
-    Object.assign(d.zones[0].ventilation[0], { runs: 'demand', demand_min_fraction: 0.2, control_schedule_ref: null })
+    Object.assign(d.zones[0].ventilation[0], { runs: 'demand', demand_min_fraction: 0.2, control_schedule_ref: 'always_on' })
     const v = zoneVentilation(ModelDocument.parse(d), W.hours)[0][0]
     const same = (x: number) => Math.max(0.2, x)
     d.profiles.push({ id: 'shape', kind: 'schedule', day_types: { weekday: occ.map(same), saturday: Array(24).fill(0.2), sunday: Array(24).fill(0.2) } })
@@ -204,9 +227,25 @@ describe('Brief 114 P2: fans by how they run', () => {
     expect(e).toBeGreaterThan(0.2 * H)
     expect(e).toBeLessThan(0.5 * H)
   })
+  it('review F1: demand runs only inside its hours; off outside them, whatever the least share', () => {
+    const d = setup()
+    const occ = Array(24).fill(0).map((_, h) => (h >= 9 && h < 17 ? 0.8 : 0))
+    d.profiles.push({ id: 'people', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' }, occupancy_rate: 1, sensible_w_per_person: 75, radiant_fraction: 0.3, schedule: { weekday: occ, saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+    d.zones[0].profile_refs.occupancy = 'people'
+    Object.assign(d.zones[0].ventilation[0], { runs: 'demand', demand_min_fraction: 0.2, control_schedule_ref: 'office' })
+    const v = zoneVentilation(ModelDocument.parse(d), W.hours)[0][0]
+    const c = calendar(W.hours)
+    for (let h = 0; h < H; h++) {
+      const inHours = c.day[h] === 'weekday' && c.hourOfDay[h] >= 8 && c.hourOfDay[h] < 18
+      const pres = c.day[h] === 'weekday' && c.hourOfDay[h] >= 9 && c.hourOfDay[h] < 17 ? 0.8 : 0
+      expect(v.running[h]).toBeCloseTo(inHours ? Math.max(0.2, pres) : 0, 12)
+    }
+    d.zones[0].ventilation[0].control_schedule_ref = null
+    expect(ModelDocument.safeParse(d).success).toBe(false)  // demand needs its hours
+  })
   it('demand needs a zone with people and a least share', () => {
     const d = setup()
-    Object.assign(d.zones[0].ventilation[0], { runs: 'demand', demand_min_fraction: 0.2, control_schedule_ref: null })
+    Object.assign(d.zones[0].ventilation[0], { runs: 'demand', demand_min_fraction: 0.2, control_schedule_ref: 'always_on' })
     d.zones[0].profile_refs.occupancy = null
     expect(() => zoneVentilation(ModelDocument.parse(d), W.hours)).toThrow(/profile_refs\.occupancy/)
     d.zones[0].ventilation[0].demand_min_fraction = null
@@ -288,7 +327,21 @@ describe('Brief 114 P1: the stated defaults (NCM Modelling Guide 2021, Table 14)
     const d = setup()
     expect(defaultPumps(ModelDocument.parse(d), 'hp')).toBeNull()  // nothing says it has water: the user says
     d.system_groups[0].design_flow_c = 45; d.system_groups[0].design_return_c = 40
-    expect(defaultPumps(ModelDocument.parse(d), 'hp')).toEqual({ power: { w_per_m2: 0.6 }, speed: 'fixed', runs: 'with_demand', schedule_ref: null, default_from: NCM_SOURCE })
+    const doc = ModelDocument.parse(d)
+    const refs = new Set(doc.zones.filter((z) => ['west', 'east'].includes(z.id)).map((z) => z.setpoints.hours_ref))
+    const got = defaultPumps(doc, 'hp')!
+    expect(got).toMatchObject({ power: { w_per_m2: 0.6 }, speed: 'fixed', default_from: expect.stringContaining(NCM_SOURCE) })
+    // Review F2: paired with the rooms' heating hours when they share them (NCM para 103), else with demand, said so.
+    if (refs.size === 1 && [...refs][0] != null) expect(got).toMatchObject({ runs: 'schedule', schedule_ref: [...refs][0] })
+    else expect(got).toMatchObject({ runs: 'with_demand', schedule_ref: null, default_from: expect.stringContaining('no one set of heating hours') })
+  })
+  it('review F2: shared heating hours are paired; mixed hours run with demand and say why', () => {
+    const d = setup()
+    d.system_groups[0].design_flow_c = 55
+    for (const z of d.zones) z.setpoints.hours_ref = 'office'
+    expect(defaultPumps(ModelDocument.parse(d), 'hp')).toMatchObject({ runs: 'schedule', schedule_ref: 'office' })
+    d.zones.find((z: any) => z.id === 'east').setpoints.hours_ref = null
+    expect(defaultPumps(ModelDocument.parse(d), 'hp')).toMatchObject({ runs: 'with_demand', default_from: expect.stringContaining('no one set of heating hours') })
     expect(defaultPumps(ModelDocument.parse(d), 'chiller')).toBeNull()
   })
 })
