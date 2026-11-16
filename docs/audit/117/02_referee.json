@@ -1,0 +1,292 @@
+{
+ "source": "validation/energyplus/117_design_referee.py",
+ "engine": "docs/audit/117/02_engine_design.json",
+ "engine_sha256": "b2173980b6ad7d5c738356ec3b51bb63ee6db944999bd6c25e7489726393b706",
+ "wind_m_s": 4.0,
+ "gate": {
+  "room_pct": 3.0,
+  "building_pct": 2.0
+ },
+ "variants": {
+  "iso_conv": {
+   "cooled_room": {
+    "notes": [
+     "104_cooled_room.py model, iso_conv; every room heated to its design temperature; two months at the design condition",
+     "infiltration 0.5 ach at standard density"
+    ],
+    "warnings": 2,
+    "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c",
+    "epw_sha256": "d86049faedd9362928fdba34e599b0f78f3b606cfaa01fca922084d978c657cd",
+    "rooms": {
+     "west": {
+      "engine_w": 1588.13,
+      "energyplus_w": 1445.65,
+      "diff_pct": 9.856,
+      "energyplus_air_c": 20.0,
+      "internal_c": 20,
+      "air_engine_w": 300.12,
+      "air_energyplus_w": 303.13,
+      "fabric_engine_w": 1288.02,
+      "fabric_energyplus_w": 1142.52,
+      "pass": false
+     },
+     "middle": {
+      "engine_w": 509.47,
+      "energyplus_w": 593.09,
+      "diff_pct": -14.098,
+      "energyplus_air_c": 12.0,
+      "internal_c": 12,
+      "air_engine_w": 229.29,
+      "air_energyplus_w": 231.59,
+      "fabric_engine_w": 280.18,
+      "fabric_energyplus_w": 361.5,
+      "pass": false
+     },
+     "east": {
+      "engine_w": 1588.13,
+      "energyplus_w": 1445.65,
+      "diff_pct": 9.856,
+      "energyplus_air_c": 20.0,
+      "internal_c": 20,
+      "air_engine_w": 300.12,
+      "air_energyplus_w": 303.13,
+      "fabric_engine_w": 1288.02,
+      "fabric_energyplus_w": 1142.52,
+      "pass": false
+     }
+    },
+    "building_heated": {
+     "engine_w": 3176.27,
+     "energyplus_w": 2891.29,
+     "diff_pct": 9.856,
+     "pass": false
+    }
+   },
+   "bridgewater": {
+    "notes": [
+     "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+     "airmass: capacitance multiplier 65.5597 on every zone",
+     "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+     "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+     "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}",
+     "vent: 15 ZoneVentilation:DesignFlowRate, 2.7030 m3/s of outdoor air equivalent in all",
+     "iso_conv: fixed coefficients on 70 surfaces",
+     "no gains; heating 21 C, cooling off; two months at the design condition"
+    ],
+    "warnings": 6,
+    "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c",
+    "ground_c": 11.258207762557078,
+    "epw_sha256": "b8f2eebfb8e66e146e455a7e8f0e35b82bdfd42b81a64b77cefce2941a1a4409",
+    "rooms": {
+     "z1": {
+      "engine_w": 29387.56,
+      "energyplus_w": 29396.8,
+      "diff_pct": -0.031,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 20104.03,
+      "air_energyplus_w": 20507.4,
+      "fabric_engine_w": 9283.52,
+      "fabric_energyplus_w": 8889.4,
+      "pass": true
+     },
+     "z2": {
+      "engine_w": 25318.99,
+      "energyplus_w": 25715.77,
+      "diff_pct": -1.543,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 18451.43,
+      "air_energyplus_w": 18821.64,
+      "fabric_engine_w": 6867.56,
+      "fabric_energyplus_w": 6894.13,
+      "pass": true
+     },
+     "z3": {
+      "engine_w": 25318.99,
+      "energyplus_w": 25546.11,
+      "diff_pct": -0.889,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 18451.43,
+      "air_energyplus_w": 18821.64,
+      "fabric_engine_w": 6867.56,
+      "fabric_energyplus_w": 6724.47,
+      "pass": true
+     },
+     "z4": {
+      "engine_w": 25318.99,
+      "energyplus_w": 25812.74,
+      "diff_pct": -1.913,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 18451.43,
+      "air_energyplus_w": 18821.64,
+      "fabric_engine_w": 6867.56,
+      "fabric_energyplus_w": 6991.11,
+      "pass": true
+     },
+     "z5": {
+      "engine_w": 30658.82,
+      "energyplus_w": 29886.03,
+      "diff_pct": 2.586,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 20104.03,
+      "air_energyplus_w": 20507.4,
+      "fabric_engine_w": 10554.79,
+      "fabric_energyplus_w": 9378.63,
+      "pass": true
+     }
+    },
+    "building_heated": {
+     "engine_w": 136003.35,
+     "energyplus_w": 136357.44,
+     "diff_pct": -0.26,
+     "pass": true
+    }
+   }
+  },
+  "combined": {
+   "cooled_room": {
+    "notes": [
+     "104_cooled_room.py model, iso_conv; every room heated to its design temperature; two months at the design condition",
+     "infiltration 0.5 ach at standard density",
+     "combined_films: ISO 6946 combined films as convection on 21 surfaces; long-wave off on 11 materials"
+    ],
+    "warnings": 2,
+    "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c",
+    "epw_sha256": "d86049faedd9362928fdba34e599b0f78f3b606cfaa01fca922084d978c657cd",
+    "rooms": {
+     "west": {
+      "engine_w": 1588.13,
+      "energyplus_w": 1594.78,
+      "diff_pct": -0.417,
+      "energyplus_air_c": 20.0,
+      "internal_c": 20,
+      "air_engine_w": 300.12,
+      "air_energyplus_w": 303.13,
+      "fabric_engine_w": 1288.02,
+      "fabric_energyplus_w": 1291.65,
+      "pass": true
+     },
+     "middle": {
+      "engine_w": 509.47,
+      "energyplus_w": 516.8,
+      "diff_pct": -1.417,
+      "energyplus_air_c": 12.0,
+      "internal_c": 12,
+      "air_engine_w": 229.29,
+      "air_energyplus_w": 231.59,
+      "fabric_engine_w": 280.18,
+      "fabric_energyplus_w": 285.21,
+      "pass": true
+     },
+     "east": {
+      "engine_w": 1588.13,
+      "energyplus_w": 1594.78,
+      "diff_pct": -0.417,
+      "energyplus_air_c": 20.0,
+      "internal_c": 20,
+      "air_engine_w": 300.12,
+      "air_energyplus_w": 303.13,
+      "fabric_engine_w": 1288.02,
+      "fabric_energyplus_w": 1291.65,
+      "pass": true
+     }
+    },
+    "building_heated": {
+     "engine_w": 3176.27,
+     "energyplus_w": 3189.56,
+     "diff_pct": -0.417,
+     "pass": true
+    }
+   },
+   "bridgewater": {
+    "notes": [
+     "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+     "airmass: capacitance multiplier 65.5597 on every zone",
+     "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+     "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+     "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}",
+     "vent: 15 ZoneVentilation:DesignFlowRate, 2.7030 m3/s of outdoor air equivalent in all",
+     "iso_conv: fixed coefficients on 70 surfaces",
+     "combined_films: ISO 6946 combined films as convection on 70 surfaces; long-wave off on 18 materials",
+     "no gains; heating 21 C, cooling off; two months at the design condition"
+    ],
+    "warnings": 6,
+    "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c",
+    "ground_c": 11.258207762557078,
+    "epw_sha256": "b8f2eebfb8e66e146e455a7e8f0e35b82bdfd42b81a64b77cefce2941a1a4409",
+    "rooms": {
+     "z1": {
+      "engine_w": 29387.56,
+      "energyplus_w": 29877.3,
+      "diff_pct": -1.639,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 20104.03,
+      "air_energyplus_w": 20507.4,
+      "fabric_engine_w": 9283.52,
+      "fabric_energyplus_w": 9369.9,
+      "pass": true
+     },
+     "z2": {
+      "engine_w": 25318.99,
+      "energyplus_w": 25768.93,
+      "diff_pct": -1.746,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 18451.43,
+      "air_energyplus_w": 18821.64,
+      "fabric_engine_w": 6867.56,
+      "fabric_energyplus_w": 6947.29,
+      "pass": true
+     },
+     "z3": {
+      "engine_w": 25318.99,
+      "energyplus_w": 25768.92,
+      "diff_pct": -1.746,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 18451.43,
+      "air_energyplus_w": 18821.64,
+      "fabric_engine_w": 6867.56,
+      "fabric_energyplus_w": 6947.29,
+      "pass": true
+     },
+     "z4": {
+      "engine_w": 25318.99,
+      "energyplus_w": 25768.93,
+      "diff_pct": -1.746,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 18451.43,
+      "air_energyplus_w": 18821.64,
+      "fabric_engine_w": 6867.56,
+      "fabric_energyplus_w": 6947.29,
+      "pass": true
+     },
+     "z5": {
+      "engine_w": 30658.82,
+      "energyplus_w": 31139.26,
+      "diff_pct": -1.543,
+      "energyplus_air_c": 21.0,
+      "internal_c": 21,
+      "air_engine_w": 20104.03,
+      "air_energyplus_w": 20507.4,
+      "fabric_engine_w": 10554.79,
+      "fabric_energyplus_w": 10631.87,
+      "pass": true
+     }
+    },
+    "building_heated": {
+     "engine_w": 136003.35,
+     "energyplus_w": 138323.34,
+     "diff_pct": -1.677,
+     "pass": true
+    }
+   }
+  }
+ }
+}
