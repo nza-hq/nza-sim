@@ -56,6 +56,10 @@ import ResultsPanel from '../run/ResultsPanel'
 import EmbeddedResults from '../run/EmbeddedResults'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { buildDocument } from './toDocument'
+// @ts-expect-error untyped JS from today's app (Brief 110b P2: today's inspectors, reused)
+import ConstructionInspector from '../../components/library/ConstructionInspector.jsx'
+// @ts-expect-error untyped JS from today's app
+import GlazingInspector from '../../components/library/GlazingInspector.jsx'
 import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
 // three.js only loads when 3D is first opened.
@@ -733,6 +737,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const startExample = () => { const r = addShape(plan, EXAMPLE); if (!('why' in r)) { commit(r.plan); fitTo(EXAMPLE); pick('select'); setSel({ kind: 'blocks', idx: [0] }) } }
   /** Where Site puts the weather choice (the run's own picker, rendered there). */
   const [weatherEl, setWeatherEl] = useState<HTMLElement | null>(null)
+  /** Today's library inspector, opened from a fabric type's ⓘ (Brief 110b P2). */
+  const [inspect, setInspect] = useState<{ name: string; glazing: boolean } | null>(null)
 
   // ─── the wall card: a room's piece of an outside wall, or the whole wall ─────────
   const pieces = useMemo(() => wallPieces(plan), [plan])
@@ -1220,6 +1226,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             <option value="">{lib.length ? 'Not set' : 'None in the library yet'}</option>
             {lib.map((x) => <option key={x.key} value={x.key}>{short(x.name)}{x.u != null ? ` · U ${x.u}` : ''}</option>)}
           </select>
+          {at.construction && <button type="button" className="gl-info" aria-label={`Layers and values of ${at.name}`} title="See the construction in the library" onClick={() => setInspect({ name: at.construction!, glazing: at.element === 'glazing' })}>ⓘ</button>}
         </div>
         <div className="gl-row"><span>U-value you know</span>
           <label className="gl-u" title="Used over the library's. Empty: the library's.">
@@ -1517,6 +1524,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const root = (
     <div className={`gl-root${giving ? ' giving' : ''}${embedded ? ' embedded' : ''}`} ref={host}>
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
+      {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
+      {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
       {embedded && slots && <EmbeddedResults doc={built.doc} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">

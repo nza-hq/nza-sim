@@ -28,7 +28,8 @@ Brief [`docs/briefs/active/110b_carry_over_from_today.md`](docs/briefs/active/11
   - The Heat flow tab draws today's `HeatBalance` (Rows, Stacked and Sankey) from the run, through a new optional `lines` prop on `HeatBalance` and `BalanceSankey`. Today's callers do not pass it, so they are unchanged.
   - Every balance term is drawn. Conduction, sun on walls and roof, and radiation to the sky are drawn as one net "Walls, roof and floor" line, and the table below lists all three. It follows the zone chosen on the left.
   - The strip is today's `LiveResultsStrip` (heating, cooling, peak, energy used) and follows the top bar's Per m² / Total. 107 sim2 tests pass and the build is clean.
-  - Monthly, Profiles and solar by orientation need per-month and per-surface results from the run (building thread).
+  - Monthly, Profiles and solar by orientation need per-month and per-surface results from the run (the building thread is adding `summary.monthly`, per-surface lines and `summary.hourly` on 109).
+- **P2 (part):** the Spaces card's day charts are now today's `MiniProfile`, weekday and then the weekend when it differs. An all-zero day reads "none all day", not MiniProfile's "no schedule set". Each fabric type has an ⓘ that opens today's `ConstructionInspector` or `GlazingInspector`. These read the library from the backend, so they need the local app; there is no backend in the preview, so the ⓘ is hidden there. Still to do: SchedulePopout, and comfort inline with the demand (it comes with 111's Fabric only temperature).
 
 ## 🟡 Brief 111 — Simulate v2: "Results include" levels (Parts 1–2 here; 3–4 the editor's) — IN PROGRESS on `chris/111-results-levels` (stacked on 108)
 

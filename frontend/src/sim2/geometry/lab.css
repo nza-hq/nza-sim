@@ -352,15 +352,7 @@
 .ap-hw > summary { cursor: pointer; font: 700 11px var(--gl-detail); letter-spacing: .06em; text-transform: uppercase; color: var(--gl-soft); }
 .ap-wholenote { display: flex; gap: 8px; align-items: flex-start; background: #EEF5F2; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; margin: 0 0 12px; }
 .ap-wholenote .nz-icon { flex: none; margin-top: 1px; }
-.ap-spark { margin: 2px 0 10px auto; width: 228px; }
-.ap-spark svg { display: block; background: #F5F7F7; border-radius: 6px; }
-.ap-spark .wk-fill { fill: #1E5A4A; opacity: 0.12; }
-.ap-spark .wk { fill: none; stroke: #1E5A4A; stroke-width: 1.5; }
-.ap-spark .we { fill: none; stroke: #C2410C; stroke-width: 1.2; stroke-dasharray: 3 2; }
-.ap-spark .we.sun { stroke-dasharray: 1 2; }
-.ap-spark figcaption { display: flex; justify-content: space-between; font-size: 10.5px; color: #6B7280; margin-top: 2px; }
-.ap-spark .k { display: inline-block; width: 10px; height: 0; border-top: 2px solid #1E5A4A; vertical-align: middle; margin: 0 3px 0 6px; }
-.ap-spark .k.we { border-top: 2px dashed #C2410C; }
+.ap-spark { margin: 2px 0 10px auto; width: 228px; display: grid; gap: 6px; }
 .ap-borrow { background: #EEF5F2; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; }
 .ap-borrow .gl-row { margin: 0; }
 .ap-borrow p { margin: 6px 0 0; font-size: 12px; color: #4B5563; }
@@ -384,3 +376,7 @@
 /* Brief 110: a step chosen before anything is drawn. */
 .gl-needs { padding: 16px; }
 .gl-needs-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+/* Brief 110b P2: the ⓘ that opens today's library inspector. */
+.gl-info { border: 0; background: none; color: #6B7280; cursor: pointer; font-size: 14px; padding: 0 2px 0 6px; line-height: 1; }
+.gl-info:hover { color: #1F5C46; }
+.ap-spark-zero { font-size: 11px; color: #6B7280; margin: 0; }
