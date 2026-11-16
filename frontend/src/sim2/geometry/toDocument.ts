@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, profileOf, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -296,11 +296,17 @@ export function buildDocument(plan0: Plan): Built {
       const t = (plan.emitter_types ?? []).find((x) => x.id === tid)
       if (!t) return []
       const wet = isWet(t.kind)
+      // Brief 119 (2.7): a cooling kind may state its cooling; one that does not heat leaves every heating field empty.
+      const cools = coolingKind(t.kind)
+      const heats = cools ? t.heats !== false : true
+      const cooling = { heats, cooling_output_w: cools ? t.cooling_output_w ?? null : null, catalogue_ref: heats && t.catalogue ? t.catalogue : null }
+      if (!heats) return [{ id: `${zid}_${t.id}`, label: t.name, kind: t.kind, count, rated_output_w: null, radiant_fraction: null, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null, ...cooling }]
       if (wet && !feeds) notes.push(`${t.name}: fed by a heating system, but its zone has none given`)
       return [{
         id: `${zid}_${t.id}`, label: t.name, kind: t.kind, count, rated_output_w: t.rated_output_w, radiant_fraction: t.radiant_fraction,
         system_group_id: wet ? feeds : null,
         rated_flow_c: wet ? t.rated_flow_c : null, rated_return_c: wet ? t.rated_return_c : null, rated_room_c: wet ? t.rated_room_c : null, exponent_n: wet ? t.exponent_n : null,
+        ...cooling,
       }]
     })
   }

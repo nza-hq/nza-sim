@@ -39,7 +39,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
@@ -60,6 +60,7 @@ import EmbeddedResults from '../run/EmbeddedResults'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { lightingWm2 } from '../../thermal/engine/lighting'
 import { defaultPumps } from '../../thermal/catalogue/auxiliaryDefaults'
+import { CATALOGUES, catalogueItem } from '../../thermal/catalogue'
 import { PUMP_CURVE } from '../../thermal/engine/pumps'
 import { controlMap, hoursOnMonday } from './controls'
 import { buildDocument } from './toDocument'
@@ -1829,7 +1830,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return i < 0 ? null : SYSTEM_COLOURS[(i + 3) % SYSTEM_COLOURS.length]!
   }
   const curEmit = emitterTypes.find((x) => x.id === activeEmit) ?? emitterTypes[0] ?? null
-  const emitUnset = (t: EmitterType) => t.rated_output_w == null || t.radiant_fraction == null || (isWet(t.kind) && [t.rated_flow_c, t.rated_return_c, t.rated_room_c, t.exponent_n].some((v) => v == null))
+  const emitHeats = (t: EmitterType) => !coolingKind(t.kind) || t.heats !== false
+  const emitUnset = (t: EmitterType) => (emitHeats(t) ? t.rated_output_w == null || t.radiant_fraction == null || (isWet(t.kind) && [t.rated_flow_c, t.rated_return_c, t.rated_room_c, t.exponent_n].some((v) => v == null)) : t.cooling_output_w == null)
   const roomEmitters = (r: Plan['rooms'][number]) => (r.emitters ?? []).filter((e) => e.count > 0 && emitterTypes.some((t) => t.id === e.type))
   const emitName = (r: Plan['rooms'][number]) => roomEmitters(r).map((e) => `${e.count} × ${emitterTypes.find((t) => t.id === e.type)!.name}`).join(', ')
   const newEmitter = (from?: EmitterType) => {
@@ -1847,12 +1849,26 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const items: Item[] = emitterTypes.map((t) => {
       const n = plan.rooms.reduce((s2, r) => s2 + (r.emitters ?? []).filter((e) => e.type === t.id).reduce((a, e) => a + e.count, 0), 0)
       const kind = EMITTER_KINDS.find((k) => k.key === t.kind)!.name
-      return { id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, line: [kind, t.rated_output_w != null ? `${t.rated_output_w} W each` : 'output not set'].join(' · '), used: n ? `${n} in rooms` : 'not used', removable: !n }
+      return { id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, line: [kind, ...(emitHeats(t) ? [t.rated_output_w != null ? `${t.rated_output_w} W each` : 'output not set'] : []), ...(coolingKind(t.kind) && t.cooling_output_w != null ? [`cools ${t.cooling_output_w} W each`] : []), ...(emitHeats(t) ? [] : ['cools only'])].join(' · '), used: n ? `${n} in rooms` : 'not used', removable: !n }
     })
     const wet = x ? isWet(x.kind) : false
-    const num = (label: string, k: 'rated_output_w' | 'radiant_fraction' | 'rated_flow_c' | 'rated_return_c' | 'rated_room_c' | 'exponent_n', step: number, unit?: string, max?: number) => x && (
-      <div className="gl-row gl-typed"><span>{label}</span><Num value={x[k] ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 && (max == null || v <= max) ? v : k === 'radiant_fraction' && v === 0 ? 0 : x[k]; if (n !== x[k]) setEmit(x.id, { [k]: n }) }} /></div>
+    const heats = x ? emitHeats(x) : true
+    const cools = x ? coolingKind(x.kind) : false
+    // A figure typed over a catalogue item's no longer is the catalogue's: the reference goes (the run would refuse it).
+    const RATED = ['rated_output_w', 'rated_flow_c', 'rated_return_c', 'rated_room_c', 'exponent_n']
+    const num = (label: string, k: 'rated_output_w' | 'radiant_fraction' | 'rated_flow_c' | 'rated_return_c' | 'rated_room_c' | 'exponent_n' | 'cooling_output_w', step: number, unit?: string, max?: number) => x && (
+      <div className="gl-row gl-typed"><span>{label}</span><Num value={x[k] ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 && (max == null || v <= max) ? v : k === 'radiant_fraction' && v === 0 ? 0 : k === 'cooling_output_w' && !Number.isFinite(v) ? null : x[k]; if (n !== x[k]) setEmit(x.id, { [k]: n, ...(RATED.includes(k) && x.catalogue ? { catalogue: null } : {}) }) }} /></div>
     )
+    const cat = x?.catalogue ? catalogueItem(x.catalogue.catalogue, x.catalogue.item) : null
+    const pickItem = (ref: string) => {
+      if (!x) return
+      if (!ref) return setEmit(x.id, { catalogue: null })
+      const [c, id] = ref.split('|') as [string, string]
+      const got = catalogueItem(c, id)
+      if (!got) return
+      const { catalogue: cg, item: it } = got
+      setEmit(x.id, { catalogue: { catalogue: c, item: id }, rated_output_w: it.output_w, rated_flow_c: cg.rating.flow_c, rated_return_c: cg.rating.return_c, rated_room_c: cg.rating.room_c, exponent_n: it.exponent_n, ...(x.name.startsWith('Radiator') ? { name: `${cg.maker} ${it.height_mm} × ${it.length_mm}` } : {}) })
+    }
     return (
       <GivePanel
         kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
@@ -1866,13 +1882,35 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           <>
             <input className="gl-title-in ap-tname" aria-label="Emitter name" defaultValue={x.name} key={`${x.id}-${x.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== x.name && setEmit(x.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
             <div className="gl-row gl-librow"><span>Kind</span>
-              <select className="gl-sel" aria-label="Emitter kind" value={x.kind} onChange={(e) => setEmit(x.id, { kind: e.target.value as EmitterKind })}>
+              <select className="gl-sel" aria-label="Emitter kind" value={x.kind} onChange={(e) => { const k = e.target.value as EmitterKind; const m = /^(?:Radiator|Underfloor heating|Fan coil|VRF indoor unit|Electric heater|Other) (\d+)$/.exec(x.name); setEmit(x.id, { kind: k, ...(k !== 'radiator' ? { catalogue: null } : {}), ...(m ? { name: `${EMITTER_KINDS.find((q) => q.key === k)!.name} ${m[1]}` } : {}) }) }}>
                 {EMITTER_KINDS.map((k) => <option key={k.key} value={k.key}>{k.name}</option>)}
               </select>
             </div>
-            {num(wet ? 'Output of one, rated' : 'Output of one', 'rated_output_w', 50, 'W')}
-            {num('Radiant share', 'radiant_fraction', 0.05, undefined, 1)}
-            {wet && (
+            {cools && (
+              <>
+                <h4>Cooling</h4>
+                {num('Cooling of one', 'cooling_output_w', 100, 'W')}
+                <label className="gl-row gl-librow"><span>Heats as well</span><input type="checkbox" aria-label="Heats as well" checked={heats} onChange={(e) => setEmit(x.id, e.target.checked ? { heats: true } : { heats: false, catalogue: null })} /></label>
+                <p className="gl-hint">The unit's sensible cooling from the maker's data, held fixed. A room with cooling units has its cooling capped at their total; empty, its cooling is not capped.</p>
+                {heats && <h4>Heating</h4>}
+              </>
+            )}
+            {x.kind === 'radiator' && (
+              <div className="gl-row gl-librow"><span>From a catalogue</span>
+                <select className="gl-sel" aria-label="Catalogue radiator" value={x.catalogue ? `${x.catalogue.catalogue}|${x.catalogue.item}` : ''} onChange={(e) => pickItem(e.target.value)}>
+                  <option value="">Typed in</option>
+                  {Object.values(CATALOGUES).map((c) => [...new Set(c.items.map((i) => i.height_mm))].map((h) => (
+                    <optgroup key={`${c.id}${h}`} label={`${c.title}, ${h} mm high`}>
+                      {c.items.filter((i) => i.height_mm === h).map((i) => <option key={i.id} value={`${c.id}|${i.id}`}>{`${i.length_mm} mm long, ${i.output_w} W (${i.id})`}</option>)}
+                    </optgroup>
+                  )))}
+                </select>
+              </div>
+            )}
+            {cat && <p className="gl-hint">From {cat.catalogue.title}, {cat.item.type}, {cat.item.height_mm} × {cat.item.length_mm} mm, code {cat.item.id}: {cat.item.output_w} W at {cat.catalogue.rating.flow_c}/{cat.catalogue.rating.return_c}/{cat.catalogue.rating.room_c} °C, n {cat.item.exponent_n}, as printed. The run checks these figures against it.</p>}
+            {heats && num(wet ? 'Output of one, rated' : 'Output of one', 'rated_output_w', 50, 'W')}
+            {heats && num('Radiant share', 'radiant_fraction', 0.05, undefined, 1)}
+            {heats && wet && (
               <>
                 <h4>Rated at (EN 442)</h4>
                 {num('Flow', 'rated_flow_c', 1, '°C')}
@@ -1882,7 +1920,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <p className="gl-hint">From the maker's data. A new radiator starts at the EN 442 rating, 75/65/20 °C. n is about 1.3 for panel radiators, 1.1 underfloor, 1.0 fan coils. Its output is re-rated at the heating system's design flow and return.</p>
               </>
             )}
-            {!wet && <p className="gl-hint">A fixed output, not fed by the heating system's water.</p>}
+            {heats && !wet && <p className="gl-hint">A fixed output, not fed by the heating system's water.</p>}
             <div className="gl-row gl-typed ap-count"><span>How many in each room</span><Num value={emitCount} step={1} min={0} onCommit={(v) => setEmitCount(Number.isFinite(v) && v >= 0 ? Math.round(v) : 1)} /></div>
             <p className="gl-hint">Apply puts this many in each chosen room (0 takes them out). A room's emitters cap the heat it can get; a room with none is not capped.</p>
           </>
