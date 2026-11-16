@@ -77,7 +77,7 @@ export function bestestDoc(wall: string, floor: string) {
     s('window', 'glazing', 12, 180, 90, 'window600', { solar_absorptance: null, frame_fraction: 0, inside_solar_absorptance: null }),
   ]
   return ModelDocument.parse({
-    schema_version: '2.9',
+    schema_version: '2.10',
     building: { id: 'bestest', name: 'BESTEST', decoded_building_key: null, site: { lat: 39.83, lon: -104.65, name: 'Denver', exposure: null, ground: { method: 'annual_mean_outdoor' } }, orientation_deg: 0, reported_floor_area_m2: null, thermal_bridging: { mode: 'absent', multiplier: null, alpha_pct: null }, thermal_mass: { mode: null, category: null }, opening_defaults: {} },
     zones: [{
       id: 'z', name: 'Case', floor: 0, storeys: 1, polygon: [[0, 0], [8, 0], [8, 6], [0, 6]], area_m2: 48, height_m: 2.7, use_type: 'test', rooms: null,
