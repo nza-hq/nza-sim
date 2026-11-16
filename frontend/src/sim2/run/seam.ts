@@ -96,7 +96,9 @@ export type Level = (typeof LEVELS)[number]
  *   vents are on the zone and its surfaces, and stay), emitters and system groups removed; each zone heated to
  *   `heatC` with no cooling and no setback.
  * - spaces: mechanical ventilation entries (mvhr, mev), emitters and system groups removed; the zones' own setpoints,
- *   gains and natural ventilation stay.
+ *   people, equipment and natural ventilation stay. Lighting is removed with its profiles and references (Brief 112 P3):
+ *   its heat depends on the luminaires (lux × efficacy, or a W/m² stated for them), a Systems object, so it arrives at
+ *   'systems'.
  * - systems: the document unchanged.
  */
 export function levelDocument(doc: ModelDocument, level: Level, heatC: number | null = null): ModelDocument {
@@ -106,7 +108,9 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
   for (const z of d.zones) {
     z.emitters = []
     z.ventilation = level === 'fabric' ? [] : z.ventilation.filter((v) => v.kind === 'natural')
+    z.profile_refs.lighting = []
   }
+  d.profiles = d.profiles.filter((p) => p.kind !== 'lighting')
   if (level === 'fabric') {
     if (heatC == null || !Number.isFinite(heatC)) throw new Error('fabric level needs the heating setpoint')
     d.profiles = d.profiles.filter((p) => p.kind === 'schedule')

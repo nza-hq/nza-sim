@@ -54,16 +54,18 @@ describe('run copies (Rule 8: removed, not muted)', () => {
     // The document itself is not changed.
     expect(d.zones[4].emitters.length).toBe(1)
   })
-  it('spaces: no mechanical ventilation, emitter or system; the zones\' own setpoints and gains stay', async () => {
+  it('spaces: no mechanical ventilation, emitter, system or lighting; the zones\' own setpoints, people and equipment stay', async () => {
     const d = await doc()
+    expect(d.profiles.some((p) => p.kind === 'lighting')).toBe(true)
     const s = levelDocument(d, 'spaces')
     expect(s.system_groups).toEqual([])
-    expect(s.profiles).toEqual(d.profiles)
+    // Brief 112 P3: lighting arrives with the luminaires, at + Systems; everything else the spaces state stays.
+    expect(s.profiles).toEqual(d.profiles.filter((p) => p.kind !== 'lighting'))
     for (const [i, z] of s.zones.entries()) {
       expect(z.ventilation.every((v) => v.kind === 'natural')).toBe(true)
       expect(z.emitters).toEqual([])
       expect(z.setpoints).toEqual(d.zones[i].setpoints)
-      expect(z.profile_refs).toEqual(d.zones[i].profile_refs)
+      expect(z.profile_refs).toEqual({ ...d.zones[i].profile_refs, lighting: [] })
     }
   })
   it('systems: the document as it is', async () => {
