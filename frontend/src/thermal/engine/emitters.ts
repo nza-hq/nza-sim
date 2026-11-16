@@ -9,7 +9,7 @@
  * so each zone's cap is a fixed number of watts, as EnergyPlus's LimitCapacity takes it. A zone without emitters is not
  * limited (ideal loads, as before). Nothing is defaulted: a missing value is refused, naming it (Rules 2 and 3).
  */
-import { FIXED_OUTPUT_KINDS, type ModelDocument } from '../schema/model'
+import { COOLING_KINDS, FIXED_OUTPUT_KINDS, type ModelDocument } from '../schema/model'
 
 export class EmitterError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'EmitterError' }
@@ -51,10 +51,19 @@ export interface ZoneEmitters {
   slab: { surface_id: string; layer_index: number; share: number } | null
 }
 
-/** Each zone's emitters, or null for a zone that states none. Throws EmitterError for a missing or impossible value. */
+/** A heating emitter's own fields: left empty on a unit that does not heat (Brief 119). */
+const HEATING_FIELDS = ['rated_output_w', 'radiant_fraction', 'system_group_id', 'rated_flow_c', 'rated_return_c', 'rated_room_c', 'exponent_n', 'source_surface_id', 'source_layer_index'] as const
+
+/** Each zone's heating emitters, or null for a zone that states none. Throws EmitterError for a missing or impossible value. */
 export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
   return doc.zones.map((zone, zi) => {
-    if (zone.emitters.length === 0) return null
+    // Brief 119: a unit that cools and does not heat is not a heating emitter; its heating fields must be empty.
+    zone.emitters.forEach((e, j) => {
+      if (e.heats) return
+      const p = `zones[${zi}].emitters[${j}]`
+      for (const k of HEATING_FIELDS) if (e[k] != null) throw new EmitterError('leave empty: this unit does not heat', `${p}.${k}`)
+    })
+    if (!zone.emitters.some((e) => e.heats)) return null
     const zp = `zones[${zi}]`
     const room = zone.setpoints.heat_c
     if (room == null) throw new EmitterError('a zone with emitters needs a heating setpoint to rate them at', `${zp}.setpoints.heat_c`)
@@ -63,6 +72,7 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
     let cap = 0, rad = 0, fixed = 0, direct = 0, slabW = 0
     let slab: { surface_id: string; layer_index: number } | null = null
     zone.emitters.forEach((e, j) => {
+      if (!e.heats) return
       const p = `${zp}.emitters[${j}]`
       const need = (v: number | null, k: string) => { if (v == null) throw new EmitterError('required', `${p}.${k}`); return v }
       const count = need(e.count, 'count'), unit = need(e.rated_output_w, 'rated_output_w')
@@ -136,6 +146,36 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
   })
 }
 
+/** Brief 119: the most sensible cooling a zone's units give, W, and each unit entry's share of it. */
+export interface ZoneCooling {
+  cap_w: number
+  units: { id: string; kind: string; output_w: number }[]
+}
+
+/**
+ * Brief 119: each zone's cooling units, or null for a zone none of whose units cool (its cooling is not limited, ideal
+ * loads, as before; Rule 8). A unit's cooling is its stated output × count, held fixed: EnergyPlus's LimitCapacity on
+ * sensible cooling takes it the same way. Throws EmitterError for a missing or impossible value.
+ */
+export function zoneCooling(doc: ModelDocument): (ZoneCooling | null)[] {
+  return doc.zones.map((zone, zi) => {
+    const units: ZoneCooling['units'] = []
+    zone.emitters.forEach((e, j) => {
+      const p = `zones[${zi}].emitters[${j}]`
+      if (!COOLING_KINDS.includes(e.kind)) return
+      if (e.cooling_output_w == null) {
+        if (!e.heats) throw new EmitterError('required: a unit that does not heat must state its cooling', `${p}.cooling_output_w`)
+        return
+      }
+      if (e.count == null) throw new EmitterError('required', `${p}.count`)
+      units.push({ id: e.id, kind: e.kind, output_w: e.count * e.cooling_output_w })
+    })
+    if (units.length === 0) return null
+    if (zone.setpoints.cool_c == null) throw new EmitterError('a zone with cooling units needs a cooling setpoint', `zones[${zi}].setpoints.cool_c`)
+    return { cap_w: units.reduce((s, u) => s + u.output_w, 0), units }
+  })
+}
+
 /** EN 442-2's standard rating: flow 75 °C, return 65 °C, room 20 °C (the "ΔT 50" a catalogue lists). */
 export const EN442_STANDARD = { flow_c: 75, return_c: 65, room_c: 20 } as const
 
@@ -178,15 +218,17 @@ export function zoneSizing(doc: ModelDocument, zi: number, em: Pick<ZoneEmitters
   let fixed = 0
   const groups = new Set<string>(), ns = new Set<number>()
   let ratedNow = 0
-  zone.emitters.forEach((e, j) => {
+  // Brief 119: the heating emitters only (em.emitters lists them in the same order); a cooling-only unit is not one.
+  const heating = zone.emitters.filter((e) => e.heats)
+  heating.forEach((e, j) => {
     if (FIXED_OUTPUT_KINDS.includes(e.kind)) { fixed += em.emitters[j].output_w; return }
     groups.add(e.system_group_id!); ns.add(e.exponent_n!)
     ratedNow += e.count! * ratedOutputAt(e.rated_output_w!, e.exponent_n!, { flow_c: e.rated_flow_c!, return_c: e.rated_return_c!, room_c: e.rated_room_c! }, EN442_STANDARD)
   })
-  const hasFixed = zone.emitters.some((e) => FIXED_OUTPUT_KINDS.includes(e.kind))
+  const hasFixed = heating.some((e) => FIXED_OUTPUT_KINDS.includes(e.kind))
   const unlisted = doc.system_groups
     .filter((g) => g.service === 'heating' && g.enabled && g.zones.includes(zone.id))
-    .filter((g) => !(zone.emitters.some((e) => e.system_group_id === g.id) || (g.design_flow_c == null && hasFixed)))
+    .filter((g) => !(heating.some((e) => e.system_group_id === g.id) || (g.design_flow_c == null && hasFixed)))
     .map((g) => g.label || g.id)
   const base = { cap_w: em.cap_w, peak_w, shortfall_w: Math.max(0, peak_w - em.cap_w), unlisted_systems: unlisted }
   if (groups.size === 0) return { ...base, design: null, rated_now_w: null, needed_rated_w: null, note: 'Only fixed-output emitters (VRF indoor units or electric heaters): a larger unit is chosen by its stated output.' }

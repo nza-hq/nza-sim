@@ -23,3 +23,6 @@
 .es .rp-note p:last-child { margin: 0; }
 .es-mode { display: flex; gap: 6px; margin: 2px 0 8px; }
 .es-mode .rp-btn[aria-pressed="true"] { background: #235546; color: #fff; border-color: #235546; }
+/* Brief 119: cooling units. The bar takes today's cooling colour (data/balanceColours.js COOLING_COLOUR). */
+.es-sub { margin: 12px 0 2px; font-size: 12px; font-weight: 600; color: #235546; }
+.es-bar-cool span { background: #00AEEF; }

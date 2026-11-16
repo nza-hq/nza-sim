@@ -449,3 +449,68 @@ describe('saving weather to the organisation', () => {
     expect(organisationFileName('x'.repeat(300))).toMatch(ok)
   })
 })
+
+describe('Brief 119: cooling units in the emitter summary', () => {
+  it('the engine\'s own cap, the unlimited run\'s peak, the limited run\'s hours above (Rule 11)', async () => {
+    const d = await doc()
+    const z3 = d.zones[2]
+    z3.emitters = [{ id: 'z3_vrf', kind: 'vrf_indoor', count: 4, heats: false, cooling_output_w: 3000, rated_output_w: null, radiant_fraction: null, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const em = r.summary.emitters!
+    expect(em.zones).toEqual([])  // a cooling-only unit is not a heating emitter
+    expect(em.cooling).toHaveLength(1)
+    const c = em.cooling[0], z = r.results.zones[2]
+    const free = simulate(d, { weather: WEATHER, options: { ...RUN_OPTIONS, emitter_limit: 'none' } })
+    if (!free.ok) throw new Error('free run')
+    expect(c).toMatchObject({ id: z3.id, cap_w: 12000, unmet_hours: z.annual.unmet_cooling_hours, max_c: z.annual.max_control_c, hours_at_cap: z.cooling_units!.hours_at_cap })
+    expect(c.peak_w).toBe(free.results.zones[2].annual.peak_cooling_w)
+    expect(c.shortfall_w).toBeCloseTo(c.peak_w - 12000, 9)
+    expect(c.unmet_hours).toBeGreaterThan(0)
+  })
+})
+
+describe('Brief 119: radiators from the catalogue', () => {
+  const fromCatalogue = async (count: number, over: Record<string, unknown> = {}) => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 50; hp.design_return_c = 40
+    d.zones[0].emitters = [{ id: 'k2', kind: 'radiator', count, rated_output_w: 3465, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.33, catalogue_ref: { catalogue: 'stelrad-vita-compact', item: '76602220' }, ...over }]
+    return d
+  }
+  it('a short room: the smallest item that adds the rating still needed, from the engine\'s own sizing', async () => {
+    const r = simulate(await fromCatalogue(4), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const z = r.summary.emitters!.zones[0]
+    expect(z.shortfall_w).toBeGreaterThan(0)
+    expect(z.rated_now_w).toBeCloseTo(4 * 3465, 6)
+    const c = z.catalogue!
+    expect(c.extra_rated_w).toBeCloseTo(z.needed_rated_w! - z.rated_now_w!, 9)
+    expect(c).toMatchObject({ catalogue: 'stelrad-vita-compact', title: 'Stelrad Vita Compact', height_mm: 600 })
+    if (c.count === 1) expect(c.output_w).toBeGreaterThanOrEqual(c.extra_rated_w)
+    else expect(c.count * c.output_w).toBeGreaterThanOrEqual(c.extra_rated_w)
+  })
+  it('enough: no suggestion; typed-in radiators: none either', async () => {
+    const r = simulate(await fromCatalogue(40), { weather: WEATHER })
+    expect(r.ok && r.summary.emitters!.zones[0].catalogue).toBeNull()
+    const t = simulate(await fromCatalogue(4, { catalogue_ref: null }), { weather: WEATHER })
+    expect(t.ok && t.summary.emitters!.zones[0].catalogue).toBeNull()
+  })
+  it('a figure that differs from the item is refused by name, never filled', async () => {
+    const r = simulate(await fromCatalogue(4, { rated_output_w: 3500 }), { weather: WEATHER })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.missing[0]).toMatchObject({ path: 'zones[0].emitters[0].rated_output_w', what: expect.stringContaining('states 3500, but the output of Stelrad Vita Compact 76602220 is 3465') })
+  })
+})
+
+describe('Brief 119 review F10: cooling stated nowhere', () => {
+  it('a cooled zone with a VRF unit that heats and states no cooling is named, and its cooling is not limited', async () => {
+    const d = await doc()
+    const z = d.zones[1]
+    z.emitters = [{ id: 'v', kind: 'vrf_indoor', count: 2, rated_output_w: 5000, radiant_fraction: 0, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.emitters!.cooling_unstated).toEqual([{ id: z.id, name: z.name }])
+    expect(r.results.zones[1].cooling_units).toBeNull()
+  })
+})

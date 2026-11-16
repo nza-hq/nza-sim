@@ -1,0 +1,189 @@
+{
+ "source": "validation/energyplus/119_cooling_referee.py",
+ "spec_sha256": "0367d6767d1d7558de91498646bf1749d36ecb23c753a0ecdf63943f3b06a809",
+ "cooled_spec_sha256": "3a3f7c4af45fb9070e45d21ad0c4defe7e78e45d29f6196cf175e538af62725f",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "gains_csv_sha256": "55da387066d0488f75783ec712e5f5d7e45b780f019503826fec23a6e835f89f",
+ "cooled_room": {
+  "unlimited": {
+   "caps": null,
+   "zones": {
+    "middle": {
+     "cool_mwh": 1.3479596695031897,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 1341.0812017739286,
+     "latent_mwh": 0.003728610826801069,
+     "hours": 8760
+    }
+   }
+  },
+  "tight": {
+   "caps": {
+    "middle": 800
+   },
+   "zones": {
+    "middle": {
+     "cool_mwh": 1.3176321698446576,
+     "unmet_hours": 299,
+     "ep_not_met_hours": 309.0,
+     "max_c": 27.296815298616572,
+     "peak_cooling_w": 800.0473130628309,
+     "latent_mwh": 0.003666291610239331,
+     "hours": 8760
+    }
+   }
+  },
+  "mild": {
+   "caps": {
+    "middle": 1100
+   },
+   "zones": {
+    "middle": {
+     "cool_mwh": 1.3454303508290222,
+     "unmet_hours": 33,
+     "ep_not_met_hours": 33.5,
+     "max_c": 25.29260318224045,
+     "peak_cooling_w": 1100.0,
+     "latent_mwh": 0.003728659206907577,
+     "hours": 8760
+    }
+   }
+  }
+ },
+ "bridgewater": {
+  "unlimited": {
+   "caps": null,
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+    "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+    "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}",
+    "gains: 20 OtherEquipment, 345.560 MWh a year in all, gains.csv sha256 55da387066d0488f75783ec712e5f5d7e45b780f019503826fec23a6e835f89f",
+    "vent: 15 ZoneVentilation:DesignFlowRate, 2.7030 m3/s of outdoor air equivalent in all"
+   ],
+   "cooling_mwh": 57.383,
+   "heating_mwh": 119.16,
+   "zones": {
+    "Floor_1": {
+     "cool_mwh": 7.87580492802317,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 18791.65395561233,
+     "latent_mwh": 1.065148007758971,
+     "hours": 8760
+    },
+    "Floor_2": {
+     "cool_mwh": 12.583518146930961,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 19656.662966336593,
+     "latent_mwh": 1.2565669320341293,
+     "hours": 8760
+    },
+    "Floor_3": {
+     "cool_mwh": 13.362819138362537,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 19870.383806514554,
+     "latent_mwh": 1.283743310538288,
+     "hours": 8760
+    },
+    "Floor_4": {
+     "cool_mwh": 13.12888369113799,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 19983.242875088006,
+     "latent_mwh": 1.2772434557805887,
+     "hours": 8760
+    },
+    "Floor_5": {
+     "cool_mwh": 10.432080433275422,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 21180.397327183277,
+     "latent_mwh": 1.2169919721115967,
+     "hours": 8760
+    }
+   },
+   "severe": 0,
+   "warnings": 26,
+   "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.16 14:30"
+  },
+  "limited": {
+   "caps": {
+    "Floor_3": 12000
+   },
+   "notes": [
+    "frame_split: 20 windows split into glass (0.80, SHGC = glass g) and frame (0.20, no solar)",
+    "airmass: capacitance multiplier 65.5597 on every zone",
+    "slab_reversed: 4 upper slab faces given the reversed construction (inside face IntFloor_Carpet)",
+    "tb_by_zone: wall junctions 242.973 W/K by zone {\"Floor_1\": {\"h_w_per_k\": 94.234, \"u_wall\": 0.417, \"net_wall_m2\": 340.193}, \"Floor_2\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_3\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_4\": {\"h_w_per_k\": 41.5732, \"u_wall\": 0.2622, \"net_wall_m2\": 340.193}, \"Floor_5\": {\"h_w_per_k\": 24.0196, \"u_wall\": 0.2106, \"net_wall_m2\": 340.193}}",
+    "inf_by_zone: building rate 0.069248 ach shared by envelope area {\"Floor_1\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}, \"Floor_2\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_3\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_4\": {\"envelope_m2\": 468.096, \"ach\": 0.040248}, \"Floor_5\": {\"envelope_m2\": 1311.288, \"ach\": 0.112748}}",
+    "gains: 20 OtherEquipment, 345.560 MWh a year in all, gains.csv sha256 55da387066d0488f75783ec712e5f5d7e45b780f019503826fec23a6e835f89f",
+    "vent: 15 ZoneVentilation:DesignFlowRate, 2.7030 m3/s of outdoor air equivalent in all",
+    "cap: Floor_3 cooling limited to 12000 W"
+   ],
+   "cooling_mwh": 57.317,
+   "heating_mwh": 119.16,
+   "zones": {
+    "Floor_1": {
+     "cool_mwh": 7.882017205045235,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 18808.32626921218,
+     "latent_mwh": 1.0656469567723148,
+     "hours": 8760
+    },
+    "Floor_2": {
+     "cool_mwh": 12.619015612074252,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 19786.20813207096,
+     "latent_mwh": 1.2586831898834197,
+     "hours": 8760
+    },
+    "Floor_3": {
+     "cool_mwh": 13.21334363711866,
+     "unmet_hours": 43,
+     "ep_not_met_hours": 44.25,
+     "max_c": 24.77937875740877,
+     "peak_cooling_w": 12000.000000000018,
+     "latent_mwh": 0.8698996489883524,
+     "hours": 8760
+    },
+    "Floor_4": {
+     "cool_mwh": 13.164483216756597,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 20113.178198266774,
+     "latent_mwh": 1.2793017786189123,
+     "hours": 8760
+    },
+    "Floor_5": {
+     "cool_mwh": 10.438402411486088,
+     "unmet_hours": 0,
+     "ep_not_met_hours": 0.0,
+     "max_c": 24.000000000000007,
+     "peak_cooling_w": 21198.514160203278,
+     "latent_mwh": 1.2174220459429275,
+     "hours": 8760
+    }
+   },
+   "severe": 0,
+   "warnings": 26,
+   "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c, YMD=2026.11.16 14:30"
+  }
+ }
+}
