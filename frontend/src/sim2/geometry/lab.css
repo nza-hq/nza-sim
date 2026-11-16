@@ -408,3 +408,12 @@
 .gl-changes .gl-btn { padding: 2px 8px; font-size: 11.5px; }
 .gl-h4i { display: flex; align-items: center; gap: 6px; }
 .gl-h4i svg { flex: none; color: #2B2A4C; }
+
+/* ─── Brief 118: the navigator on the left ─── */
+.ap-navby { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
+.ap-navby button { border: 1px solid #D5DBD8; background: #fff; border-radius: 999px; padding: 3px 10px; font: 600 11.5px var(--gl-detail); color: var(--gl-soft); cursor: pointer; }
+.ap-navby button[aria-selected='true'] { background: var(--gl-green); border-color: var(--gl-green); color: #fff; }
+.ap-navsec { font: 700 10.5px var(--gl-detail); letter-spacing: .06em; text-transform: uppercase; color: var(--gl-soft); margin: 10px 0 4px; }
+.ap-navit .ap-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.ap-navit.active { box-shadow: inset 3px 0 0 var(--gl-green); }
+.ap-count { margin-left: auto; font: 600 11px var(--gl-data, ui-monospace); color: var(--gl-soft); }

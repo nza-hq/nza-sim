@@ -40,7 +40,7 @@ import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
 import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
-import { ChooseList, GivePanel, type Item, type Kind, Sw, type Swatch } from './ApplyPanels'
+import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
@@ -272,6 +272,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [active, setActive] = useState<Partial<Record<FabricElement, string>>>({})
   const [activeSpace, setActiveSpace] = useState<string | null>(null)
   const [activeSys, setActiveSys] = useState<Partial<Record<Service, string>>>({})
+  /** Brief 118: what the left navigates by; null follows the step (Fabric on Fabric, Systems on Systems…). */
+  const [navBy, setNavBy] = useState<string | null>(null)
+  useEffect(() => setNavBy(null), [mode])
   const [clip, setClip] = useState<number | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [pointer, setPointer] = useState<XY | null>(null)
@@ -1185,8 +1188,71 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     }
     return null
   }
+  // ─── Brief 118: navigate by anything ────────────────────────────────────────
+  const navBy0 = mode === 'fabric' ? 'fabric' : mode === 'profiles' ? 'profiles' : mode === 'spaces' ? 'spaces' : mode === 'systems' ? (sysKind === 'ventilation' ? 'ventilation' : 'systems') : 'rooms'
+  const by = navBy ?? navBy0
+  const NONE: Swatch = { colour: '#B8C0BC', unset: true }
+  const roomsWhere = (f: (r: Plan['rooms'][number]) => boolean) => plan.rooms.filter(f).map((r) => r.id)
+  const noneItem = (id: string, name: string, rooms: string[]) => (rooms.length ? [{ id, name, swatch: NONE, rooms }] : [])
+  const sysSection = (sv: Service): NavSection => ({
+    title: SERVICES.find((x) => x.key === sv)!.name,
+    items: [
+      ...systemsOf(sv).map((x) => ({
+        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: !x.template }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id),
+        active: mode === 'systems' && sysKind === sv && curSys?.id === x.id,
+        onPick: mode === 'systems' ? () => { setSysKind(sv); setActiveSys((a) => ({ ...a, [sv]: x.id })) } : undefined,
+      })),
+      ...noneItem(`none-${sv}`, `No ${SERVICES.find((x) => x.key === sv)!.name.toLowerCase()}`, roomsWhere((r) => !systemsOf(sv).some((x) => x.id === r.systems?.[sv]))),
+    ],
+  })
+  const navSections = (): NavSection[] => {
+    if (by === 'fabric') {
+      const EL: Array<[FabricElement, string]> = [['wall', 'Outside walls'], ['glazing', 'Windows'], ['door', 'Doors'], ['roof', 'Roofs'], ['floor', 'Ground floors']]
+      return EL.map(([el, title]) => ({
+        title,
+        items: plan.fabric_types.filter((t) => t.element === el).map((t) => ({
+          id: t.id, name: t.name, swatch: fabricSwatch(t.id),
+          rooms: roomsWhere((r) => (el === 'roof' || el === 'floor' ? roomType(plan, r.id, el) === t.id : piecesOfRooms(plan, [r.id]).some((p) => typeOfSpan(plan, p, el) === t.id))),
+          active: mode === 'fabric' && elem === el && activeOf(el) === t.id,
+          onPick: mode === 'fabric' ? () => { if (el === 'glazing' || el === 'door') { setFkind('openings'); setOpening(el) } else setFkind(el as FabricKind); setActive((a) => ({ ...a, [el]: t.id })) } : undefined,
+        })),
+      }))
+    }
+    if (by === 'spaces') {
+      return [{
+        items: [
+          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), active: mode === 'spaces' && curSpace?.id === sp.id, onPick: mode === 'spaces' ? () => setActiveSpace(sp.id) : undefined })),
+          ...noneItem('none-space', 'No space type', roomsWhere((r) => !plan.spaces.some((sp) => sp.id === r.space))),
+        ],
+      }]
+    }
+    if (by === 'systems') {
+      return [
+        sysSection('heating'),
+        { title: 'Emitters', items: emitterTypes.map((t) => ({ id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: mode === 'systems' && sysKind === 'emitters' && activeEmit === t.id, onPick: mode === 'systems' ? () => { setSysKind('emitters'); setActiveEmit(t.id) } : undefined })) },
+        sysSection('cooling'),
+        sysSection('dhw'),
+      ]
+    }
+    if (by === 'ventilation') return [sysSection('ventilation')]
+    if (by === 'profiles') {
+      return PROFILE_KINDS.map((k) => ({
+        title: k.name,
+        items: projectProfiles().filter((key) => profile(key)!.schedule_type === k.key).map((key) => ({
+          id: key, name: short(profile(key)!.name), swatch: { colour: '#EA580C' },
+          rooms: roomsWhere((r) => { const sp = plan.spaces.find((x) => x.id === r.space); const v = plan.systems.find((x) => x.id === r.systems?.ventilation); return (!!sp && spaceUses(sp).includes(key)) || v?.schedule === key }),
+          active: mode === 'profiles' && profKind === k.key && profSel === key,
+          onPick: mode === 'profiles' ? () => { setProfKind(k.key); setProfSel(key) } : undefined,
+        })),
+      }))
+    }
+    return []
+  }
+  const NAV_TABS = [{ key: 'rooms', name: 'Rooms' }, { key: 'fabric', name: 'Fabric' }, { key: 'profiles', name: 'Profiles' }, { key: 'spaces', name: 'Spaces' }, { key: 'systems', name: 'Systems' }, { key: 'ventilation', name: 'Ventilation' }]
+
   const chooseList = () => (
     <ChooseList
+      nav={{ by, tabs: NAV_TABS, onBy: setNavBy, sections: navSections() }}
       rows={plan.rooms.map((r) => ({ id: r.id, name: r.name, zone: r.zone, area: `${f1(ringArea(r.ring))} m²`, has: hasOf(r) }))}
       zones={plan.zones}
       chosen={new Set(chosenSet.rooms)}

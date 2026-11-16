@@ -27,14 +27,22 @@ export function ChooseList(props: {
   extra?: ReactNode
   onChoose: (ids: string[], add: boolean) => void
   onNone: () => void
+  /** Navigate by: rooms (the list below), or the project's things of one kind, each with the rooms it reaches. */
+  nav?: { by: string; tabs: Array<{ key: string; name: string }>; onBy: (k: string) => void; sections: NavSection[] }
 }) {
-  const { rows, zones, chosen } = props
+  const { rows, zones, chosen, nav } = props
   const all = rows.length > 0 && rows.every((r) => chosen.has(r.id))
   const tick = (on: boolean, part = false) => <span className={`ap-tick${on ? ' on' : part ? ' part' : ''}`} aria-hidden="true" />
   const add = (e: React.MouseEvent) => e.shiftKey || e.ctrlKey || e.metaKey
   return (
     <div className="gl-sec ap-choose">
+      {nav && (
+        <div className="ap-navby" role="tablist" aria-label="Navigate by">
+          {nav.tabs.map((t) => <button key={t.key} type="button" role="tab" aria-selected={nav.by === t.key} onClick={() => nav.onBy(t.key)}>{t.name}</button>)}
+        </div>
+      )}
       <h3>Choose <small>{chosen.size ? `${chosen.size} of ${rows.length} rooms` : 'nothing yet'}{chosen.size > 0 && <button type="button" className="ap-link" onClick={props.onNone}>Clear</button>}</small></h3>
+      {nav && nav.by !== 'rooms' ? <NavItems sections={nav.sections} rows={rows} chosen={chosen} onChoose={props.onChoose} /> : (
       <div className="ap-rows" role="listbox" aria-multiselectable="true" aria-label="Rooms">
         <div className="ap-row ap-whole" role="option" aria-selected={all} onClick={() => props.onChoose(all ? [] : rows.map((r) => r.id), false)}>
           {tick(all, chosen.size > 0)}
@@ -65,8 +73,41 @@ export function ChooseList(props: {
           )
         })}
       </div>
+      )}
       {props.extra}
       <p className="gl-hint">Tap a room here or on the drawing; Ctrl or Shift adds more. Esc lets go.</p>
+    </div>
+  )
+}
+
+export type NavItem = { id: string; name: string; swatch: Swatch; rooms: string[]; active?: boolean; onPick?: () => void }
+export type NavSection = { title?: string; items: NavItem[] }
+
+/** The navigator's list: each thing with the rooms it reaches. A tap chooses its rooms (and shows it on the right);
+ * Ctrl or Shift adds them to what is chosen. Rooms with none of the kind are listed last, so they can be chosen too. */
+function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]; rows: Row[]; chosen: ReadonlySet<string>; onChoose: (ids: string[], add: boolean) => void }) {
+  const tick = (on: boolean, part = false) => <span className={`ap-tick${on ? ' on' : part ? ' part' : ''}`} aria-hidden="true" />
+  const nameOf = (id: string) => rows.find((r) => r.id === id)?.name ?? id
+  if (!sections.some((s) => s.items.length)) return <p className="gl-hint">Nothing of this kind in the project yet.</p>
+  return (
+    <div className="ap-rows" role="listbox" aria-multiselectable="true" aria-label="Navigate">
+      {sections.map((s, i) => (!s.items.length ? null : (
+        <div key={s.title ?? i} className="ap-zone">
+          {s.title && <div className="ap-navsec">{s.title}</div>}
+          {s.items.map((it) => {
+            const on = it.rooms.length > 0 && it.rooms.every((id) => chosen.has(id))
+            return (
+              <div key={it.id} className={`ap-row ap-navit${it.active ? ' active' : ''}`} role="option" aria-selected={on}
+                onClick={(e) => { onChoose(it.rooms, e.shiftKey || e.ctrlKey || e.metaKey); it.onPick?.() }}>
+                {tick(on, it.rooms.some((id) => chosen.has(id)))}
+                <Sw s={it.swatch} />
+                <span className="ap-name">{it.name}<small>{it.rooms.length ? it.rooms.map(nameOf).join(', ') : 'no rooms'}</small></span>
+                <span className="ap-count">{it.rooms.length}</span>
+              </div>
+            )
+          })}
+        </div>
+      )))}
     </div>
   )
 }
