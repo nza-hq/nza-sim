@@ -27,6 +27,7 @@ import { ENGINE_CONSTANTS as K, heatFlowDirection } from './constants'
 import type { Element } from './elements'
 import { luFactor, luFactorInto, luSolve, type LU } from './linalg'
 import { sparseLuFactor, sparseLuSolve, type SparseLU } from './sparse'
+import { checkSetpointHours } from './zone'
 
 export interface NetworkZone {
   /** C_int: air ρ·c·V plus the zone's internal heat capacity, J/K. */
@@ -41,6 +42,8 @@ export interface NetworkZone {
   solar_beam_w: ArrayLike<number> | null
   other_gains: { w: ArrayLike<number>; convective_fraction: number | ArrayLike<number> } | null
   setpoints: { heat_c: number | null; cool_c: number | null }
+  /** Brief 109: each hour's setpoints in place of setpoints (NaN: off that hour); as Engine 1's. */
+  setpoint_hours?: { heat_c: ArrayLike<number>; cool_c: ArrayLike<number> } | null
   /** Brief 108: the most heat the zone's emitters can give, W (null or absent: unlimited, ideal loads). */
   heating_cap_w?: number | null
   /**
@@ -50,6 +53,11 @@ export interface NetworkZone {
   heating_cap_at?: ((room_c: number) => number) | null
   /** Brief 108: heating's share to the air when it differs from cooling's (the emitters'). Absent: hc_convective_fraction. */
   heating_convective_fraction?: number | null
+  /**
+   * Brief 109: underfloor heating in a floor. `share` of the zone's heating enters node `node` of element `element`
+   * (inside the floor, on this zone's side of it); the rest reaches the room as heating_convective_fraction says.
+   */
+  heating_source?: { element: number; node: number; share: number } | null
   /** Every node of the zone starts here before the warm-up, °C. */
   initial_c: number
 }
@@ -164,6 +172,7 @@ function check(inp: NetworkInputs) {
     if (!(z.bridging_w_per_k >= 0)) throw new NetworkError('must be ≥ 0', `${p}.bridging_w_per_k`)
     const { heat_c, cool_c } = z.setpoints
     if (heat_c != null && cool_c != null && heat_c > cool_c) throw new NetworkError(`heating ${heat_c} above cooling ${cool_c}`, `${p}.setpoints`)
+    checkSetpointHours(z.setpoint_hours, H, NetworkError, `${p}.setpoint_hours`)
     if (!Number.isFinite(z.initial_c)) throw new NetworkError('required', `${p}.initial_c`)
     if (z.heating_cap_w != null && !(z.heating_cap_w >= 0)) throw new NetworkError('must be ≥ 0', `${p}.heating_cap_w`)
     if (z.heating_cap_at != null && z.heating_cap_w != null) throw new NetworkError('give a fixed limit or one that follows the room, not both', `${p}.heating_cap_at`)
@@ -180,6 +189,19 @@ function check(inp: NetworkInputs) {
     }
   })
   const Z = inp.zones.length
+  inp.zones.forEach((z, zi) => {
+    const src = z.heating_source
+    if (src == null) return
+    const p = `zones[${zi}].heating_source`, ne = inp.elements[src.element]
+    if (!ne) throw new NetworkError('not an element', `${p}.element`)
+    if (!(src.share > 0 && src.share <= 1)) throw new NetworkError('must be above 0, at most 1', `${p}.share`)
+    const L = ne.element.c.length, isTwo = ne.element.boundary === 'zone'
+    // Inside the element (not a face), and on this zone's side of a floor between two zones (its storage is counted there).
+    if (!(Number.isInteger(src.node) && src.node >= (isTwo ? 1 : 0) && src.node <= L - 2)) throw new NetworkError('must be a node inside the element, not a face', `${p}.node`)
+    const mid = isTwo ? Math.floor((L - 2) / 2) : -1
+    const side = isTwo && src.node <= mid ? ne.zone_b : ne.zone_a
+    if (side !== zi) throw new NetworkError(`the node is on ${isTwo ? 'the other zone\'s side of the floor' : 'another zone\'s element'}`, `${p}.node`)
+  })
   inp.elements.forEach((ne, k) => {
     const p = `elements[${k}]`
     const e = ne.element
@@ -366,14 +388,39 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const capRec = inp.zones.map((z) => (z.heating_cap_at ? new Float64Array(inp.hours) : null))
   const ehNodes: Int32Array[] = [], ehW: Float64Array[] = [], ecW: Float64Array[] = []
   const split = (z: number, f: number) => Float64Array.from([f, ...faces[z].map((x) => ((1 - f) * x.area) / Atot[z])])
+  // Brief 109: heat into a floor's interior node j reaches the interface through that element's chain only. The chain
+  // solves B·y = b; a unit at j adds u = B⁻¹·e_j to y, so faces A and B see g_A·u_last and g_B·u_0 (as the stored
+  // heat does), and after the step the chain's nodes take φ_slab·u on top. srcU is u per zone (null: no slab).
+  const srcU: (Float64Array | null)[] = inp.zones.map((z) => {
+    const src = z.heating_source
+    if (!src) return null
+    const t = chains[src.element], e = new Float64Array(t.m), u = new Float64Array(t.m)
+    e[src.node - t.first] = 1
+    solveChain(t, e, u)
+    return u
+  })
+  const srcK = Int32Array.from(inp.zones, (z) => z.heating_source?.element ?? -1)
+  const srcShare = Float64Array.from(inp.zones, (z) => z.heating_source?.share ?? 0)
   for (let z = 0; z < Z; z++) {
-    ehNodes.push(Int32Array.from([z, ...faces[z].map((f) => f.node)]))
+    const u = srcU[z], k = srcK[z]
+    const nodes = [z, ...faces[z].map((f) => f.node)]
     ecW.push(split(z, hcf))
-    ehW.push(hcfH[z] === hcf ? ecW[z] : split(z, hcfH[z]))
+    let wh = hcfH[z] === hcf ? ecW[z] : split(z, hcfH[z])
+    if (u) {
+      const s = srcShare[z], t = chains[k]
+      const w = [...Array.from(wh, (x) => (1 - s) * x), s * t.gA * u[t.m - 1]]
+      nodes.push(faceA[k])
+      if (two[k]) { w.push(s * t.gB * u[0]); nodes.push(faceB[k]) }
+      wh = Float64Array.from(w)
+      // Cooling keeps the zone's own split; its weights cover the leading nodes only.
+      const c = new Float64Array(nodes.length); c.set(ecW[z]); ecW[z] = c
+    }
+    ehNodes.push(Int32Array.from(nodes))
+    ehW.push(wh)
   }
   const G = new Float64Array(Z * Z), Gr = new Float64Array(Z * Z), EW = new Float64Array(Z * Z), RW = new Float64Array(Z * Z)
   const EWc = new Float64Array(Z * Z), RWc = new Float64Array(Z * Z)
-  const admittance = !operative && hcf === 1 && hcfH.every((f) => f === 1)
+  const admittance = !operative && hcf === 1 && hcfH.every((f) => f === 1) && srcU.every((u) => u == null)
   const Y = new Float64Array(admittance ? Z * Z : 0)
   const assemble = () => {
     for (let i = 0; i < n; i++) { rows[i].clear(); for (const [j, v] of base[i]) rows[i].set(j, v) }
@@ -467,6 +514,9 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   }
   const heatC = Float64Array.from(inp.zones, (z) => z.setpoints.heat_c ?? NaN)
   const coolC = Float64Array.from(inp.zones, (z) => z.setpoints.cool_c ?? NaN)
+  // Brief 109: zones whose setpoints change by the hour; read at the start of each hour's steps.
+  const spH = inp.zones.map((z) => z.setpoint_hours ?? null)
+  const anySpH = spH.some((x) => x != null)
   const ventIn = inp.zones.map((z) => z.ventilation_w_per_k), solIn = inp.zones.map((z) => z.solar_transmitted_w)
   const beamIn = inp.zones.map((z, i) => (z.solar_beam_w && hasFloor[i] ? z.solar_beam_w : null))
   const ogIn = inp.zones.map((z) => (z.other_gains ? z.other_gains.w : null))
@@ -619,6 +669,14 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const sub = (h: number, te: number, record: boolean, w: number) => {
     if (tarp) tarpCoefficients()
     if (anyCapAt) for (let z = 0; z < Z; z++) { const f = capAt[z]; if (f) { capW[z] = f(ctlPrev[z]); if (record) capRec[z]![h] += w * capW[z] } }
+    if (anySpH) for (let z = 0; z < Z; z++) {
+      const sp = spH[z]
+      if (!sp) continue
+      heatC[z] = sp.heat_c[h]; coolC[z] = sp.cool_c[h]
+      // A service switched off this hour lets go of the zone; the active set then starts it free.
+      if ((mode[z] === 1 || mode[z] === 2) && Number.isNaN(heatC[z])) mode[z] = 0
+      if (mode[z] === -1 && Number.isNaN(coolC[z])) mode[z] = 0
+    }
     for (let i = 0; i < n; i++) bF[i] = capDT[i] * xF[i]
     const zi0 = h * Z * 3
     for (let z = 0; z < Z; z++) {
@@ -694,6 +752,13 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       const xi = rhs[i]
       if (record) stored[zoneOfNode[i]] += capDT[i] * (xi - xF[i])
       xF[i] = xi
+    }
+    // A floor heated from inside it: the chain's own solution takes that heat on top (Brief 109).
+    for (let z = 0; z < Z; z++) {
+      const u = srcU[z]
+      if (!u || !(phi[z] > 0)) continue
+      const o = cO[srcK[z]], q = srcShare[z] * phi[z]
+      for (let j = 0; j < u.length; j++) CY[o + j] += q * u[j]
     }
     for (let k = 0; k < E; k++) {
       const xfa = xF[faceA[k]], xfb = two[k] ? xF[faceB[k]] : 0

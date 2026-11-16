@@ -21,6 +21,12 @@
  *
  * 2.3 → 2.4 (Brief 108) adds each zone's emitters, empty: nothing is stated, so heating stays unlimited, as before. It
  * fills no value, so the run seam accepts a 2.3 document through it (unlike 2.2 and older, Brief 105 review F1).
+ *
+ * 2.4 → 2.5 (Brief 109) adds each emitter's source surface and layer, null. It fills nothing either, so the seam
+ * accepts a 2.4 document the same way.
+ *
+ * 2.5 → 2.6 (Brief 117) adds the building's design conditions and each zone's design internal temperature, null: no
+ * design heat loss is worked out until they are stated. Nothing is filled.
  */
 import { ModelDocument, SCHEMA_VERSION } from './model'
 
@@ -102,11 +108,13 @@ export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
   if (from === '2.0' || from === '2.1') to22(doc)
-  if (from !== '2.3') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
+  if (from !== '2.3' && from !== '2.4' && from !== '2.5') for (const p of doc.profiles as Obj[]) stateTodaysGainInputs(p)
   to24(doc)
+  to25(doc)
+  to26(doc)
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
 }
@@ -114,6 +122,14 @@ export function upgradeDocument(input: unknown): ModelDocument {
 /** 2.3 → 2.4 (Brief 108): no emitters stated, so no zone's heating is limited (as before). Nothing is filled. */
 function to24(doc: Obj): void {
   for (const z of doc.zones as Obj[]) z.emitters ??= []
+}
+
+/**
+ * 2.4 → 2.5 (Brief 109): every emitter states no source surface or layer. Nothing is filled: an underfloor emitter
+ * from 2.4 is then refused by name until its floor and layer are stated.
+ */
+function to25(doc: Obj): void {
+  for (const z of doc.zones as Obj[]) for (const e of z.emitters as Obj[]) { e.source_surface_id ??= null; e.source_layer_index ??= null }
 }
 
 function to22(doc: Obj): void {
@@ -141,4 +157,10 @@ function to21(doc: Obj): void {
   if (tb?.mode === 'iso14683_auto' && tb.multiplier == null) tb.multiplier = TODAY.bridging_multiplier
   for (const z of doc.zones as Obj[]) z.internal_heat_capacity_j_per_k_m2 = TODAY.internal_heat_capacity_j_per_k_m2
   doc.building.site.ground = { method: 'annual_mean_outdoor' }
+}
+
+/** 2.5 → 2.6 (Brief 117): no design conditions and no design internal temperatures. Nothing is filled. */
+function to26(doc: Obj): void {
+  doc.building.design ??= null
+  for (const z of doc.zones as Obj[]) z.design_internal_c ??= null
 }

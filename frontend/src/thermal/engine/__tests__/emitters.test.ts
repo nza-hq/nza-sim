@@ -305,8 +305,9 @@ describe('review F8 and F11: refusals in words', () => {
     expect(() => runModel(b.doc, W, b.lib, { ...REFEREE_OPTIONS, emitter_limit: 'off' as any })).toThrow('options.emitter_limit: unknown emitter_limit "off"')
   })
   it('a setback says what it is, not a brief number', () => {
+    // Brief 109 models setbacks; one without its hours is still refused, in words.
     const b = withEmitters(800, 0, (d) => { d.zones[0].setpoints.setback_c = 16 })
-    expect(() => runModel(b.doc, W, b.lib, REFEREE_OPTIONS)).toThrow('zones[0].setpoints.setback_c: setbacks (a lower night setpoint) are not modelled yet')
+    expect(() => runModel(b.doc, W, b.lib, REFEREE_OPTIONS)).toThrow('zones[0].setpoints.hours_ref: a setback needs the hours it applies outside (hours_ref)')
   })
 })
 

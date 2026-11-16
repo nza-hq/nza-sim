@@ -32,7 +32,7 @@ export function ratedOutputAt(
 export interface ZoneEmitters {
   /** The most heat the zone's emitters give, W. */
   cap_w: number
-  /** Heating's share given as radiation: the emitters' radiant fractions weighted by output. */
+  /** Heating's share given as radiation: the radiant fractions of the emitters that heat the room directly, weighted by output. */
   radiant_fraction: number
   /** Each emitter entry's total output (count × one unit) at the design temperatures, W. */
   emitters: { id: string; kind: string; output_w: number; rated_w: number; exponent_n: number | null }[]
@@ -43,6 +43,12 @@ export interface ZoneEmitters {
    * setpoint (it is not being heated), so at the setpoint and above this is `cap_w`.
    */
   at: (room_c: number) => number
+  /**
+   * Brief 109: underfloor heating in a floor. Its heat enters the floor at the inside face of `layer_index` (the floor
+   * carries it to the room, and down); `share` is its part of the zone's heating, its design output over `cap_w`, held
+   * for the year. Null: every emitter heats the room directly. `radiant_fraction` is then the other emitters'.
+   */
+  slab: { surface_id: string; layer_index: number; share: number } | null
 }
 
 /** Each zone's emitters, or null for a zone that states none. Throws EmitterError for a missing or impossible value. */
@@ -54,12 +60,32 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
     if (room == null) throw new EmitterError('a zone with emitters needs a heating setpoint to rate them at', `${zp}.setpoints.heat_c`)
     const out: ZoneEmitters['emitters'] = []
     const wet: { units: number; unit_w: number; n: number; rated: { flow_c: number; return_c: number; room_c: number }; flow_c: number; return_c: number }[] = []
-    let cap = 0, rad = 0, fixed = 0
+    let cap = 0, rad = 0, fixed = 0, direct = 0, slabW = 0
+    let slab: { surface_id: string; layer_index: number } | null = null
     zone.emitters.forEach((e, j) => {
       const p = `${zp}.emitters[${j}]`
       const need = (v: number | null, k: string) => { if (v == null) throw new EmitterError('required', `${p}.${k}`); return v }
-      const count = need(e.count, 'count'), unit = need(e.rated_output_w, 'rated_output_w'), rf = need(e.radiant_fraction, 'radiant_fraction')
-      if (!(rf >= 0 && rf <= 1)) throw new EmitterError('must be 0 to 1', `${p}.radiant_fraction`)
+      const count = need(e.count, 'count'), unit = need(e.rated_output_w, 'rated_output_w')
+      // Brief 109: underfloor heating states the floor and layer its pipes are in; nothing else has a source.
+      const inSlab = e.kind === 'underfloor'
+      let rf = 0
+      if (inSlab) {
+        const sid = need(e.source_surface_id, 'source_surface_id'), li = need(e.source_layer_index, 'source_layer_index')
+        if (e.radiant_fraction != null) throw new EmitterError('leave empty: underfloor heating gives its heat through the floor it is in', `${p}.radiant_fraction`)
+        const si = doc.surfaces.findIndex((x) => x.id === sid)
+        const sf = doc.surfaces[si]
+        if (!sf) throw new EmitterError(`names surface "${sid}", which the building does not have`, `${p}.source_surface_id`)
+        if (!zone.surfaces.includes(sid)) throw new EmitterError(`names surface "${sid}", which is not one of ${zone.name || zone.id}'s`, `${p}.source_surface_id`)
+        const ownFloor = sf.zone_a === zone.id ? sf.kind === 'floor' || sf.kind === 'ground' : sf.kind === 'ceiling'
+        if (!ownFloor) throw new EmitterError(`names surface "${sid}", which is not ${zone.name || zone.id}'s floor`, `${p}.source_surface_id`)
+        if (slab && (slab.surface_id !== sid || slab.layer_index !== li)) throw new EmitterError('underfloor heating in one zone must be in one floor and layer', `${p}.source_surface_id`)
+        slab = { surface_id: sid, layer_index: li }
+      } else {
+        if (e.source_surface_id != null) throw new EmitterError('only underfloor heating is in a floor; leave empty', `${p}.source_surface_id`)
+        if (e.source_layer_index != null) throw new EmitterError('only underfloor heating is in a floor; leave empty', `${p}.source_layer_index`)
+        rf = need(e.radiant_fraction, 'radiant_fraction')
+        if (!(rf >= 0 && rf <= 1)) throw new EmitterError('must be 0 to 1', `${p}.radiant_fraction`)
+      }
       let w: number
       let n: number | null = null
       if (FIXED_OUTPUT_KINDS.includes(e.kind)) { w = count * unit; fixed += w }
@@ -82,7 +108,8 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
         wet.push({ units: count, unit_w: unit, n, rated, flow_c: flow, return_c: ret })
       }
       out.push({ id: e.id, kind: e.kind, output_w: w, rated_w: count * unit, exponent_n: n })
-      cap += w; rad += w * rf
+      cap += w
+      if (inSlab) slabW += w; else { direct += w; rad += w * rf }
     })
     // Review F1: the water flow through each wet emitter is the one that carries its design output at the design flow
     // and return; at the cap the valve is open and that flow holds. In a colder room the emitter gives more, so the
@@ -101,7 +128,11 @@ export function zoneEmitters(doc: ModelDocument): (ZoneEmitters | null)[] {
       }
       return q
     }
-    return { cap_w: cap, radiant_fraction: cap > 0 ? rad / cap : 0, emitters: out, at }
+    const sl = slab as { surface_id: string; layer_index: number } | null
+    return {
+      cap_w: cap, radiant_fraction: direct > 0 ? rad / direct : 0, emitters: out, at,
+      slab: sl ? { ...sl, share: cap > 0 ? slabW / cap : 1 } : null,
+    }
   })
 }
 

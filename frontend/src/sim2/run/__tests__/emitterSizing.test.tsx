@@ -9,12 +9,12 @@ import type { EmitterZone, Summary } from '../seam'
 
 const zone = (over: Partial<EmitterZone> = {}): EmitterZone => ({
   id: 'z1', name: 'Storey 1', cap_w: 10400, peak_w: 23200, shortfall_w: 12800, design: { flow_c: 50, return_c: 40, room_c: 21 },
-  rated_now_w: 27400, needed_rated_w: 61000, note: null, unlisted_systems: [], unmet_hours: 634, min_c: 18.04, hours_at_cap: 1200, ...over,
+  rated_now_w: 27400, needed_rated_w: 61000, note: null, unlisted_systems: [], unmet_hours: 634, min_c: 18.04, in_use: false, hours_at_cap: 1200, ...over,
 })
 const summary = (emitters: Summary['emitters']): Summary => ({
-  engine: 'thermal-2', run_ms: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
+  engine: 'thermal-2', run_ms: 1, steps_per_hour: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
   building: { floor_m2: 100, heating_kwh: 111800, cooling_kwh: 0, peak_heating_w: 0, peak_cooling_w: 0 },
-  zones: [], breakdown: [], drafts: [], energy: { ok: false, missing: [] }, emitters,
+  zones: [], breakdown: [], drafts: [], energy: { ok: false, missing: [] }, emitters, design_heat_loss: null,
 })
 const html = (s: Summary, whatIf = null) => renderToStaticMarkup(<EmitterSizing summary={s} whatIf={whatIf} onWhatIf={() => {}} />)
 

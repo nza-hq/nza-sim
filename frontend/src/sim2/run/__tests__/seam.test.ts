@@ -8,10 +8,12 @@ import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import { runModel } from '../../../thermal/engine/model'
 import { logMeanDeltaT } from '../../../thermal/engine/emitters'
+import { designHeatLoss } from '../../../thermal/engine/designHeatLoss'
+import { ModelDocument } from '../../../thermal/schema/model'
 import { fromBuildingConfig } from '../../../thermal/schema/fromBuildingConfig'
 import { MOS, readMos } from '../../../thermal/engine/__tests__/denver'
 import { bodyFromLibrary, CONSTRUCTIONS } from '../library'
-import { RUN_OPTIONS, simulate } from '../seam'
+import { facingOf, QUARTER_HOUR_OPTIONS, RUN_OPTIONS, simulate } from '../seam'
 import type { WeatherChoice } from '../weather'
 
 const repo = (p: string) => fileURLToPath(new URL(`../../../../../${p}`, import.meta.url))
@@ -60,6 +62,150 @@ describe('simulate', () => {
     expect(interzoneGross).toBeGreaterThan(0)
     expect(Math.abs(interzone)).toBeLessThan(1e-6 * interzoneGross)
     expect(r.summary.breakdown.some((l) => l.term === 'interzone')).toBe(false)
+  })
+  it('monthly, by surface kind, window sun by facing, and hourly on request: regroupings that sum back (Brief 109)', async () => {
+    const d = await doc()
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const s = r.summary
+    expect(s.hourly).toBeNull()
+    const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
+    // Months sum to the year, for the building and each zone.
+    expect(s.building.monthly.heating_kwh).toHaveLength(12)
+    expect(sum(s.building.monthly.heating_kwh)).toBeCloseTo(s.building.heating_kwh, 6)
+    expect(sum(s.building.monthly.cooling_kwh)).toBeCloseTo(s.building.cooling_kwh, 6)
+    for (const z of s.zones) { expect(sum(z.monthly.heating_kwh)).toBeCloseTo(z.heating_kwh, 6); expect(sum(z.monthly.cooling_kwh)).toBeCloseTo(z.cooling_kwh, 6) }
+    expect(s.building.monthly.heating_kwh[0]).toBeGreaterThan(s.building.monthly.heating_kwh[6])  // January heats more than July
+    // By surface kind, plus the lines that name no surface, gives the breakdown term by term (Rule 9: same lines).
+    const check = (bySurface: typeof s.by_surface, breakdown: typeof s.breakdown, lines: { term: string; surface_id: string | null; kwh: number }[]) => {
+      for (const b of breakdown) {
+        const fromSurfaces = bySurface.filter((l) => l.term === b.term).reduce((x, l) => x + l.kwh, 0)
+        const noSurface = lines.filter((l) => l.term === b.term && l.surface_id == null).reduce((x, l) => x + l.kwh, 0)
+        expect(fromSurfaces + noSurface).toBeCloseTo(b.kwh, 6)
+      }
+    }
+    check(s.by_surface, s.breakdown, r.results.zones.flatMap((z) => z.breakdown).filter((l) => l.term !== 'interzone'))
+    r.results.zones.forEach((z, i) => check(s.zones[i].by_surface, s.zones[i].breakdown, z.breakdown))
+    expect(new Set(s.by_surface.map((l) => l.kind))).toEqual(new Set(['wall', 'roof', 'ground', 'glazing']))
+    expect(s.by_surface.some((l) => l.term === 'interzone')).toBe(false)
+    // An intermediate storey sees the slab below as its floor and the one above as its ceiling, from its own side.
+    const mid = s.zones[2].by_surface.filter((l) => l.term === 'interzone').map((l) => l.kind).sort()
+    expect(mid).toEqual(['ceiling', 'floor'])
+    // Window sun by facing sums to the window lines; Bridgewater has windows on four facades and no rooflights.
+    const tr = s.breakdown.find((l) => l.term === 'solar_transmitted')!.kwh
+    expect(s.window_solar.map((w) => w.facing)).toEqual(['N', 'E', 'S', 'W'])
+    expect(s.window_solar.reduce((x, w) => x + w.transmitted_kwh, 0)).toBeCloseTo(tr, 6)
+    // Per square metre of glass, the south-west (azimuth 222°, sector S) takes more sun than the north-east (42°, sector N).
+    const area = (f: string) => d.surfaces.filter((x: any) => x.kind === 'glazing' && facingOf(x) === f).reduce((a: number, x: any) => a + x.area_m2, 0)
+    const per = (f: string) => s.window_solar.find((w) => w.facing === f)!.transmitted_kwh / area(f)
+    expect(per('S')).toBeGreaterThan(1.5 * per('N'))
+    // Hourly on request: the building's 8,760 values, summing to the year and peaking at the stated peak.
+    const h = simulate(d, { weather: WEATHER, hourly: true })
+    if (!h.ok || !h.summary.hourly) throw new Error('no hourly')
+    expect(h.summary.hourly.heating_w).toHaveLength(8760)
+    expect(Array.from(h.summary.hourly.heating_w).reduce((x, y) => x + y, 0) / 1000).toBeCloseTo(s.building.heating_kwh, 6)
+    expect(Math.max(...h.summary.hourly.cooling_w)).toBeCloseTo(s.building.peak_cooling_w, 6)
+  })
+  it('heating hours: hours below in use, morning and later peaks with when, and a cold morning\'s time back (Brief 109 P4)', async () => {
+    const d = await doc()
+    expect(simulate(d, { weather: WEATHER }).ok && (simulate(d, { weather: WEATHER }) as any).summary.zones.every((z: any) => z.hours === null)).toBe(true)
+    const HOURS = JSON.parse(readFileSync(repo('validation/energyplus/109_setback_spec.json'), 'utf8')).hours
+    d.profiles.push({ id: 'hours', kind: 'schedule', day_types: HOURS })
+    for (const z of d.zones) { z.setpoints.hours_ref = 'hours'; z.setpoints.setback_c = 16 }
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    r.summary.zones.forEach((z, i) => {
+      const h = z.hours!, res = r.results.zones[i]
+      expect(h.setpoint_c).toBe(d.zones[i].setpoints.heat_c); expect(h.setback_c).toBe(16)
+      expect(h.in_use_hours).toBe(res.annual.in_use_hours)
+      expect(h.unmet_in_use_hours).toBe(res.annual.unmet_heating_hours_in_use)
+      // The peaks are the engine's own hours, in use, the morning one at the start of the hours (07:00 here).
+      expect(h.morning_peak!.w).toBe(res.hourly.heating_w[h.morning_peak!.hour])
+      expect(h.morning_peak!.hour % 24).toBe(7)
+      expect(h.later_peak!.w).toBe(res.hourly.heating_w[h.later_peak!.hour])
+      expect(h.morning_peak!.w).toBeGreaterThan(h.later_peak!.w)
+      expect(h.recovery!.mornings).toBeGreaterThan(20)
+      expect(h.recovery!.median_h).toBe(0)  // unlimited heating holds the setpoint from the first hour
+    })
+    // With the heating limited, the room takes longer to come back.
+    for (const z of d.zones) z.emitters = [{ id: `${z.id}_e`, kind: 'electric', count: 1, rated_output_w: 15000, radiant_fraction: 0, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    const c = simulate(d, { weather: WEATHER })
+    if (!c.ok) throw new Error(JSON.stringify(c.missing))
+    const h0 = c.summary.zones[0].hours!.recovery!
+    expect((h0.median_h ?? 99) + h0.not_reached).toBeGreaterThan(0)
+    // Review F1 (decision 4): emitters are sized on the steady run, heated at every hour with no setback, not on the
+    // Monday-morning recovery; and their hours below are the hours in use (review F6).
+    const steady = structuredClone(d)
+    for (const z of steady.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null }
+    // Review F3: a limited zone heated to hours runs in quarter hours; the same building unlimited keeps one step.
+    expect(r.summary.steps_per_hour).toBe(1); expect(c.summary.steps_per_hour).toBe(4)
+    const s = simulate(steady, { weather: WEATHER, options: QUARTER_HOUR_OPTIONS })
+    if (!s.ok) throw new Error(JSON.stringify(s.missing))
+    c.summary.emitters!.zones.forEach((z, i) => {
+      expect(z.peak_w).toBe(s.summary.emitters!.zones[i].peak_w)
+      expect(z.peak_w).toBeLessThan(r.summary.zones[i].hours!.morning_peak!.w / 2)
+      expect(z.in_use).toBe(true); expect(s.summary.emitters!.zones[i].in_use).toBe(false)
+      expect(z.unmet_hours).toBe(c.results.zones[i].annual.unmet_heating_hours_in_use)
+      expect(z.min_c).toBe(c.results.zones[i].annual.min_control_in_use_c)
+    })
+  })
+  it('underfloor heating in the floor between two storeys, from the upper storey; the lower half refused (109 review F5)', async () => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 45; hp.design_return_c = 35
+    // ceiling_z1: zone_a z1 below, zone_b z2 above; its layers run from z2's face (carpet, screed, concrete, …).
+    const ufh = (layer: number) => {
+      d.zones[1].emitters = [{ id: 'z2_ufh', kind: 'underfloor', count: 1, rated_output_w: 400000, radiant_fraction: null, system_group_id: hp.id, rated_flow_c: 45, rated_return_c: 35, rated_room_c: 21, exponent_n: 1.1, source_surface_id: 'ceiling_z1', source_layer_index: layer }]
+      return simulate(d, { weather: WEATHER })
+    }
+    const r = ufh(0)
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.results.engine).toBe('thermal-2')
+    const z2 = r.results.zones[1]
+    expect(z2.emitters?.slab).toEqual({ surface_id: 'ceiling_z1', layer_index: 0, share: 1 })
+    expect(z2.breakdown.find((l) => l.term === 'heating')!.kwh).toBeCloseTo(z2.annual.heating_kwh, 9)
+    for (const z of r.results.zones) expect(z.closure.max_wh).toBeLessThanOrEqual(1)
+    const no = ufh(2)
+    if (no.ok) throw new Error('ran')
+    expect(no.missing[0].path).toBe('zones[1].emitters[0].source_layer_index')
+    expect(no.missing[0].what).toMatch(/half/)
+  })
+  it('a pre-heat hour (part value) is neither in use nor set back: not counted, and not the first hour (109 review F9)', async () => {
+    const d = await doc()
+    const HOURS = JSON.parse(readFileSync(repo('validation/energyplus/109_setback_spec.json'), 'utf8')).hours
+    const first = HOURS.weekday.findIndex((f: number) => f === 1)
+    HOURS.weekday[first - 1] = 0.5
+    d.profiles.push({ id: 'hours', kind: 'schedule', day_types: HOURS })
+    for (const z of d.zones) {
+      z.setpoints.hours_ref = 'hours'; z.setpoints.setback_c = 16
+      z.emitters = [{ id: `${z.id}_e`, kind: 'electric', count: 1, rated_output_w: 15000, radiant_fraction: 0, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null }]
+    }
+    const r = simulate(d, { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const z = r.results.zones[0], h = r.summary.zones[0].hours!, sp = d.zones[0].setpoints.heat_c
+    let use = 0, below = 0
+    for (let i = 0; i < 8760; i++) {
+      const day = Math.floor(i / 24) % 7, f = (day < 5 ? HOURS.weekday : day === 5 ? HOURS.saturday : HOURS.sunday)[i % 24]
+      if (f !== 1) continue
+      use++; if (z.hourly.theta_air_c[i] < sp - 0.5) below++
+    }
+    expect(h.in_use_hours).toBe(use)
+    expect(h.unmet_in_use_hours).toBe(below)
+    expect(h.unmet_in_use_hours).toBeLessThan(z.annual.unmet_heating_hours!)  // the part hour is counted against its own setpoint only there
+    expect(h.morning_peak!.hour % 24).toBe(first)
+  })
+  it('a setback refused in words (Brief 109 P4)', async () => {
+    const d = await doc()
+    d.zones[0].setpoints.setback_c = 16
+    const r = simulate(d, { weather: WEATHER })
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.missing[0].what).toMatch(/^Choose the hours ".+" is heated in, so its setback knows when to apply\.$/)
+    d.profiles.push({ id: 'h', kind: 'schedule', day_types: { weekday: Array(24).fill(0.5), saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+    d.zones[0].setpoints.hours_ref = 'h'; d.zones[0].setpoints.setback_c = null
+    const r2 = simulate(d, { weather: WEATHER })
+    if (r2.ok) throw new Error('ran')
+    expect(r2.missing[0].what).toMatch(/^The schedule "h", weekday, hour 0: a part value \(0\.5\) needs a setback/)
   })
   it('energy used by the installed systems, and what they still need while demand still shows (Brief 107 P4)', async () => {
     const r = simulate(await doc(), { weather: WEATHER })
@@ -223,6 +369,72 @@ describe('simulate', () => {
     const r = simulate({ schema_version: '2.3', zones: [] }, { weather: WEATHER })
     expect(r.ok).toBe(false)
     expect(simulate({ schema_version: '9.9' }, { weather: WEATHER })).toEqual({ ok: false, missing: [expect.objectContaining({ path: 'schema_version' })] })
+  })
+})
+
+describe('Brief 117: the design heat loss in the summary', () => {
+  const design = async (over: (d: any) => void = () => {}) => {
+    const d = await doc()
+    const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
+    hp.design_flow_c = 50; hp.design_return_c = 40
+    d.zones.forEach((z: any) => {
+      z.emitters = [{ id: `${z.id}_rads`, kind: 'radiator', count: 1, rated_output_w: 30000, radiant_fraction: 0.3, system_group_id: hp.id, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 }]
+      z.design_internal_c = 'follow_heat_c'
+    })
+    d.building.design = { outdoor: { stated_c: -3 }, warm_up_w_per_m2: 5, vent_wind_m_s: 4 }
+    over(d)
+    return d
+  }
+  it('only on the full run: the fabric and spaces copies have none', async () => {
+    const d = await design()
+    for (const level of ['fabric', 'spaces'] as const) {
+      const r = simulate(d, { weather: WEATHER, level, fabric_heat_c: 21 })
+      if (!r.ok) throw new Error(JSON.stringify(r.missing))
+      expect(r.summary.design_heat_loss).toBeNull()
+    }
+    const r = simulate(d, { weather: WEATHER })
+    expect(r.ok && r.summary.design_heat_loss?.ok).toBe(true)
+  })
+  it('none without design conditions', async () => {
+    const r = simulate(await doc(), { weather: WEATHER })
+    expect(r.ok && r.summary.design_heat_loss).toBeNull()
+  })
+  it('the engine\'s own figures (Rule 11), terms summing to each room (Rule 9), and the emitters against them', async () => {
+    const d = await design()
+    const r = simulate(d, { weather: WEATHER, what_if: { design_flow_c: 70, design_return_c: 60 } })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    const dh = r.summary.design_heat_loss!
+    if (!dh.ok) throw new Error(JSON.stringify(dh.missing))
+    const direct = designHeatLoss(ModelDocument.parse(d), r.results.zones, W)
+    expect(dh.building_w).toBe(direct.building_w)
+    expect(dh).toMatchObject({ outdoor_c: -3, outdoor_source: 'stated', warm_up_w_per_m2: 5, what_if: { design_flow_c: 70, design_return_c: 60 } })
+    const f = (fl: number, rt: number) => Math.pow(logMeanDeltaT(fl, rt, 21) / logMeanDeltaT(75, 65, 20), 1.3)
+    dh.zones.forEach((z, i) => {
+      expect(z.total_w).toBe(direct.zones[i].total_w)
+      expect(z.terms.reduce((s, t) => s + t.w, 0)).toBeCloseTo(z.total_w, 6)
+      expect(z.terms.find((t) => t.term === 'warm_up')!.w).toBeCloseTo(5 * z.floor_m2, 9)
+      expect(z.emitters!.peak_w).toBe(z.total_w)
+      expect(z.emitters!.cap_w).toBeCloseTo(30000 * f(50, 40), 6)
+      expect(z.emitters!.design).toEqual({ flow_c: 50, return_c: 40, room_c: 21 })
+      expect(z.emitters!.needed_rated_w).toBeCloseTo(z.total_w / f(50, 40), 6)
+      expect(z.what_if_emitters!.cap_w).toBeCloseTo(30000 * f(70, 60), 6)
+    })
+  })
+  it('a design temperature away from the setpoint rates the emitters at it', async () => {
+    const r = simulate(await design((d) => { d.zones[0].design_internal_c = 18 }), { weather: WEATHER })
+    if (!r.ok || !r.summary.design_heat_loss?.ok) throw new Error('no design heat loss')
+    const z = r.summary.design_heat_loss.zones[0]
+    expect(z).toMatchObject({ internal_c: 18, internal_source: 'stated' })
+    expect(z.emitters!.design!.room_c).toBe(18)
+    expect(z.emitters!.cap_w).toBeCloseTo(30000 * Math.pow(logMeanDeltaT(50, 40, 18) / logMeanDeltaT(75, 65, 20), 1.3), 6)
+  })
+  it('what it still needs, in words; the year\'s results are still there', async () => {
+    const r = simulate(await design((d) => { d.zones[1].design_internal_c = null }), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.design_heat_loss).toEqual({ ok: false, missing: [{ path: 'zones[1].design_internal_c', what: 'State the design temperature for "Storey 2", or let it follow its heating setpoint.' }] })
+    expect(r.summary.emitters).not.toBeNull()
+    const v = simulate(await design((d) => { d.building.design.vent_wind_m_s = null }), { weather: WEATHER })
+    expect(v.ok && v.summary.design_heat_loss).toEqual({ ok: false, missing: [{ path: 'building.design.vent_wind_m_s', what: 'State the wind speed at which the permanent vents are counted for the design heat loss.' }] })
   })
 })
 

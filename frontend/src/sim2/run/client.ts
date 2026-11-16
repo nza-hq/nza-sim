@@ -28,9 +28,10 @@ export class RunClient {
   /**
    * Runs `doc` after `delayMs` with no newer call; returns the run's number. Brief 111: `level` is what the results
    * include ('systems' when absent); 'fabric' needs `fabric_heat_c`, the temperature the caller shows. Brief 108:
-   * `what_if`, a second flow/return pair for the emitters.
+   * `what_if`, a second flow/return pair for the emitters. Brief 109: `hourly`, also send the building's 8,760 hourly
+   * heating and cooling values.
    */
-  run(doc: unknown, delayMs = 250, opts: { level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf | null } = {}): number {
+  run(doc: unknown, delayMs = 250, opts: { level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf | null; hourly?: boolean } = {}): number {
     const id = ++this.seq
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => { this.timer = null; this.send({ type: 'run', id, doc, ...opts }) }, delayMs)
