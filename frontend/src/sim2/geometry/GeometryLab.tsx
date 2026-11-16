@@ -158,8 +158,8 @@ type ProfileKind = 'occupancy' | 'lighting' | 'equipment' | 'ventilation'
 /** The kinds the engine reads today. Heating hours and setback join when Brief 109 lands. */
 const PROFILE_KINDS: ReadonlyArray<{ key: ProfileKind; name: string; spark: string; icon: IconName; where: string }> = [
   { key: 'occupancy', name: 'Occupancy', spark: 'Occupancy', icon: 'person', where: 'a space type points at it on Spaces' },
-  { key: 'lighting', name: 'Lighting', spark: 'Lighting', icon: 'profile', where: 'a space type with its own lighting profile points at it on Spaces' },
-  { key: 'equipment', name: 'Equipment', spark: 'Equipment', icon: 'profile', where: 'a space type with its own equipment profile points at it on Spaces' },
+  { key: 'lighting', name: 'Lighting', spark: 'Lighting', icon: 'lighting', where: 'a space type with its own lighting profile points at it on Spaces' },
+  { key: 'equipment', name: 'Equipment', spark: 'Equipment', icon: 'power', where: 'a space type with its own equipment profile points at it on Spaces' },
   { key: 'ventilation', name: 'Ventilation', spark: 'Ventilation', icon: 'ventilation', where: 'a ventilation system points at it on Systems' },
 ]
 const SPACE_COLOURS = ['#E0A84E', '#5B9BD5', '#6AA84F', '#C27BA0', '#45A5A0', '#D9734E', '#8E7CC3', '#A0A04A']
@@ -1511,7 +1511,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <p>{sp.borrowed ? borrowedFrom(BORROWS.find((x) => x.key === sp.borrowed)!) + ' All can be changed below.' : "Pick one to fill this in from today's NZA Sim profiles, or fill it in yourself."}</p>
             </div>
             {opt('Use', 'use', USES as Array<{ key: string; name: string }>)}
-            <h4>People</h4>
+            <h4 className="gl-h4i"><Icon name="person" size={18} />People</h4>
             {opt('Occupancy', 'occupancy', [{ key: ALWAYS, name: 'In all the time (100%)' }, ...profilesFor('occupancy')])}
             <Spark label="Occupancy" days={sp.occupancy === ALWAYS ? { weekday: Array(24).fill(1) } : profile(sp.occupancy ?? '')?.day_types ?? null} />
             <div className="gl-row gl-librow"><span>Count people</span>
@@ -1523,14 +1523,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {sp.people_basis === 'per_room' ? typed('People in each room', 'people_per_room', 1) : typed('People per m²', 'people_per_m2', 0.01)}
             {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
             {typed('Occupancy rate', 'occupancy_rate', 0.05, undefined, 1)}
-            <h4>Lighting</h4>
+            <h4 className="gl-h4i"><Icon name="lighting" size={18} />Lighting</h4>
             {typed('Lighting', 'lighting_w_per_m2', 0.5, 'W/m²')}
             {opt('Follows', 'light_relationship', [...RELATIONSHIPS, { key: 'always_on', name: 'Always on' }])}
             {(sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill') && opt('Its profile', 'lighting', profilesFor('lighting'))}
             {sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill'
               ? <Spark label="Lighting" days={profile(sp.lighting ?? '')?.day_types ?? null} />
               : sp.light_relationship === 'always_on' ? <Spark label="Lighting" days={{ weekday: Array(24).fill(1) }} /> : null}
-            <h4>Equipment</h4>
+            <h4 className="gl-h4i"><Icon name="power" size={18} />Equipment</h4>
             {typed('In use', 'equipment_w_per_m2', 0.5, 'W/m²')}
             {typed('Always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
             {opt('Follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}

@@ -14,8 +14,10 @@ import dhw from './system-dhw.svg?raw'
 import heating from './system-heating.svg?raw'
 import boiler from './system-boiler.svg?raw'
 import ventilation from './system-ventilation.svg?raw'
+import lighting from './system-lighting.svg?raw'
+import power from './system-power.svg?raw'
 
-const ICONS = { air, bridge, floor, openings, roof, wall, building, person, profile, rooms, cooling, dhw, heating, boiler, ventilation } as const
+const ICONS = { air, bridge, floor, openings, roof, wall, building, person, profile, rooms, cooling, dhw, heating, boiler, ventilation, lighting, power } as const
 export type IconName = keyof typeof ICONS
 
 export default function Icon({ name, size = 22, className }: { name: IconName; size?: number; className?: string }) {

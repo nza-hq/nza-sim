@@ -22,5 +22,7 @@ restyle each other. Draw over an icon here only by re-copying it from the set.
 | `building.svg` | `hartpury-dt-icons_building.svg` | `eafde5e3813a` |
 | `person.svg` | `hartpury-dt-icons_person.svg` | `eb5e18901bac` |
 | `system-boiler.svg` | `hartpury-dt-icons_hvac-boiler.svg` | `f0aca9795544` |
+| `system-lighting.svg` | `hartpury-dt-icons_hvac-lighting.svg` (GitHub main b5dff69, 16 Nov) | `08d832b5fc87` |
+| `system-power.svg` | `hartpury-dt-icons_hvac-plugin.svg` (GitHub main b5dff69, 16 Nov) | `46c511028c63` |
 
 - `profile.svg` (a day's profile as steps) was drawn for the Model workspace's Profiles step (Brief 110b, 16 Nov 2026) in the same line style; it is not from the Hartpury set.
