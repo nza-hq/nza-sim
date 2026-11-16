@@ -84,6 +84,22 @@ export type PlanPumps = {
   runs: 'continuous' | 'with_demand' | 'schedule' | null
   schedule: string | null
   default_from: string | null
+  /** Continuous pumps only: the months of the season, 1–12 (Controls). Null or absent: the months with load. */
+  season_months?: number[] | null
+}
+/** Months as words: a run of months (wrapping the year) as "Oct–Apr", otherwise listed. */
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export function monthsText(ms: number[]): string {
+  const set = new Set(ms)
+  if (set.size === 12) return 'all year'
+  if (set.size === 1) return MONTHS[ms[0]! - 1]!
+  const start = [...set].find((m) => !set.has(m === 1 ? 12 : m - 1))
+  if (start != null) {
+    let n = 0, m = start
+    while (set.has(m)) { n++; m = m === 12 ? 1 : m + 1 }
+    if (n === set.size) return `${MONTHS[start - 1]}–${MONTHS[(start + n - 2) % 12]}`
+  }
+  return [...set].sort((a, b) => a - b).map((m) => MONTHS[m - 1]).join(', ')
 }
 export const noPumps = (): PlanPumps => ({ basis: null, value: null, speed: null, runs: null, schedule: null, default_from: null })
 /** Brief 114: a building load outside the rooms (a lift, external lighting): its power and when it runs. */

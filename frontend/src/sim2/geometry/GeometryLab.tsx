@@ -39,7 +39,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, profile, profilesFor, system, systemsFor } from '../library/library'
@@ -1931,7 +1931,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {(() => {
           const r = figs.now?.energy && figs.now.energy.ok ? figs.now.energy.pumps.find((y) => y.id === `${sv}_${x.id}`) : null
           if (!r) return null
-          const months = r.season_months?.length ? `, ${r.season_months.length} months in its season` : ''
+          const months = r.season_months?.length ? `, season: ${monthsText(r.season_months)} (${r.season_from === 'stated' ? 'stated' : 'from the load'})` : ''
           return <>
             <div className="gl-row"><span>In the year</span><span className="ap-setc">{Math.round(r.rated_w).toLocaleString('en-GB')} W rated, {Math.round(r.hours_run).toLocaleString('en-GB')} h{months}, {Math.round(r.kwh).toLocaleString('en-GB')} kWh</span></div>
             {r.design_from === 'peak' && r.speed === 'variable' && <p className="gl-hint">Sized on the busiest hour, {(r.design_w / 1000).toFixed(1)} kW (no capacity or design conditions stated).</p>}
@@ -1949,7 +1949,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // Controls = how the kit is told to run (brief 114 table v4). Each field still has one place: set-to, setback and
   // heating hours on the space type; lighting switching on the space type; fans', pumps' and other loads' run modes on
   // their system or load. They are edited here only; the other steps show them with "Set on Controls".
-  const pumpRunsText = (pu: PlanPumps) => pu.runs === 'with_demand' ? 'With demand' : pu.runs === 'continuous' ? 'Continuously through its season' : pu.runs === 'schedule' ? (pu.schedule ? `On ${short(profile(pu.schedule)?.name ?? pu.schedule)}` : 'On a schedule (not chosen)') : 'Not set'
+  const pumpRunsText = (pu: PlanPumps) => pu.runs === 'with_demand' ? 'With demand' : pu.runs === 'continuous' ? `Continuously through its season (${pu.season_months?.length ? monthsText(pu.season_months) : 'the months with load'})` : pu.runs === 'schedule' ? (pu.schedule ? `On ${short(profile(pu.schedule)?.name ?? pu.schedule)}` : 'On a schedule (not chosen)') : 'Not set'
   const ventRunsText = (x: PlanSystem) => {
     const r = x.runs ?? (x.schedule === 'always_on' ? 'continuous' : x.schedule ? 'schedule' : null)
     const nm = (k: string) => short(profile(k)?.name ?? k)
@@ -2131,7 +2131,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           return <>
             <h4>Pumps</h4>
             <div className="gl-row gl-librow"><span>Runs</span>
-              <select className="gl-sel" aria-label="When the pumps run" value={pu.runs ?? ''} onChange={(e) => setPu({ runs: (e.target.value || null) as PlanPumps['runs'], ...(e.target.value !== 'schedule' ? { schedule: null } : {}) })}>
+              <select className="gl-sel" aria-label="When the pumps run" value={pu.runs ?? ''} onChange={(e) => setPu({ runs: (e.target.value || null) as PlanPumps['runs'], ...(e.target.value !== 'schedule' ? { schedule: null } : {}), ...(e.target.value !== 'continuous' ? { season_months: null } : {}) })}>
                 <option value="">Not set</option>
                 <option value="with_demand">With demand (when the system has load)</option>
                 <option value="continuous">Continuously through its season</option>
@@ -2146,8 +2146,19 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 </select>
               </div>
             )}
+            {pu.runs === 'continuous' && (
+              <div className="gl-row gl-librow"><span>Season</span>
+                <span className="ap-months" role="group" aria-label="Pump season months">
+                  {MONTHS.map((nm, i) => {
+                    const on = !!pu.season_months?.includes(i + 1)
+                    return <button key={nm} type="button" aria-pressed={on} title={nm} onClick={() => { const cur = pu.season_months ?? []; const next = on ? cur.filter((m) => m !== i + 1) : [...cur, i + 1].sort((a, b) => a - b); setPu({ season_months: next.length ? next : null }) }}>{nm[0]}</button>
+                  })}
+                </span>
+              </div>
+            )}
+            {pu.runs === 'continuous' && <p className="gl-hint">{pu.season_months?.length ? `Season: ${monthsText(pu.season_months)} (stated).` : 'No months chosen: the season is the months the system has load.'}</p>}
             {pu.default_from && <p className="ap-default">Default, from {pu.default_from}</p>}
-            <p className="gl-hint">"Continuously" is every hour of the system's season (the months it has load), not all year. Power and speed are on Systems.</p>
+            <p className="gl-hint">"Continuously" is every hour of the system's season: the months chosen, or with none the months it has load; not all year. Power and speed are on Systems.</p>
           </>
         })()}
         {x && x.service === 'ventilation' && <>

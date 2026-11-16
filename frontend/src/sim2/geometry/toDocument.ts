@@ -441,7 +441,7 @@ export function buildDocument(plan0: Plan): Built {
     if (!pu || (pu.basis == null && pu.value == null && pu.speed == null && pu.runs == null)) return {}
     const miss = [pu.value == null || pu.basis == null ? 'power' : '', pu.speed == null ? 'fixed or variable speed' : '', pu.runs == null ? 'how they run' : '', pu.runs === 'schedule' && !pu.schedule ? 'their schedule' : ''].filter(Boolean)
     if (miss.length) { notes.push(`${sys.name}: its pumps need ${miss.join(', ')} (Systems)`); return {} }
-    return { pumps: { power: { [pu.basis!]: pu.value }, speed: pu.speed, runs: pu.runs, schedule_ref: pu.runs === 'schedule' ? scheduleRef(pu.schedule) : null, default_from: pu.default_from ?? null } }
+    return { pumps: { power: { [pu.basis!]: pu.value }, speed: pu.speed, runs: pu.runs, schedule_ref: pu.runs === 'schedule' ? scheduleRef(pu.schedule) : null, ...(pu.runs === 'continuous' && pu.season_months?.length ? { season_months: [...new Set(pu.season_months)].sort((a, b) => a - b) } : {}), default_from: pu.default_from ?? null } }
   }
   const hasGroup = (service: Service, id: string) => used.some((z) => zoneSys(z.id, service)?.id === id && !!system(zoneSys(z.id, service)?.template)?.fuel)
   for (const service of ['heating', 'cooling', 'dhw'] as const) {

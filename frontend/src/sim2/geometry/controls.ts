@@ -4,14 +4,14 @@
  * what it follows, what it is set to, how it runs, and its week (168 hours, Monday first) where the document states
  * one. Nothing here is a result of the run; the week is the schedule the engine is given, hour for hour.
  */
-import { CONTROLLERS, type Plan, type PlanControl, type Service } from './plan'
+import { CONTROLLERS, type Plan, type PlanControl, type Service, monthsText } from './plan'
 
 /** A week of hourly values 0 to 1, Monday 00:00 first (five weekdays, Saturday, Sunday). */
 export type Week = number[]
 type Days = { weekday: number[]; saturday: number[]; sunday: number[] }
 type DocProfile = { id: string; kind: string; label?: string; day_types?: Days; schedule?: Days; relationship_to_occupancy?: string }
 type DocZone = { id: string; name: string; profile_refs: { occupancy: string | null; lighting: string[] }; setpoints: { heat_c: number | null; cool_c: number | null; setback_c: number | null; hours_ref: string | null }; ventilation: Array<{ id: string; label?: string; runs?: string | null; control_schedule_ref?: string | null; demand_min_fraction?: number | null }> }
-type DocGroup = { id: string; service: string; label?: string; zones: string[]; pumps?: { runs: string; schedule_ref: string | null } }
+type DocGroup = { id: string; service: string; label?: string; zones: string[]; pumps?: { runs: string; schedule_ref: string | null; season_months?: number[] | null } }
 type Doc = { zones: DocZone[]; system_groups: DocGroup[]; profiles: DocProfile[] }
 
 export type MapRow = {
@@ -80,7 +80,7 @@ export function controlMap(plan: Plan, doc: Doc | null): { occupied: Week | null
     if (!g) continue
     const zs = g.zones.map(zone).filter((z): z is DocZone => !!z)
     const kind: PlanControl['kind'] = sys.service === 'lighting' ? 'lighting' : 'system'
-    const pumps = g.pumps ? (g.pumps.runs === 'continuous' ? 'pumps continuously through its season' : g.pumps.runs === 'with_demand' ? 'pumps with demand' : `pumps on ${schedName(g.pumps.schedule_ref)}`) : null
+    const pumps = g.pumps ? (g.pumps.runs === 'continuous' ? `pumps continuously through its season (${g.pumps.season_months?.length ? monthsText(g.pumps.season_months) : 'months with load'})` : g.pumps.runs === 'with_demand' ? 'pumps with demand' : `pumps on ${schedName(g.pumps.schedule_ref)}`) : null
     if (sys.service === 'heating' || sys.service === 'cooling') {
       const heat = sys.service === 'heating'
       const sets = [...new Set(zs.map((z) => {

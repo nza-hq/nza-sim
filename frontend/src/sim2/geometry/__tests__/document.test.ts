@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALWAYS, azimuthOf, emptyPlan, layoutIn, noPumps, upgradePlan, wallRuns, type Plan, type PlanSystem, type XY } from '../plan'
+import { ALWAYS, azimuthOf, emptyPlan, layoutIn, monthsText, noPumps, upgradePlan, wallRuns, type Plan, type PlanSystem, type XY } from '../plan'
 import { DOOR, changeWindow, crossing, setOpeningsIn, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, wallPieces, windowsIn } from '../facade'
 import { cutZones } from '../ported/zones'
 import { fitRooms } from '../rooms'
@@ -341,6 +341,12 @@ describe('pumps, other loads and fan run modes (Brief 114 P4a)', () => {
     expect(doc.system_groups.find((x: any) => x.service === 'heating').pumps).toEqual({ power: { w_per_m2: 0.5 }, speed: 'variable', runs: 'with_demand', schedule_ref: null, default_from: 'NCM' })
     expect(doc.other_loads).toEqual([{ id: 'l1', kind: 'lift', label: 'Lift', power_w: 2000, runs: 'continuous', schedule_ref: null, default_from: null }])
     expect(b.notes.join(' ')).toContain('Car park: needs its power, how it runs')
+    // Linzie 23:11: a continuous pump's season can be stated in months (written sorted, once each); none: the load's.
+    const season = buildDocument({ ...p, systems: [{ ...p.systems[0]!, pumps: { ...p.systems[0]!.pumps!, runs: 'continuous', season_months: [12, 1, 2, 10, 11, 3, 4, 1] } }] })
+    expect((season.doc as any).system_groups.find((x: any) => x.service === 'heating').pumps.season_months).toEqual([1, 2, 3, 4, 10, 11, 12])
+    expect(season.issues).toEqual([])
+    expect(monthsText([1, 2, 3, 4, 10, 11, 12])).toBe('Oct–Apr')
+    expect(monthsText([6, 8])).toBe('Jun, Aug')
     const half = buildDocument({ ...p, systems: [{ ...p.systems[0]!, pumps: { ...noPumps(), basis: 'w', value: 80 } }], other_loads: [] }) as any
     expect(half.doc.system_groups.find((x: any) => x.service === 'heating').pumps ?? null).toBeNull()
     expect(half.doc.other_loads ?? null).toBeNull()
