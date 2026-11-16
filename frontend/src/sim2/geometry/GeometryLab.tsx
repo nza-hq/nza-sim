@@ -1056,11 +1056,19 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     : mode === 'systems' ? (sysColour(r.systems?.[service]) ?? '#FFFFFF') + '59'
     : mode === 'fabric' ? (elem === 'roof' || elem === 'floor' ? typeColour(plan, roomType(plan, r.id, elem)) + '40' : '#FFFFFF')
     : tintOf(r.zone).fill
+  /** Brief 120 P6: "short N h" (the system's capacity) on a room whose zone the system's capacity held below (above) its setpoint. */
+  const shortMark = (r: Plan['rooms'][number]) => {
+    if (service !== 'heating' && service !== 'cooling') return ''
+    const sh = figs.now?.zones.find((z) => z.id === r.zone)?.short?.[service]
+    // Short because of the system (alone, or with the room's own emitters at their limit too).
+    const h = sh ? sh.system_short_hours + sh.both_short_hours : 0
+    return h > 0 ? `short ${Math.round(h)} h` : ''
+  }
   const roomSub = (r: Plan['rooms'][number]) =>
     mode === 'profiles' ? (profSel ? (roomUses(r).includes(profSel) ? 'uses it' : '') : `${f1(ringArea(r.ring))} m²`)
     : mode === 'spaces' ? (plan.spaces.find((x) => x.id === r.space)?.name ?? 'No space type')
     : mode === 'systems' && sysKind === 'emitters' ? (emitName(r) || 'No emitters')
-    : mode === 'systems' ? (plan.systems.find((x) => x.id === r.systems?.[service])?.name ?? 'None given')
+    : mode === 'systems' ? shortMark(r) || (plan.systems.find((x) => x.id === r.systems?.[service])?.name ?? 'None given')
     : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
     : `${f1(ringArea(r.ring))} m²`
 
@@ -1837,7 +1845,29 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       <GivePanel
         kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
         title={`${sv.name} systems`} icon={SERVICE_ICON[service]}
-        top={service === 'dhw' ? (() => {
+        top={service === 'heating' ? (() => {
+          // Brief 117/120: the design heat loss's conditions, for sizing the systems against their rooms.
+          const bi = plan.building ?? noBuildingInputs()
+          const setBi = (q: Partial<BuildingInputs>) => commit({ ...plan, building: { ...bi, ...q } })
+          const out = bi.design_outdoor
+          return (
+            <details className="ap-hw" open>
+              <summary>Design heat loss, for sizing</summary>
+              <div className="gl-row gl-librow"><span>Design outdoor</span>
+                <select className="gl-sel" aria-label="Design outdoor temperature" value={out == null ? '' : typeof out === 'number' ? 'stated' : out} onChange={(e) => { const v = e.target.value; setBi({ design_outdoor: v === '' ? null : v === 'stated' ? (typeof out === 'number' ? out : -3) : (v as 'heating_99_6' | 'heating_99') }) }}>
+                  <option value="">Not set</option>
+                  <option value="heating_99_6">Weather file, coldest 0.4 % of hours</option>
+                  <option value="heating_99">Weather file, coldest 1 % of hours</option>
+                  <option value="stated">Stated (MCS / CIBSE Guide A)</option>
+                </select>
+              </div>
+              {typeof out === 'number' && <div className="gl-row gl-typed"><span>Outdoor at</span><Num value={out} unit="°C" step={0.5} onCommit={(v) => { if (Number.isFinite(v) && v !== out) setBi({ design_outdoor: v }) }} /></div>}
+              {out != null && <div className="gl-row gl-typed"><span>Warm-up allowance</span><Num value={bi.warm_up_w_per_m2 ?? ''} unit="W/m²" step={1} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (bi.warm_up_w_per_m2 ?? null)) setBi({ warm_up_w_per_m2: n }) }} /></div>}
+              {out != null && <div className="gl-row gl-typed"><span>Wind for vents</span><Num value={bi.vent_wind_m_s ?? ''} unit="m/s" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (bi.vent_wind_m_s ?? null)) setBi({ vent_wind_m_s: n }) }} /></div>}
+              <p className="gl-hint">Each heated room is held at its heating temperature (Spaces). The design heat loss is shown beside each system's output below, and per room under "Do they meet the need?". Wind is needed only where rooms have permanent vents. Empty stays unset.</p>
+            </details>
+          )
+        })() : service === 'dhw' ? (() => {
           const hw = plan.dhw ?? noDhw()
           const setHw = (q: Partial<DhwInputs>) => commit({ ...plan, dhw: { ...hw, ...q } })
           const n = (label: string, k: 'storage_c' | 'tap_c' | 'cold_c' | 'pump_w', step: number, unit: string) => (
@@ -1910,6 +1940,42 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <p className="gl-hint">What the water leaves and comes back at on a design day. Radiators and underfloor fed by this system are re-rated to these (a heat pump at 45/40 gets much less from a radiator rated at 75/65). Empty stays unset.</p>
               </>
             )}
+            {(service === 'heating' || service === 'cooling' || service === 'dhw') && x.template && system(x.template)?.fuel && (() => {
+              // Brief 120 P6: what the system can give, against what its rooms ask of it.
+              const gid = `${service}_${x.id}`
+              const s0 = figs.now
+              const plant = s0?.plants?.find((p0) => p0.id === gid)
+              const dhl = s0?.design_heat_loss?.ok ? s0.design_heat_loss.systems.find((d) => d.id === gid) : null
+              const wh = s0?.energy && s0.energy.ok ? s0.energy.water_heaters.find((w) => w.id === gid) : null
+              const kw = (w: number) => `${(w / 1000).toFixed(1)} kW`
+              const hws = systemsOf('dhw').filter((y) => system(y.template)?.fuel)
+              return (
+                <>
+                  <h4>{service === 'dhw' ? 'Water heater' : 'Capacity'}</h4>
+                  <div className="gl-row gl-typed"><span>{service === 'dhw' ? "Heater's output" : 'Output'}</span><Num value={x.capacity_kw ?? ''} unit="kW" step={0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.capacity_kw ?? null)) setSys(x.id, { capacity_kw: n }) }} /></div>
+                  {service === 'dhw' && <div className="gl-row gl-typed"><span>Store</span><Num value={x.storage_litres ?? ''} unit="litres" step={10} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.storage_litres ?? null)) setSys(x.id, { storage_litres: n }) }} /></div>}
+                  {service === 'heating' && (
+                    dhl ? <div className="gl-row"><span>Its rooms' design heat loss</span><span className="ap-setc">{kw(dhl.rooms_w)}{dhl.hot_water_w > 0 ? ` + hot water ${kw(dhl.hot_water_w)}` : ''}{dhl.hot_water_w > 0 ? ` = ${kw(dhl.total_w)}` : ''}</span></div>
+                    : <p className="gl-hint">{x.capacity_kw == null ? '' : 'Choose the design outdoor temperature above to see its rooms\' design heat loss beside it.'}</p>
+                  )}
+                  {plant && <div className="gl-row"><span>In the year</span><span className="ap-setc">{plant.hours_short > 0 ? `short ${Math.round(plant.hours_short)} h at ${kw(plant.capacity_kw * 1000)}${plant.min_flow_c != null ? `; flow fell to ${plant.min_flow_c.toFixed(0)} °C` : ''}${plant.hot_water_short_hours > 0 ? `; hot water short ${Math.round(plant.hot_water_short_hours)} h` : ''}` : 'never short'}</span></div>}
+                  {wh && <div className="gl-row"><span>In the year</span><span className="ap-setc">{wh.hours_short > 0 ? `short ${Math.round(wh.hours_short)} h, ${(wh.short_kwh / 1000).toFixed(1)} MWh not given` : `never short (peak draw ${kw(wh.peak_draw_w)})`}</span></div>}
+                  {wh && wh.short_without_store && <p className="gl-hint">Its output limits the hot water now, with no store to cover the peaks: state the store if it has one.</p>}
+                  {wh && wh.assumes.length > 0 && <p className="gl-hint">Assumes: {wh.assumes.join('; ')}.</p>}
+                  {service === 'heating' && hws.length > 0 && (
+                    <div className="gl-row gl-librow"><span>Heats hot water first</span>
+                      <select className="gl-sel" aria-label="Hot water it heats first" value={x.dhw_first ?? ''} onChange={(e) => setSys(x.id, { dhw_first: e.target.value || null })}>
+                        <option value="">No</option>
+                        {hws.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <p className="gl-hint">{service === 'dhw'
+                    ? 'A dedicated water heater: its output, and the store it refills (the store needs the output). A hot water system a boiler heats first takes neither. Empty: not limited.'
+                    : `Empty: not limited. With an output, the rooms it serves share it; a room it cannot hold is marked "system short" on the drawing. Where two systems split a room, the others top up what a capped one cannot give, in no order (no lead/lag).${service === 'heating' ? ' Heating hot water first takes from the same output.' : ' Cooling output is shared between rooms in proportion to what each asks; this has not yet been checked against EnergyPlus.'}`}</p>
+                </>
+              )
+            })()}
             {service === 'heating' && x && (() => {
               // Brief 118 P4 (a view): the emitters this system feeds are the emitters in the rooms it heats.
               const rs = plan.rooms.filter((r) => r.systems?.heating === x.id)

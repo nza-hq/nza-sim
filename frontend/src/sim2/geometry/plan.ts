@@ -61,6 +61,12 @@ export type PlanSystem = {
   /** Heating: the design flow and return temperatures, °C, its emitters are re-rated at (schema 2.4). */
   design_flow_c?: number | null
   design_return_c?: number | null
+  /** Brief 120: heating and cooling, its output, kW (limits the rooms it serves); hot water, the water heater's output. */
+  capacity_kw?: number | null
+  /** Brief 120: hot water, the store the heater refills, litres (needs the heater's kW). */
+  storage_litres?: number | null
+  /** Brief 120: heating, a hot water system (PlanSystem id) it heats first. */
+  dhw_first?: string | null
   /** Lighting (Brief 112): the luminaires' efficacy, W/m² for each 100 lux. Runs on electricity; no library template. */
   efficacy?: number | null
 }
@@ -186,7 +192,14 @@ export type SpaceType = {
 
 /** Air leakage (q50, m³/h·m² at 50 Pa, every zone), thermal bridging (ISO 14683 default junctions × multiplier) and
  * site exposure. */
-export type BuildingInputs = { q50: number | null; tb_multiplier: number | null; exposure: 'sheltered' | 'normal' | 'exposed' | null }
+export type BuildingInputs = {
+  q50: number | null; tb_multiplier: number | null; exposure: 'sheltered' | 'normal' | 'exposed' | null
+  /** Brief 117/120: the design heat loss's outdoor temperature: stated °C, or the weather file's coldest 0.4 % / 1 %. */
+  design_outdoor?: number | 'heating_99_6' | 'heating_99' | null
+  /** Brief 117: warm-up allowance after a setback, W/m² (null: none), and the wind for permanent vents, m/s. */
+  warm_up_w_per_m2?: number | null
+  vent_wind_m_s?: number | null
+}
 /** Hot water, for the whole building (the schema's service-level fields): stored, tap and cold-supply temperatures,
  * daily demand per person or per m² of floor, a circulation pump, and when it is used (shown as 'flat' until changed). Typed; null is not stated. */
 export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c: number | null; basis: 'per_person' | 'per_m2' | null; litres: number | null; pump_w: number | null; shape?: 'flat' | 'follow_occupancy' | null }
