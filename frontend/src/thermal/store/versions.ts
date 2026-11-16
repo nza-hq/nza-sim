@@ -57,24 +57,55 @@ export interface SavedVersion {
 /**
  * Saves the document as the building's next version, unless a version with the same model hash exists for that
  * building already (then that one is returned). Versions are immutable; the newest becomes the parent.
+ *
+ * Brief 110 P4: `plan` (the Model workspace's source) is stored beside the document, with its own hash. The model hash
+ * and the run key stay the document's alone. With a plan, "the same version" is the same document and the same plan,
+ * so renaming a type (a plan change the engine never sees) is still saved.
  */
-export async function saveModelVersion(sb: SupabaseClient, buildingId: string, doc: ModelDocument, note: string | null): Promise<SavedVersion> {
+export async function saveModelVersion(sb: SupabaseClient, buildingId: string, doc: ModelDocument, note: string | null, plan?: unknown): Promise<SavedVersion> {
   // The exact text that is hashed is what the database stores and checks (Brief 102a, QA M1): SQL never re-serialises
   // it, so float noise such as -2.8e-17 or a value of 1e21 hashes the same on both sides.
   const canonical = canonicalJSON(doc)
-  const [mh, lh, wh] = await Promise.all([sha256Hex(canonical), libraryHash(doc.library_refs), weatherHash(doc.weather_ref)])
-  const same = await sb.from('model_versions').select('id').eq('building_id', buildingId).eq('model_hash', mh).limit(1)
+  const planText = plan === undefined ? null : canonicalJSON(JSON.parse(JSON.stringify(plan)))
+  const [mh, lh, wh, ph] = await Promise.all([
+    sha256Hex(canonical), libraryHash(doc.library_refs), weatherHash(doc.weather_ref), planText == null ? null : sha256Hex(planText),
+  ])
+  let q = sb.from('model_versions').select('id').eq('building_id', buildingId).eq('model_hash', mh)
+  if (ph) q = q.eq('plan_hash', ph)
+  const same = await q.limit(1)
   if (same.error) fail('reading model versions', same.error)
   if (same.data && same.data.length) return { id: same.data[0].id, model_hash: mh, library_hash: lh, weather_hash: wh, created: false }
   const latest = await sb.from('model_versions').select('id').eq('building_id', buildingId).order('created_at', { ascending: false }).limit(1)
   if (latest.error) fail('reading model versions', latest.error)
-  const { data: id, error } = await sb.rpc('create_model_version', {
+  const args = {
     p_building: buildingId, p_schema_version: doc.schema_version, p_canonical: canonical,
     p_model_hash: mh, p_library_hash: lh, p_weather_hash: wh,
     p_parent: latest.data?.[0]?.id ?? null, p_note: note,
-  })
+  }
+  const { data: id, error } = planText == null
+    ? await sb.rpc('create_model_version', args)
+    : await sb.rpc('create_model_version_with_plan', { ...args, p_plan_canonical: planText, p_plan_hash: ph })
   if (error) fail('saving the model version', error)
   return { id: id as string, model_hash: mh, library_hash: lh, weather_hash: wh, created: true }
+}
+
+/** The drawn model's building for a local project (0008: '<local id>:model', its own history beside the Systems page's). */
+export async function ensureModelBuilding(sb: SupabaseClient, orgId: string, localRef: string, name: string): Promise<string> {
+  if (!localRef || typeof localRef !== 'string') throw new Error('no local project id: open a saved project first')
+  const { data, error } = await sb.rpc('ensure_model_building', { p_org: orgId, p_local_ref: localRef, p_name: name })
+  if (error) fail('finding the drawn model for this project', error)
+  return data as string
+}
+
+export interface LoadedVersion { id: string; created_at: string; model_hash: string; document: ModelDocument; plan: unknown }
+
+/** The building's newest version that has a Plan (Brief 110 P4), or null when none is saved yet. */
+export async function loadLatestVersion(sb: SupabaseClient, buildingId: string): Promise<LoadedVersion | null> {
+  const r = await sb.from('model_versions').select('id, created_at, model_hash, document, plan')
+    .eq('building_id', buildingId).not('plan', 'is', null).order('created_at', { ascending: false }).limit(1)
+  if (r.error) fail('reading model versions', r.error)
+  const row = r.data?.[0]
+  return row ? (row as LoadedVersion) : null
 }
 
 /** Records a run of this version; a second call with the same engine, library and weather returns the first run's id (record_run dedupes within the version, Brief 102a). */

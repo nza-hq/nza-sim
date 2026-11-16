@@ -1,0 +1,58 @@
+{
+ "source": "scripts/111_fabric.mts",
+ "epw_sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2",
+ "heat_c": 21,
+ "level": "fabric",
+ "building": {
+  "engine2_mwh": 90.614,
+  "energyplus_mwh": 88.418,
+  "diff_pct": 2.5,
+  "tolerance_pct": 10,
+  "pass": true
+ },
+ "cooling": {
+  "engine2_mwh": 0,
+  "energyplus_mwh": 0
+ },
+ "storeys": {
+  "Floor_1": {
+   "engine2_mwh": 24.738,
+   "energyplus_mwh": 23.178,
+   "diff_pct": 6.7
+  },
+  "Floor_2": {
+   "engine2_mwh": 13.469,
+   "energyplus_mwh": 13.88,
+   "diff_pct": -3
+  },
+  "Floor_3": {
+   "engine2_mwh": 13.149,
+   "energyplus_mwh": 13.256,
+   "diff_pct": -0.8
+  },
+  "Floor_4": {
+   "engine2_mwh": 13.748,
+   "energyplus_mwh": 14.119,
+   "diff_pct": -2.6
+  },
+  "Floor_5": {
+   "engine2_mwh": 25.51,
+   "energyplus_mwh": 23.985,
+   "diff_pct": 6.4
+  }
+ },
+ "breakdown_kwh": {
+  "heating": 90614,
+  "cooling": 0,
+  "conduction": -784055,
+  "opaque_solar_absorbed": 1417196,
+  "sky_longwave": -803219,
+  "glazing_solar_absorbed": 49328,
+  "bridging": -27951,
+  "infiltration": -30867,
+  "permanent_vents": -19243,
+  "solar_transmitted": 110432,
+  "solar_lost_through_glazing": -2335,
+  "storage": 101
+ }
+}

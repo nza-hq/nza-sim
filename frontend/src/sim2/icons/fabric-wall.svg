@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+  <polygon fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="12.06 18.82 12.06 41.42 40.24 41.42 40.24 18.82 26.15 8.58 12.06 18.82"/>
+  <g>
+    <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="20.85" y1="30.35" x2="18.42" y2="30.35"/>
+    <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="16.52" y1="30.35" x2="14.09" y2="30.35"/>
+    <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="12.19" y1="30.35" x2="9.77" y2="30.35"/>
+    <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="7.86" y1="30.35" x2="5.44" y2="30.35"/>
+    <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="7.86 33.83 5.14 30.38 7.86 26.93"/>
+  </g>
+</svg>

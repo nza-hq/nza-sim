@@ -3,7 +3,7 @@
  *
  * Shown inside the results panel when any zone states emitters; the editor places it with one line,
  * `<EmitterSizing summary={summary} whatIf={whatIf} onWhatIf={setWhatIf} />`, and passes `whatIf` to the run
- * (`client.run(doc, delay, whatIf)`). It owns nothing of the editor's.
+ * (`client.run(doc, delay, { what_if: whatIf })`). It owns nothing of the editor's.
  *
  * Per zone: what the emitters give at the design temperatures against the peak, the shortfall, the hours below the
  * setpoint and the lowest temperature, and the rating that would cover the peak. A second flow and return pair runs the
@@ -125,7 +125,7 @@ export function EmitterSizing({ summary, whatIf, onWhatIf }: { summary: Summary;
           <tbody>
             <tr><td>Zones short</td><td>{shortCount}</td><td>{wi.zones.filter((z) => z.shortfall_w > 0).length}</td></tr>
             <tr><td>Heating delivered</td><td>{mwh(summary.building.heating_kwh)} MWh</td><td>{mwh(wi.heating_kwh)} MWh</td></tr>
-            {summary.energy.ok && wi.energy.ok && (
+            {summary.energy?.ok && wi.energy?.ok && (
               <tr><td>Energy used</td><td>{mwh(summary.energy.total_kwh)} MWh</td><td>{mwh(wi.energy.total_kwh)} MWh</td></tr>
             )}
           </tbody>

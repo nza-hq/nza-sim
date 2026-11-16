@@ -1,0 +1,336 @@
+{
+ "_note": "Test fixture for browser checks: a 20 x 10 m box, two rooms in two zones, library fabric, two space types and their systems. Typed values (q50 5, setpoints, gains) are test inputs, not a real building. Load with window.sim2.loadPlan(fixture.plan).",
+ "plan": {
+  "blocks": [
+   [
+    [
+     0,
+     0
+    ],
+    [
+     20,
+     0
+    ],
+    [
+     20,
+     10
+    ],
+    [
+     0,
+     10
+    ]
+   ]
+  ],
+  "rooms": [
+   {
+    "id": "r1",
+    "name": "Room 1",
+    "ring": [
+     [
+      12,
+      10
+     ],
+     [
+      0,
+      10
+     ],
+     [
+      0,
+      0
+     ],
+     [
+      12,
+      0
+     ]
+    ],
+    "zone": "z1",
+    "space": "s1",
+    "systems": {
+     "heating": "y1",
+     "cooling": "y2",
+     "ventilation": "y3"
+    }
+   },
+   {
+    "id": "r2",
+    "name": "Room 2",
+    "ring": [
+     [
+      12,
+      0
+     ],
+     [
+      20,
+      0
+     ],
+     [
+      20,
+      10
+     ],
+     [
+      12,
+      10
+     ]
+    ],
+    "zone": "z2",
+    "space": "s2",
+    "systems": {
+     "heating": "y4",
+     "cooling": "y5"
+    }
+   }
+  ],
+  "zones": [
+   {
+    "id": "z1",
+    "name": "Zone 1",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z2",
+    "name": "Zone 2",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   }
+  ],
+  "systems": [
+   {
+    "id": "y1",
+    "service": "heating",
+    "name": "VRF heating",
+    "template": "vrf_heating"
+   },
+   {
+    "id": "y2",
+    "service": "cooling",
+    "name": "VRF cooling",
+    "template": "vrf_cooling"
+   },
+   {
+    "id": "y3",
+    "service": "ventilation",
+    "name": "MVHR",
+    "template": "mvhr_standard",
+    "flow": 1,
+    "schedule": "always_on"
+   },
+   {
+    "id": "y4",
+    "service": "heating",
+    "name": "Panel heaters",
+    "template": "electric_panel_heating"
+   },
+   {
+    "id": "y5",
+    "service": "cooling",
+    "name": "No cooling",
+    "template": "none_cooling"
+   }
+  ],
+  "storey_height_m": 3,
+  "windows": [
+   {
+    "id": "wmwiaha3gr",
+    "wall": 0,
+    "t_m": 2.6391666666666667,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiaha3gs",
+    "wall": 0,
+    "t_m": 6.111333333333333,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiaha3gt",
+    "wall": 0,
+    "t_m": 9.583499999999999,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiaha3gu",
+    "wall": 0,
+    "t_m": 13.055666666666665,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiaha3gv",
+    "wall": 0,
+    "t_m": 16.527833333333334,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiahaho28",
+    "wall": 2,
+    "t_m": 2.1431428571428572,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiahaho29",
+    "wall": 2,
+    "t_m": 5.119285714285715,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiahaho2a",
+    "wall": 2,
+    "t_m": 8.095428571428572,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiahaho2b",
+    "wall": 2,
+    "t_m": 11.07157142857143,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiahaho2c",
+    "wall": 2,
+    "t_m": 14.047714285714287,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "wmwiahaho2d",
+    "wall": 2,
+    "t_m": 17.023857142857146,
+    "width_m": 0.833,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   }
+  ],
+  "fabric_types": [
+   {
+    "id": "f_wall",
+    "element": "wall",
+    "name": "External wall",
+    "construction": "cavity_wall_standard",
+    "u": null
+   },
+   {
+    "id": "f_glazing",
+    "element": "glazing",
+    "name": "Windows",
+    "construction": "double_low_e",
+    "u": null
+   },
+   {
+    "id": "f_door",
+    "element": "door",
+    "name": "Doors",
+    "construction": null,
+    "u": 1.8
+   },
+   {
+    "id": "f_roof",
+    "element": "roof",
+    "name": "Roof",
+    "construction": "flat_roof_standard",
+    "u": null
+   },
+   {
+    "id": "f_floor",
+    "element": "floor",
+    "name": "Ground floor",
+    "construction": "ground_floor_slab",
+    "u": null
+   },
+   {
+    "id": "f_partition",
+    "element": "partition",
+    "name": "Wall between zones",
+    "construction": "interior_wall_block_plastered",
+    "u": null
+   }
+  ],
+  "wall_spans": [],
+  "spaces": [
+   {
+    "use": "office",
+    "occupancy": "office_occupancy",
+    "lighting": "office_lighting",
+    "equipment": null,
+    "id": "s1",
+    "name": "Office",
+    "people_per_m2": 0.1,
+    "sensible_w_per_person": 75,
+    "occupancy_rate": 0.75,
+    "lighting_w_per_m2": 8,
+    "equipment_w_per_m2": 12,
+    "heat_c": 21,
+    "cool_c": 24,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "equipment_baseload_w_per_m2": 0
+   },
+   {
+    "use": "other",
+    "occupancy": null,
+    "lighting": null,
+    "equipment": null,
+    "id": "s2",
+    "name": "Store",
+    "heat_c": 16,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1
+   }
+  ],
+  "building": {
+   "q50": 5,
+   "tb_multiplier": 1,
+   "exposure": "normal"
+  },
+  "next": {
+   "room": 3,
+   "zone": 3,
+   "system": 1
+  }
+ }
+}

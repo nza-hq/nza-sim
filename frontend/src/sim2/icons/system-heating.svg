@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.33,15.62c-.95,0-1.71.77-1.71,1.71v22.79c0,.95.77,1.71,1.71,1.71s1.71-.77,1.71-1.71v-22.79c0-.95-.77-1.71-1.71-1.71Z"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.68,15.62c-.95,0-1.71.77-1.71,1.71v22.79c0,.95.77,1.71,1.71,1.71s1.71-.77,1.71-1.71v-22.79c0-.95-.77-1.71-1.71-1.71Z"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M22.03,15.62c-.95,0-1.71.77-1.71,1.71v22.79c0,.95.77,1.71,1.71,1.71s1.71-.77,1.71-1.71v-22.79c0-.95-.77-1.71-1.71-1.71Z"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M27.39,15.62c-.95,0-1.71.77-1.71,1.71v22.79c0,.95.77,1.71,1.71,1.71s1.71-.77,1.71-1.71v-22.79c0-.95-.77-1.71-1.71-1.71Z"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M32.74,15.62c-.95,0-1.71.77-1.71,1.71v22.79c0,.95.77,1.71,1.71,1.71s1.71-.77,1.71-1.71v-22.79c0-.95-.77-1.71-1.71-1.71Z"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M38.09,15.62c-.95,0-1.71.77-1.71,1.71v22.79c0,.95.77,1.71,1.71,1.71s1.71-.77,1.71-1.71v-22.79c0-.95-.77-1.71-1.71-1.71Z"/>
+  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="40.59" y1="20.35" x2="42.39" y2="20.35"/>
+  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="4.04" y1="21.07" x2="5.84" y2="21.07"/>
+  <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" points="8.86 18.36 6.62 18.36 6.62 23.77 8.86 23.77"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.6,12.7s-1.17-.8-.59-2.01c.59-1.21.97-1.61.97-2.61s-.97-2.41-.97-2.41"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M31.6,12.7s-1.17-.8-.59-2.01c.59-1.21.97-1.61.97-2.61s-.97-2.41-.97-2.41"/>
+  <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M24.95,13s-1.53-1.04-.76-2.59c.76-1.56,1.26-2.08,1.26-3.37s-1.26-3.11-1.26-3.11"/>
+</svg>

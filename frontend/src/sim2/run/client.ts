@@ -2,7 +2,7 @@
  * Brief 105 Part 4: the editor's handle on the run worker. One worker per page; a run is debounced on edit and only
  * the latest one's answer is kept (an older run that finishes late is dropped).
  */
-import type { WhatIf } from './seam'
+import type { Level, WhatIf } from './seam'
 import type { WorkerIn, WorkerOut } from './worker'
 
 export type RunAnswer = Extract<WorkerOut, { type: 'result' }>
@@ -25,11 +25,15 @@ export class RunClient {
     this.send({ type: 'weather', bytes, file_name, source })
   }
   clearWeather() { this.send({ type: 'clear_weather' }) }
-  /** Runs `doc` after `delayMs` with no newer call; returns the run's number. `what_if`: a second flow/return pair (Brief 108). */
-  run(doc: unknown, delayMs = 250, what_if: WhatIf | null = null): number {
+  /**
+   * Runs `doc` after `delayMs` with no newer call; returns the run's number. Brief 111: `level` is what the results
+   * include ('systems' when absent); 'fabric' needs `fabric_heat_c`, the temperature the caller shows. Brief 108:
+   * `what_if`, a second flow/return pair for the emitters.
+   */
+  run(doc: unknown, delayMs = 250, opts: { level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf | null } = {}): number {
     const id = ++this.seq
     if (this.timer) clearTimeout(this.timer)
-    this.timer = setTimeout(() => { this.timer = null; this.send({ type: 'run', id, doc, what_if }) }, delayMs)
+    this.timer = setTimeout(() => { this.timer = null; this.send({ type: 'run', id, doc, ...opts }) }, delayMs)
     return id
   }
   dispose() { if (this.timer) clearTimeout(this.timer); this.worker.terminate() }
