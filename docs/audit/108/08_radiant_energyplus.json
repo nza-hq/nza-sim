@@ -1,0 +1,78 @@
+{
+ "source": "validation/energyplus/108_radiant_referee.py",
+ "spec_sha256": "3a3f7c4af45fb9070e45d21ad0c4defe7e78e45d29f6196cf175e538af62725f",
+ "radiant_spec_sha256": "bf890b60d2655f7e3322a3cd0977683afb8a73e400fccdc854a1bb009349d9bf",
+ "weather_mos_sha256": "13f5a77b445b558dd162880a98e00ecaffe3bf567d88ca8581dfa88b589fbb48",
+ "runs": {
+  "unlimited": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.4132869177802416,
+     "electricity_mwh": 1.9045772784435444,
+     "peak_electricity_w": 1473.037989402516,
+     "radiant_share": 0.4042867561743812,
+     "unmet_hours": 273,
+     "min_c": 19.23161615918743,
+     "peak_heating_w": 1093.1452414034445
+    },
+    "east": {
+     "heat_mwh": 1.411035208922272,
+     "electricity_mwh": 1.901541477535563,
+     "peak_electricity_w": 1473.3567208545476,
+     "radiant_share": 0.40428646971635795,
+     "unmet_hours": 273,
+     "min_c": 19.231450462672186,
+     "peak_heating_w": 1093.38186040258
+    }
+   }
+  },
+  "tight": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.3751677511558513,
+     "electricity_mwh": 1.8527045885978946,
+     "peak_electricity_w": 800.0,
+     "radiant_share": 0.4041771457425464,
+     "unmet_hours": 693,
+     "min_c": 13.60193203857689,
+     "peak_heating_w": 605.0970042692999
+    },
+    "east": {
+     "heat_mwh": 1.3730714179411803,
+     "electricity_mwh": 1.8498928188955324,
+     "peak_electricity_w": 800.0,
+     "radiant_share": 0.4041798834475727,
+     "unmet_hours": 692,
+     "min_c": 13.595871516871732,
+     "peak_heating_w": 604.8725769643881
+    }
+   }
+  },
+  "mild": {
+   "warnings": 5,
+   "zones": {
+    "west": {
+     "heat_mwh": 1.4109597158539404,
+     "electricity_mwh": 1.901387460275342,
+     "peak_electricity_w": 1100.0,
+     "radiant_share": 0.40427535362862965,
+     "unmet_hours": 278,
+     "min_c": 16.69311440233327,
+     "peak_heating_w": 827.2741194662119
+    },
+    "east": {
+     "heat_mwh": 1.4087316702603259,
+     "electricity_mwh": 1.8983860659989742,
+     "peak_electricity_w": 1100.0,
+     "radiant_share": 0.40427558478503495,
+     "unmet_hours": 279,
+     "min_c": 16.690254677872048,
+     "peak_heating_w": 827.7004105111757
+    }
+   }
+  }
+ },
+ "energyplus_version": "EnergyPlus, Version 25.2.0-cf7368216c"
+}

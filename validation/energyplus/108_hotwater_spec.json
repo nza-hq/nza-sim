@@ -1,0 +1,12 @@
+{
+ "about": "Brief 108 review F1: the cooled room (104_cooled_room_spec.json) with its heated rooms heated by hot-water radiators whose output follows the room. Flow 50 C, design return 40 C, rooms at their 20 C setpoint; each room's emitter gives 'design_output_w' there. Exponent 1 and radiant share 0, so EnergyPlus's ZoneHVAC:Baseboard:RadiantConvective:Water (effectiveness-NTU at a fixed UA, all convective) and Engine 2's EN 442 radiator at constant water flow are the same kind of curve: output in proportion to (flow temperature - room air temperature). EnergyPlus's rating inputs are derived from these figures by its documented sizing (Engineering Reference 15.4.3.3), before any comparison; the referee then measures the proportion EnergyPlus actually ran with. 'tight' and 'mild' are the caps of 108_capped_spec.json, now at the setpoint only.",
+ "flow_c": 50.0,
+ "return_c": 40.0,
+ "rated_room_c": 20.0,
+ "exponent_n": 1.0,
+ "radiant_fraction": 0.0,
+ "cases": {
+  "tight": { "west": 800, "east": 800 },
+  "mild": { "west": 1100, "east": 1100 }
+ }
+}

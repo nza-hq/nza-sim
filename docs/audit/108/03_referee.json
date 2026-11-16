@@ -1,0 +1,364 @@
+{
+ "source": "scripts/108_referee.mts",
+ "caps_sha256": "04eb39ec8470d33ef9477170519f5df3c969c4d04365c9c8584aa8bc80adc1fd",
+ "gate": "heating ±10 %, unmet hours ±20 % or ±50 h, lowest temperature ±1 K",
+ "cooled_room": {
+  "uncapped": {
+   "caps": null,
+   "rooms": {
+    "west": {
+     "engine2": {
+      "heat": 1.861,
+      "unmet": 0,
+      "min": 20,
+      "peak_w": 1424.753,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 1.933,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 20,
+      "peak_w": 1471.165
+     },
+     "heating_pct": -3.7,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "east": {
+     "engine2": {
+      "heat": 1.862,
+      "unmet": 0,
+      "min": 20,
+      "peak_w": 1427.058,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 1.93,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 20,
+      "peak_w": 1471.508
+     },
+     "heating_pct": -3.5,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    }
+   }
+  },
+  "tight": {
+   "caps": {
+    "west": 800,
+    "east": 800
+   },
+   "rooms": {
+    "west": {
+     "engine2": {
+      "heat": 1.815,
+      "unmet": 460,
+      "min": 14.228,
+      "peak_w": 800,
+      "hours_at_cap": 674
+     },
+     "energyplus": {
+      "heat": 1.88,
+      "unmet": 517,
+      "ep_not_met": 513.75,
+      "min": 14.022,
+      "peak_w": 800.046
+     },
+     "heating_pct": -3.4,
+     "unmet_diff_h": -57,
+     "min_diff_k": 0.21,
+     "pass": true
+    },
+    "east": {
+     "engine2": {
+      "heat": 1.815,
+      "unmet": 461,
+      "min": 14.193,
+      "peak_w": 800,
+      "hours_at_cap": 680
+     },
+     "energyplus": {
+      "heat": 1.877,
+      "unmet": 511,
+      "ep_not_met": 511,
+      "min": 14.016,
+      "peak_w": 800.046
+     },
+     "heating_pct": -3.3,
+     "unmet_diff_h": -50,
+     "min_diff_k": 0.18,
+     "pass": true
+    }
+   }
+  },
+  "mild": {
+   "caps": {
+    "west": 1100,
+    "east": 1100
+   },
+   "rooms": {
+    "west": {
+     "engine2": {
+      "heat": 1.859,
+      "unmet": 26,
+      "min": 17.536,
+      "peak_w": 1100,
+      "hours_at_cap": 62
+     },
+     "energyplus": {
+      "heat": 1.93,
+      "unmet": 32,
+      "ep_not_met": 31.75,
+      "min": 17.241,
+      "peak_w": 1100.057
+     },
+     "heating_pct": -3.7,
+     "unmet_diff_h": -6,
+     "min_diff_k": 0.29,
+     "pass": true
+    },
+    "east": {
+     "engine2": {
+      "heat": 1.859,
+      "unmet": 26,
+      "min": 17.511,
+      "peak_w": 1100,
+      "hours_at_cap": 65
+     },
+     "energyplus": {
+      "heat": 1.927,
+      "unmet": 32,
+      "ep_not_met": 31.25,
+      "min": 17.238,
+      "peak_w": 1100.058
+     },
+     "heating_pct": -3.5,
+     "unmet_diff_h": -6,
+     "min_diff_k": 0.27,
+     "pass": true
+    }
+   }
+  }
+ },
+ "bridgewater_five_storeys": {
+  "uncapped": {
+   "caps": null,
+   "storeys": {
+    "Floor_1": {
+     "engine2": {
+      "heat": 27.758,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 21355.504,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 28.375,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 20161.292
+     },
+     "heating_pct": -2.2,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_2": {
+     "engine2": {
+      "heat": 18.79,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 17545.537,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 20.638,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 17125.827
+     },
+     "heating_pct": -9,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_3": {
+     "engine2": {
+      "heat": 18.569,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 17500.978,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 20.031,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 17001.097
+     },
+     "heating_pct": -7.3,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_4": {
+     "engine2": {
+      "heat": 19.201,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 17727.78,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 20.815,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 17369.99
+     },
+     "heating_pct": -7.8,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_5": {
+     "engine2": {
+      "heat": 30.228,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 22405.86,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 29.3,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 21593.317
+     },
+     "heating_pct": 3.2,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    }
+   },
+   "run_ms": 359
+  },
+  "capped": {
+   "caps": {
+    "Floor_5": 12000
+   },
+   "storeys": {
+    "Floor_1": {
+     "engine2": {
+      "heat": 27.758,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 21356.339,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 28.38,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 20166.019
+     },
+     "heating_pct": -2.2,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_2": {
+     "engine2": {
+      "heat": 18.794,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 17555.562,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 20.651,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 17150.927
+     },
+     "heating_pct": -9,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_3": {
+     "engine2": {
+      "heat": 18.61,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 17615.067,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 20.083,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 17143.027
+     },
+     "heating_pct": -7.3,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_4": {
+     "engine2": {
+      "heat": 19.603,
+      "unmet": 0,
+      "min": 21,
+      "peak_w": 18942.65,
+      "hours_at_cap": 0
+     },
+     "energyplus": {
+      "heat": 21.071,
+      "unmet": 0,
+      "ep_not_met": 0,
+      "min": 21,
+      "peak_w": 18230.644
+     },
+     "heating_pct": -7,
+     "unmet_diff_h": 0,
+     "min_diff_k": 0,
+     "pass": true
+    },
+    "Floor_5": {
+     "engine2": {
+      "heat": 29.109,
+      "unmet": 388,
+      "min": 18.55,
+      "peak_w": 12000,
+      "hours_at_cap": 890
+     },
+     "energyplus": {
+      "heat": 28.373,
+      "unmet": 345,
+      "ep_not_met": 343,
+      "min": 18.633,
+      "peak_w": 12000
+     },
+     "heating_pct": 2.6,
+     "unmet_diff_h": 43,
+     "min_diff_k": -0.08,
+     "pass": true
+    }
+   },
+   "run_ms": 317
+  }
+ }
+}

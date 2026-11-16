@@ -1,0 +1,21 @@
+/* Brief 108 Part 5: emitters against need, inside the results panel. Colours as run.css. */
+.es { margin-top: 6px; }
+.es-sum { margin: 2px 0 8px; font-size: 12px; color: #3A4743; }
+.es-whatif { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; padding: 8px; background: #F5F4F1; border-radius: 8px; font-size: 12px; }
+.es-whatif .rp-label { flex-basis: 100%; }
+.es-whatif input { width: 46px; font: inherit; font-size: 12px; padding: 1px 4px; border: 1px solid #DCE2DF; border-radius: 4px; }
+.es-whatif .rp-btn:disabled { opacity: .45; cursor: default; }
+.es-zones { list-style: none; margin: 0; padding: 0; }
+.es-zone { padding: 8px 0; border-top: 1px solid #DCE2DF; }
+.es-zone-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
+.es-zone-head span { font: 600 12px/18px var(--font-figures, system-ui); color: #235546; }
+.es-short .es-zone-head span { color: #A0522D; }
+.es-bar { height: 6px; margin: 4px 0; background: #F1E4D8; border-radius: 3px; overflow: hidden; }
+.es-bar span { display: block; height: 100%; background: #235546; }
+.es-line { margin: 2px 0 0; font-size: 12px; line-height: 17px; color: #3A4743; }
+.es-need { color: #1E2B27; }
+.es-muted { color: #6B7A75; }
+.es-compare { margin-top: 6px; }
+.es-building { margin-bottom: 8px; }
+.es-hint { flex-basis: 100%; font-size: 11px; line-height: 15px; color: #6B7A75; }
+.es-warn { margin: 0 0 8px; color: #A0522D; }

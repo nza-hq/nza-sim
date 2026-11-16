@@ -45,6 +45,19 @@ export interface ZoneInputs {
   /** Share of heating/cooling delivered to the air (1 = ideal convective, as EnergyPlus IdealLoads). */
   hc_convective_fraction: number
   /**
+   * Brief 108: the most heat the zone's emitters can give, W (null or absent: unlimited, ideal loads). When the
+   * heating needed to hold the setpoint is more, the zone gets this and floats below its setpoint.
+   */
+  heating_cap_w?: number | null
+  /**
+   * Brief 108 review F1 (Linzie, 15 Nov): the emitters' output with the room at a given temperature, W. When given, in
+   * place of heating_cap_w, each hour's limit is this at the zone's control temperature at the end of the hour before:
+   * a colder room draws more from the same radiators. Null or absent: heating_cap_w, fixed.
+   */
+  heating_cap_at?: ((room_c: number) => number) | null
+  /** Brief 108: heating's share to the air when it differs from cooling's (the emitters' convective share). Absent: hc_convective_fraction. */
+  heating_convective_fraction?: number | null
+  /**
    * Outside convective coefficient per hour, W/m²K, for every element facing the outside (windows included), in place
    * of each element's fixed h_ce. Null or absent: the element's own (ISO 52016-1 Table 25, 20 W/m²K).
    */
@@ -85,6 +98,8 @@ export interface ZoneRun {
   heating_w: Float64Array
   /** Cooling delivered, W (≥ 0, heat removed). */
   cooling_w: Float64Array
+  /** Review F1: each hour's heating limit, W, when it follows the room's temperature (heating_cap_at); otherwise absent. */
+  heating_cap_w?: Float64Array
   /** Every term of the zone's balance per hour, W, positive into the zone (air + all element nodes). */
   terms: {
     /** Per element: convection and long-wave with outdoor air at the outside face, or conduction to the ground. */
@@ -126,6 +141,10 @@ function check(inp: ZoneInputs) {
   if (!(inp.air_capacity_j_per_k >= 0)) throw new ZoneError('must be ≥ 0', 'air_capacity_j_per_k')
   if (!(inp.bridging_w_per_k >= 0)) throw new ZoneError('must be ≥ 0', 'bridging_w_per_k')
   if (!(inp.hc_convective_fraction >= 0 && inp.hc_convective_fraction <= 1)) throw new ZoneError('must be 0 to 1', 'hc_convective_fraction')
+  if (inp.heating_convective_fraction != null && !(inp.heating_convective_fraction >= 0 && inp.heating_convective_fraction <= 1)) throw new ZoneError('must be 0 to 1', 'heating_convective_fraction')
+  if (inp.heating_cap_w != null && !(inp.heating_cap_w >= 0)) throw new ZoneError('must be ≥ 0', 'heating_cap_w')
+  if (inp.heating_cap_at != null && inp.heating_cap_w != null) throw new ZoneError('give a fixed limit or one that follows the room, not both', 'heating_cap_at')
+  if (inp.heating_cap_at != null && typeof inp.heating_cap_at !== 'function') throw new ZoneError('must be a function of the room temperature', 'heating_cap_at')
   if (!Number.isFinite(inp.initial_c)) throw new ZoneError('required', 'initial_c')
   if (!(Number.isInteger(inp.warmup_days) && inp.warmup_days >= 0)) throw new ZoneError('a whole number ≥ 0', 'warmup_days')
   if (inp.control !== 'air' && inp.control !== 'operative') throw new ZoneError('air or operative', 'control')
@@ -208,9 +227,19 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   capF[0] = inp.air_capacity_j_per_k
   for (let k = 0; k < E; k++) capF[k + 1] = els[k].c[els[k].c.length - 1] * els[k].area_m2
   const eAir = new Float64Array(F); eAir[0] = 1
-  const eHC = new Float64Array(F)
-  eHC[0] = inp.hc_convective_fraction
-  for (let k = 0; k < E; k++) eHC[k + 1] += ((1 - inp.hc_convective_fraction) * els[k].area_m2) / A_tot
+  const spread = (f: number) => {
+    const v = new Float64Array(F)
+    v[0] = f
+    for (let k = 0; k < E; k++) v[k + 1] += ((1 - f) * els[k].area_m2) / A_tot
+    return v
+  }
+  const eHC = spread(inp.hc_convective_fraction)
+  // Brief 108: heating may reach the room differently from cooling (radiators give part of their heat as radiation).
+  const hcfH = inp.heating_convective_fraction ?? inp.hc_convective_fraction
+  const eH = hcfH === inp.hc_convective_fraction ? eHC : spread(hcfH)
+  const capH = inp.heating_cap_w ?? Infinity
+  const capAt = inp.heating_cap_at ?? null
+  let ctlPrev = inp.initial_c  // the control temperature at the end of the step before (review F1)
   const ctl = new Float64Array(F)
   if (inp.control === 'air') ctl[0] = 1
   else { ctl[0] = 0.5; for (let k = 0; k < E; k++) ctl[k + 1] += (0.5 * els[k].area_m2) / A_tot }
@@ -239,7 +268,8 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     const lu = luFactor(S, F)
     const uAir = luSolve(lu, eAir, new Float64Array(F))
     const wHC = luSolve(lu, eHC, new Float64Array(F))
-    return { tri, lu, uAir, wHC, ctl_uAir: dot(ctl, uAir), ctl_wHC: dot(ctl, wHC), gB: gB_m2.map((g, k) => g * els[k].area_m2) }
+    const wH = eH === eHC ? wHC : luSolve(lu, eH, new Float64Array(F))
+    return { tri, lu, uAir, wHC, wH, ctl_uAir: dot(ctl, uAir), ctl_wHC: dot(ctl, wHC), ctl_wH: dot(ctl, wH), gB: gB_m2.map((g, k) => g * els[k].area_m2) }
   }
   const gBm2 = Float64Array.from(els, (e) => e.g_boundary)
   const hci = Float64Array.from(els, (e) => e.h_ci)
@@ -265,6 +295,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
       solar_transmitted_w: new Float64Array(H), solar_lost_w: new Float64Array(H), other_gains_w: new Float64Array(H), storage_w: new Float64Array(H),
     },
     closure_wh: new Float64Array(H),
+    ...(inp.heating_cap_at ? { heating_cap_w: new Float64Array(H) } : {}),
   }
 
   const xF = new Float64Array(F).fill(inp.initial_c)
@@ -322,7 +353,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
       }
       if (changed) st = build(gBm2, hci)
     }
-    const { tri, lu, uAir, wHC, ctl_uAir, ctl_wHC, gB } = st
+    const { tri, lu, uAir, wHC, wH, ctl_uAir, ctl_wHC, ctl_wH, gB } = st
     const te = inp.theta_e[h], hv = inp.ventilation_w_per_k[h], sol = inp.solar_transmitted_w[h]
     const beam = beamIn && floorShare ? beamIn[h] : 0
     const ogw = og ? og.w[h] : 0, ogc = ogcH ? ogcH[h] : ogcN
@@ -342,15 +373,18 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     }
     luSolve(lu, bF, z)
     const den = 1 + hv * uAir[0]
-    const zA = (hv * z[0]) / den, wA = (hv * wHC[0]) / den
+    const zA = (hv * z[0]) / den
     const ctl0 = dot(ctl, z) - ctl_uAir * zA
-    const dctl = ctl_wHC - ctl_uAir * wA
     let phi = 0
-    if (heat_c != null && ctl0 < heat_c) phi = (heat_c - ctl0) / dctl
-    else if (cool_c != null && ctl0 > cool_c) phi = (cool_c - ctl0) / dctl
+    const capNow = capAt ? capAt(ctlPrev) : capH
+    let w = wHC, wA = (hv * wHC[0]) / den
+    if (heat_c != null && ctl0 < heat_c) {
+      w = wH; wA = (hv * wH[0]) / den
+      phi = Math.min((heat_c - ctl0) / (ctl_wH - ctl_uAir * wA), capNow)  // Brief 108: at most the emitters' output
+    } else if (cool_c != null && ctl0 > cool_c) phi = (cool_c - ctl0) / (ctl_wHC - ctl_uAir * wA)
     let stored = 0
     for (let i = 0; i < F; i++) {
-      const xi = z[i] - uAir[i] * zA + phi * (wHC[i] - uAir[i] * wA)
+      const xi = z[i] - uAir[i] * zA + phi * (w[i] - uAir[i] * wA)
       if (record) stored += (capF[i] / DT) * (xi - xF[i])
       xF[i] = xi
     }
@@ -362,7 +396,9 @@ export function runZone(inp: ZoneInputs): ZoneRun {
         x[j] = xj
       }
     }
+    if (capAt) ctlPrev = dot(ctl, xF)
     if (!record) return
+    if (out.heating_cap_w) out.heating_cap_w[h] = capNow
     const T = out.terms
     const ta = xF[0]
     let sum = phi + (T.bridging_w[h] = inp.bridging_w_per_k * (te - ta)) + (T.ventilation_w[h] = hv * (te - ta))

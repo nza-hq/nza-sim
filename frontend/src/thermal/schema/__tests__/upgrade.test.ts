@@ -51,10 +51,10 @@ function downgrade(d: any) {
   return o
 }
 
-describe('schema 2.1, 2.2 and 2.3', () => {
+describe('schema 2.1, 2.2, 2.3 and 2.4', () => {
   it('the converter writes today\'s constants into the document', async () => {
     const d = await anchor()
-    expect(d.schema_version).toBe('2.3')
+    expect(d.schema_version).toBe('2.4')
     for (const s of d.surfaces) {
       if (s.kind === 'wall') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.6, 0.9, null])
       if (s.kind === 'roof') expect([s.solar_absorptance, s.thermal_emissivity, s.frame_fraction]).toEqual([0.7, 0.9, null])
@@ -88,6 +88,17 @@ describe('schema 2.1, 2.2 and 2.3', () => {
     const occ: any = d.profiles.find((p) => p.kind === 'occupancy')
     expect([occ.occupancy_rate, occ.sensible_w_per_person, occ.density]).toEqual([1, 75, { value: 2.5, basis: 'per_room' }])
     const old = to22(d)
+    expect(() => ModelDocument.parse(old)).toThrow()
+    const up = upgradeDocument(old)
+    expect(up).toEqual(d)
+    expect(await modelHash(up)).toBe(await modelHash(d))
+  })
+  it('a 2.3 document upgrades to the 2.4 one by adding empty emitter lists, and fills nothing else (Brief 108)', async () => {
+    const d = await anchor()
+    expect(d.zones.every((z) => z.emitters.length === 0)).toBe(true)
+    const old: any = structuredClone(d)
+    old.schema_version = '2.3'
+    for (const z of old.zones) delete z.emitters
     expect(() => ModelDocument.parse(old)).toThrow()
     const up = upgradeDocument(old)
     expect(up).toEqual(d)
@@ -137,7 +148,7 @@ describe('schema 2.1, 2.2 and 2.3', () => {
     const e = structuredClone(d); e.surfaces[glz].inside_solar_absorptance = 0.5
     expect(() => ModelDocument.parse(e)).toThrow('not inside_solar_absorptance')
     expect(() => upgradeDocument({ ...d, schema_version: '1.0' })).toThrow('schema version "1.0"')
-    expect(SCHEMA_VERSION).toBe('2.3')
+    expect(SCHEMA_VERSION).toBe('2.4')
     expect(TODAY.inside_solar_absorptance).toBe(0.7)
     expect(TODAY.internal_heat_capacity_j_per_k_m2).toBe(250_000)
   })

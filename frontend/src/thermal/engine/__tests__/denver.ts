@@ -77,14 +77,14 @@ export function bestestDoc(wall: string, floor: string) {
     s('window', 'glazing', 12, 180, 90, 'window600', { solar_absorptance: null, frame_fraction: 0, inside_solar_absorptance: null }),
   ]
   return ModelDocument.parse({
-    schema_version: '2.3',
+    schema_version: '2.4',
     building: { id: 'bestest', name: 'BESTEST', decoded_building_key: null, site: { lat: 39.83, lon: -104.65, name: 'Denver', exposure: null, ground: { method: 'annual_mean_outdoor' } }, orientation_deg: 0, reported_floor_area_m2: null, thermal_bridging: { mode: 'absent', multiplier: null, alpha_pct: null }, thermal_mass: { mode: null, category: null }, opening_defaults: {} },
     zones: [{
       id: 'z', name: 'Case', floor: 0, storeys: 1, polygon: [[0, 0], [8, 0], [8, 6], [0, 6]], area_m2: 48, height_m: 2.7, use_type: 'test', rooms: null,
       profile_refs: { occupancy: null, lighting: [], equipment: [], auxiliary: [] },
       setpoints: { heat_c: 20, cool_c: 27, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' },
       // 0.5 ach at Denver's altitude is 0.414 ach of sea-level air (as the Modelica case); no internal mass beyond air.
-      ventilation: [], infiltration_q50: null, infiltration_ach: 0.414, internal_heat_capacity_j_per_k_m2: 0,
+      ventilation: [], infiltration_q50: null, infiltration_ach: 0.414, internal_heat_capacity_j_per_k_m2: 0, emitters: [],
       surfaces: surfaces.map((x) => x.id),
     }],
     surfaces, system_groups: [], profiles: [],

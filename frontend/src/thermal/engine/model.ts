@@ -21,6 +21,7 @@ import { runZone } from './zone'
 import type { ModelDocument } from '../schema/model'
 import { GainsError, zoneGains, type ZoneGains } from './gains'
 import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
+import { EmitterError, zoneEmitters, type ZoneEmitters } from './emitters'
 
 export class ModelError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'ModelError' }
@@ -46,6 +47,19 @@ export interface RunOptions {
    * and permanent vents only, as Briefs 103 and 104 ran.
    */
   ventilation?: 'none' | 'document'
+  /**
+   * Brief 108 Part 4, the sizing run. 'none': each zone keeps its emitters' radiant share but their output is not
+   * limited, so its peak heating is what its emitters would need to give to hold the setpoint every hour. Absent or
+   * 'cap': heating is limited to the emitters' output (Part 2).
+   */
+  emitter_limit?: 'cap' | 'none'
+  /**
+   * Brief 108 review F1 (Linzie, 15 Nov: "work it out each hour"). 'room' (default): each hour's limit is the
+   * emitters' output at the room's control temperature at the end of the hour before, so a colder room draws more.
+   * 'setpoint': the output with the room at its setpoint, fixed all year, as EnergyPlus's LimitCapacity takes it (the
+   * Part 3 referee runs on this).
+   */
+  emitter_rating?: 'room' | 'setpoint'
   /**
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
@@ -290,6 +304,8 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
 
 /** One zone's run in a common shape, from either solver. */
 interface Solved {
+  /** Review F1: each hour's heating limit when it follows the room (absent otherwise). */
+  heating_cap_w?: Float64Array
   heating_w: Float64Array; cooling_w: Float64Array
   theta_air: Float64Array; theta_op: Float64Array; theta_mrt: Float64Array
   bridging_w: Float64Array; ventilation_w: Float64Array; solar_lost_w: Float64Array; other_gains_w: Float64Array; storage_w: Float64Array
@@ -377,6 +393,26 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   } else if (options.internal_gains != null && options.internal_gains !== 'none') {
     throw new ModelError(`unknown value ${JSON.stringify(options.internal_gains)} ('none' or 'profiles')`, 'options.internal_gains')
   }
+  // A setback (a lower heating setpoint outside stated hours) is not modelled until Brief 109: refused, not ignored.
+  doc.zones.forEach((z, zi) => {
+    if (z.setpoints.setback_c != null) throw new ModelError('setbacks (a lower night setpoint) are not modelled yet', `zones[${zi}].setpoints.setback_c`)
+    if (z.setpoints.hours_ref != null) throw new ModelError('setpoints that change by the hour are not modelled yet', `zones[${zi}].setpoints.hours_ref`)
+  })
+  // Emitters per zone (Brief 108): a zone that states them is limited to their output, and their radiant share sets
+  // how heating reaches the room. A zone that states none is not limited, as before.
+  let emit: (ZoneEmitters | null)[]
+  try { emit = zoneEmitters(doc) } catch (e) {
+    if (e instanceof EmitterError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
+    throw e
+  }
+  // Review F8: a mode parameter that is not one of its values is refused, never read as the default (CLAUDE.md lesson 11).
+  if (options.emitter_limit != null && options.emitter_limit !== 'cap' && options.emitter_limit !== 'none') throw new ModelError(`unknown emitter_limit "${String(options.emitter_limit)}"`, 'options.emitter_limit')
+  if (options.emitter_rating != null && options.emitter_rating !== 'room' && options.emitter_rating !== 'setpoint') throw new ModelError(`unknown emitter_rating "${String(options.emitter_rating)}"`, 'options.emitter_rating')
+  const byRoom = options.emitter_rating !== 'setpoint'
+  const limited = (zi: number) => options.emitter_limit !== 'none' && emit[zi] != null
+  const capOf = (zi: number) => (limited(zi) && !byRoom ? emit[zi]!.cap_w : null)
+  const capAtOf = (zi: number) => (limited(zi) && byRoom ? emit[zi]!.at : null)
+  const hcfHeatOf = (zi: number) => (emit[zi] ? 1 - emit[zi]!.radiant_fraction : null)
   const gainsIn = (zi: number) => {
     const g = gains[zi]
     return g ? { w: g.total_w, convective_fraction: g.convective_fraction } : null
@@ -394,6 +430,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       inside_solar_absorptance: insideAlpha, solar_convective_fraction: options.solar_convective_fraction,
       other_gains: options.other_gains ?? gainsIn(0), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
       control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
+      heating_cap_w: capOf(0), heating_cap_at: capAtOf(0), heating_convective_fraction: hcfHeatOf(0),
       warmup_days: options.warmup_days,
       h_ce_w_per_m2k: sp?.outside_convection === 'wind' ? Float64Array.from(weather.hours.wind_speed, (v) => K.h_ce_wind_a + K.h_ce_wind_b * Math.max(0, v)) : null,
       inside_convection: (sp?.inside_convection ?? 'by_tilt') as 'by_tilt' | 'by_heat_flow',
@@ -401,6 +438,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     })
     const T = run.terms
     solved = [{
+      heating_cap_w: run.heating_cap_w,
       heating_w: run.heating_w, cooling_w: run.cooling_w, theta_air: run.theta_air, theta_op: run.theta_op, theta_mrt: run.theta_mrt,
       bridging_w: T.bridging_w, ventilation_w: T.ventilation_w, solar_lost_w: T.solar_lost_w, other_gains_w: T.other_gains_w, storage_w: T.storage_w,
       closure_wh: run.closure_wh, interzone_w: new Float64Array(H),
@@ -421,6 +459,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         solar_transmitted_w: built.zones[zi].solarTransmitted, solar_beam_w: sp?.beam_on_floor ? built.zones[zi].solarBeam : null,
         other_gains: options.other_gains ?? gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c },
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
+        heating_cap_w: capOf(zi), heating_cap_at: capAtOf(zi), heating_convective_fraction: hcfHeatOf(zi),
       })),
       elements: elements.map((element, k) => ({
         element, zone_a: zoneA[k], zone_b: zoneB[k], solar_absorbed_w_per_m2: absorbed[k],
@@ -433,6 +472,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       inside_convection: sp?.inside_convection === 'tarp' ? 'tarp' : 'fixed',
     })
     solved = run.zones.map((z, zi) => ({
+      heating_cap_w: z.heating_cap_w,
       heating_w: z.heating_w, cooling_w: z.cooling_w, theta_air: z.theta_air, theta_op: z.theta_op, theta_mrt: z.theta_mrt,
       bridging_w: z.terms.bridging_w, ventilation_w: z.terms.ventilation_w, solar_lost_w: z.terms.solar_lost_w,
       other_gains_w: z.terms.other_gains_w, storage_w: z.terms.storage_w, closure_wh: z.closure_wh, interzone_w: z.terms.interzone_w,
@@ -500,6 +540,17 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       const t = run.theta_air[h]; mn = Math.min(mn, t); mx = Math.max(mx, t); mean += t / H
       maxClosure = Math.max(maxClosure, run.closure_wh[h])
     }
+    // Brief 108: hours the control temperature is more than UNMET_K below the heating setpoint, and hours at the cap.
+    const ctlT = options.control === 'operative' ? run.theta_op : run.theta_air
+    const hsp = zone.setpoints.heat_c
+    let unmet = 0, minCtl = Infinity, atCap = 0
+    const em = emit[zi]
+    for (let h = 0; h < H; h++) {
+      minCtl = Math.min(minCtl, ctlT[h])
+      if (hsp != null && ctlT[h] < hsp - UNMET_K) unmet++
+      const capH = run.heating_cap_w ? run.heating_cap_w[h] : em?.cap_w ?? Infinity  // review F1: the hour's own limit
+      if (em && run.heating_w[h] >= capH * (1 - 1e-9) && (capH > 0 || (hsp != null && ctlT[h] < hsp - 1e-6))) atCap++
+    }
     let closure
     try { closure = checkClosure(lines, maxClosure) } catch (e) {
       if (e instanceof ModelError && Zn > 1) throw new ModelError(e.message, `zones[${zi}].${e.path}`)
@@ -518,7 +569,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         heating_kwh: kwh(run.heating_w), cooling_kwh: kwh(run.cooling_w),
         peak_heating_w: Math.max(...run.heating_w), peak_cooling_w: Math.max(...run.cooling_w),
         theta_air_c: { min: mn, max: mx, mean },
+        unmet_heating_hours: hsp == null ? null : unmet, min_control_c: minCtl,
       },
+      emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters } : null,
       breakdown: lines,
       closure,
       run_ms,
@@ -533,6 +586,9 @@ export function runZoneModel(doc: ModelDocument, weather: Weather, library: Reco
   if (doc.zones.length !== 1) throw new ModelError(`runZoneModel runs one zone; the document has ${doc.zones.length} (use runModel)`, 'zones')
   return runModel(doc, weather, library, options).zones[0]
 }
+
+/** Brief 108: an hour is unmet when the control temperature is more than this below the heating setpoint, K. */
+export const UNMET_K = 0.5
 
 /** Largest hourly residual a run may have, Wh: |Σ terms − demand − Δstorage| (brief: "fails loudly"). */
 export const CLOSURE_MAX_WH = 1
