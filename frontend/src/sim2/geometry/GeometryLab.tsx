@@ -1376,7 +1376,13 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     // A system changes energy used, not demand: on Systems the card says energy used when the run has it.
     const its = previewItems(figs.now, figs.preview, unit)
     const e = its.find((x) => x.label === 'Energy used')
-    if (mode === 'systems' && !e && !figs.preview.energy?.ok) return 'Energy used: shown once every service has a system'
+    if (mode === 'systems' && !e) {
+      // Energy used shows only once every service has a system: say what this change brings it to, or that it is still missing.
+      const pe = figs.preview.energy
+      if (!pe?.ok) return 'Energy used: shown once every service has a system'
+      const v = unit === 'kwh_per_m2' ? pe.total_kwh / figs.preview.building.floor_m2 : pe.total_kwh / 1000
+      return `Energy used → ${v.toFixed(1)} ${unit === 'kwh_per_m2' ? 'kWh/m²' : 'MWh'} (every service now has a system)`
+    }
     const h = (mode === 'systems' && e) || its[0]!
     return `${h.label} ${h.value} ${h.unit} (${h.sub})`
   }
