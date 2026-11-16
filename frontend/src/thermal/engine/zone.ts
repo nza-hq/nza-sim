@@ -55,6 +55,11 @@ export interface ZoneInputs {
    */
   heating_cap_w?: number | null
   /**
+   * Brief 119: the most sensible cooling the zone's units give, W (null or absent: unlimited, ideal loads). When the
+   * cooling needed to hold the setpoint is more, the zone gets this and floats above its setpoint.
+   */
+  cooling_cap_w?: number | null
+  /**
    * Brief 108 review F1 (Linzie, 15 Nov): the emitters' output with the room at a given temperature, W. When given, in
    * place of heating_cap_w, each hour's limit is this at the zone's control temperature at the end of the hour before:
    * a colder room draws more from the same radiators. Null or absent: heating_cap_w, fixed.
@@ -149,6 +154,7 @@ function check(inp: ZoneInputs) {
   if (!(inp.hc_convective_fraction >= 0 && inp.hc_convective_fraction <= 1)) throw new ZoneError('must be 0 to 1', 'hc_convective_fraction')
   if (inp.heating_convective_fraction != null && !(inp.heating_convective_fraction >= 0 && inp.heating_convective_fraction <= 1)) throw new ZoneError('must be 0 to 1', 'heating_convective_fraction')
   if (inp.heating_cap_w != null && !(inp.heating_cap_w >= 0)) throw new ZoneError('must be ≥ 0', 'heating_cap_w')
+  if (inp.cooling_cap_w != null && !(inp.cooling_cap_w >= 0)) throw new ZoneError('must be ≥ 0', 'cooling_cap_w')
   if (inp.heating_cap_at != null && inp.heating_cap_w != null) throw new ZoneError('give a fixed limit or one that follows the room, not both', 'heating_cap_at')
   if (inp.heating_cap_at != null && typeof inp.heating_cap_at !== 'function') throw new ZoneError('must be a function of the room temperature', 'heating_cap_at')
   if (!Number.isFinite(inp.initial_c)) throw new ZoneError('required', 'initial_c')
@@ -244,6 +250,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
   const hcfH = inp.heating_convective_fraction ?? inp.hc_convective_fraction
   const eH = hcfH === inp.hc_convective_fraction ? eHC : spread(hcfH)
   const capH = inp.heating_cap_w ?? Infinity
+  const capC = inp.cooling_cap_w ?? Infinity
   const capAt = inp.heating_cap_at ?? null
   let ctlPrev = inp.initial_c  // the control temperature at the end of the step before (review F1)
   const ctl = new Float64Array(F)
@@ -389,7 +396,7 @@ export function runZone(inp: ZoneInputs): ZoneRun {
     if (heat_c != null && ctl0 < heat_c) {
       w = wH; wA = (hv * wH[0]) / den
       phi = Math.min((heat_c - ctl0) / (ctl_wH - ctl_uAir * wA), capNow)  // Brief 108: at most the emitters' output
-    } else if (cool_c != null && ctl0 > cool_c) phi = (cool_c - ctl0) / (ctl_wHC - ctl_uAir * wA)
+    } else if (cool_c != null && ctl0 > cool_c) phi = Math.max((cool_c - ctl0) / (ctl_wHC - ctl_uAir * wA), -capC)  // Brief 119: at most the units' cooling
     let stored = 0
     for (let i = 0; i < F; i++) {
       const xi = z[i] - uAir[i] * zA + phi * (w[i] - uAir[i] * wA)

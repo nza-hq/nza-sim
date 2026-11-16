@@ -208,7 +208,7 @@ describe('(f) schema 2.6', () => {
     delete old.building.design
     for (const z of old.zones) delete z.design_internal_c
     const up = upgradeDocument(old)
-    expect(up.schema_version).toBe('2.6')
+    expect(up.schema_version).toBe('2.7')
     expect(up.building.design).toBeNull()
     for (const z of up.zones) expect(z.design_internal_c).toBeNull()
   })

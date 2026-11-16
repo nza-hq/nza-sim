@@ -21,7 +21,7 @@ import { runZone } from './zone'
 import type { ModelDocument } from '../schema/model'
 import { calendar, GainsError, zoneGains, type ZoneGains } from './gains'
 import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
-import { EmitterError, zoneEmitters, type ZoneEmitters } from './emitters'
+import { EmitterError, zoneCooling, zoneEmitters, type ZoneCooling, type ZoneEmitters } from './emitters'
 
 export class ModelError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'ModelError' }
@@ -397,7 +397,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   // Emitters per zone (Brief 108): a zone that states them is limited to their output, and their radiant share sets
   // how heating reaches the room. A zone that states none is not limited, as before.
   let emit: (ZoneEmitters | null)[]
-  try { emit = zoneEmitters(doc) } catch (e) {
+  // Brief 119: a zone whose units state any cooling is limited to it; a zone none of whose units cool is not.
+  let cool: (ZoneCooling | null)[]
+  try { emit = zoneEmitters(doc); cool = zoneCooling(doc) } catch (e) {
     if (e instanceof EmitterError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
     throw e
   }
@@ -408,6 +410,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   const limited = (zi: number) => options.emitter_limit !== 'none' && emit[zi] != null
   const capOf = (zi: number) => (limited(zi) && !byRoom ? emit[zi]!.cap_w : null)
   const capAtOf = (zi: number) => (limited(zi) && byRoom ? emit[zi]!.at : null)
+  const coolCapOf = (zi: number) => (options.emitter_limit !== 'none' && cool[zi] != null ? cool[zi]!.cap_w : null)
   const hcfHeatOf = (zi: number) => (emit[zi] ? 1 - emit[zi]!.radiant_fraction : null)
   // Brief 109: where underfloor heating's heat enters its floor: the element, and the node at its layer's inside face.
   const sourceOf = (zi: number) => {
@@ -449,7 +452,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       inside_solar_absorptance: insideAlpha, solar_convective_fraction: options.solar_convective_fraction,
       other_gains: options.other_gains ?? gainsIn(0), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c }, setpoint_hours: hoursOf[0]?.hourly ?? null,
       control: options.control, hc_convective_fraction: options.hc_convective_fraction, initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
-      heating_cap_w: capOf(0), heating_cap_at: capAtOf(0), heating_convective_fraction: hcfHeatOf(0),
+      heating_cap_w: capOf(0), heating_cap_at: capAtOf(0), heating_convective_fraction: hcfHeatOf(0), cooling_cap_w: coolCapOf(0),
       warmup_days: options.warmup_days,
       h_ce_w_per_m2k: sp?.outside_convection === 'wind' ? Float64Array.from(weather.hours.wind_speed, (v) => K.h_ce_wind_a + K.h_ce_wind_b * Math.max(0, v)) : null,
       inside_convection: (sp?.inside_convection ?? 'by_tilt') as 'by_tilt' | 'by_heat_flow',
@@ -478,7 +481,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         solar_transmitted_w: built.zones[zi].solarTransmitted, solar_beam_w: sp?.beam_on_floor ? built.zones[zi].solarBeam : null,
         other_gains: options.other_gains ?? gainsIn(zi), setpoints: { heat_c: zone.setpoints.heat_c, cool_c: zone.setpoints.cool_c }, setpoint_hours: hoursOf[zi]?.hourly ?? null,
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
-        heating_cap_w: capOf(zi), heating_cap_at: capAtOf(zi), heating_convective_fraction: hcfHeatOf(zi),
+        heating_cap_w: capOf(zi), heating_cap_at: capAtOf(zi), heating_convective_fraction: hcfHeatOf(zi), cooling_cap_w: coolCapOf(zi),
         heating_source: sourceOf(zi),
       })),
       elements: elements.map((element, k) => ({
@@ -568,6 +571,17 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const sh = hoursOf[zi]
     let unmet = 0, unmetUse = 0, minCtl = Infinity, minUse = Infinity, atCap = 0
     const em = emit[zi]
+    // Brief 119: the mirror for cooling: hours more than UNMET_K above each hour's cooling setpoint, and at the units' limit.
+    const cooled = zone.setpoints.cool_c != null
+    const cu = cool[zi], capCool = cu && options.emitter_limit !== 'none' ? cu.cap_w : Infinity
+    let unmetC = 0, unmetCUse = 0, maxCtl = -Infinity, atCoolCap = 0
+    for (let h = 0; h < H; h++) {
+      const csp = sh ? sh.hourly.cool_c[h] : zone.setpoints.cool_c ?? NaN
+      const inUse = sh ? sh.in_use[h] === 1 : true
+      maxCtl = Math.max(maxCtl, ctlT[h])
+      if (ctlT[h] > csp + UNMET_K) { unmetC++; if (inUse) unmetCUse++ }
+      if (cu && !Number.isNaN(csp) && run.cooling_w[h] >= capCool * (1 - 1e-9) && (capCool > 0 || ctlT[h] > csp + 1e-6)) atCoolCap++
+    }
     for (let h = 0; h < H; h++) {
       const hsp = sh ? sh.hourly.heat_c[h] : zone.setpoints.heat_c ?? NaN
       const inUse = sh ? sh.in_use[h] === 1 : true
@@ -598,8 +612,10 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         unmet_heating_hours: heated ? unmet : null, min_control_c: minCtl,
         in_use_hours: sh ? sh.in_use_hours : H,
         unmet_heating_hours_in_use: heated ? unmetUse : null, min_control_in_use_c: Number.isFinite(minUse) ? minUse : null,
+        unmet_cooling_hours: cooled ? unmetC : null, unmet_cooling_hours_in_use: cooled ? unmetCUse : null, max_control_c: maxCtl,
       },
       emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters, slab: em.slab } : null,
+      cooling_units: cu ? { cap_w: cu.cap_w, hours_at_cap: atCoolCap, units: cu.units } : null,
       breakdown: lines,
       closure,
       run_ms,

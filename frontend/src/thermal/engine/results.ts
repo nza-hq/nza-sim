@@ -70,6 +70,12 @@ export interface ZoneResults {
     unmet_heating_hours_in_use: number | null
     /** Brief 109: the lowest control temperature in use, °C (null: never in use). */
     min_control_in_use_c: number | null
+    /** Brief 119: hours the control temperature is more than 0.5 K above the cooling setpoint (null: not cooled). */
+    unmet_cooling_hours: number | null
+    /** Brief 119: of those, the hours in use (null: not cooled). */
+    unmet_cooling_hours_in_use: number | null
+    /** Brief 119: the highest control temperature (air or operative, as the run's control), °C. */
+    max_control_c: number
   }
   /** Brief 108: the zone's emitters and the cap they set, or null when it states none (heating not limited). */
   emitters: {
@@ -77,6 +83,8 @@ export interface ZoneResults {
     /** Brief 109: underfloor heating's floor and layer, and its share of the zone's heating; null when none is in a floor. */
     slab: { surface_id: string; layer_index: number; share: number } | null
   } | null
+  /** Brief 119: the zone's cooling units and the limit they set, or null when none cools (cooling not limited). */
+  cooling_units: { cap_w: number; hours_at_cap: number; units: { id: string; kind: string; output_w: number }[] } | null
   /** Every term of the balance, per element where it has one (Rule 9). The lines sum to the closure residual. */
   breakdown: BreakdownLine[]
   closure: { max_wh: number; sum_kwh: number }
