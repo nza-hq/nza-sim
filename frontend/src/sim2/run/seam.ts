@@ -16,7 +16,8 @@
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
-import { zoneSizing, type ZoneSizing } from '../../thermal/engine/emitters'
+import { zoneEmitters, zoneSizing, type ZoneSizing } from '../../thermal/engine/emitters'
+import { DesignError, designHeatLoss, type DesignTerm } from '../../thermal/engine/designHeatLoss'
 import { FUELS, readDocFloorM2, readSystemsEui, readSystemsTotalKwh, runSystems, ServedError, type EndUse, type Fuel } from '../../thermal/engine/systems'
 import {
   readBuildingCoolingKwh, readBuildingHeatingKwh, readBuildingHourlyW, readBuildingPeakW, readZoneMinControlC, type BreakdownLine, type ModelResults,
@@ -125,7 +126,45 @@ export interface Summary {
    * that would cover it. Null when no zone states emitters (heating is not limited anywhere).
    */
   emitters: EmitterSummary | null
+  /**
+   * Brief 117: the design heat loss of each room at the design outdoor temperature, for sizing (MCS MIS 3005-D), and
+   * each zone's emitters against it. Null when the document states no design conditions (`building.design`).
+   */
+  design_heat_loss: DesignSummary | null
 }
+
+/** Brief 117: one room's design heat loss, its lines summed by term (Rule 9: they sum to `total_w`). */
+export interface DesignZoneSummary {
+  id: string; name: string; floor_m2: number
+  /** False for an unheated zone: its lines are shown for the rooms next to it, and it is not in the building total. */
+  heated: boolean
+  internal_c: number
+  internal_source: 'stated' | 'follow_heat_c'
+  /** Air changes an hour from infiltration, vents and ventilation, before the 0.5 minimum. */
+  ach: number
+  terms: { term: DesignTerm; w: number }[]
+  total_w: number
+  w_per_m2: number
+  /**
+   * The zone's emitters against its design heat loss, rated with the room at its design temperature: at the systems'
+   * flow and return, and at the what-if pair when one is asked for. Null when the zone states no emitters.
+   */
+  emitters: ZoneSizing | null
+  what_if_emitters: ZoneSizing | null
+}
+
+export type DesignSummary =
+  | {
+      ok: true
+      outdoor_c: number; outdoor_source: 'stated' | 'heating_99_6' | 'heating_99'; ground_c: number
+      warm_up_w_per_m2: number | null; vent_wind_m_s: number | null
+      /** The heated zones' sum, W: heat between heated zones cancels in it. */
+      building_w: number
+      zones: DesignZoneSummary[]
+      /** The what-if pair the emitter lines were also rated at, or null. */
+      what_if: WhatIf | null
+    }
+  | { ok: false; missing: Missing[] }
 
 /** One zone's emitters: sizing (peak from a run with the emitters unlimited) and how the capped run went. */
 export type EmitterZone = ZoneSizing & {
@@ -333,8 +372,10 @@ export function simulate(input: unknown, deps: { weather: WeatherChoice | null; 
     drafts: pre.drafts,
     energy: energyOf(doc, results, weather),
     emitters: null,
+    design_heat_loss: null,
   }
   summary.emitters = emitterSummary(doc, results, options, run, weather, deps.what_if ?? null)
+  summary.design_heat_loss = designSummary(doc, results, weather, deps.what_if ?? null)
   return { ok: true, results, summary }
 }
 
@@ -468,6 +509,68 @@ function emitterSummary(
   // emitters, the output weighting moves). Where no zone's share moves, the base run's peaks are the what-if's.
   const same = results.zones.every((z, i) => Math.abs((z.emitters?.radiant_fraction ?? 0) - (wr.zones[i].emitters?.radiant_fraction ?? 0)) < 1e-12)
   return { zones, what_if: { ok: true, flow_c, return_c, heating_kwh: readBuildingHeatingKwh(wr), zones: sized(w, wr, same ? free : unlimited(w)), energy: energyOf(w, wr, weather) } }
+}
+
+/** Brief 117: a design heat loss refusal in plain words. */
+function designMissing(e: DesignError, doc: ModelDocument): Missing {
+  const p = e.path, msg = e.message.slice(p.length + 2)
+  const z = p.match(/^zones\[(\d+)\]\.design_internal_c$/)
+  if (z) {
+    const zn = zoneName(doc, z[1])
+    if (msg.includes('unheated')) return { path: p, what: `State the temperature unheated ${zn} is taken to sit at, for the heat lost to it from the rooms next to it.` }
+    if (msg.includes('no heating setpoint')) return { path: p, what: `${zn} has no heating setpoint to follow: state its design temperature.` }
+    return { path: p, what: `State the design temperature for ${zn}, or let it follow its heating setpoint.` }
+  }
+  if (p === 'building.design.vent_wind_m_s') return { path: p, what: 'State the wind speed at which the permanent vents are counted for the design heat loss.' }
+  return explain(p, msg, doc)
+}
+
+/**
+ * Brief 117 Part 3: each room's design heat loss (thermal/engine/designHeatLoss.ts, from this run's conductances), and
+ * each zone's emitters against it. The emitters are rated with the room at its design temperature: a copy of the
+ * document with each heated zone's setpoint at its design temperature, read only by zoneEmitters and zoneSizing.
+ */
+function designSummary(doc: ModelDocument, results: ModelResults, weather: WeatherChoice, whatIf: WhatIf | null): DesignSummary | null {
+  if (doc.building.design == null) return null
+  let r: ReturnType<typeof designHeatLoss>
+  try { r = designHeatLoss(doc, results.zones, weather.weather) } catch (e) {
+    if (e instanceof DesignError) return { ok: false, missing: [designMissing(e, doc)] }
+    throw e
+  }
+  const sizing = (d: ModelDocument) => {
+    const at = structuredClone(d)
+    r.zones.forEach((z, i) => { if (z.heated) at.zones[i].setpoints.heat_c = z.internal_c })
+    const em = zoneEmitters(at)
+    return r.zones.map((z, i) => (em[i] && z.heated ? zoneSizing(at, i, em[i]!, z.total_w) : null))
+  }
+  let base: (ZoneSizing | null)[]
+  let other: (ZoneSizing | null)[] | null = null
+  try {
+    base = sizing(doc)
+    if (whatIf) {
+      const w = structuredClone(doc)
+      for (const g of w.system_groups) if (g.service === 'heating' && g.design_flow_c != null) { g.design_flow_c = whatIf.design_flow_c; g.design_return_c = whatIf.design_return_c }
+      other = sizing(w)
+    }
+  } catch (e) {
+    // An emitter that cannot be rated with the room at its design temperature (a flow below it), named by its path.
+    const m = engineMissing(e, doc)
+    if (m) return { ok: false, missing: [m] }
+    throw e
+  }
+  return {
+    ok: true, outdoor_c: r.outdoor_c, outdoor_source: r.outdoor_source, ground_c: r.ground_c,
+    warm_up_w_per_m2: r.warm_up_w_per_m2, vent_wind_m_s: r.vent_wind_m_s, building_w: r.building_w, what_if: whatIf,
+    zones: r.zones.map((z, i) => {
+      const by = new Map<DesignTerm, number>()
+      for (const l of z.lines) by.set(l.term, (by.get(l.term) ?? 0) + l.w)
+      return {
+        id: z.zone_id, name: z.name, floor_m2: doc.zones[i].area_m2, heated: z.heated, internal_c: z.internal_c, internal_source: z.internal_source,
+        ach: z.ach, terms: [...by].map(([term, w]) => ({ term, w })), total_w: z.total_w, w_per_m2: z.w_per_m2,
+        emitters: base[i], what_if_emitters: other ? other[i] : null,
+      }
+    }),
+  }
 }
 
 const SERVICE_WORDS: Record<string, string> = { heating: 'heating', cooling: 'cooling', dhw: 'hot water', lighting: 'lighting', small_power: 'small power', auxiliary: 'auxiliary' }

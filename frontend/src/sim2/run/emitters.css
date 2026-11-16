@@ -21,3 +21,5 @@
 .es-warn { margin: 0 0 8px; color: #A0522D; }
 .es .rp-note p { margin: 0 0 6px; }
 .es .rp-note p:last-child { margin: 0; }
+.es-mode { display: flex; gap: 6px; margin: 2px 0 8px; }
+.es-mode .rp-btn[aria-pressed="true"] { background: #235546; color: #fff; border-color: #235546; }

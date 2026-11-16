@@ -1,0 +1,64 @@
+{
+ "source": "scripts/117_panel.mts",
+ "outdoor_c": -4.6,
+ "building_w": 136003,
+ "zones": [
+  {
+   "name": "Storey 1",
+   "total_w": 29388,
+   "w_per_m2": 34.9,
+   "cap_50_40_w": 11384,
+   "short_50_40_w": 18003,
+   "needed_rated_w": 77444,
+   "cap_70_60_w": 25374,
+   "short_70_60_w": 4013
+  },
+  {
+   "name": "Storey 2",
+   "total_w": 25319,
+   "w_per_m2": 30,
+   "cap_50_40_w": 11384,
+   "short_50_40_w": 13935,
+   "needed_rated_w": 66722,
+   "cap_70_60_w": 25374,
+   "short_70_60_w": 0
+  },
+  {
+   "name": "Storey 3",
+   "total_w": 25319,
+   "w_per_m2": 30,
+   "cap_50_40_w": 11384,
+   "short_50_40_w": 13935,
+   "needed_rated_w": 66722,
+   "cap_70_60_w": 25374,
+   "short_70_60_w": 0
+  },
+  {
+   "name": "Storey 4",
+   "total_w": 25319,
+   "w_per_m2": 30,
+   "cap_50_40_w": 11384,
+   "short_50_40_w": 13935,
+   "needed_rated_w": 66722,
+   "cap_70_60_w": 25374,
+   "short_70_60_w": 0
+  },
+  {
+   "name": "Storey 5",
+   "total_w": 30659,
+   "w_per_m2": 36.4,
+   "cap_50_40_w": 11384,
+   "short_50_40_w": 19275,
+   "needed_rated_w": 80794,
+   "cap_70_60_w": 25374,
+   "short_70_60_w": 5284
+  }
+ ],
+ "year_round_peak_w": [
+  23158,
+  18947,
+  18991,
+  19023,
+  24930
+ ]
+}

@@ -8,7 +8,8 @@
 - **Method:** Linzie, 16 Nov: published UK sources (MCS MIS 3005-D and the MCS calculator's method, CIBSE design temperatures), not the text of BS EN 12831-1. That standard's further ground factors and its reheat table are not used.
 - **Checks:** 12 hand-calculation tests pass (`designHeatLoss.test.ts`). The full v2 suite passes (268), and `npm run build` is clean. No file of today's engine changed.
 - **P2 (16 Nov):** EnergyPlus held steady at the design condition (`validation/energyplus/117_design_referee.py`, `docs/audit/117/02_referee.md`). The gated run uses the method's own films and passes: every room within −1.75 %, the cooled room −0.42 %, Bridgewater −1.68 %. The first run used the engine's year-run surface physics (air-only heating, long-wave between faces). It passed at Bridgewater (−0.26 %) and failed in the cooled room (+9.9 % / −14.1 %), all of it fabric: faces colder than the method's combined film assumes. Recorded as a judgement made after seeing the result. For sizing, the method sits on the safe side by up to about 10 % for a room heated by warm air.
-- **Next:** P3 results panel (Design heat loss | Year-round check).
+- **P3 (16 Nov):** `summary.design_heat_loss` in the seam; new `sim2/run/DesignHeatLoss.tsx` (`<DesignHeatLoss summary={summary} />`, for the editor to place); the emitter panel gains a "Design heat loss | Year-round check" switch when design conditions are stated, with its props unchanged. Browser check on Bridgewater: `docs/audit/117/03_panel.md`/`.png`. The v2 tests pass.
+- **Next:** P4 independent review.
 
 ## ✅ Brief 109 — Simulate v2: heating hours and setbacks, morning warm-up, underfloor heating in the slab — CLOSED 16 Nov 2026 on `chris/109-dynamics` (PR awaiting Linzie)
 
