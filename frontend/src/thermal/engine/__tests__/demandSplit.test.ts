@@ -45,6 +45,20 @@ describe('Brief 112 P1: lighting from lux and efficacy', () => {
     })
   })
 
+  it('with half the floor lit, the lux path gains what the stated W/m² gains (review F4: area share is applied)', () => {
+    const base = withLighting({ magnitude: { value: 7.5, unit: 'w_per_m2' }, area_share: 0.5 })
+    const lux = withLighting({ lux: 300, area_share: 0.5 })
+    lux.system_groups = [lights('l', allZones(lux), 2.5)]
+    const full = withLighting({ lux: 300 })
+    full.system_groups = [lights('l', allZones(full), 2.5)]
+    const a = zoneGains(ModelDocument.parse(base), W.hours), b = zoneGains(ModelDocument.parse(lux), W.hours), c = zoneGains(ModelDocument.parse(full), W.hours)
+    const sum = (g: any) => g!.gains.find((q: any) => q.kind === 'lighting')!.w.reduce((x: number, y: number) => x + y, 0)
+    a.forEach((g, zi) => {
+      expect(Array.from(b[zi]!.gains.find((q) => q.kind === 'lighting')!.w)).toEqual(Array.from(g!.gains.find((q) => q.kind === 'lighting')!.w))
+      expect(sum(b[zi])).toBeCloseTo(sum(c[zi]) / 2, 6)
+    })
+  })
+
   it('lux with no lighting system, or one without its efficacy, is refused by name', () => {
     const none = ModelDocument.parse(withLighting({ lux: 300 }))
     expect(() => zoneGains(none, W.hours)).toThrow(GainsError)

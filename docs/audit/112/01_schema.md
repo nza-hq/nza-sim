@@ -21,6 +21,10 @@
    - **Per m² with a zone that has no occupancy is refused, naming the zone.** Such a zone had hot water before, and the new shape has nowhere to carry it. It is refused rather than dropped.
    - In the editor, a space type with no people and per m² use gets a note on the page (the editor thread's part of this P1).
 5. **A hot water system with no space stating use is named**, as stated use with no system already was (Brief 107 review F1).
+6. **Lighting controls stay on the space's lighting profile for now** (review F3). `daylight_factor` and `relationship_to_occupancy` (presence and spill) are still read from the lighting profile; the lighting system's `control_factor` only weights the energy split between groups. The brief's table puts controls under Systems; Brief 114 moves them to its Controls step. Until then a field can sit on Spaces that the brief puts elsewhere, and P5's "each field on exactly one step" holds for lux and efficacy only.
+7. **The 2.7 → 2.8 upgrade fills nothing** (review F1). A gain input a 2.7 document leaves out stays out and is refused by name, as from 2.3 on. The seam upgrades 2.7 documents (review F2), so saved versions and stored runs at 2.7 re-run without re-saving.
+   - Per m² hot water with a zone that has no occupancy is **refused on purpose**: the new shape has no place for it, and dropping it would be silent.
+   - Litres stated with no basis are **dropped on purpose**: today's engine needs the basis to use them, so they never reached a result.
 
 ## Checks
 

@@ -104,6 +104,24 @@ describe('schema 2.1 to 2.6', () => {
     expect(up).toEqual(d)
     expect(await modelHash(up)).toBe(await modelHash(d))
   })
+  it('a 2.7 document upgrades to the 2.8 one, and its unstated gain inputs stay unstated (Brief 112 review F1)', async () => {
+    const d: any = await anchor()
+    for (const p of d.profiles) {
+      if (p.kind === 'occupancy') { delete p.occupancy_rate; delete p.sensible_w_per_person }
+      if (p.kind === 'lighting') { delete p.area_share; delete p.gain_fraction; delete p.daylight_factor }
+    }
+    const occ = d.profiles.filter((p: any) => p.kind === 'occupancy')
+    expect(occ.length).toBeGreaterThan(0)
+    const old: any = structuredClone(d)
+    old.schema_version = '2.7'
+    const hw = occ[0].dhw
+    if (hw) Object.assign(old.services.dhw, { demand_basis: hw.basis, [hw.basis === 'per_person' ? 'litres_per_person_per_day' : 'litres_per_m2_per_day']: hw.litres_per_day })
+    for (const p of old.profiles) { delete p.dhw; delete p.lux }
+    for (const g of old.system_groups) delete g.efficacy_w_m2_per_100lux
+    const up: any = upgradeDocument(old)
+    expect(up).toEqual(d)
+    for (const p of up.profiles.filter((q: any) => q.kind === 'occupancy')) expect([p.occupancy_rate, p.sensible_w_per_person]).toEqual([undefined, undefined])
+  })
   it('fills only today\'s fallbacks a profile leaves out, and only those today\'s engine reads for it', () => {
     const occ: any = { id: 'o', kind: 'occupancy', density: { value: 0.1, basis: 'per_m2' } }
     stateTodaysGainInputs(occ)

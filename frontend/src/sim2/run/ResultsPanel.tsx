@@ -84,6 +84,11 @@ type State =
  * a hotel space type's lighting follows occupancy, and its people per m² is still unset, so the zone has no occupancy). */
 function plainMissing(items: { path: string; what: string }[], doc: unknown) {
   return items.map((m) => {
+    const zl = m.path.match(/^zones\[(\d+)\]\.profile_refs\.lighting$/)
+    if (zl) {
+      const zone = (doc as { zones?: { name?: string }[] } | null)?.zones?.[Number(zl[1])]
+      return { ...m, what: `Give "${zone?.name || `zone ${Number(zl[1]) + 1}`}" a lighting system with its efficacy (Systems, Lighting): its space type states the light needed in lux.` }
+    }
     const z = m.path.match(/^zones\[(\d+)\]\.profile_refs\.occupancy$/)
     if (!z) return m
     const zone = (doc as { zones?: { name?: string }[] } | null)?.zones?.[Number(z[1])]
@@ -320,7 +325,7 @@ export function LevelSwitch({ run }: { run: Run }) {
           <>The fabric alone: every room heated to{' '}
             <input className="rp-level-c" aria-label="Every room heated to (°C)" inputMode="decimal" value={typed} onChange={(e) => setTyped(e.target.value)} onBlur={commitC} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />{' '}°C, no people, no cooling.</>
         ) : level === 'spaces'
-          ? 'Adds people, lights and equipment from the space types, each at its own temperatures. No systems.'
+          ? 'Adds people and equipment from the space types, each at its own temperatures. No systems, so no lighting yet.'
           : 'The whole model, through to energy used.'}
       </span>
     </div>
@@ -401,6 +406,8 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
               <span className="rp-sub">{perM2(s.building.cooling_kwh, s.building.floor_m2)} kWh/m² · peak {Math.round(s.building.peak_cooling_w / 1000)} kW</span>
             </div>
           </div>
+          {/* Brief 112 (Rule 8): lighting heat needs the luminaires' efficacy, a Systems object. */}
+          {run.level === 'spaces' && <p className="rp-none">Lighting heat appears at + Systems, because it depends on the luminaires.</p>}
 
           <h3>Energy used <i>estimate</i></h3>
           {s.energy === null ? (

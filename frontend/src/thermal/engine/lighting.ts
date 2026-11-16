@@ -2,7 +2,7 @@
  * Brief 112 Part 2: lighting from the light a space needs (lux, demand, on the space's lighting profile) and the
  * luminaires that deliver it (efficacy, W/m² per 100 lux, on the lighting system). Rule 11: this is the one place lux
  * becomes W/m². The W/m² is never stored on the document; the engine, the panel and the energy split read it from here
- * (`__tests__/lighting.test.ts` fails if any other file does the multiplication).
+ * (`__tests__/lightingOneDerivation.test.ts` fails if any other file does the arithmetic).
  */
 import type { ModelDocument } from '../schema/model'
 

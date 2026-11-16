@@ -301,6 +301,7 @@ const WORDS: [RegExp, (m: RegExpMatchArray, doc: ModelDocument | null, message: 
   [/^zones\[(\d+)\]\.ventilation\[(\d+)\]\.recovery_sensible_pct$/, (m, d) => `Set the MVHR heat recovery for ${zoneName(d, m[1])}.`],
   [/^building\.thermal_bridging\./, () => 'Set the thermal bridging for the building.'],
   [/^building\.site\.exposure$/, () => 'Set the site exposure (sheltered, normal or exposed).'],
+  [/^zones\[(\d+)\]\.profile_refs\.lighting$/, (m, d) => `Lighting in ${zoneName(d, m[1])} is stated in lux, so it needs a lighting system with its efficacy (W/m² per 100 lux).`],
   [/^system_groups\[(\d+)\]\.efficacy_w_m2_per_100lux$/, (m, d, msg) => msg.startsWith('required: ')
     ? `The lighting system "${d?.system_groups[Number(m[1])]?.label || d?.system_groups[Number(m[1])]?.id}" needs its efficacy (W/m² per 100 lux): ${msg.slice(10).split(',')[0]}.`
     : `${msg.charAt(0).toUpperCase()}${msg.slice(1)}.`],
@@ -410,7 +411,7 @@ export function simulate(
     const v = (input as { schema_version?: unknown })?.schema_version
     const parsed = ModelDocument.safeParse(input)
     if (parsed.success) doc = parsed.data
-    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119); nothing is filled
+    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7' || v === '2.8') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2), 2.8 → 2.9 no DHW priority (Brief 120); nothing is filled
     else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
       // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
       // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the

@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, isWet, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, profile, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -45,7 +45,9 @@ export type Built = {
   totals: { zones: number; rooms: number; floor_m2: number; walls: number; wall_net_m2: number; glazing: number; glazing_m2: number; windows: number; doors: number; door_m2: number; partitions: number; systems: number }
 }
 
-export function buildDocument(plan: Plan): Built {
+export function buildDocument(plan0: Plan): Built {
+  // A plan held from before Brief 112 (one building-wide hot water use) is read as its space types' own.
+  const plan = hotWaterOnSpaces(plan0)
   const notes: string[] = []
   const h = plan.storey_height_m
   const { shares: roomShares, open } = edgesOf(plan.blocks, plan.rooms)
@@ -314,13 +316,15 @@ export function buildDocument(plan: Plan): Built {
       const key = sp[k]
       const shape = key && profile(key)?.day_types ? shapeOf(key) : null
       const w = k === 'lighting' ? sp.lighting_w_per_m2 : sp.equipment_w_per_m2
-      if (!shape && w == null && (k === 'lighting' || sp.equipment_baseload_w_per_m2 == null)) return []
+      if (!shape && w == null && (k === 'lighting' ? sp.lux == null : sp.equipment_baseload_w_per_m2 == null)) return []
       const id = `${sp.id}_${k}`
       // Today's engine reads lighting from magnitude and equipment from active + baseload.
       const base = sp.equipment_baseload_w_per_m2
       if (k === 'equipment' && (w != null) !== (base != null)) notes.push(`${sp.name}: equipment needs both "in use" and "always on" W/m² (0 is fine)`)
+      // Brief 112: lighting states the lux the space needs (its W/m² comes from the lighting system's efficacy), or,
+      // while no lux is stated, a W/m² stated directly.
       const size = k === 'lighting'
-        ? (w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
+        ? (sp.lux != null ? { lux: sp.lux } : w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
         : w != null && base != null ? { active: { value: w, unit: 'w_per_m2' }, baseload: { value: base, unit: 'w_per_m2' } } : {}
       // Stated detail only: a field left empty on the space type is left out, and the engine names it.
       const L = k === 'lighting'
@@ -338,9 +342,9 @@ export function buildDocument(plan: Plan): Built {
       return [id]
     }
     let occupancy: string | null = null
-    // Schema 2.8: hot water use lives on the occupancy profile (today one building-wide figure, copied to each).
-    const hw0 = plan.dhw ?? noDhw()
-    const hwUse = hw0.basis != null && hw0.litres != null ? { basis: hw0.basis, litres_per_day: hw0.litres } : null
+    // Schema 2.8: hot water use lives on the occupancy profile, stated on the space type (Brief 112).
+    const hwUse = sp.hot_water_basis != null && sp.hot_water_litres != null ? { basis: sp.hot_water_basis, litres_per_day: sp.hot_water_litres } : null
+    if ((sp.hot_water_basis != null) !== (sp.hot_water_litres != null)) notes.push(`${sp.name}: hot water needs both how it is counted and the litres a day`)
     const perRoom = sp.people_basis === 'per_room'
     const dens = perRoom ? sp.people_per_room : sp.people_per_m2
     const allTime = sp.occupancy === ALWAYS
@@ -367,8 +371,10 @@ export function buildDocument(plan: Plan): Built {
   const bi = plan.building ?? noBuildingInputs()
   const hw = plan.dhw ?? noDhw()
   const noHw = used.filter((z) => !system(zoneSys(z.id, 'dhw')?.template)?.fuel)
-  if (hw.basis != null && noHw.length) notes.push(`Hot water use is stated, but ${noHw.map((z) => z.name ?? z.id).join(', ')} ${noHw.length > 1 ? 'have' : 'has'} no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)`)
-  if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && ([hw.storage_c, hw.tap_c, hw.cold_c, hw.basis, hw.litres].some((v) => v == null) || hw.shape === null)) notes.push('Hot water: a system is given but its temperatures or daily demand or when it is used are not all stated (Systems, Hot water)')
+  const hwStated = used.some((z) => { const sp = spaceOf.get(z.id); return sp?.hot_water_basis != null && sp.hot_water_litres != null })
+  if (hwStated && noHw.length) notes.push(`Hot water use is stated, but ${noHw.map((z) => z.name ?? z.id).join(', ')} ${noHw.length > 1 ? 'have' : 'has'} no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)`)
+  if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && ([hw.storage_c, hw.tap_c, hw.cold_c].some((v) => v == null) || hw.shape === null)) notes.push('Hot water: a system is given but its temperatures or when it is used are not all stated (Systems, Hot water)')
+  if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && !hwStated) notes.push('Hot water: a system is given but no space type states how much is used (Spaces, Hot water)')
   const zones = used.map((z) => ({
     id: z.id,
     name: z.name,
@@ -408,6 +414,19 @@ export function buildDocument(plan: Plan): Built {
       const sys = plan.systems.find((x) => x.id === id)!
       const t = system(sys.template)!
       system_groups.push({ id: `${service}_${id}`, service, label: sys.name, zones: zs, enabled: true, share_pct: 100, source: t.fuel, efficiency_metric: efficiencyFor(t, service), template_ref: t.key, ...(is24 && service === 'heating' ? { design_flow_c: sys.design_flow_c ?? null, design_return_c: sys.design_return_c ?? null } : {}) })
+    }
+  }
+  // Brief 112: lighting systems are luminaires, stated by their efficacy; they run on electricity and have no library
+  // template. Empty efficacy stays empty, and the run names it.
+  {
+    const bySystem = new Map<string, string[]>()
+    for (const z of used) {
+      const sys = zoneSys(z.id, 'lighting')
+      if (sys) bySystem.set(sys.id, [...(bySystem.get(sys.id) ?? []), z.id])
+    }
+    for (const [id, zs] of bySystem) {
+      const sys = plan.systems.find((x) => x.id === id)!
+      system_groups.push({ id: `lighting_${id}`, service: 'lighting', label: sys.name, zones: zs, enabled: true, share_pct: 100, source: 'electricity', efficiency_metric: null, template_ref: null, efficacy_w_m2_per_100lux: sys.efficacy ?? null })
     }
   }
 
