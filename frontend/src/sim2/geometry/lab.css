@@ -430,3 +430,38 @@
 
 /* Brief 114: a value filled by "Use defaults", until edited. */
 .ap-default { font-size: 12px; color: #235546; background: #EAF3EF; border-radius: 6px; padding: 4px 8px; margin: 4px 0; }
+
+/* Brief 114 P4b: the Controls step. */
+.gl-root .ap-goctl { border: 0; background: none; padding: 0; margin-left: 6px; color: #235546; text-decoration: underline; font: inherit; font-size: 12px; cursor: pointer; }
+.gl-root .gl-ctlmap { position: absolute; inset: 0; z-index: 30; overflow: auto; background: #FFFFFF; padding: 18px 22px 40px; }
+.gl-root .gl-ctlmap h2 { font-size: 18px; margin: 0 0 6px; color: #1F2A27; }
+.gl-root .gl-ctlmap h2 small { font-size: 12px; font-weight: 500; color: #9A3412; background: #FFEDD5; border-radius: 6px; padding: 2px 6px; margin-left: 8px; }
+.gl-root .ap-flags { margin: 10px 0 14px; padding: 8px 12px 8px 28px; background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 8px; color: #7C2D12; font-size: 13px; }
+.gl-root .ap-flags li { margin: 2px 0; }
+.gl-root .ap-ctltable { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+.gl-root .ap-ctltable th { text-align: left; font-weight: 600; color: #4B5A55; border-bottom: 1px solid #DCE2DF; padding: 6px 8px; white-space: nowrap; }
+.gl-root .ap-ctltable td { border-bottom: 1px solid #EEF1EF; padding: 6px 8px; vertical-align: middle; max-width: 200px; }
+.gl-root .ap-ctltable td i, .gl-root .ap-ctlright h3 i, .gl-root .ap-ctltree i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+.gl-root .ap-ctltable tbody tr { cursor: pointer; }
+.gl-root .ap-ctltable tbody tr:hover { background: #F6F8F7; }
+.gl-root .ap-ctltable tbody tr[aria-selected='true'] { background: #EAF3EF; }
+.gl-root .ap-ctltable tr.ap-occ { cursor: default; color: #235546; }
+.gl-root .ap-wkh { display: flex; font-size: 11px; color: #4B5A55; }
+.gl-root .ap-wkh span { flex: 1; font-weight: 500; }
+.gl-root .ap-ctltable tr.ap-rowtop td { border-bottom: 0; padding-bottom: 2px; }
+.gl-root .ap-ctltable tr.ap-wkrow td { padding-top: 0; max-width: none; }
+.gl-root .ap-ctlright { padding: 12px 16px 24px; }
+.gl-root .ap-week { display: block; }
+.gl-root .ap-wknote { color: #6B7280; font-style: italic; }
+.gl-root .ap-ctlgroup h4 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #4B5A55; }
+.gl-root .ap-ctltree { list-style: none; margin: 0; padding: 0; }
+.gl-root .ap-ctltree button { display: flex; align-items: center; gap: 2px; width: 100%; border: 0; background: none; padding: 6px 8px; border-radius: 6px; text-align: left; font: inherit; cursor: pointer; }
+.gl-root .ap-ctltree button span { flex: 1; }
+.gl-root .ap-ctltree button small { color: #6B7280; font-size: 11.5px; }
+.gl-root .ap-ctltree button[aria-pressed='true'] { background: #EAF3EF; }
+.gl-root .ap-ctltree button:hover { background: #F6F8F7; }
+.gl-root .ap-ctlright h3 small { font-weight: 400; color: #6B7280; margin-left: 6px; }
+.gl-root .ap-ctlspace { border-top: 1px solid #EEF1EF; padding-top: 6px; margin-top: 6px; }
+.gl-root .ap-ctlsp { font-weight: 600; margin: 2px 0 4px; }
+.gl-root .gl-in { width: 100%; font: inherit; padding: 4px 6px; border: 1px solid #DCE2DF; border-radius: 6px; }
+.gl-root .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

@@ -87,6 +87,17 @@ export type PlanPumps = {
 }
 export const noPumps = (): PlanPumps => ({ basis: null, value: null, speed: null, runs: null, schedule: null, default_from: null })
 /** Brief 114: a building load outside the rooms (a lift, external lighting): its power and when it runs. */
+/** Brief 114: who or what controls a system, its fans or its lighting. Recorded, not yet used in the calculation. */
+export const CONTROLLERS = [
+  { key: 'central_bms', name: 'Central BMS' },
+  { key: 'local', name: 'Local controls' },
+  { key: 'time_clock', name: 'Time clock' },
+  { key: 'manual', name: 'By hand' },
+  { key: 'photocell', name: 'Photocell' },
+] as const
+export type Controller = (typeof CONTROLLERS)[number]['key']
+/** A control entry on the plan: `ref` is the plan system's id (ventilation and lighting systems included). */
+export type PlanControl = { kind: 'system' | 'ventilation' | 'lighting'; ref: string; controller: Controller | null; note: string | null }
 export type OtherLoadInput = { id: string; kind: 'lift' | 'external_lighting' | 'other'; name: string; power_w: number | null; runs: 'continuous' | 'schedule' | 'dusk_to_dawn' | null; schedule: string | null }
 
 /** Emitter kinds (schema 2.4). Wet kinds are fed by the room's heating system and rated (EN 442); VRF indoor units and
@@ -193,6 +204,11 @@ export type SpaceType = {
   /** Comfort band the systems hold, °C, typed. */
   heat_c?: number | null
   cool_c?: number | null
+  /** Brief 114 (edited on Controls): the heating hours (a schedule profile's key, or today's heating setpoint profile
+   * read as its hours at its highest temperature; null or 'always_on': every hour) and
+   * the temperature outside them, °C (null: off outside them). */
+  heat_hours?: string | null
+  setback_c?: number | null
   /** How the gains enter the zone (schema 2.3 profile fields), visible and editable on the space type. A new space
    * type starts from today's engine values (TODAY in thermal/schema/upgrade.ts). */
   radiant_fraction?: number | null
@@ -245,6 +261,8 @@ export type Plan = {
   profiles?: string[]
   /** Brief 114: lifts, external lighting and other loads outside the rooms (Systems, Other loads). */
   other_loads?: OtherLoadInput[]
+  /** Brief 114: the Controls step's record of who controls each system (recorded, not yet used in the calculation). */
+  controls?: PlanControl[]
   /** Whole-building fabric inputs, typed (null: not stated). */
   building?: BuildingInputs
   /** Emitter types (Systems step), given to rooms with a count. */

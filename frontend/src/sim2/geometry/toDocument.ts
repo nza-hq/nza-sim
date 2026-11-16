@@ -273,10 +273,10 @@ export function buildDocument(plan0: Plan): Built {
       flow_rate: v.flow ?? null, flow_rate_basis: v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
       // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
-      // least share). Not stated: the schedule decides, as before.
+      // least share, inside its hours: review F1). Not stated: the schedule decides, as before.
       ...(() => {
         const runs = v.runs ?? null
-        if (runs === 'demand') return { runs, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: null }
+        if (runs === 'demand') return { runs, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: scheduleRef(v.schedule) }
         if (runs === 'continuous') return { runs, control_schedule_ref: 'always_on' }
         return { ...(runs ? { runs } : {}), control_schedule_ref: scheduleRef(v.schedule) }
       })(),
@@ -389,6 +389,18 @@ export function buildDocument(plan0: Plan): Built {
   if (hwStated && noHw.length) notes.push(`Hot water use is stated, but ${noHw.map((z) => z.name ?? z.id).join(', ')} ${noHw.length > 1 ? 'have' : 'has'} no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)`)
   if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && ([hw.storage_c, hw.tap_c, hw.cold_c].some((v) => v == null) || hw.shape === null)) notes.push('Hot water: a system is given but its temperatures or when it is used are not all stated (Systems, Hot water)')
   if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && !hwStated) notes.push('Hot water: a system is given but no space type states how much is used (Spaces, Hot water)')
+  const setbackNoted = new Set<string>()
+  /** Heating hours: a schedule, or today's heating setpoint profile read as its hours at its highest temperature (on)
+   * and the rest (off). The temperatures themselves are typed on Controls (filled from the profile when it is chosen). */
+  const hoursRef = (key: string) => {
+    const pr = profile(key)
+    if (pr?.schedule_type !== 'heating_setpoint' || !pr.day_types) return scheduleRef(key)
+    const d = pr.day_types
+    const hi = Math.max(...d.weekday, ...d.saturday, ...d.sunday)
+    const on = (xs: number[]) => xs.map((v) => (v >= hi ? 1 : 0))
+    addProfile({ id: `${key}_hours`, kind: 'schedule', label: `${pr.name}: hours at ${hi} °C`, day_types: { weekday: on(d.weekday), saturday: on(d.saturday), sunday: on(d.sunday) } })
+    return `${key}_hours`
+  }
   const zones = used.map((z) => ({
     id: z.id,
     name: z.name,
@@ -404,7 +416,11 @@ export function buildDocument(plan0: Plan): Built {
       const sp = spaceOf.get(z.id)
       const heat = sp?.heat_c ?? null
       const cool = sp?.cool_c ?? null
-      return { heat_c: heat, cool_c: cool, setback_c: null, hours_ref: null, control_strategy: heat != null || cool != null ? 'active_setpoint' : null }
+      // Brief 114 (Controls): the heating hours and the setback outside them. A setback without hours means nothing.
+      const hours = sp?.heat_hours && sp.heat_hours !== 'always_on' && (heat != null || cool != null) ? hoursRef(sp.heat_hours) : null
+      const setback = hours && heat != null ? sp?.setback_c ?? null : null
+      if (sp?.setback_c != null && !hours && !setbackNoted.has(sp.id)) { setbackNoted.add(sp.id); notes.push(`${sp.name}: a setback needs heating hours to apply outside (Controls)`) }
+      return { heat_c: heat, cool_c: cool, setback_c: setback, hours_ref: hours, control_strategy: heat != null || cool != null ? 'active_setpoint' : null }
     })(),
     ventilation: ventOf(z.id),
     // A heated room is held at its heating temperature for the design heat loss (said on Systems, Heating).
@@ -513,6 +529,20 @@ export function buildDocument(plan0: Plan): Built {
         return [{ id: l.id, kind: l.kind, label: l.name, power_w: l.power_w, runs: l.runs, schedule_ref: l.runs === 'schedule' || (l.runs === 'dusk_to_dawn' && l.schedule) ? scheduleRef(l.schedule) : null, default_from: null }]
       })
       return loads.length ? { other_loads: loads } : {}
+    })(),
+    // Brief 114: the control map, one entry per controlled thing that reached the document (recorded, not yet used in
+    // the calculation). A system's group id is `${service}_${id}`; a ventilation system's zone entries are `${id}_vent`.
+    ...(() => {
+      const ventIds = new Set(zones.flatMap((z) => (z.ventilation as Array<{ id: string }>).map((v) => v.id)))
+      const ctl = (plan.controls ?? []).flatMap((c) => {
+        if (!c.controller) return []
+        const sys = plan.systems.find((y) => y.id === c.ref)
+        const ref = c.kind === 'ventilation' ? `${c.ref}_vent` : sys ? `${sys.service}_${c.ref}` : null
+        const there = ref != null && (c.kind === 'ventilation' ? ventIds.has(ref) : system_groups.some((g) => g.id === ref))
+        if (!there) return []
+        return [{ id: `ctl_${c.kind}_${c.ref}`, target: { kind: c.kind, ref }, controller: c.controller, hours_ref: null, note: c.note?.trim() || null }]
+      })
+      return ctl.length ? { controls: ctl } : {}
     })(),
     weather_ref: { kind: 'legacy', id: 'unassigned' },
     library_refs: libraryRefs(),
