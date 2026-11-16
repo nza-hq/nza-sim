@@ -46,6 +46,8 @@ export interface NetworkZone {
   setpoint_hours?: { heat_c: ArrayLike<number>; cool_c: ArrayLike<number> } | null
   /** Brief 108: the most heat the zone's emitters can give, W (null or absent: unlimited, ideal loads). */
   heating_cap_w?: number | null
+  /** Brief 119: the most sensible cooling the zone's units give, W (null or absent: unlimited, ideal loads). */
+  cooling_cap_w?: number | null
   /**
    * Brief 108 review F1: the emitters' output with the room at a given temperature, W. When given, in place of
    * heating_cap_w, each step's limit is this at the zone's control temperature at the end of the step before.
@@ -175,6 +177,7 @@ function check(inp: NetworkInputs) {
     checkSetpointHours(z.setpoint_hours, H, NetworkError, `${p}.setpoint_hours`)
     if (!Number.isFinite(z.initial_c)) throw new NetworkError('required', `${p}.initial_c`)
     if (z.heating_cap_w != null && !(z.heating_cap_w >= 0)) throw new NetworkError('must be ≥ 0', `${p}.heating_cap_w`)
+    if (z.cooling_cap_w != null && !(z.cooling_cap_w >= 0)) throw new NetworkError('must be ≥ 0', `${p}.cooling_cap_w`)
     if (z.heating_cap_at != null && z.heating_cap_w != null) throw new NetworkError('give a fixed limit or one that follows the room, not both', `${p}.heating_cap_at`)
     if (z.heating_cap_at != null && typeof z.heating_cap_at !== 'function') throw new NetworkError('must be a function of the room temperature', `${p}.heating_cap_at`)
     if (z.heating_convective_fraction != null && !(z.heating_convective_fraction >= 0 && z.heating_convective_fraction <= 1)) throw new NetworkError('must be 0 to 1', `${p}.heating_convective_fraction`)
@@ -381,6 +384,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const hcf = inp.hc_convective_fraction
   const hcfH = Float64Array.from(inp.zones, (z) => z.heating_convective_fraction ?? hcf)
   const capW = Float64Array.from(inp.zones, (z) => z.heating_cap_w ?? Infinity)
+  const capC = Float64Array.from(inp.zones, (z) => z.cooling_cap_w ?? Infinity)
   // Review F1: a limit that follows the room is set each step from the control temperature at the end of the step before.
   const capAt = inp.zones.map((z) => z.heating_cap_at ?? null)
   const anyCapAt = capAt.some((f) => f != null)
@@ -542,11 +546,14 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const bF = new Float64Array(n), z0 = new Float64Array(n), rhs = new Float64Array(n)
   const hv = new Float64Array(Z), phi = new Float64Array(Z), xa = new Float64Array(Z)
   // 0 free, 1 heating to heat_c, −1 cooling to cool_c, 2 heating at its limit (Brief 108: free, with the emitters'
-  // whole output as a known input); kept from the hour before.
+  // whole output as a known input), −2 cooling at its limit (Brief 119: the units' whole cooling, known); kept from
+  // the hour before.
   const mode = new Int8Array(Z)
   const held = (j: number) => mode[j] === 1 || mode[j] === -1
-  const Ecol = (j: number) => (mode[j] === -1 ? EWc : EW)
-  const Rcol = (j: number) => (mode[j] === -1 ? RWc : RW)
+  const Ecol = (j: number) => (mode[j] < 0 ? EWc : EW)
+  const Rcol = (j: number) => (mode[j] < 0 ? RWc : RW)
+  /** A zone at its limit: its heating (+) or cooling (−), known; 0 otherwise. */
+  const known = (j: number) => (mode[j] === 2 ? capW[j] : mode[j] === -2 ? -capC[j] : 0)
   let maxPasses = 0, hoursOverOne = 0
   const solDiffuse = new Float64Array(Z), radBeam = new Float64Array(Z), ogRad = new Float64Array(Z)
   const stored = new Float64Array(Z), sum = new Float64Array(Z), izs = new Float64Array(Z)
@@ -579,7 +586,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       if (nf) {
         for (let p = 0; p < nf; p++) {
           const i = freeIdx[p]
-          let r = wY[i] + (mode[i] === 2 ? capW[i] : 0)  // all heating at the air node here: φ adds to the air's balance
+          let r = wY[i] + known(i)  // all heating and cooling at the air node here: φ adds to the air's balance
           for (let a = 0; a < m; a++) { const j = actIdx[a]; r -= Y[i * Z + j] * xa[j] }
           bm[p] = r
           for (let q = 0; q <= p; q++) Kc[p * nf + q] = Y[i * Z + freeIdx[q]] + (q === p ? hv[i] : 0)
@@ -597,7 +604,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
         }
         for (let p = 0; p < nf; p++) { let v = bm[p]; for (let r = 0; r < p; r++) v -= Kc[p * nf + r] * um[r]; um[p] = v / Kc[p * nf + p] }
         for (let p = nf - 1; p >= 0; p--) { let v = um[p]; for (let r = p + 1; r < nf; r++) v -= Kc[r * nf + p] * um[r]; um[p] = v / Kc[p * nf + p] }
-        for (let p = 0; p < nf; p++) { const i = freeIdx[p]; xa[i] = um[p]; phi[i] = mode[i] === 2 ? capW[i] : 0 }
+        for (let p = 0; p < nf; p++) { const i = freeIdx[p]; xa[i] = um[p]; phi[i] = known(i) }
       }
       for (let a = 0; a < m; a++) {
         const i = actIdx[a]
@@ -614,7 +621,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
           const gij = G[i * Z + j]
           if (!held(j)) {
             Am[i * Z + j] = (i === j ? 1 : 0) + gij * hv[j]
-            if (mode[j] === 2) r += EW[i * Z + j] * capW[j]  // a capped zone's known heating
+            if (mode[j] === 2 || mode[j] === -2) r += Ecol(j)[i * Z + j] * known(j)  // a capped zone's known heating or cooling
           } else {
             Am[i * Z + j] = -Ecol(j)[i * Z + j]
             r -= ((i === j ? 1 : 0) + gij * hv[j]) * (mode[j] === 1 ? heatC[j] : coolC[j])
@@ -624,20 +631,20 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       }
       luSolve(luFactorInto(Am, Z, luM), bm, um)
       for (let j = 0; j < Z; j++) {
-        if (!held(j)) { xa[j] = um[j]; phi[j] = mode[j] === 2 ? capW[j] : 0 } else { xa[j] = mode[j] === 1 ? heatC[j] : coolC[j]; phi[j] = um[j] }
+        if (!held(j)) { xa[j] = um[j]; phi[j] = known(j) } else { xa[j] = mode[j] === 1 ? heatC[j] : coolC[j]; phi[j] = um[j] }
       }
       return
     }
     const N = Z + m
     for (let i = 0; i < Z; i++) {
       let r = z0[i]
-      for (let j = 0; j < Z; j++) if (mode[j] === 2) r += EW[i * Z + j] * capW[j]
+      for (let j = 0; j < Z; j++) if (mode[j] === 2 || mode[j] === -2) r += Ecol(j)[i * Z + j] * known(j)
       bm[i] = r
     }
     for (let a = 0; a < m; a++) {
       const zi = actIdx[a]
       let r = (mode[zi] === 1 ? heatC[zi] : coolC[zi]) - 0.5 * z0[rad[zi]]
-      for (let j = 0; j < Z; j++) if (mode[j] === 2) r -= 0.5 * RW[zi * Z + j] * capW[j]
+      for (let j = 0; j < Z; j++) if (mode[j] === 2 || mode[j] === -2) r -= 0.5 * Rcol(j)[zi * Z + j] * known(j)
       bm[Z + a] = r
     }
     {
@@ -654,7 +661,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       }
     }
     luSolve(luFactorInto(Am, N, luM), bm, um)
-    for (let j = 0; j < Z; j++) { xa[j] = um[j]; phi[j] = mode[j] === 2 ? capW[j] : 0 }
+    for (let j = 0; j < Z; j++) { xa[j] = um[j]; phi[j] = known(j) }
     for (let a = 0; a < m; a++) phi[actIdx[a]] = um[Z + a]
   }
   /** The control temperature of zone i for the current xa, φ (operative needs the star node). */
@@ -675,7 +682,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       heatC[z] = sp.heat_c[h]; coolC[z] = sp.cool_c[h]
       // A service switched off this hour lets go of the zone; the active set then starts it free.
       if ((mode[z] === 1 || mode[z] === 2) && Number.isNaN(heatC[z])) mode[z] = 0
-      if (mode[z] === -1 && Number.isNaN(coolC[z])) mode[z] = 0
+      if ((mode[z] === -1 || mode[z] === -2) && Number.isNaN(coolC[z])) mode[z] = 0
     }
     for (let i = 0; i < n; i++) bF[i] = capDT[i] * xF[i]
     const zi0 = h * Z * 3
@@ -726,7 +733,11 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
         if (mode[z] === 1 && phi[z] < 0) { mode[z] = 0; changed = true }
         else if (mode[z] === 1 && phi[z] > capW[z]) { mode[z] = 2; changed = true }  // Brief 108: needs more than its emitters give
         else if (mode[z] === -1 && phi[z] > 0) { mode[z] = 0; changed = true }
-        else if (mode[z] === 2) {
+        else if (mode[z] === -1 && -phi[z] > capC[z]) { mode[z] = -2; changed = true }  // Brief 119: needs more than its units give
+        else if (mode[z] === -2) {
+          // At its limit, the zone floats; once it would fall below its setpoint it needs less than the limit.
+          if (control(z) < coolC[z] - 1e-9) { mode[z] = -1; changed = true }
+        } else if (mode[z] === 2) {
           // At its limit, the zone floats; once it would rise above its setpoint it needs less than the limit.
           if (control(z) > heatC[z] + 1e-9) { mode[z] = 1; changed = true }
         } else if (mode[z] === 0) {

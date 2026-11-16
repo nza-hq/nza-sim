@@ -20,7 +20,7 @@ const year: EmitterZone = { ...sizing({ peak_w: 9800, shortfall_w: 0 }), id: 'z1
 const summary = (d: DesignSummary | null): Summary => ({
   engine: 'thermal-2', run_ms: 1, steps_per_hour: 1, weather: { file_name: 'w.epw', station: 'W', sha256: 'x' },
   building: { floor_m2: 100, heating_kwh: 1, cooling_kwh: 0, peak_heating_w: 0, peak_cooling_w: 0 },
-  zones: [], breakdown: [], drafts: [], energy: { ok: false, missing: [] }, emitters: { zones: [year], what_if: null }, design_heat_loss: d,
+  zones: [], breakdown: [], drafts: [], energy: { ok: false, missing: [] }, emitters: { zones: [year], cooling: [], cooling_unstated: [], what_if: null }, design_heat_loss: d,
 } as unknown as Summary)
 const ok = (zones: DesignZoneSummary[]): DesignSummary => ({ ok: true, outdoor_c: -4.6, outdoor_source: 'heating_99_6', ground_c: 11.3, warm_up_w_per_m2: 36, vent_wind_m_s: null, building_w: 12600, zones, what_if: null })
 const panel = (s: Summary) => renderToStaticMarkup(<DesignHeatLoss summary={s} />)
