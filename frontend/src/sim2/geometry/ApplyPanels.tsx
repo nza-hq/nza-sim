@@ -28,7 +28,7 @@ export function ChooseList(props: {
   onChoose: (ids: string[], add: boolean) => void
   onNone: () => void
   /** Navigate by: rooms (the list below), or the project's things of one kind, each with the rooms it reaches. */
-  nav?: { by: string; tabs: Array<{ key: string; name: string }>; onBy: (k: string) => void; sections: NavSection[] }
+  nav?: { by: string; tabs: Array<{ key: string; name: string; icon?: IconName }>; onBy: (k: string) => void; sections: NavSection[] }
   /** Brief 118 P2: zones are made, filled and named here. */
   onNewZone?: () => void
   onMoveTo?: (zone: string) => void
@@ -44,7 +44,7 @@ export function ChooseList(props: {
     <div className="gl-sec ap-choose">
       {nav && (
         <div className="ap-navby" role="tablist" aria-label="Navigate by">
-          {nav.tabs.map((t) => <button key={t.key} type="button" role="tab" aria-selected={nav.by === t.key} onClick={() => nav.onBy(t.key)}>{t.name}</button>)}
+          {nav.tabs.map((t) => <button key={t.key} type="button" role="tab" aria-selected={nav.by === t.key} onClick={() => nav.onBy(t.key)} title={t.name}>{t.icon && <Icon name={t.icon} size={18} />}<span>{t.name}</span></button>)}
         </div>
       )}
       <h3>Choose <small>{chosen.size ? `${chosen.size} of ${rows.length} rooms` : 'nothing yet'}{chosen.size > 0 && <button type="button" className="ap-link" onClick={props.onNone}>Clear</button>}</small></h3>
@@ -93,7 +93,7 @@ export function ChooseList(props: {
   )
 }
 
-export type NavItem = { id: string; name: string; swatch: Swatch; rooms: string[]; active?: boolean; onPick?: () => void; onRename?: (name: string) => void }
+export type NavItem = { id: string; name: string; swatch: Swatch; rooms: string[]; active?: boolean; onPick?: () => void; onRename?: (name: string) => void; /** Instead of choosing its rooms (walls choose their wall parts). */ choose?: () => void; count?: number; what?: string }
 export type NavSection = { title?: string; items: NavItem[]; onNew?: { label: string; run: () => void } }
 
 /** A name that a double-click turns into a box: Enter or leaving it keeps the change, Esc drops it. */
@@ -119,11 +119,11 @@ function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]
             const on = it.rooms.length > 0 && it.rooms.every((id) => chosen.has(id))
             return (
               <div key={it.id} className={`ap-row ap-navit${it.active ? ' active' : ''}`} role="option" aria-selected={on}
-                onClick={(e) => { onChoose(it.rooms, e.shiftKey || e.ctrlKey || e.metaKey); it.onPick?.() }}>
+                onClick={(e) => { if (it.choose) it.choose(); else onChoose(it.rooms, e.shiftKey || e.ctrlKey || e.metaKey); it.onPick?.() }}>
                 {tick(on, it.rooms.some((id) => chosen.has(id)))}
                 <Sw s={it.swatch} />
-                <span className="ap-name"><EditName name={it.name} onRename={it.onRename} /><small>{it.rooms.length ? it.rooms.map(nameOf).join(', ') : 'no rooms'}</small></span>
-                <span className="ap-count">{it.rooms.length}</span>
+                <span className="ap-name"><EditName name={it.name} onRename={it.onRename} /><small>{it.rooms.length ? it.rooms.map(nameOf).join(', ') : it.count ? '' : 'not used'}</small></span>
+                <span className="ap-count" title={it.what ? `${it.count} ${it.what}s` : `${it.rooms.length} rooms`}>{it.what ? it.count : it.rooms.length}</span>
               </div>
             )
           })}

@@ -410,9 +410,12 @@
 .gl-h4i svg { flex: none; color: #2B2A4C; }
 
 /* ─── Brief 118: the navigator on the left ─── */
-.ap-navby { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
-.ap-navby button { border: 1px solid #D5DBD8; background: #fff; border-radius: 999px; padding: 3px 10px; font: 600 11.5px var(--gl-detail); color: var(--gl-soft); cursor: pointer; }
-.ap-navby button[aria-selected='true'] { background: var(--gl-green); border-color: var(--gl-green); color: #fff; }
+.ap-navby { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; margin: 0 0 12px; }
+.ap-navby button { display: flex; flex-direction: column; align-items: center; gap: 3px; border: 1px solid transparent; background: none; border-radius: 9px; padding: 5px 2px 4px; font: 500 10.5px var(--gl-detail); line-height: 1.15; color: var(--gl-soft); cursor: pointer; text-align: center; }
+.ap-navby button:hover { background: var(--gl-tint); }
+.ap-navby button[aria-selected='true'] { background: #F1F6F3; border-color: var(--gl-green); color: var(--gl-green); font-weight: 600; }
+/* The kinds live on the left in the workspace; the right is the passport. */
+.gl-root.gl-pane .ap-give .ap-kinds { display: none; }
 .ap-navsec { font: 700 10.5px var(--gl-detail); letter-spacing: .06em; text-transform: uppercase; color: var(--gl-soft); margin: 10px 0 4px; }
 .ap-navit .ap-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .ap-navit.active { box-shadow: inset 3px 0 0 var(--gl-green); }
