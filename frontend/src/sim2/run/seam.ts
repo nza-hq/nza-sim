@@ -428,7 +428,9 @@ export function simulate(
     design_heat_loss: null,
   }
   summary.emitters = emitterSummary(doc, results, options, run, weather, deps.what_if ?? null)
-  summary.design_heat_loss = designSummary(doc, results, weather, deps.what_if ?? null)
+  // The design heat loss sizes the installed kit, so only the full run has one (as energy): the fabric and spaces copies
+  // have no emitters and no mechanical ventilation, and their heat loss would leave those out.
+  summary.design_heat_loss = level === 'systems' ? designSummary(doc, results, weather, deps.what_if ?? null) : null
   return { ok: true, results, summary }
 }
 

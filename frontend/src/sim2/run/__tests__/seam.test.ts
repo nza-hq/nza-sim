@@ -385,6 +385,16 @@ describe('Brief 117: the design heat loss in the summary', () => {
     over(d)
     return d
   }
+  it('only on the full run: the fabric and spaces copies have none', async () => {
+    const d = await design()
+    for (const level of ['fabric', 'spaces'] as const) {
+      const r = simulate(d, { weather: WEATHER, level, fabric_heat_c: 21 })
+      if (!r.ok) throw new Error(JSON.stringify(r.missing))
+      expect(r.summary.design_heat_loss).toBeNull()
+    }
+    const r = simulate(d, { weather: WEATHER })
+    expect(r.ok && r.summary.design_heat_loss?.ok).toBe(true)
+  })
   it('none without design conditions', async () => {
     const r = simulate(await doc(), { weather: WEATHER })
     expect(r.ok && r.summary.design_heat_loss).toBeNull()
