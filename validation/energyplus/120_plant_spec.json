@@ -1,0 +1,19 @@
+{
+ "about": "Brief 120 Part 2: a capacity on the plant that feeds two rooms' radiators. The cooled room (104_cooled_room_spec.json) with its heated rooms (west, east) on hot-water radiators as 108_hotwater_spec.json (flow 50 C, return 40 C, rated at a 20 C room, exponent 1, all convective), fed by one plant whose output is limited to 'plant_w'. EnergyPlus: DistrictHeating:Water with Nominal Capacity = plant_w (a source limited to its capacity, as a boiler at its nominal output); when it is short the loop's flow temperature falls and each baseboard gives what the cooler water gives it. Engine 2: the system's capacity_kw, shared among the rooms in proportion to what each asks after its radiator's limit (Linzie's decision 1). Fixed before any run: the cases and the gate.",
+ "flow_c": 50.0,
+ "return_c": 40.0,
+ "rated_room_c": 20.0,
+ "exponent_n": 1.0,
+ "radiant_fraction": 0.0,
+ "cases": {
+  "binds": { "radiators": { "west": 1100, "east": 1100 }, "plant_w": 1600 },
+  "free": { "radiators": { "west": 1100, "east": 1100 }, "plant_w": 2600 },
+  "unequal": { "radiators": { "west": 1600, "east": 900 }, "plant_w": 1600 }
+ },
+ "gate": {
+  "annual_heating_pct": 3.0,
+  "unmet_hours_pct": 10.0,
+  "unmet_hours_floor_h": 10,
+  "note": "Per room and case: annual heating within +/-3 %; unmet hours (air more than 0.5 K below the setpoint) within +/-10 % or +/-10 h, whichever is larger. The sharing in the plant's short hours is reported room by room (each room's share of what the plant gave), not gated: the two methods share differently by design (proportional to ask against a falling flow temperature), and this measures by how much."
+ }
+}
