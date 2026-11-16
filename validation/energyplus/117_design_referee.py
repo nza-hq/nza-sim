@@ -41,8 +41,11 @@ SIGMA = 5.670374419e-8
 WIND = 4.0
 ROOM_GATE, BUILDING_GATE = 0.03, 0.02
 # 'iso_conv': the engine's year-run surface physics (fixed convection, long-wave between faces), as built first.
-# 'combined': the design method's own films (combined_films). See docs/audit/117/02_referee.md for why both.
-VARIANTS = ("iso_conv", "combined")
+# 'combined': the design method's own films (combined_films), the arithmetic referee. See docs/audit/117/02_referee.md.
+VARIANTS = ("iso_conv", "combined", "iso_conv_operative")
+# Review F1 (04_independent_review.md), gate stated before running, 16 Nov: 'iso_conv_operative' is iso_conv with
+# each room held at its design temperature as an operative temperature (radiative fraction 0.5), the physical
+# referee; same gate, each room +-3 %, the building +-2 %. 'combined' stays as the arithmetic referee.
 AIR_VARS = ("Zone Infiltration Sensible Heat Loss Energy", "Zone Ventilation Sensible Heat Loss Energy")
 
 
@@ -111,6 +114,13 @@ def combined_films(ep: dict, notes: list) -> None:
     notes.append(f"combined_films: ISO 6946 combined films as convection on {len(cc)} surfaces; long-wave off on {n} materials")
 
 
+def operative(ep: dict, notes: list) -> None:
+    """Each thermostat controls the operative temperature (half air, half mean radiant) rather than the air."""
+    ep["ZoneControl:Thermostat:OperativeTemperature"] = {f"op_{n}": {"thermostat_name": n, "radiative_fraction_input_mode": "Constant",
+                                                                   "fixed_radiative_fraction": 0.5} for n in ep["ZoneControl:Thermostat"]}
+    notes.append(f"operative: {len(ep['ZoneControl:Thermostat'])} thermostats on operative temperature, radiative fraction 0.5")
+
+
 def week(ep: dict) -> None:
     for rp in ep["RunPeriod"].values():
         rp.update({"begin_month": 1, "begin_day_of_month": 1, "end_month": 2, "end_day_of_month": 28})
@@ -120,6 +130,7 @@ def run(energyplus: str, ep: dict, epw: Path, d: Path) -> dict:
     d.mkdir(parents=True, exist_ok=True)
     ep.setdefault("Output:Variable", {})["h_117"] = {"key_value": "*", "variable_name": "Zone Ideal Loads Zone Sensible Heating Energy", "reporting_frequency": "Hourly"}
     ep["Output:Variable"]["t_117"] = {"key_value": "*", "variable_name": "Zone Mean Air Temperature", "reporting_frequency": "Hourly"}
+    ep["Output:Variable"]["o_117"] = {"key_value": "*", "variable_name": "Zone Operative Temperature", "reporting_frequency": "Hourly"}
     for i, v in enumerate(AIR_VARS):
         ep["Output:Variable"][f"a_117_{i}"] = {"key_value": "*", "variable_name": v, "reporting_frequency": "Hourly"}
     ep["Output:SQLite"] = {"Output:SQLite 1": {"option_type": "Simple"}}
@@ -145,7 +156,7 @@ def run(energyplus: str, ep: dict, epw: Path, d: Path) -> dict:
         if abs(w - w24) > 1e-3 * max(1.0, w):
             raise SystemExit(f"{z}: not steady ({w:.2f} W now, {w24:.2f} W a day before)")
         air = sum((series(v, z) or [0.0])[-1] for v in AIR_VARS) / 3600.0
-        out[z] = {"w": w, "air_c": tz[-1], "air_w": air}
+        out[z] = {"w": w, "air_c": tz[-1], "operative_c": series("Zone Operative Temperature", z)[-1], "air_w": air}
     con.close()
     out_v = subprocess.run([energyplus, "--version"], capture_output=True, text=True).stdout.strip()
     return {"zones": out, "warnings": len(re.findall(r"\*\* Warning \*\*", err)), "version": out_v}
@@ -161,7 +172,8 @@ def compare(engine: dict, ep_zones: dict, names: dict) -> dict:
         air = sum(t.get(k, 0.0) for k in ("infiltration", "vents", "mechanical_ventilation"))
         ep_air = ep_zones[names[z["zone_id"]]]["air_w"]
         rows[z["zone_id"]] = {"engine_w": round(calc, 2), "energyplus_w": round(ep_w, 2), "diff_pct": round(100 * (calc - ep_w) / ep_w, 3),
-                              "energyplus_air_c": round(ep_zones[names[z["zone_id"]]]["air_c"], 3), "internal_c": z["internal_c"],
+                              "energyplus_air_c": round(ep_zones[names[z["zone_id"]]]["air_c"], 3),
+                              "energyplus_operative_c": round(ep_zones[names[z["zone_id"]]]["operative_c"], 3), "internal_c": z["internal_c"],
                               "air_engine_w": round(air, 2), "air_energyplus_w": round(ep_air, 2),
                               "fabric_engine_w": round(calc - air, 2), "fabric_energyplus_w": round(ep_w - ep_air, 2),
                               "pass": abs(calc - ep_w) <= ROOM_GATE * ep_w}
@@ -187,6 +199,8 @@ def cooled(a, eng: dict, root: Path, variant: str) -> dict:
     notes.append(f"infiltration {SPEC_SITE_ACH} ach at standard density")
     if variant == "combined":
         combined_films(ep, notes)
+    if variant == "iso_conv_operative":
+        operative(ep, notes)
     week(ep)
     temps = {z["zone_id"]: z["internal_c"] for z in eng["zones"]}
     # Every room heated to its design temperature (the middle room is cooled in 104's model).
@@ -226,6 +240,8 @@ def bridgewater(a, eng: dict, root: Path, variant: str) -> dict:
     A.iso_conv(ep, notes)
     if variant == "combined":
         combined_films(ep, notes)
+    if variant == "iso_conv_operative":
+        operative(ep, notes)
     week(ep)
     t = {z["internal_c"] for z in eng["zones"]}
     if len(t) != 1:
