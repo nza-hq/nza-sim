@@ -12,8 +12,8 @@ const repo = (p: string) => fileURLToPath(new URL(`../../../../../${p}`, import.
 export const AIR_SPEC = JSON.parse(fs.readFileSync(repo('validation/energyplus/115_air_spec.json'), 'utf8'))
 export const AIR_SPEC_PATH = repo('validation/energyplus/115_air_spec.json')
 
-export function airBoxDocument(caseName: string) {
-  const S = AIR_SPEC, c = S.cases[caseName]
+export function airBoxDocument(caseName: string, S: any = AIR_SPEC) {
+  const c = S.cases[caseName]
   if (!c) throw new Error(`no case ${caseName}`)
   const { lib } = cooledRoomDocument()
   const Wd = S.width_m, D = S.depth_m, Hh = S.height_m
@@ -66,7 +66,7 @@ export function airBoxDocument(caseName: string) {
       id: 'room', name: 'room', floor: 0, storeys: 1, polygon: [[0, 0], [Wd, 0], [Wd, D], [0, D]], area_m2: Wd * D, height_m: Hh, use_type: 'test', rooms: null,
       profile_refs: { occupancy: null, lighting: [], equipment: [], auxiliary: [] },
       setpoints: { heat_c: S.heat_c, cool_c: c.cool ? S.cool_c : null, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' },
-      ventilation: [], infiltration_q50: c.q50, infiltration_ach: null, internal_heat_capacity_j_per_k_m2: 0, emitters: [],
+      ventilation: [], infiltration_q50: c.q50 ?? S.q50, infiltration_ach: null, internal_heat_capacity_j_per_k_m2: 0, emitters: [],
       surfaces: surfaces.map((s) => s.id),
     }],
     surfaces, system_groups: [], profiles: [], controls,

@@ -1,0 +1,1589 @@
+{
+ "source": "scripts/115_community_centre.mts",
+ "weather": {
+  "file": "GBR_London.Gatwick.037760_IWEC.epw",
+  "sha256": "c61a0a1ea127529b04380cce1e4fc88553bb7036d11127f7673d4e1e5b4edffc"
+ },
+ "notes": [
+  "Enhanced fabric: windows: windows of different heights share a wall; their openings run from the lowest sill to the highest head, which overstates the stack flow a little",
+  "Hot water use is stated, but Store has no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)",
+  "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris): a draft library item, not yet checked by Chris"
+ ],
+ "runs": {
+  "shut": {
+   "label": "0  Windows shut (baseline, weather-driven air)",
+   "steps_per_hour": 4,
+   "run_ms": 8117,
+   "floor_m2": 684,
+   "heating_kwh": 20139.345020913242,
+   "cooling_kwh": 13174.511582725034,
+   "heating_djf_kwh": 12567.049826905068,
+   "peak_heating_w": 48254.39125964162,
+   "gas_kwh": 20700.067657077725,
+   "electricity_kwh": 50528.92322034184,
+   "eui_kwh_per_m2": 104.1359515751748,
+   "zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2116.6067164697397,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 628,
+     "hours_above_28": 7,
+     "max_in_use_c": 28.100363302417158,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1761.6573940571884,
+      "vents": -315.805710127028,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2855.487839002235,
+     "cooling_kwh": 680.9269129577431,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.6914758002561,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -2184.503799819225,
+      "vents": -653.7948642800952,
+      "windows": 0,
+      "mechanical": -2138.767019120507
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 989.1035804869656,
+     "cooling_kwh": 427.9749355803019,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.873412399966238,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -823.2963326220851,
+      "vents": -174.10713553727624,
+      "windows": 0,
+      "mechanical": -713.213125831875
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6388.098772333053,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 818,
+     "hours_above_28": 106,
+     "max_in_use_c": 30.772082301589364,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -3448.072452730859,
+      "vents": -746.0299535867134,
+      "windows": 0,
+      "mechanical": 0
+     }
+    }
+   ],
+   "all_zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2116.6067164697397,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 628,
+     "hours_above_28": 7,
+     "max_in_use_c": 28.100363302417158,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1761.6573940571884,
+      "vents": -315.805710127028,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Kitchen",
+     "heating_kwh": 4152.5233659082905,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 114,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.49994766213646,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -365.95433877591313,
+      "vents": -9.222577281706807,
+      "windows": 0,
+      "mechanical": -11745.913556559577
+     }
+    },
+    {
+     "name": "Reception",
+     "heating_kwh": 1244.9180145794294,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 385,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.5899859514253,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1117.5883165697126,
+      "vents": -265.60764294601273,
+      "windows": 0,
+      "mechanical": -1139.5548748634183
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2855.487839002235,
+     "cooling_kwh": 680.9269129577431,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.6914758002561,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -2184.503799819225,
+      "vents": -653.7948642800952,
+      "windows": 0,
+      "mechanical": -2138.767019120507
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 989.1035804869656,
+     "cooling_kwh": 427.9749355803019,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.873412399966238,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -823.2963326220851,
+      "vents": -174.10713553727624,
+      "windows": 0,
+      "mechanical": -713.213125831875
+     }
+    },
+    {
+     "name": "Comms room",
+     "heating_kwh": 0,
+     "cooling_kwh": 12065.609734186988,
+     "in_use_hours": 8760,
+     "hours_above_25": 34,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.05876553920805,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -319.84477601831713,
+      "vents": 0,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Store",
+     "heating_kwh": 0,
+     "cooling_kwh": 0,
+     "in_use_hours": 8760,
+     "hours_above_25": 194,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.913533821897765,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -212.33012477873828,
+      "vents": -7.136820258808946,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "WCs",
+     "heating_kwh": 2392.60673213353,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.409708237420563,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -238.70211589395805,
+      "vents": -4.237766427873391,
+      "windows": 0,
+      "mechanical": -2678.4760431340014
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6388.098772333053,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 818,
+     "hours_above_28": 106,
+     "max_in_use_c": 30.772082301589364,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -3448.072452730859,
+      "vents": -746.0299535867134,
+      "windows": 0,
+      "mechanical": 0
+     }
+    }
+   ]
+  },
+  "cracked": {
+   "label": "1a Windows open a quarter, every hour",
+   "steps_per_hour": 4,
+   "run_ms": 3252,
+   "floor_m2": 684,
+   "heating_kwh": 67003.15750079688,
+   "cooling_kwh": 11637.062512959114,
+   "heating_djf_kwh": 33134.00199578025,
+   "peak_heating_w": 51024.06849532402,
+   "gas_kwh": 51327.23679959415,
+   "electricity_kwh": 55760.610876734616,
+   "eui_kwh_per_m2": 156.56118081334614,
+   "zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 9490.702548191413,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 22,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.685510016648486,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1111.4114576902718,
+      "vents": -222.26889293697596,
+      "windows": -9529.286360093927,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 14284.5375829821,
+     "cooling_kwh": 26.08638106374243,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.375650311544938,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1446.0956059837617,
+      "vents": -470.89319520634797,
+      "windows": -14718.071738181088,
+      "mechanical": -1747.8105876187533
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 4657.321177030812,
+     "cooling_kwh": 73.08756616140076,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.595402914897857,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -600.1408195815691,
+      "vents": -135.0031979012175,
+      "windows": -4959.195277980821,
+      "mechanical": -623.9172364253772
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 26224.73291714076,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 76,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.812972100371226,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -2550.481086955461,
+      "vents": -583.5031131791055,
+      "windows": -23301.557663827047,
+      "mechanical": 0
+     }
+    }
+   ],
+   "all_zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 9490.702548191413,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 22,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.685510016648486,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1111.4114576902718,
+      "vents": -222.26889293697596,
+      "windows": -9529.286360093927,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Kitchen",
+     "heating_kwh": 4803.827084711776,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 13,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.419840854876853,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -316.4254441679419,
+      "vents": -7.9267545909087485,
+      "windows": -418.2754217900443,
+      "mechanical": -11015.370762819683
+     }
+    },
+    {
+     "name": "Reception",
+     "heating_kwh": 4834.467542824258,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.570768980561382,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -656.6189698703115,
+      "vents": -150.70158997759575,
+      "windows": -5300.783050425107,
+      "mechanical": -937.0646933376665
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 14284.5375829821,
+     "cooling_kwh": 26.08638106374243,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.375650311544938,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1446.0956059837617,
+      "vents": -470.89319520634797,
+      "windows": -14718.071738181088,
+      "mechanical": -1747.8105876187533
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 4657.321177030812,
+     "cooling_kwh": 73.08756616140076,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.595402914897857,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -600.1408195815691,
+      "vents": -135.0031979012175,
+      "windows": -4959.195277980821,
+      "mechanical": -623.9172364253772
+     }
+    },
+    {
+     "name": "Comms room",
+     "heating_kwh": 0,
+     "cooling_kwh": 11537.88856573397,
+     "in_use_hours": 8760,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.988912466798425,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -319.8447760183171,
+      "vents": 0,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Store",
+     "heating_kwh": 0,
+     "cooling_kwh": 0,
+     "in_use_hours": 8760,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.121889816269707,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -88.1071591540302,
+      "vents": -9.781858996583141,
+      "windows": -845.6249504841887,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "WCs",
+     "heating_kwh": 2707.568647915766,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.05850807379209,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -245.54909948629503,
+      "vents": -2.6988520877808337,
+      "windows": -44.90132257521004,
+      "mechanical": -2499.6894655307824
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 26224.73291714076,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 76,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.812972100371226,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -2550.481086955461,
+      "vents": -583.5031131791055,
+      "windows": -23301.557663827047,
+      "mechanical": 0
+     }
+    }
+   ]
+  },
+  "wide": {
+   "label": "1b Windows wide open, every hour",
+   "steps_per_hour": 4,
+   "run_ms": 3568,
+   "floor_m2": 684,
+   "heating_kwh": 173171.4797266167,
+   "cooling_kwh": 11202.869384423813,
+   "heating_djf_kwh": 76204.41151558868,
+   "peak_heating_w": 60250.877691054295,
+   "gas_kwh": 116648.43539226058,
+   "electricity_kwh": 70041.91381626565,
+   "eui_kwh_per_m2": 272.9391070300091,
+   "zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 27354.74750088386,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.97302581881432,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -831.6578466191023,
+      "vents": -175.10542827347302,
+      "windows": -28662.217055256006,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 40542.77361704905,
+     "cooling_kwh": 33.97532252305503,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.03904484596775,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1033.6801080838873,
+      "vents": -349.62364342739477,
+      "windows": -42640.757046678824,
+      "mechanical": -1350.6624048836898
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 15222.275609933016,
+     "cooling_kwh": 52.88270939769184,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.342646011827526,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -497.8116141001558,
+      "vents": -114.33772773079872,
+      "windows": -16423.99914886787,
+      "mechanical": -545.1077841251386
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 66779.22640010362,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 30,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.79716570423615,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1772.8932454659541,
+      "vents": -425.6956299757425,
+      "windows": -66287.6299255334,
+      "mechanical": 0
+     }
+    }
+   ],
+   "all_zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 27354.74750088386,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.97302581881432,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -831.6578466191023,
+      "vents": -175.10542827347302,
+      "windows": -28662.217055256006,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Kitchen",
+     "heating_kwh": 5983.675417456515,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 5,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.96395978615445,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -289.65349381401825,
+      "vents": -7.417221241019331,
+      "windows": -1502.7574773789481,
+      "mechanical": -10404.849869654696
+     }
+    },
+    {
+     "name": "Reception",
+     "heating_kwh": 13645.01316658031,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.824177515568252,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -490.32335037158947,
+      "vents": -115.68649744238833,
+      "windows": -15347.719868788115,
+      "mechanical": -744.8265453753268
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 40542.77361704905,
+     "cooling_kwh": 33.97532252305503,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.03904484596775,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1033.6801080838873,
+      "vents": -349.62364342739477,
+      "windows": -42640.757046678824,
+      "mechanical": -1350.6624048836898
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 15222.275609933016,
+     "cooling_kwh": 52.88270939769184,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.342646011827526,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -497.8116141001558,
+      "vents": -114.33772773079872,
+      "windows": -16423.99914886787,
+      "mechanical": -545.1077841251386
+     }
+    },
+    {
+     "name": "Comms room",
+     "heating_kwh": 0,
+     "cooling_kwh": 11116.011352503067,
+     "in_use_hours": 8760,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.94663398607838,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -319.8447760183171,
+      "vents": 0,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Store",
+     "heating_kwh": 439.0834298414503,
+     "cooling_kwh": 0,
+     "in_use_hours": 8760,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.458752967073742,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -61.172093216114895,
+      "vents": -7.621041135947747,
+      "windows": -2187.8423849649116,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "WCs",
+     "heating_kwh": 3204.684584768858,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 22.56939376103329,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -240.90123540176637,
+      "vents": -1.9393007237763313,
+      "windows": -219.51418786756935,
+      "mechanical": -2397.3873381762987
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 66779.22640010362,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 30,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.79716570423615,
+     "hours_windows_open": 8760,
+     "air_kwh": {
+      "leakage": -1772.8932454659541,
+      "vents": -425.6956299757425,
+      "windows": -66287.6299255334,
+      "mechanical": 0
+     }
+    }
+   ]
+  },
+  "cooled": {
+   "label": "2a Office and meeting room cooled, windows shut (= 0)",
+   "steps_per_hour": 4,
+   "run_ms": 2726,
+   "floor_m2": 684,
+   "heating_kwh": 20139.345020913242,
+   "cooling_kwh": 13174.511582725034,
+   "heating_djf_kwh": 12567.049826905068,
+   "peak_heating_w": 48254.39125964162,
+   "gas_kwh": 20700.067657077725,
+   "electricity_kwh": 50528.92322034184,
+   "eui_kwh_per_m2": 104.1359515751748,
+   "zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2116.6067164697397,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 628,
+     "hours_above_28": 7,
+     "max_in_use_c": 28.100363302417158,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1761.6573940571884,
+      "vents": -315.805710127028,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2855.487839002235,
+     "cooling_kwh": 680.9269129577431,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.6914758002561,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -2184.503799819225,
+      "vents": -653.7948642800952,
+      "windows": 0,
+      "mechanical": -2138.767019120507
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 989.1035804869656,
+     "cooling_kwh": 427.9749355803019,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.873412399966238,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -823.2963326220851,
+      "vents": -174.10713553727624,
+      "windows": 0,
+      "mechanical": -713.213125831875
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6388.098772333053,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 818,
+     "hours_above_28": 106,
+     "max_in_use_c": 30.772082301589364,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -3448.072452730859,
+      "vents": -746.0299535867134,
+      "windows": 0,
+      "mechanical": 0
+     }
+    }
+   ],
+   "all_zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2116.6067164697397,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 628,
+     "hours_above_28": 7,
+     "max_in_use_c": 28.100363302417158,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1761.6573940571884,
+      "vents": -315.805710127028,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Kitchen",
+     "heating_kwh": 4152.5233659082905,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 114,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.49994766213646,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -365.95433877591313,
+      "vents": -9.222577281706807,
+      "windows": 0,
+      "mechanical": -11745.913556559577
+     }
+    },
+    {
+     "name": "Reception",
+     "heating_kwh": 1244.9180145794294,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 385,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.5899859514253,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1117.5883165697126,
+      "vents": -265.60764294601273,
+      "windows": 0,
+      "mechanical": -1139.5548748634183
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2855.487839002235,
+     "cooling_kwh": 680.9269129577431,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.6914758002561,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -2184.503799819225,
+      "vents": -653.7948642800952,
+      "windows": 0,
+      "mechanical": -2138.767019120507
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 989.1035804869656,
+     "cooling_kwh": 427.9749355803019,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.873412399966238,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -823.2963326220851,
+      "vents": -174.10713553727624,
+      "windows": 0,
+      "mechanical": -713.213125831875
+     }
+    },
+    {
+     "name": "Comms room",
+     "heating_kwh": 0,
+     "cooling_kwh": 12065.609734186988,
+     "in_use_hours": 8760,
+     "hours_above_25": 34,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.05876553920805,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -319.84477601831713,
+      "vents": 0,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Store",
+     "heating_kwh": 0,
+     "cooling_kwh": 0,
+     "in_use_hours": 8760,
+     "hours_above_25": 194,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.913533821897765,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -212.33012477873828,
+      "vents": -7.136820258808946,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "WCs",
+     "heating_kwh": 2392.60673213353,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.409708237420563,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -238.70211589395805,
+      "vents": -4.237766427873391,
+      "windows": 0,
+      "mechanical": -2678.4760431340014
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6388.098772333053,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 818,
+     "hours_above_28": 106,
+     "max_in_use_c": 30.772082301589364,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -3448.072452730859,
+      "vents": -746.0299535867134,
+      "windows": 0,
+      "mechanical": 0
+     }
+    }
+   ]
+  },
+  "no_cooling_shut": {
+   "label": "2b No cooling, windows shut",
+   "steps_per_hour": 4,
+   "run_ms": 2567,
+   "floor_m2": 684,
+   "heating_kwh": 20131.806088365298,
+   "cooling_kwh": 12250.264239316417,
+   "heating_djf_kwh": 12567.049826905064,
+   "peak_heating_w": 48254.391259641554,
+   "gas_kwh": 20698.5487352442,
+   "electricity_kwh": 50207.85296409394,
+   "eui_kwh_per_m2": 103.6643299697926,
+   "zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2116.396770777551,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 638,
+     "hours_above_28": 16,
+     "max_in_use_c": 28.32018563530298,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1769.6051916182196,
+      "vents": -316.6466058713607,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2852.2088081723573,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 518,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.73261028175019,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -2273.7112848145475,
+      "vents": -677.3663745173482,
+      "windows": 0,
+      "mechanical": -2232.7300898342723
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 986.311500333323,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 484,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.074937037455385,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -866.7490632773361,
+      "vents": -182.11385582722068,
+      "windows": 0,
+      "mechanical": -753.7894125713716
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6387.943992632885,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 822,
+     "hours_above_28": 109,
+     "max_in_use_c": 30.773993950763163,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -3449.050937894833,
+      "vents": -746.2012657560983,
+      "windows": 0,
+      "mechanical": 0
+     }
+    }
+   ],
+   "all_zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2116.396770777551,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 638,
+     "hours_above_28": 16,
+     "max_in_use_c": 28.32018563530298,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1769.6051916182196,
+      "vents": -316.6466058713607,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Kitchen",
+     "heating_kwh": 4151.940122531008,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 133,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.53703379745594,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -366.8619239454259,
+      "vents": -9.229976155342527,
+      "windows": 0,
+      "mechanical": -11775.332176890814
+     }
+    },
+    {
+     "name": "Reception",
+     "heating_kwh": 1244.8476011019018,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 484,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.414541282901787,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -1134.2397315002872,
+      "vents": -268.56040693655564,
+      "windows": 0,
+      "mechanical": -1156.886414767099
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2852.2088081723573,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 518,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.73261028175019,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -2273.7112848145475,
+      "vents": -677.3663745173482,
+      "windows": 0,
+      "mechanical": -2232.7300898342723
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 986.311500333323,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 484,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.074937037455385,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -866.7490632773361,
+      "vents": -182.11385582722068,
+      "windows": 0,
+      "mechanical": -753.7894125713716
+     }
+    },
+    {
+     "name": "Comms room",
+     "heating_kwh": 0,
+     "cooling_kwh": 12250.264239316417,
+     "in_use_hours": 8760,
+     "hours_above_25": 1444,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.280198338733193,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -319.84477601831713,
+      "vents": 0,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Store",
+     "heating_kwh": 0,
+     "cooling_kwh": 0,
+     "in_use_hours": 8760,
+     "hours_above_25": 211,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.923708985935235,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -212.61578351615037,
+      "vents": -7.140382784233787,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "WCs",
+     "heating_kwh": 2392.157292816274,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.42783394031518,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -238.93405333933435,
+      "vents": -4.244331936338309,
+      "windows": 0,
+      "mechanical": -2681.2384995978764
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6387.943992632885,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 822,
+     "hours_above_28": 109,
+     "max_in_use_c": 30.773993950763163,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -3449.050937894833,
+      "vents": -746.2012657560983,
+      "windows": 0,
+      "mechanical": 0
+     }
+    }
+   ]
+  },
+  "passive": {
+   "label": "2c No cooling, windows open above 22 °C in use",
+   "steps_per_hour": 4,
+   "run_ms": 2654,
+   "floor_m2": 684,
+   "heating_kwh": 20284.057183775287,
+   "cooling_kwh": 11959.113243229931,
+   "heating_djf_kwh": 12567.049826906734,
+   "peak_heating_w": 48254.391259672935,
+   "gas_kwh": 20757.136754382725,
+   "electricity_kwh": 50147.051969572734,
+   "eui_kwh_per_m2": 103.66109462566588,
+   "zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2122.538367992646,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 72,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.437205360745036,
+     "hours_windows_open": 807,
+     "air_kwh": {
+      "leakage": -1629.535175914137,
+      "vents": -297.3402351758676,
+      "windows": -957.312719465512,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2925.1208770149146,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 4,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.12148480289733,
+     "hours_windows_open": 751,
+     "air_kwh": {
+      "leakage": -2091.3947621594602,
+      "vents": -625.5230019232009,
+      "windows": -1325.0841776710893,
+      "mechanical": -2046.897171888398
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 1006.8717158115747,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 6,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.39154497111901,
+     "hours_windows_open": 793,
+     "air_kwh": {
+      "leakage": -806.1118886554857,
+      "vents": -170.8962269324499,
+      "windows": -467.4564815561774,
+      "mechanical": -699.7021764170505
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6397.713986299732,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 105,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.88005427270894,
+     "hours_windows_open": 733,
+     "air_kwh": {
+      "leakage": -3155.8858598239235,
+      "vents": -688.0691573342438,
+      "windows": -1781.5486963602027,
+      "mechanical": 0
+     }
+    }
+   ],
+   "all_zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2122.538367992646,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 72,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.437205360745036,
+     "hours_windows_open": 807,
+     "air_kwh": {
+      "leakage": -1629.535175914137,
+      "vents": -297.3402351758676,
+      "windows": -957.312719465512,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Kitchen",
+     "heating_kwh": 4171.753242145094,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 24,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.794763859629924,
+     "hours_windows_open": 380,
+     "air_kwh": {
+      "leakage": -354.4273199854668,
+      "vents": -9.045691347962416,
+      "windows": -15.500910903765297,
+      "mechanical": -11375.650472402116
+     }
+    },
+    {
+     "name": "Reception",
+     "heating_kwh": 1249.7254345835859,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 2,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.038900344652113,
+     "hours_windows_open": 623,
+     "air_kwh": {
+      "leakage": -1053.0336241402142,
+      "vents": -250.4862595641687,
+      "windows": -438.77976586635674,
+      "mechanical": -1073.5242628990297
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2925.1208770149146,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 4,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.12148480289733,
+     "hours_windows_open": 751,
+     "air_kwh": {
+      "leakage": -2091.3947621594602,
+      "vents": -625.5230019232009,
+      "windows": -1325.0841776710893,
+      "mechanical": -2046.897171888398
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 1006.8717158115747,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 6,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.39154497111901,
+     "hours_windows_open": 793,
+     "air_kwh": {
+      "leakage": -806.1118886554857,
+      "vents": -170.8962269324499,
+      "windows": -467.4564815561774,
+      "mechanical": -699.7021764170505
+     }
+    },
+    {
+     "name": "Comms room",
+     "heating_kwh": 0,
+     "cooling_kwh": 11959.113243229931,
+     "in_use_hours": 8760,
+     "hours_above_25": 89,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.12501270622632,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -319.844776018317,
+      "vents": 0,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Store",
+     "heating_kwh": 0,
+     "cooling_kwh": 0,
+     "in_use_hours": 8760,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.89249240437065,
+     "hours_windows_open": 461,
+     "air_kwh": {
+      "leakage": -198.17195891892993,
+      "vents": -6.938650495465229,
+      "windows": -68.48732618873404,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "WCs",
+     "heating_kwh": 2410.333559927738,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.37024964673124,
+     "hours_windows_open": 42,
+     "air_kwh": {
+      "leakage": -229.6208334166501,
+      "vents": -3.8752468213757583,
+      "windows": -0.12882476411103821,
+      "mechanical": -2566.419351563113
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6397.713986299732,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 105,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.88005427270894,
+     "hours_windows_open": 733,
+     "air_kwh": {
+      "leakage": -3155.8858598239235,
+      "vents": -688.0691573342438,
+      "windows": -1781.5486963602027,
+      "mechanical": 0
+     }
+    }
+   ]
+  },
+  "mixed": {
+   "label": "2d Cooled and windows open above 22 °C in use",
+   "steps_per_hour": 4,
+   "run_ms": 2708,
+   "floor_m2": 684,
+   "heating_kwh": 20283.888440885734,
+   "cooling_kwh": 12087.559558463223,
+   "heating_djf_kwh": 12567.049826906734,
+   "peak_heating_w": 48254.391259672935,
+   "gas_kwh": 20757.128526633936,
+   "electricity_kwh": 50189.33412038284,
+   "eui_kwh_per_m2": 103.72289860674967,
+   "zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2122.537357675881,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 72,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.431858546183893,
+     "hours_windows_open": 806,
+     "air_kwh": {
+      "leakage": -1629.4801835312778,
+      "vents": -297.33427784639105,
+      "windows": -956.5153335908248,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2925.075414600743,
+     "cooling_kwh": 49.056002518120245,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.484731740412137,
+     "hours_windows_open": 746,
+     "air_kwh": {
+      "leakage": -2089.092176618093,
+      "vents": -624.951074004093,
+      "windows": -1285.3663563917735,
+      "mechanical": -2043.8875010770992
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 1006.7580782791356,
+     "cooling_kwh": 92.16468294805348,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.721209290382717,
+     "hours_windows_open": 774,
+     "air_kwh": {
+      "leakage": -802.8060693054657,
+      "vents": -170.08798380970012,
+      "windows": -423.1910125218928,
+      "mechanical": -696.0787005688197
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6397.712715318977,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 105,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.880025950588106,
+     "hours_windows_open": 734,
+     "air_kwh": {
+      "leakage": -3155.7561658527134,
+      "vents": -688.0253856685067,
+      "windows": -1782.224227863076,
+      "mechanical": 0
+     }
+    }
+   ],
+   "all_zones": [
+    {
+     "name": "Café",
+     "heating_kwh": 2122.537357675881,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 72,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.431858546183893,
+     "hours_windows_open": 806,
+     "air_kwh": {
+      "leakage": -1629.4801835312778,
+      "vents": -297.33427784639105,
+      "windows": -956.5153335908248,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Kitchen",
+     "heating_kwh": 4171.750125280128,
+     "cooling_kwh": 0,
+     "in_use_hours": 3546,
+     "hours_above_25": 24,
+     "hours_above_28": 0,
+     "max_in_use_c": 26.79093512227789,
+     "hours_windows_open": 380,
+     "air_kwh": {
+      "leakage": -354.4139132610822,
+      "vents": -9.045418529429652,
+      "windows": -15.488542038564203,
+      "mechanical": -11375.155379149186
+     }
+    },
+    {
+     "name": "Reception",
+     "heating_kwh": 1249.7233611695444,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 2,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.02205794171099,
+     "hours_windows_open": 621,
+     "air_kwh": {
+      "leakage": -1052.8104440967545,
+      "vents": -250.45665697756002,
+      "windows": -434.78164815630674,
+      "mechanical": -1073.2171131404405
+     }
+    },
+    {
+     "name": "Open-plan office",
+     "heating_kwh": 2925.075414600743,
+     "cooling_kwh": 49.056002518120245,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 24.484731740412137,
+     "hours_windows_open": 746,
+     "air_kwh": {
+      "leakage": -2089.092176618093,
+      "vents": -624.951074004093,
+      "windows": -1285.3663563917735,
+      "mechanical": -2043.8875010770992
+     }
+    },
+    {
+     "name": "Meeting room",
+     "heating_kwh": 1006.7580782791356,
+     "cooling_kwh": 92.16468294805348,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.721209290382717,
+     "hours_windows_open": 774,
+     "air_kwh": {
+      "leakage": -802.8060693054657,
+      "vents": -170.08798380970012,
+      "windows": -423.1910125218928,
+      "mechanical": -696.0787005688197
+     }
+    },
+    {
+     "name": "Comms room",
+     "heating_kwh": 0,
+     "cooling_kwh": 11946.338872997048,
+     "in_use_hours": 8760,
+     "hours_above_25": 24,
+     "hours_above_28": 0,
+     "max_in_use_c": 25.026400467935634,
+     "hours_windows_open": 0,
+     "air_kwh": {
+      "leakage": -319.844776018317,
+      "vents": 0,
+      "windows": 0,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "Store",
+     "heating_kwh": 0,
+     "cooling_kwh": 0,
+     "in_use_hours": 8760,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.89206741174939,
+     "hours_windows_open": 463,
+     "air_kwh": {
+      "leakage": -198.17199816515378,
+      "vents": -6.938527928310072,
+      "windows": -68.35347994706767,
+      "mechanical": 0
+     }
+    },
+    {
+     "name": "WCs",
+     "heating_kwh": 2410.3313885613265,
+     "cooling_kwh": 0,
+     "in_use_hours": 2871,
+     "hours_above_25": 0,
+     "hours_above_28": 0,
+     "max_in_use_c": 23.37014670344372,
+     "hours_windows_open": 42,
+     "air_kwh": {
+      "leakage": -229.61563656659456,
+      "vents": -3.8750637370775975,
+      "windows": -0.12882427348638192,
+      "mechanical": -2566.3500214875917
+     }
+    },
+    {
+     "name": "Main hall",
+     "heating_kwh": 6397.712715318977,
+     "cooling_kwh": 0,
+     "in_use_hours": 4850,
+     "hours_above_25": 105,
+     "hours_above_28": 0,
+     "max_in_use_c": 27.880025950588106,
+     "hours_windows_open": 734,
+     "air_kwh": {
+      "leakage": -3155.7561658527134,
+      "vents": -688.0253856685067,
+      "windows": -1782.224227863076,
+      "mechanical": 0
+     }
+    }
+   ]
+  }
+ }
+}
