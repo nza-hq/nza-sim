@@ -55,7 +55,7 @@ export function StepRail({ step, onStep }: { step: StepId; onStep: (s: StepId) =
   )
 }
 
-export default function ModelWorkspace({ render, header }: { header?: React.ReactNode; render?: (a: { step: StepId; slots: Slots; centre: CentreTab; setCentre: (c: CentreTab) => void }) => React.ReactNode }) {
+export default function ModelWorkspace({ render, header }: { header?: React.ReactNode; render?: (a: { step: StepId; slots: Slots; centre: CentreTab; setCentre: (c: CentreTab) => void; openRight: () => void }) => React.ReactNode }) {
   const [params, setParams] = useSearchParams()
   const q = params.get('step')
   const step: StepId = isStep(q) ? q : 'shape'
@@ -66,6 +66,8 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
   const setLeft = (dx: number) => setLayout((l) => ({ ...l, left: clamp(l.left + dx, LEFT.min, LEFT.max) }))
   const setRight = (dx: number) => setLayout((l) => ({ ...l, right: clamp(l.right - dx, RIGHT.min, RIGHT.max) }))
   const setCentre = (c: CentreTab) => setLayout((l) => ({ ...l, centre: c }))
+  // The right closes (Linzie, 17 Nov 00:31: "Shouldn't the right be able to close?"); choosing something opens it again.
+  const setRightOpen = (on: boolean) => setLayout((l) => (l.rightOpen === on ? l : { ...l, rightOpen: on }))
 
   // The panes the steps render into (callback refs, so the steps mount once the boxes exist).
   const [left, setLeftEl] = useState<HTMLElement | null>(null)
@@ -97,7 +99,7 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
           })}
         </div>
         <div className="mw-centre flex-1 min-h-0 relative overflow-hidden" ref={setCentreEl}>
-          {later && (
+          {later && layout.centre === 'drawing' && (
             <div className="mw-empty-over"><div className="mw-empty">
               <h2>{later.title}</h2>
               <p>{later.text}</p>
@@ -106,9 +108,13 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
           )}
         </div>
       </section>
-      <ResizeHandle onResize={setRight} />
-      <aside className="mw-right flex-shrink-0 bg-white border-l border-light-grey min-h-0 overflow-hidden" style={{ width: layout.right }} ref={setRightEl} />
-      {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: layout.centre, setCentre })}
+      {layout.rightOpen && <ResizeHandle onResize={setRight} />}
+      <aside className={`mw-right flex-shrink-0 bg-white border-l border-light-grey min-h-0 overflow-visible relative${layout.rightOpen ? '' : ' mw-shut'}`} style={{ width: layout.rightOpen ? layout.right : 0 }} aria-hidden={!layout.rightOpen}>
+        <button type="button" className="mw-close" aria-label="Close the right panel" title="Close" onClick={() => setRightOpen(false)}>›</button>
+        <div className="mw-slot h-full overflow-hidden" ref={setRightEl} />
+      </aside>
+      {!layout.rightOpen && <button type="button" className="mw-open" onClick={() => setRightOpen(true)} title="Open the right panel">‹ Details</button>}
+      {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: layout.centre, setCentre, openRight: () => setRightOpen(true) })}
      </div>
     </div>
   )
