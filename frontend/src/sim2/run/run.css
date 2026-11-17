@@ -122,3 +122,9 @@ button.rp-strip-msg { cursor: pointer; text-decoration: underline; text-underlin
 .rp-est { border-bottom: 1px solid #E5E7EB; padding-bottom: 12px; margin-bottom: 12px; }
 .rp-est-notes { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: #6B7280; }
 .rp-est-h { margin: 16px 0 0; font-size: 14px; font-weight: 600; }
+/* Brief 123: Run in EnergyPlus, and its comparison. */
+.rp-ep { margin-left: 6px; }
+.rp-ep:disabled, .rp-run:disabled { opacity: 0.5; cursor: default; }
+.rp-epc h3 { display: flex; align-items: center; gap: 8px; }
+.rp-epc .rp-table { margin-top: 6px; }
+.rp-epnotes { margin: 6px 0 0; padding-left: 1.2em; font-size: 12px; line-height: 18px; color: #3A4743; }

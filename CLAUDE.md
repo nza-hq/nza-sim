@@ -87,6 +87,10 @@ These rules were learned the hard way during the May 2026 audit and dynamic-engi
 4. **The anon key is public by design**, safe only because every table has RLS and every write goes through a security-definer function. **No service-role key** in the repo, a laptop `.env`, a log or Notion. Scripts (e.g. `scripts/102_seed_library.mjs`) use the anon key plus a signed-in user's own session.
 5. **Sign-in** is an email magic link. Organisations, roles (admin / editor / viewer) and invitations come from `my_access()` and the tenancy functions in `0001_tenancy.sql`; the current organisation is `useAuth().org` (`frontend/src/auth/AuthGate.tsx`).
 
+## EnergyPlus runs in Simulate v2 (Brief 123, Nov 2026)
+
+"Run in EnergyPlus" is the third tier (instant monthly estimate, NZA Sim hourly run, EnergyPlus). The translator is TypeScript (`frontend/src/thermal/energyplus/toEnergyPlus.ts`) and the runner is Node (`frontend/plugins/energyplusRunner.js`, mounted by the Vite dev server), a stated exception to Rule 5 because v2's model and engine are TypeScript; today's Python `nza_engine/` path is unchanged. EnergyPlus's result is its own (Rule 11): room loads and temperatures read from EnergyPlus (Rule 7), energy through the same system conversion as the hourly run, labelled. Never commit EPW files.
+
 ## Module scopes
 
 These statements define what each module computes and what it does not.

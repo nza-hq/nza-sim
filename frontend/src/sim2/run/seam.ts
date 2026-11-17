@@ -438,7 +438,7 @@ export function explain(path: string, message: string, doc: ModelDocument | null
 }
 
 /** What a run needs that the document does not state yet, all at once. */
-function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: readonly LibraryItem[]) {
+export function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: readonly LibraryItem[]) {
   const missing: Missing[] = []
   if (!weather) missing.push({ path: 'weather', what: 'Choose a weather file.' })
   const lib = resolveConstructions(doc, items)
@@ -480,14 +480,11 @@ function withCatalogue(doc: ModelDocument, zi: number, s: EngineZoneSizing): Zon
   return { ...s, catalogue: { catalogue: c.id, title: c.title, item: it.id, type: it.type, height_mm: it.height_mm, length_mm: it.length_mm, output_w: it.output_w, count: sug.count, extra_rated_w: extra } }
 }
 
-export function simulate(
-  input: unknown,
-  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean },
-): SimulateResult {
-  const level = deps.level ?? 'systems'
-  if (!LEVELS.includes(level)) return { ok: false, missing: [{ path: 'level', what: `Unknown results level "${String(level)}".` }] }
-  const fabricC = level === 'fabric' ? deps.fabric_heat_c ?? null : null
-  if (level === 'fabric' && (fabricC == null || !Number.isFinite(fabricC))) return { ok: false, missing: [{ path: 'fabric_heat_c', what: 'Fabric only needs the temperature every room is heated to.' }] }
+/**
+ * The document a run reads (simulate, and Brief 123's EnergyPlus input): checked against the schema, an older version
+ * upgraded where that fills nothing, else refused in words.
+ */
+export function readRunDocument(input: unknown): { ok: true; doc: ModelDocument } | { ok: false; missing: Missing[] } {
   let doc: ModelDocument
   try {
     const v = (input as { schema_version?: unknown })?.schema_version
@@ -499,11 +496,25 @@ export function simulate(
       // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
       // current version; an older saved plan is brought up to date by the editor, which shows what it fills.
       upgradeDocument(input)  // still read, so a document that cannot be read says why
-      return { ok: false, missing: [{ path: 'schema_version', what: `This building was saved in an older format (${String(v)}). Open it in the editor and save it again before results can be shown.` }] }
-    } else return { ok: false, missing: parsed.error.issues.slice(0, 12).map((i) => explain(i.path.join('.'), i.message, null)) }
+      return { ok: false as const, missing: [{ path: 'schema_version', what: `This building was saved in an older format (${String(v)}). Open it in the editor and save it again before results can be shown.` }] }
+    } else return { ok: false as const, missing: parsed.error.issues.slice(0, 12).map((i) => explain(i.path.join('.'), i.message, null)) }
   } catch (e) {
-    return { ok: false, missing: [{ path: 'schema_version', what: `The building cannot be read (${(e as Error).message}).` }] }
+    return { ok: false as const, missing: [{ path: 'schema_version', what: `The building cannot be read (${(e as Error).message}).` }] }
   }
+  return { ok: true, doc }
+}
+
+export function simulate(
+  input: unknown,
+  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean },
+): SimulateResult {
+  const level = deps.level ?? 'systems'
+  if (!LEVELS.includes(level)) return { ok: false, missing: [{ path: 'level', what: `Unknown results level "${String(level)}".` }] }
+  const fabricC = level === 'fabric' ? deps.fabric_heat_c ?? null : null
+  if (level === 'fabric' && (fabricC == null || !Number.isFinite(fabricC))) return { ok: false, missing: [{ path: 'fabric_heat_c', what: 'Fabric only needs the temperature every room is heated to.' }] }
+  const read = readRunDocument(input)
+  if (!read.ok) return read
+  let doc = read.doc
   doc = levelDocument(doc, level, fabricC)
   const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
   if (pre.missing.length) return { ok: false, missing: pre.missing }
@@ -655,7 +666,7 @@ export function facingOf(s: { azimuth_deg: number | null; tilt_deg: number }): F
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 /** Hourly W (one non-leap year, 8,760 hours from 1 January) to kWh by month. */
-function monthly(heat: ArrayLike<number>, cool: ArrayLike<number>): Monthly {
+export function monthly(heat: ArrayLike<number>, cool: ArrayLike<number>): Monthly {
   if (heat.length !== 8760 || cool.length !== 8760) throw new Error(`monthly totals need 8,760 hours, not ${heat.length}`)
   const out: Monthly = { heating_kwh: [], cooling_kwh: [] }
   let h = 0
@@ -852,7 +863,7 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
   return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
 }
 
-function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
+export function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
   let a: ReturnType<typeof runSystems>
   // Brief 114 review F4: a heating system's pumps with no capacity are sized on its rooms' design heat loss, when the
   // building states its design conditions (one calculation, designHeatLoss; a refusal there is the design line's).

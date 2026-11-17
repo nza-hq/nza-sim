@@ -1,0 +1,569 @@
+{
+ "source": "scripts/123_energyplus.mts",
+ "weather": {
+  "bridgewater": {
+   "file": "GBR_ENG_Yeovilton.AF.038530_TMYx.2011-2025.epw",
+   "sha256": "c65711022b0ea7e05ccfe03565f5d6b377fa6ea9157e3bc0066f0793fa478cf2"
+  },
+  "community": {
+   "file": "GBR_London.Gatwick.037760_IWEC.epw",
+   "sha256": "c61a0a1ea127529b04380cce1e4fc88553bb7036d11127f7673d4e1e5b4edffc"
+  }
+ },
+ "runs": [
+  {
+   "label": "bridgewater",
+   "energyplus": "25.2.0",
+   "ep_run_s": 3.7,
+   "warnings": 2,
+   "severe": 0,
+   "severe_text": [],
+   "nza_steps_per_hour": 1,
+   "heating_kwh": {
+    "nza": 114546,
+    "ep": 126669,
+    "diff_pct": -9.6
+   },
+   "cooling_kwh": {
+    "nza": 62725,
+    "ep": 56614,
+    "diff_pct": 10.8
+   },
+   "peak_heating_kw": {
+    "nza": 96.5,
+    "ep": 103.5
+   },
+   "peak_cooling_kw": {
+    "nza": 101.7,
+    "ep": 98.1
+   },
+   "eui": {
+    "nza": 131.9,
+    "ep": 132.5
+   },
+   "zones": [
+    {
+     "zone": "Storey 1",
+     "heating_kwh": [
+      27758,
+      29286
+     ],
+     "cooling_kwh": [
+      10143,
+      8142
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Storey 2",
+     "heating_kwh": [
+      18790,
+      21795
+     ],
+     "cooling_kwh": [
+      14282,
+      12633
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Storey 3",
+     "heating_kwh": [
+      18569,
+      21506
+     ],
+     "cooling_kwh": [
+      14567,
+      13208
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Storey 4",
+     "heating_kwh": [
+      19201,
+      22473
+     ],
+     "cooling_kwh": [
+      14063,
+      12812
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Storey 5",
+     "heating_kwh": [
+      30228,
+      31610
+     ],
+     "cooling_kwh": [
+      9670,
+      9819
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    }
+   ],
+   "monthly_heating_kwh": {
+    "nza": [
+     30603,
+     22020,
+     17908,
+     4086,
+     72,
+     0,
+     0,
+     0,
+     0,
+     112,
+     14828,
+     24917
+    ],
+    "ep": [
+     32927,
+     24375,
+     20282,
+     5184,
+     132,
+     0,
+     0,
+     0,
+     0,
+     478,
+     16574,
+     26718
+    ]
+   },
+   "notes": [
+    "Permanent vents: the flow per unit of wind the model states for each vent (as the hourly run takes it), with EnergyPlus's wind at the zone's height and terrain.",
+    "People: their sensible heat as stated (W per person, radiant share), as the hourly run takes it; their moisture is not modelled in either.",
+    "MVHR: outdoor air through the room's ideal loads at its flow × (1 − heat recovery), the same heat as the stated recovery all year (the model states no summer bypass); its heat is in the room's heating and cooling. Fan electricity is from the stated SFP, as in the hourly run.",
+    "Energy: EnergyPlus gives each room's heating and cooling; the fuel and electricity come from those through the systems' stated efficiencies, the same conversion the hourly run uses. Lighting, equipment, hot water, pumps and fans are the same inputs in both."
+   ]
+  },
+  {
+   "label": "community_A",
+   "energyplus": "25.2.0",
+   "ep_run_s": 4.3,
+   "warnings": 3,
+   "severe": 0,
+   "severe_text": [],
+   "nza_steps_per_hour": 1,
+   "heating_kwh": {
+    "nza": 23463,
+    "ep": 22336,
+    "diff_pct": 5
+   },
+   "cooling_kwh": {
+    "nza": 12990,
+    "ep": 13188,
+    "diff_pct": -1.5
+   },
+   "peak_heating_kw": {
+    "nza": 15,
+    "ep": 14.3
+   },
+   "peak_cooling_kw": {
+    "nza": 5.5,
+    "ep": 5.3
+   },
+   "eui": {
+    "nza": 108.5,
+    "ep": 107.5
+   },
+   "zones": [
+    {
+     "zone": "Café",
+     "heating_kwh": [
+      1978,
+      1664
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Kitchen",
+     "heating_kwh": [
+      6137,
+      6710
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      15,
+      20
+     ]
+    },
+    {
+     "zone": "Reception",
+     "heating_kwh": [
+      1173,
+      1157
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Open-plan office",
+     "heating_kwh": [
+      3357,
+      2866
+     ],
+     "cooling_kwh": [
+      620,
+      868
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Meeting room",
+     "heating_kwh": [
+      1264,
+      1161
+     ],
+     "cooling_kwh": [
+      412,
+      537
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Comms room",
+     "heating_kwh": [
+      0,
+      0
+     ],
+     "cooling_kwh": [
+      11957,
+      11783
+     ],
+     "unmet_heating_in_use": [
+      null,
+      null
+     ]
+    },
+    {
+     "zone": "Store",
+     "heating_kwh": [
+      0,
+      0
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "WCs",
+     "heating_kwh": [
+      3297,
+      3246
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "Main hall",
+     "heating_kwh": [
+      6257,
+      5531
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    }
+   ],
+   "monthly_heating_kwh": {
+    "nza": [
+     5089,
+     4579,
+     3052,
+     1707,
+     254,
+     39,
+     0,
+     0,
+     65,
+     1219,
+     2779,
+     4679
+    ],
+    "ep": [
+     4955,
+     4413,
+     2848,
+     1471,
+     243,
+     36,
+     0,
+     0,
+     53,
+     1070,
+     2650,
+     4597
+    ]
+   },
+   "notes": [
+    "Overhangs and fins are not carried (EnergyPlus needs each window's real size and position, which the model does not hold yet), so 3 windows have more sun in EnergyPlus than in NZA Sim: z1_glazing_1, z4_glazing_1, z5_glazing_1.",
+    "People: their sensible heat as stated (W per person, radiant share), as the hourly run takes it; their moisture is not modelled in either.",
+    "Radiators and other emitters: EnergyPlus limits each room's heating to its emitters' output at the setpoint, held fixed (LimitCapacity); the hourly run re-rates it each hour at the room's temperature. The heat goes to the air in EnergyPlus.",
+    "MVHR: outdoor air through the room's ideal loads at its flow × (1 − heat recovery), the same heat as the stated recovery all year (the model states no summer bypass); its heat is in the room's heating and cooling. Fan electricity is from the stated SFP, as in the hourly run.",
+    "Energy: EnergyPlus gives each room's heating and cooling; the fuel and electricity come from those through the systems' stated efficiencies, the same conversion the hourly run uses. Lighting, equipment, hot water, pumps and fans are the same inputs in both."
+   ]
+  },
+  {
+   "label": "community_B",
+   "energyplus": "25.2.0",
+   "ep_run_s": 4.5,
+   "warnings": 3,
+   "severe": 0,
+   "severe_text": [],
+   "nza_steps_per_hour": 4,
+   "heating_kwh": {
+    "nza": 20284,
+    "ep": 19703,
+    "diff_pct": 2.9
+   },
+   "cooling_kwh": {
+    "nza": 12794,
+    "ep": 13030,
+    "diff_pct": -1.8
+   },
+   "peak_heating_kw": {
+    "nza": 48.8,
+    "ep": 45.6
+   },
+   "peak_cooling_kw": {
+    "nza": 14.1,
+    "ep": 33
+   },
+   "eui": {
+    "nza": 104.3,
+    "ep": 103.8
+   },
+   "zones": [
+    {
+     "zone": "Café",
+     "heating_kwh": [
+      2252,
+      1948
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      125,
+      137
+     ]
+    },
+    {
+     "zone": "Kitchen",
+     "heating_kwh": [
+      4377,
+      4813
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      804,
+      919
+     ]
+    },
+    {
+     "zone": "Reception",
+     "heating_kwh": [
+      1237,
+      1200
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      115,
+      144
+     ]
+    },
+    {
+     "zone": "Open-plan office",
+     "heating_kwh": [
+      2725,
+      2501
+     ],
+     "cooling_kwh": [
+      596,
+      845
+     ],
+     "unmet_heating_in_use": [
+      190,
+      223
+     ]
+    },
+    {
+     "zone": "Meeting room",
+     "heating_kwh": [
+      985,
+      1032
+     ],
+     "cooling_kwh": [
+      379,
+      496
+     ],
+     "unmet_heating_in_use": [
+      43,
+      83
+     ]
+    },
+    {
+     "zone": "Comms room",
+     "heating_kwh": [
+      0,
+      0
+     ],
+     "cooling_kwh": [
+      11818,
+      11689
+     ],
+     "unmet_heating_in_use": [
+      null,
+      null
+     ]
+    },
+    {
+     "zone": "Store",
+     "heating_kwh": [
+      0,
+      0
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      0,
+      0
+     ]
+    },
+    {
+     "zone": "WCs",
+     "heating_kwh": [
+      2515,
+      2562
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      245,
+      308
+     ]
+    },
+    {
+     "zone": "Main hall",
+     "heating_kwh": [
+      6193,
+      5646
+     ],
+     "cooling_kwh": [
+      0,
+      0
+     ],
+     "unmet_heating_in_use": [
+      185,
+      168
+     ]
+    }
+   ],
+   "monthly_heating_kwh": {
+    "nza": [
+     4436,
+     4030,
+     2595,
+     1456,
+     219,
+     31,
+     0,
+     0,
+     44,
+     1034,
+     2390,
+     4048
+    ],
+    "ep": [
+     4390,
+     3974,
+     2474,
+     1279,
+     201,
+     29,
+     0,
+     0,
+     33,
+     933,
+     2328,
+     4061
+    ]
+   },
+   "notes": [
+    "Overhangs and fins are not carried (EnergyPlus needs each window's real size and position, which the model does not hold yet), so 3 windows have more sun in EnergyPlus than in NZA Sim: z1_glazing_1, z4_glazing_1, z5_glazing_1.",
+    "People: their sensible heat as stated (W per person, radiant share), as the hourly run takes it; their moisture is not modelled in either.",
+    "Radiators and other emitters: EnergyPlus limits each room's heating to its emitters' output at the setpoint, held fixed (LimitCapacity); the hourly run re-rates it each hour at the room's temperature. The heat goes to the air in EnergyPlus.",
+    "MVHR: outdoor air through the room's ideal loads at its flow × (1 − heat recovery), the same heat as the stated recovery all year (the model states no summer bypass); its heat is in the room's heating and cooling. Fan electricity is from the stated SFP, as in the hourly run.",
+    "Energy: EnergyPlus gives each room's heating and cooling; the fuel and electricity come from those through the systems' stated efficiencies, the same conversion the hourly run uses. Lighting, equipment, hot water, pumps and fans are the same inputs in both."
+   ]
+  }
+ ]
+}

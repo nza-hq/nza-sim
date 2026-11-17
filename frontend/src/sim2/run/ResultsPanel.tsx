@@ -13,6 +13,7 @@ import { RunClient, type InstantAnswer, type RunAnswer, type WeatherAnswer } fro
 import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
 import type { InstantEstimate, Level, Missing, Summary, WhatIf } from './seam'
 import { EmitterSizing } from './EmitterSizing'
+import { EnergyPlusButton, EnergyPlusCompare, useEnergyPlus } from './EnergyPlusCompare'
 // @ts-expect-error untyped JS from today's app (Brief 110b: reused, not redrawn)
 import LiveResultsStrip from '../../components/shared/LiveResultsStrip.jsx'
 // @ts-expect-error untyped JS from today's app
@@ -279,7 +280,12 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
 
   // On a held step, an hourly result of an older document is out of date until Run.
   const hourlyStale = hold && state.kind === 'done' && ranFor !== doc
-  return { auth, state, previewState, instant, hold, hourlyStale, runHourly, level, setLevel, fabricC, setFabricC, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+  // Brief 123: the third tier, EnergyPlus, on the document and weather as they stand.
+  const energyPlus = useEnergyPlus(() => {
+    const l = latestLevel.current
+    return { doc: latestDoc.current, level: l.level, fabric_heat_c: l.level === 'fabric' ? l.c : null, weather: weatherBytes.current }
+  })
+  return { auth, doc, energyPlus, state, previewState, instant, hold, hourlyStale, runHourly, level, setLevel, fabricC, setFabricC, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
 }
 export type Run = ReturnType<typeof useRun>
 
@@ -416,6 +422,7 @@ function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit:
           : state.kind === 'missing' ? <span className="rp-strip-msg">{state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set</span>
           : state.kind === 'error' ? <span className="rp-strip-msg rp-error" title={state.message}>{/cannot run in this view/.test(state.message) ? "can't run in this view" : 'stopped with an error (see Heat flow)'}</span> : null}
         <button type="button" className="rp-btn rp-run" disabled={!weather || state.kind === 'running'} onClick={runHourly}>{s ? 'Run again' : 'Run'}</button>
+        <EnergyPlusButton ep={run.energyPlus} disabled={!weather} onRan={onOpen} />
       </div>
     </div>
   )
@@ -481,6 +488,8 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
       )}
       {state.kind === 'error' && <p className="rp-error" role="alert">The run failed: {state.message}</p>}
       {(state.kind === 'idle' || (state.kind === 'running' && !s)) && <p className="rp-wait">Working it out…</p>}
+      {/* Brief 123: kept apart from the hourly figures below (Rule 11), each column named. */}
+      <EnergyPlusCompare ep={run.energyPlus} current={run.doc} disabled={!run.weather} />
 
       {s && (
         <div className={state.kind === 'running' ? 'rp-stale' : undefined}>
