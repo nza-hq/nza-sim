@@ -97,7 +97,7 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
           })}
         </div>
         <div className="mw-centre flex-1 min-h-0 relative overflow-hidden" ref={setCentreEl}>
-          {later && (
+          {later && layout.centre === 'drawing' && (
             <div className="mw-empty-over"><div className="mw-empty">
               <h2>{later.title}</h2>
               <p>{later.text}</p>

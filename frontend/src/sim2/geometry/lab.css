@@ -472,5 +472,15 @@
 .gl-profedit { position: absolute; inset: 0; z-index: 30; overflow: auto; background: #fff; }
 .gl-profnone { padding: 32px; color: #58595B; }
 .gl-profnone h3 { font: 600 16px var(--gl-detail, inherit); color: #235546; margin: 0 0 8px; }
-/* Today's editor lays out side by side; below its width the centre scrolls rather than clipping the heatmap. */
-.gl-profedit > .p-4 { min-width: 960px; }
+/* Today's editor lays out side by side; in a narrow centre its two halves stack (the day above the year), so nothing is
+ * cut off or hidden off to the side. */
+.gl-profedit { container-type: inline-size; }
+@container (max-width: 940px) { .gl-profedit .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Overnight walk-through: a long option or name must not push the right pane's section past its edge. */
+.gl-right .gl-body > .gl-sec { min-width: 0; max-width: 100%; }
+.gl-right .gl-sel { min-width: 0; max-width: 100%; }
+.gl-right .ap-detail > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.gl-right .ap-detail .gl-title-in { width: 100%; box-sizing: border-box; }
+.gl-right .gl-row > .ap-setc { min-width: 0; text-align: right; white-space: normal; max-width: 70%; }
+.gl-root .ap-goctl { white-space: nowrap; }
