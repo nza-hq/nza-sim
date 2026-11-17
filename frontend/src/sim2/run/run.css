@@ -109,3 +109,16 @@ button.rp-strip-msg { cursor: pointer; text-decoration: underline; text-underlin
 .rp-monthly-head i { font-weight: 400; color: #6B7280; }
 .rp-monthly-badges { display: flex; gap: 8px; }
 .rp-monthly-foot { font-size: 11px; color: #6B7280; margin: 0; }
+
+/* Brief 122: the held strip on Site, Shape and Fabric: the monthly estimate (static) as you edit, the hourly year on Run. */
+.rp-strip-held .rp-strip-live { display: flex; align-items: stretch; flex: 1 1 auto; min-width: 320px; }
+.rp-strip-held .rp-strip-wx { flex: 0 1 auto; min-width: 0; }
+.rp-strip-held .rp-strip-live > div { flex: 1; }
+.rp-strip-tag { align-self: center; padding: 0 10px 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #6B7280; white-space: nowrap; }
+.rp-strip-hourly { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-left: 1px solid #E5E7EB; white-space: nowrap; }
+.rp-strip-hv { font-variant-numeric: tabular-nums; }
+.rp-strip-hv.rp-stale { color: #9CA3AF; }
+.rp-run { padding: 4px 12px; }
+.rp-est { border-bottom: 1px solid #E5E7EB; padding-bottom: 12px; margin-bottom: 12px; }
+.rp-est-notes { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: #6B7280; }
+.rp-est-h { margin: 16px 0 0; font-size: 14px; font-weight: 600; }

@@ -6,7 +6,7 @@
  */
 import DivergingMonthlyChart from '../../components/shared/DivergingMonthlyChart.jsx'
 import ChartTotalsBadge from '../../components/shared/ChartTotalsBadge.jsx'
-import type { Summary } from './seam'
+import type { InstantEstimate, Summary } from './seam'
 
 type Zone = Summary['zones'][number]
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
@@ -44,6 +44,33 @@ export function MonthlyDemand({ summary, zone }: { summary: Summary; zone: Zone 
         {adds ? 'The twelve months add up to the year on Heat flow.' : `The months add up to ${Math.round(h)} kWh heating and ${Math.round(c)} kWh cooling, not the year's ${Math.round(year.heat)} and ${Math.round(year.cool)}: please report this.`}
         {!heated && cooled ? ' No room here is heated.' : heated && !cooled ? ' No room here is cooled.' : ''}
       </p>
+    </div>
+  )
+}
+
+/** Brief 122: the monthly estimate (static)'s months, on Site, Shape and Fabric. Labelled as the static engine's (Rule 7). */
+export function MonthlyEstimate({ estimate, zone }: { estimate: InstantEstimate; zone: InstantEstimate['zones'][number] | null }) {
+  const m = zone ? zone.monthly : estimate.monthly
+  const floor = zone ? zone.floor_m2 : estimate.building.floor_m2
+  const h = sum(m.heating_kwh), c = sum(m.cooling_kwh)
+  return (
+    <div className="rp-monthly">
+      <div className="rp-monthly-head">
+        <span>Heating and cooling demand by month <i>{estimate.label}</i></span>
+        <span className="rp-monthly-badges">
+          <ChartTotalsBadge label="Σ heating" value_kwh={h} gia_m2={floor} />
+          {c > 0 && <ChartTotalsBadge label="Σ cooling" value_kwh={c} gia_m2={floor} />}
+        </span>
+      </div>
+      <DivergingMonthlyChart
+        gainsStacks={c > 0 ? [{ key: 'cooling', label: 'Cooling demand', color: '#3B82F6', values: m.cooling_kwh }] : []}
+        lossesStacks={[{ key: 'heating', label: 'Heating demand', color: '#E8604C', values: m.heating_kwh }]}
+        height={340}
+        upLabel="↑"
+        downLabel="↓"
+        unit="kWh"
+      />
+      <p className="rp-monthly-foot">The monthly method, worked out as you edit. Run the hourly year (above) for the full calculation.</p>
     </div>
   )
 }
