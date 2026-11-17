@@ -1,0 +1,125 @@
+{
+ "epw": "USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw",
+ "cases": {
+  "exposed": {
+   "base": {
+    "heat_kwh": 0.0,
+    "cool_kwh": 4079.6930073531958,
+    "peak_cool_w": 2491.80320013057,
+    "free": {
+     "max_c": 29.600082625398567,
+     "hours_over_26": 255,
+     "hours_over_28": 40
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 0.0,
+    "cool_kwh": 3977.145065437173,
+    "peak_cool_w": 2330.3811561327807,
+    "free": {
+     "max_c": 28.484873254804725,
+     "hours_over_26": 142,
+     "hours_over_28": 5
+    },
+    "warnings": 3
+   }
+  },
+  "carpet": {
+   "base": {
+    "heat_kwh": 0.0,
+    "cool_kwh": 4104.439331941461,
+    "peak_cool_w": 2669.9450068347933,
+    "free": {
+     "max_c": 30.078956202731746,
+     "hours_over_26": 318,
+     "hours_over_28": 57
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 0.0,
+    "cool_kwh": 3995.051482786532,
+    "peak_cool_w": 2457.617459111911,
+    "free": {
+     "max_c": 28.90033997111602,
+     "hours_over_26": 192,
+     "hours_over_28": 16
+    },
+    "warnings": 3
+   }
+  },
+  "ceiling_void": {
+   "base": {
+    "heat_kwh": 0.11365229031950956,
+    "cool_kwh": 4152.5058307941,
+    "peak_cool_w": 2794.5453679011785,
+    "free": {
+     "max_c": 31.228208083370866,
+     "hours_over_26": 411,
+     "hours_over_28": 135
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 0.20446977323716692,
+    "cool_kwh": 4069.1806275371546,
+    "peak_cool_w": 2615.79301299322,
+    "free": {
+     "max_c": 30.728816650622242,
+     "hours_over_26": 383,
+     "hours_over_28": 106
+    },
+    "warnings": 3
+   }
+  },
+  "carpet_and_void": {
+   "base": {
+    "heat_kwh": 0.6881381502696814,
+    "cool_kwh": 4220.869752129452,
+    "peak_cool_w": 3015.06673902425,
+    "free": {
+     "max_c": 32.088165727870084,
+     "hours_over_26": 523,
+     "hours_over_28": 212
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 0.8340618991421188,
+    "cool_kwh": 4132.901567739892,
+    "peak_cool_w": 2817.9951319765682,
+    "free": {
+     "max_c": 31.5768024462474,
+     "hours_over_26": 485,
+     "hours_over_28": 180
+    },
+    "warnings": 3
+   }
+  },
+  "lightweight": {
+   "base": {
+    "heat_kwh": 54.29166700650556,
+    "cool_kwh": 4467.965245099266,
+    "peak_cool_w": 3502.3203419785,
+    "free": {
+     "max_c": 34.89313733551103,
+     "hours_over_26": 826,
+     "hours_over_28": 446
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 68.65615754296297,
+    "cool_kwh": 4397.902911679388,
+    "peak_cool_w": 3362.062873909802,
+    "free": {
+     "max_c": 34.51800586605579,
+     "hours_over_26": 784,
+     "hours_over_28": 412
+    },
+    "warnings": 3
+   }
+  }
+ }
+}
