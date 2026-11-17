@@ -25,7 +25,7 @@ import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { ALWAYS, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
-import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
+import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
 import type { XY } from './ported/zones'
@@ -280,7 +280,19 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     return i < 0 ? 0 : i
   }
   const loftId = (i: number) => (plan.blocks.length > 1 ? `loft_${i + 1}` : 'loft')
-  const wallType = plan.fabric_types.find((t) => t.element === 'wall')?.id
+  /** A gable or raised wall takes the wall type of the outside wall it stands on (at the middle of its foot). */
+  const wallTypeUnder = (f: BlockRoof['faces'][number]) => {
+    const base = f.pts.filter((p) => Math.abs(p[2]) < 1e-6)
+    const m: XY = base.length ? [base.reduce((t, p) => t + p[0], 0) / base.length, base.reduce((t, p) => t + p[1], 0) / base.length] : [f.pts[0]![0], f.pts[0]![1]]
+    let best = { d: Infinity, run: -1, t: 0 }
+    for (const r of runs) {
+      const L = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1]) || 1
+      const t = Math.max(0, Math.min(L, ((m[0] - r.a[0]) * (r.b[0] - r.a[0]) + (m[1] - r.a[1]) * (r.b[1] - r.a[1])) / L))
+      const d = Math.hypot(r.a[0] + ((r.b[0] - r.a[0]) * t) / L - m[0], r.a[1] + ((r.b[1] - r.a[1]) * t) / L - m[1])
+      if (d < best.d) best = { d, run: r.index, t }
+    }
+    return best.run >= 0 ? typeAt(plan, best.run, best.t) : firstType(plan, 'wall')
+  }
   const slopeRef = rec?.loft_slope_type ? constructionOf(rec.loft_slope_type) : { key: 'unassigned:roof:loft_slopes' }
   if (rec && cold && roofs.some((_, i) => pitched(i)) && !rec.loft_slope_type) notes.push('The loft\'s roof slopes have no construction yet: choose what they are made of on Shape, Roof')
   /** Warm roof: the extra height each zone gets from its share of the roof space. */
@@ -291,7 +303,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     add(zone, ext({
       id, kind: wall ? 'wall' : 'roof', zone_a: zone, zone_b: 'outside', facade: wall ? facade4(f.azimuth_deg ?? 0) : null,
       area_m2: r3(f.area_m2 * share), azimuth_deg: f.azimuth_deg == null ? null : r3(f.azimuth_deg), tilt_deg: r3(f.tilt_deg),
-      construction_ref: wall ? (wallType ? constructionOf(wallType) : { key: 'unassigned:external_wall' }) : onLoft ? slopeRef : constructionOf(type),
+      construction_ref: wall ? constructionOf(wallTypeUnder(f)) : onLoft ? slopeRef : constructionOf(type),
       g_value: null, openings: [],
     }, wall ? 'wall' : 'roof'))
     void i

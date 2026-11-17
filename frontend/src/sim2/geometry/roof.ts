@@ -55,6 +55,8 @@ export type RoofFace = {
   /** Downhill (slopes) or outward (walls) compass bearing, degrees from north; null for a flat face. */
   azimuth_deg: number | null
   area_m2: number
+  /** A wall: which side of the block's outline it stands on (index into the ring), for its wall type. */
+  edge?: number
 }
 export type BlockRoof = {
   style: RoofStyle
@@ -277,7 +279,7 @@ export function fromServed(ring: readonly XY[], style: RoofStyle, served: Served
     const top = [...up.values()].sort((p, q) => ((q[0] - a[0]) * ux + (q[1] - a[1]) * uy) - ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy))
     const pts: XYZ[] = [[a[0], a[1], 0], [b[0], b[1], 0], ...top]
     const area = faceArea(pts)
-    if (area > 1e-6) walls.push({ kind: 'wall', pts, tilt_deg: 90, azimuth_deg: bearing(uy, -ux), area_m2: area })
+    if (area > 1e-6) walls.push({ kind: 'wall', pts, tilt_deg: 90, azimuth_deg: bearing(uy, -ux), area_m2: area, edge: i })
   })
   // Lines: face edges off the outline (ridges, hips, valleys), each once.
   const seen = new Set<string>()
