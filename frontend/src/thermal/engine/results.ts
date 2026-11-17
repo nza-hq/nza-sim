@@ -46,7 +46,8 @@ export interface ZoneResults {
    * Brief 115: weather-driven air (absent under today's method). Each hour: the outdoor air that came in, kg/h, and
    * how far the windows were open (0 to 1 of their widest, the hour's mean); and the hours any window was open.
    */
-  air?: { inflow_kg_per_h: Float64Array; window_open_fraction: Float64Array; hours_windows_open: number }
+  /** Brief 115: weather-driven air. `leakage` 'q50_over_20': a room with no outside wall keeps today's leakage (review F4). */
+  air?: { inflow_kg_per_h: Float64Array; window_open_fraction: Float64Array; hours_windows_open: number; leakage: 'weather' | 'q50_over_20' }
   hourly: {
     theta_air_c: Float64Array
     theta_operative_c: Float64Array

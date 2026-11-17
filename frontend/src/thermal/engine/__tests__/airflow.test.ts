@@ -236,6 +236,27 @@ describe('Brief 115: runModel under weather-driven air', () => {
     nat.zones[0].ventilation = [{ id: 'nat', kind: 'natural', enabled: true, flow_rate: 1, flow_rate_basis: 'ach', recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
     expect(() => runV(nat)).toThrow('zones[0].ventilation[0]: the room\'s opening windows give its natural ventilation')
   })
+  it('review F4: an inner room under a roof keeps today\'s leakage (q50 ÷ 20), stated, and its extract fan as before', () => {
+    const d = weatherDriven()
+    const mid = d.zones[1], west = d.zones[0]
+    // Its outside walls become partitions to the west room; its windows and vents go.
+    const drop = new Set<string>()
+    for (const sf of d.surfaces) if (sf.zone_a === mid.id && sf.zone_b === 'outside' && sf.tilt_deg === 90) {
+      if (sf.kind === 'glazing') drop.add(sf.id)
+      else { Object.assign(sf, { kind: 'partition', zone_b: west.id, openings: [], azimuth_deg: null, solar_absorptance: null, thermal_emissivity: null, frame_fraction: null, g_value: null, facade: null, construction_ref: { key: 'partition' }, inside_solar_absorptance_b: sf.inside_solar_absorptance }); west.surfaces.push(sf.id) }
+    }
+    d.surfaces = d.surfaces.filter((sf: any) => !drop.has(sf.id))
+    for (const z of d.zones) z.surfaces = z.surfaces.filter((id: string) => !drop.has(id))
+    d.controls = d.controls.filter((c: any) => c.target.ref !== mid.id)
+    mid.ventilation = [{ id: 'wc', kind: 'mev', enabled: true, flow_rate: 10, flow_rate_basis: 'constant', sfp_w_per_l_s: 1, recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
+    const r = runModel(ModelDocument.parse(d), W, LIB, { ...REFEREE_OPTIONS, ventilation: 'document' })
+    const z = r.zones[1]
+    expect(z.air!.leakage).toBe('q50_over_20')
+    expect(r.zones[0].air!.leakage).toBe('weather')
+    expect(readZoneTermKwh(z, 'infiltration')).toBeLessThan(0)
+    expect(z.breakdown.find((l) => l.term === 'mechanical_ventilation')!.kwh).toBeLessThan(0)
+    expect(Math.abs(z.closure.sum_kwh)).toBeLessThan(1e-3)
+  })
   it('a vent under weather-driven air needs cd and height, not today\'s flow_mode', () => {
     const d = weatherDriven()
     const v = d.surfaces.find((s: any) => s.openings.some((o: any) => o.kind === 'permanent_vent')).openings[0]

@@ -373,6 +373,20 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     throw new ModelError(`unknown value ${JSON.stringify(options.ventilation)} ('none' or 'document')`, 'options.ventilation')
   }
 
+  // Brief 115: weather-driven air, per zone (built before the conductances: a room with no outside wall keeps today's
+  // leakage, review F4).
+  let airModels: ZoneAirModel[] | null = null
+  if (weatherAir) {
+    try {
+      airModels = buildAirModels(doc, built.zones.map((Z) => Z.envelopeArea), (ref, p) => scheduleFractions(doc, ref, weather.hours, p), (ref, p) => temperatureHours(doc, ref, weather.hours, p))
+    } catch (e) {
+      if (e instanceof AirflowError || e instanceof ScheduleError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
+      throw e
+    }
+  }
+  // Review F3/F4: an extract fan is in the room's air balance when the room has outside paths (leakage on its walls,
+  // vents, windows); an inner room with none keeps today's leakage and its fan's own conductance, as before.
+  const mevInBalance = doc.zones.map((_, zi) => !!airModels && airModels[zi].cracks.length + airModels[zi].vents.length + airModels[zi].windows.length > 0)
   // Air, bridging and ground, per zone.
   const tg = groundTemperature(weather)
   const air = doc.zones.map((zone, zi) => {
@@ -380,13 +394,13 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const path = `zones[${zi}]`
     const volume = zone.area_m2 * zone.height_m
     // Brief 115: under weather-driven air, leakage and vents are worked out each step (airAt below), not here.
-    const inf = weatherAir ? { source: 'q50' as const, ach: 0, h_w_per_k: 0 } : infiltration({ q50: zone.infiltration_q50, ach: zone.infiltration_ach, envelope_area_m2: Z.envelopeArea, volume_m3: volume, path })
+    const inf = weatherAir && !airModels![zi].fixed_leakage ? { source: 'q50' as const, ach: 0, h_w_per_k: 0 } : infiltration({ q50: zone.infiltration_q50, ach: zone.infiltration_ach, envelope_area_m2: Z.envelopeArea, volume_m3: volume, path })
     const ventH = ventConductance(Z.vents.map((v) => v.m3s_per_ms), weather.hours.wind_speed, H)
     const Hve = new Float64Array(H)
     for (let h = 0; h < H; h++) {
       let m = 0
       // Review F3: under weather-driven air an extract fan is in the pressure balance instead (airAt), not here.
-      for (const v of mech[zi]) if (!(weatherAir && v.kind === 'mev')) m += v.h_w_per_k[h]
+      for (const v of mech[zi]) if (!(mevInBalance[zi] && v.kind === 'mev')) m += v.h_w_per_k[h]
       Hve[h] = inf.h_w_per_k + ventH[h] + m
     }
     // Σ U·A of the zone's envelope (the legacy α bridging mode only): elements facing outside or the ground.
@@ -400,23 +414,15 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   })
 
   // Brief 115: weather-driven air, per zone, and what it recorded each hour.
-  let airModels: ZoneAirModel[] | null = null
   const airInflow: Float64Array[] = [], airOpen: Float64Array[] = []
   let airAtOf: (zi: number) => ((h: number, room_c: number, te: number, out: Float64Array, w: number, frac: number) => void) | null = () => null
   if (weatherAir) {
-    try {
-      airModels = buildAirModels(doc, built.zones.map((Z) => Z.envelopeArea), (ref, p) => scheduleFractions(doc, ref, weather.hours, p), (ref, p) => temperatureHours(doc, ref, weather.hours, p))
-    } catch (e) {
-      if (e instanceof AirflowError || e instanceof ScheduleError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
-      throw e
-    }
     // Review F3: under weather-driven air an extract fan (MEV) is a fixed flow out of the room, in its pressure
     // balance; its air arrives through leakage, vents and windows (their lines), so its own conductance is not added
     // again. A 'natural' entry beside opening windows would count the windows' air twice: refused by name.
     doc.zones.forEach((z, zi) => {
       const mevs = mech[zi].filter((v) => v.kind === 'mev')
-      if (mevs.length) {
-        if (!airModels![zi].cracks.length && !airModels![zi].vents.length && !airModels![zi].windows.length) throw new ModelError('an extract fan needs air leakage, vents or windows to draw its air from', `zones[${zi}].ventilation`)
+      if (mevs.length && mevInBalance[zi]) {
         const ex = new Float64Array(H)
         for (const v of mevs) for (let h = 0; h < H; h++) ex[h] += v.flow_m3s * v.running[h]
         airModels![zi].extract = ex
@@ -656,7 +662,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       const tot = a.Hve[h]
       if (tot > 0) {
         infW += (v * a.inf.h_w_per_k) / tot; ventW += (v * a.ventH[h]) / tot
-        mech[zi].forEach((m, j) => { if (!(weatherAir && m.kind === 'mev')) mechW[j] += (v * m.h_w_per_k[h]) / tot })
+        mech[zi].forEach((m, j) => { if (!(mevInBalance[zi] && m.kind === 'mev')) mechW[j] += (v * m.h_w_per_k[h]) / tot })
       }
     }
     if (al) { infW += kwh(al[0]) * 1000; ventW += kwh(al[1]) * 1000 }
@@ -760,7 +766,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       },
       emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters, slab: em.slab } : null,
       cooling_units: cu ? { cap_w: cu.cap_w, hours_at_cap: atCoolCap, units: cu.units } : null,
-      ...(weatherAir ? { air: { inflow_kg_per_h: airInflow[zi], window_open_fraction: airOpen[zi], hours_windows_open: airOpen[zi].reduce((t, x) => t + (x > 0 ? 1 : 0), 0) } } : {}),
+      ...(weatherAir ? { air: { inflow_kg_per_h: airInflow[zi], window_open_fraction: airOpen[zi], hours_windows_open: airOpen[zi].reduce((t, x) => t + (x > 0 ? 1 : 0), 0), leakage: airModels![zi].fixed_leakage ? 'q50_over_20' as const : 'weather' as const } } : {}),
       breakdown: lines,
       closure,
       run_ms,

@@ -163,6 +163,8 @@ export interface ZoneAirModel {
   cp: Float64Array[]
   /** The site's 10 m wind ÷ the weather file's. */
   wind10: number
+  /** Review F4: the room has leakage but no outside wall; its leakage is today's q50 ÷ 20 (model.ts), not here. */
+  fixed_leakage?: boolean
   /**
    * Review F3: extract fans (MEV) as a fixed flow out of the room each hour, m³/s (of room air); null: none. The air
    * they draw comes in through the room's leakage, vents and windows, and is counted on those lines.
@@ -429,8 +431,10 @@ export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (r
     const kTot = (RHO_REF * q50 * envelopeArea[zi]) / 3600 / Math.pow(50, n)
     const wallArea = walls.reduce((t, { s }) => t + s.area_m2, 0)
     const cracks: Crack[] = []
-    if (kTot > 0) {
-      if (!(wallArea > 0)) throw new AirflowError('a room with air leakage needs an outside wall to carry it (roof and floor leakage is put on the walls)', `${zp}.infiltration_q50`)
+    // Review F4: a room with leakage but no outside wall (an inner room under a roof) has no facade for the wind to act
+    // on, so its leakage is today's q50 ÷ 20 air changes (stated per room: `fixed_leakage`), not refused.
+    const fixedLeakage = kTot > 0 && !(wallArea > 0)
+    if (kTot > 0 && !fixedLeakage) {
       for (const { s } of walls) for (let b = 0; b < AIR.crack_bands; b++) {
         const z = base + ((b + 0.5) * Hz) / AIR.crack_bands
         cracks.push({ z, wind: windFactor(z, terrain), facade: facadeIndex(s.azimuth_deg!), k: (kTot * s.area_m2) / wallArea / AIR.crack_bands })
@@ -478,6 +482,6 @@ export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (r
         modulation: md ? { lower_dk: md.full_open_below_dk, upper_dk: md.min_open_above_dk, min_fraction: md.min_fraction } : null,
       }
     }
-    return { n, cracks, vents, windows, rule, turbulence: air.single_sided_turbulence === true, cp: facades.map((a) => tables.get(a)!), wind10: windFactor(10, terrain) }
+    return { n, cracks, vents, windows, rule, fixed_leakage: fixedLeakage, turbulence: air.single_sided_turbulence === true, cp: facades.map((a) => tables.get(a)!), wind10: windFactor(10, terrain) }
   })
 }
