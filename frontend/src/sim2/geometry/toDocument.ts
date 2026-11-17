@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, FINISH_KEY, finishesOf, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -36,6 +36,9 @@ const is21 = (SCHEMA_VERSION as string) !== '2.0'
 const is22 = is21 && (SCHEMA_VERSION as string) !== '2.1'
 const is23 = is22 && (SCHEMA_VERSION as string) !== '2.2'
 const is24 = is23 && (SCHEMA_VERSION as string) !== '2.3'
+/** Brief 124: a library construction whose layers already include carpet (named so in the library). */
+export const carpetIn = (key: string | null | undefined) => /carpet/i.test(construction(key)?.name ?? '')
+const is212 = Number((SCHEMA_VERSION as string).split('.')[1]) >= 12
 
 export type Built = {
   doc: unknown
@@ -358,6 +361,26 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     if (by.size > 1 && sp) notes.push(`${z.name} has rooms of ${by.size} space types; the model gives the zone ${sp.name}'s (the most floor)`)
     if (sp && rs.some((r) => !r.space)) notes.push(`${z.name} has rooms with no space type; the zone takes ${sp.name}'s`)
   }
+  // Brief 124 P4: each room's floor finish and ceiling, from its zone's space type (typical for the space when not
+  // typed). Carpet goes on the ground floor's room face; a suspended ceiling under a flat roof or a loft ceiling.
+  if (is212) {
+    const hardOnCarpet = new Set<string>()
+    for (const sf of surfaces) {
+      const z = sf.zone_a as string
+      if (!spaceOf.has(z)) continue
+      const f = finishesOf(spaceOf.get(z))
+      const flat = sf.kind === 'roof' && (sf.tilt_deg as number) === 0
+      let key = sf.kind === 'ground' ? FINISH_KEY[f.floor] : flat || sf.kind === 'ceiling' ? FINISH_KEY[f.ceiling] : undefined
+      // The library's ground floors are "Carpet, screed, …": their carpet is already a layer, so none is added on top.
+      // A hard floor asked of one cannot take the layer out; the document says so.
+      if (sf.kind === 'ground' && carpetIn((sf.construction_ref as { key: string } | undefined)?.key)) {
+        if (f.floor === 'hard' && !f.floor_typical) hardOnCarpet.add(spaceOf.get(z)?.name ?? z)
+        key = null
+      }
+      if (key !== undefined) sf.inside_finish = key ? { key } : null
+    }
+    for (const n of hardOnCarpet) notes.push(`${n}: hard floor chosen, but its ground floor construction already has carpet in it; choose a floor construction without carpet`)
+  }
   /** 'always_on' as chosen, or a library ventilation profile written as a document schedule profile. */
   const scheduleRef = (key: string | null | undefined) => {
     if (!key) return null
@@ -646,6 +669,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     const refs = new Map<string, { kind: string; key: string; version: null; body_hash: string }>()
     const pin = (kind: string, item: { key: string; body_hash?: string } | undefined) => item?.body_hash && refs.set(`${kind}:${item.key}`, { kind, key: item.key, version: null, body_hash: item.body_hash! })
     for (const sf of surfaces) pin('construction', construction((sf.construction_ref as { key: string }).key))
+    for (const sf of surfaces) for (const f of [sf.inside_finish, sf.inside_finish_b] as Array<{ key: string } | null | undefined>) if (f) pin('construction', construction(f.key))
     for (const g of system_groups) pin('system_template', system(g.template_ref as string))
     for (const z of used) {
       for (const sv of SERVICES) pin('system_template', system(zoneSys(z.id, sv.key)?.template))

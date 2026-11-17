@@ -39,6 +39,8 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
+import { FinishInfo, FinishRows } from './Finishes'
+import { carpetIn } from './toDocument'
 import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ApplyBarTarget, ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
@@ -1774,7 +1776,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         onNew={elem === 'partition' && types.length ? undefined : () => { const r = newType(plan, elem); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}
         onCopy={elem === 'partition' ? undefined : (id) => { const r = newType(plan, elem, plan.fabric_types.find((t) => t.id === id)); commit(r.plan); setActive((a) => ({ ...a, [elem]: r.id })) }}
         onRemove={(id) => commit({ ...plan, fabric_types: plan.fabric_types.filter((x) => x.id !== id), wall_spans: plan.wall_spans.filter((x) => x.type !== id) })}
-        detail={detail}
+        detail={isRooms ? <>{detail}{finishesForFabric(elem)}</> : detail}
         give={elem === 'partition' ? null : giveFoot({
           name: at?.name ?? null,
           rooms: isRooms,
@@ -1788,6 +1790,21 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </div>
         ) : undefined}
       />
+    )
+  }
+
+  // ─── Brief 124 P4: the finishes on Fabric's floor and roof, one pair per space type in use ─────────────────────────
+  const carpetedFloor = (spaceId: string) => plan.rooms.some((r) => r.space === spaceId && carpetIn(plan.fabric_types.find((t) => t.id === roomType(plan, r.id, 'floor'))?.construction))
+  const finishesForFabric = (el: 'roof' | 'floor') => {
+    const used = plan.spaces.filter((x) => plan.rooms.some((r) => r.space === x.id))
+    return (
+      <div className="gl-sec">
+        <h4>{el === 'floor' ? 'On the floor' : 'Under the roof'} <FinishInfo /></h4>
+        {el === 'floor' && used.some((x) => carpetedFloor(x.id)) && <p className="gl-hint">The library's ground floors already have carpet in them, so no carpet is added on top. A hard floor needs a floor construction without carpet.</p>}
+        {used.length ? used.map((x) => <FinishRows key={x.id} sp={x} label={x.name} show={el === 'floor' ? 'floor' : 'ceiling'} info={false} onSet={(q) => setSpace(x.id, q)} />)
+          : <p className="gl-hint">Finishes come with a room's space type. Give rooms a space type in Spaces to see them here.</p>}
+        <p className="gl-hint">Set for each space type; the same choice is on its card in Spaces.</p>
+      </div>
     )
   }
 
@@ -2108,6 +2125,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {sp.equip_relationship === 'independent' && opt('Its profile', 'equipment', profilesFor('equipment'))}
             {sp.equip_relationship === 'independent' && <Spark label="Equipment" days={profile(sp.equipment ?? '')?.day_types ?? null} onEdit={sp.equipment ? () => setSchedPop(sp.equipment) : undefined} />}
             <p className="gl-hint">"With occupancy" uses the occupancy profile above, so lighting and equipment rise and fall with the people.</p>
+            <h4 className="gl-h4i"><Icon name="floor" size={18} />Finishes</h4>
+            <FinishRows sp={sp} onSet={(q) => setSpace(sp.id, q)} carpeted={carpetedFloor(sp.id)} />
             <h4 className="gl-h4i"><Icon name="dhw" size={18} />Hot water</h4>
             <div className="gl-row gl-librow"><span>Used</span>
               <select className="gl-sel" aria-label="Hot water counted" value={sp.hot_water_basis ?? ''} onChange={(e) => setSpace(sp.id, { hot_water_basis: (e.target.value || null) as SpaceType['hot_water_basis'] })}>
