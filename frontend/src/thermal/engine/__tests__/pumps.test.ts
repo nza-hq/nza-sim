@@ -316,7 +316,7 @@ describe('Brief 114 P1: the control map and the upgrade', () => {
     expect(s.by_fuel).toEqual(base.by_fuel)
     expect(s.not_modelled).toEqual(expect.arrayContaining([
       { path: 'controls[0].controller', what: 'controller (recorded, not yet used in the calculation)' },
-      { path: 'controls[1]', what: 'window rule (Brief 115)' },
+      { path: 'controls[1]', what: 'window rule (used only with weather-driven air)' },
     ]))
   })
   it('2.9 upgrades to 2.10 with nothing filled: no pumps, fans as their schedule says, no other loads, no controls', () => {

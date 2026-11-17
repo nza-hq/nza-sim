@@ -322,11 +322,13 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   }))
   const floor_m2 = readDocFloorM2(doc)
   if (!(floor_m2 > 0)) miss('zones', 'the building has no floor area, so it has no EUI')
-  // Brief 114: the controller on each entry is recorded and shown, and changes no number yet; a window rule waits for
-  // Brief 115. One line each, so nothing stated is silently dropped.
+  // Brief 114: the controller on each entry is recorded and shown, and changes no number yet. A window rule is used
+  // under weather-driven air (Brief 115); under today's method it is stated and not used. One line each, so nothing
+  // stated is silently dropped.
+  const weatherAir = doc.building.air.method === 'weather_driven'
   doc.controls.forEach((c, i) => {
     not_modelled.push({ path: `controls[${i}].controller`, what: 'controller (recorded, not yet used in the calculation)' })
-    if (c.target.kind === 'window') not_modelled.push({ path: `controls[${i}]`, what: 'window rule (Brief 115)' })
+    if (c.target.kind === 'window' && !weatherAir) not_modelled.push({ path: `controls[${i}]`, what: 'window rule (used only with weather-driven air)' })
   })
   // Brief 114, no double count (review F6): an old auxiliary load named for pumps (or circulators) beside system pumps,
   // or for lifts or external lighting beside an other load of that kind, is refused by name. Names are all an old

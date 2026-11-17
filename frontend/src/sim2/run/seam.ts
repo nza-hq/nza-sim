@@ -378,6 +378,15 @@ const EMITTER_FIELD: Record<string, string> = {
   source_surface_id: 'the floor its pipes are in', source_layer_index: 'the layer its pipes run along',
 }
 const zoneName = (d: ModelDocument | null, i: string) => `"${d?.zones[Number(i)]?.name || `zone ${Number(i) + 1}`}"`
+/** Who a control map entry is about, in the person's words: the windows of a room by its name, a system by its label. */
+function controlOwner(d: ModelDocument, i: number): string {
+  const c = d.controls[i]
+  if (!c) return `controls[${i}]`
+  const zi = d.zones.findIndex((z) => z.id === c.target.ref)
+  if (c.target.kind === 'window' && zi >= 0) return `the windows in ${zoneName(d, String(zi))}`
+  if (c.target.kind === 'system') { const g = d.system_groups.find((x) => x.id === c.target.ref); if (g) return `"${g.label || g.id}"` }
+  return `the control of "${c.target.ref}"`
+}
 const profileLabel = (d: ModelDocument | null, i: string) => d?.profiles[Number(i)]?.label || d?.profiles[Number(i)]?.id || `profile ${i}`
 
 /** One missing input in plain words; the engine's own message when there is no wording for its path. */
@@ -853,7 +862,7 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
       const m = n.path.match(/^system_groups\[(\d+)\]/)
       const v = n.path.match(/^zones\[(\d+)\]\.ventilation/)
       const c = n.path.match(/^controls\[(\d+)\]/)
-      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : c ? `the control of "${doc.controls[Number(c[1])]?.target.ref}"` : n.path
+      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : c ? controlOwner(doc, Number(c[1])) : n.path
       return `${owner}: ${n.what}`
     }),
     no_hot_water: s.dhw == null,
