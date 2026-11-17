@@ -42,7 +42,9 @@ describe('air in the workspace (Brief 115 P6)', () => {
     const g = d.surfaces.find((s: any) => s.kind === 'glazing')
     expect(g.openings).toEqual([{ kind: 'permanent_vent', area_m2: 0.0075, cd: 0.6, flow_mode: 'single_sided' }])
     expect(b.notes.join(' ')).toContain('opening windows count only with weather-driven air')
-    expect(simulate(d, { weather: WEATHER }).ok).toBe(true)
+    const r = simulate(d, { weather: WEATHER }) as any
+    expect(r.ok).toBe(true)
+    expect(r.summary.zones[0].air).toBeNull()
   })
 
   it('weather-driven: terrain, exponent, openings at their heights, and the window rule as the zone\'s entry; the run opens them', () => {
@@ -69,6 +71,9 @@ describe('air in the workspace (Brief 115 P6)', () => {
     const terms = r.summary.breakdown.map((x: any) => x.term)
     expect(terms).toContain('window_ventilation')
     expect(r.summary.breakdown.find((x: any) => x.term === 'window_ventilation').kwh).toBeLessThan(0)
+    // Review F4: the run carries each zone's air (Rule 11), so the editor reads it rather than working it out again.
+    expect(r.summary.zones[0].air.leakage).toBe('weather')
+    expect(r.summary.zones[0].air.hours_windows_open).toBeGreaterThan(0)
   })
 
   it('a window rule that opens below the heating temperature is refused by name', () => {

@@ -156,6 +156,11 @@ export interface Summary {
      * service no system with a capacity serves in the zone.
      */
     short: { heating: ShortSplit | null; cooling: ShortSplit | null }
+    /**
+     * Brief 115 review F4: the zone's air under weather-driven air, read from the run (Rule 11). `leakage` 'q50_over_20':
+     * a room with no outside wall keeps today's leakage. Null under the fixed method.
+     */
+    air: { leakage: 'weather' | 'q50_over_20'; hours_windows_open: number } | null
   }[]
   /** Brief 120 P3: each heating or cooling system with a capacity, in the document's order (empty: none states one). */
   plants: PlantSummary[]
@@ -565,6 +570,7 @@ export function simulate(
         heating: z.annual.system_short_heating_hours_in_use == null ? null : split(z.annual.unmet_heating_hours_in_use ?? 0, z.annual.system_short_heating_hours_in_use, z.annual.both_short_heating_hours_in_use ?? 0),
         cooling: z.annual.system_short_cooling_hours_in_use == null ? null : split(z.annual.unmet_cooling_hours_in_use ?? 0, z.annual.system_short_cooling_hours_in_use, z.annual.both_short_cooling_hours_in_use ?? 0),
       },
+      air: z.air ? { leakage: z.air.leakage, hours_windows_open: z.air.hours_windows_open } : null,
     })),
     plants: results.plants.map((p) => {
       const g = doc.system_groups.find((x) => x.id === p.id)!
