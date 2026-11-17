@@ -324,7 +324,7 @@ describe('Brief 114 P1: the control map and the upgrade', () => {
     d.schema_version = '2.9'
     for (const g of d.system_groups) delete g.pumps
     const up = upgradeDocument(d)
-    expect(up.schema_version).toBe('2.11')
+    expect(up.schema_version).toBe('2.12')
     expect(up.system_groups.every((g) => g.pumps === null)).toBe(true)
     expect(up.zones[0].ventilation[0]).toMatchObject({ runs: null, demand_min_fraction: null, control_schedule_ref: 'always_on' })
     expect(up.other_loads).toEqual([])

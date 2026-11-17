@@ -30,7 +30,7 @@ import type { ConstructionBody, Layer } from '../engine/elements'
 import type { Weather } from '../engine/types'
 import { iso6946Films } from '../engine/elements'
 import { ENGINE_CONSTANTS as K } from '../engine/constants'
-import { groundTemperature, zoneSetpointHours } from '../engine/model'
+import { groundTemperature, ModelError, surfaceLayers, zoneSetpointHours } from '../engine/model'
 import { zoneGains } from '../engine/gains'
 import { zoneVentilation } from '../engine/ventilation'
 import { zoneCooling, zoneEmitters } from '../engine/emitters'
@@ -298,7 +298,7 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
     const z0 = zone.floor * zone.height_m
     put('Zone', zn, { direction_of_relative_north: 0, x_origin: 0, y_origin: 0, z_origin: 0, multiplier: 1, ceiling_height: r6(height), volume: r6(volume), floor_area: r6(zone.area_m2) })
 
-    // Internal heat capacity on the air (as the referees carry the document's 250 kJ/m²K).
+    // Internal heat capacity on the air: the zone's contents (Brief 124: ISO 52016-1's 10 kJ/K·m²), as the hourly run.
     const C = zone.internal_heat_capacity_j_per_k_m2 * zone.area_m2
     if (C > 0) {
       const m = 1 + C / (K.rho_c_air * volume)
@@ -331,7 +331,12 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
       const interzone = zoneIndex.has(s.zone_b) && s.zone_b !== s.zone_a
       if (interzone && s.zone_a !== zone.id) continue  // written from zone_a's side, with its twin
       const b = bodyOf(s, p)
-      let layers = (b.layers ?? []) as Layer[]
+      // Brief 124: with the inside finishes (carpet, a suspended ceiling) on each face, as the hourly run builds them.
+      let layers: Layer[]
+      try { layers = surfaceLayers(s, library, p) } catch (e) {
+        if (e instanceof ModelError) throw new EnergyPlusInputError(e.message.slice(e.path.length + 2), e.path)
+        throw e
+      }
       if (s.kind === 'internal_mass' || interzone) {
         const ia = s.inside_solar_absorptance!, ib = s.inside_solar_absorptance_b!
         // One set of materials, zone_b's face first (its absorptance ib) and zone_a's last (ia); zone_b's surface takes

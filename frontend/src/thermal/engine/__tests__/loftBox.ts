@@ -89,7 +89,7 @@ export function loftBoxDocument(caseName: string, S: any = ROOF_SPEC) {
   }
   for (const z of zones) z.surfaces = surfaces.filter((s) => s.zone_a === z.id || s.zone_b === z.id).map((s) => s.id)
   const doc = ModelDocument.parse({
-    schema_version: '2.11',
+    schema_version: '2.12',
     building: {
       id: `loft-box-${caseName}`, name: `Loft box ${caseName}`, decoded_building_key: null,
       site: { lat: 41.98, lon: -87.92, name: 'Chicago O\'Hare', exposure: null, ground: { method: 'annual_mean_outdoor' } },

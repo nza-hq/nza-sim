@@ -1,0 +1,162 @@
+{
+ "about": "Thermal mass behind finishes (Linzie 17 Nov 2026). One 6 x 6 m office room on a middle floor of a concrete-frame building: south wall with a 9 m2 window, north wall solid, east/west walls are a plasterboard stud partition to an identical neighbour, floor and ceiling are one concrete slab to identical rooms above and below. Because the neighbours are identical, the partition and the slab are modelled with both faces in this room (EnergyPlus: a surface pair in the same zone; our engine: internal_mass). Layers are listed from the ceiling face (room below) to the floor face (this room), for the slab; each layer [thickness m, conductivity W/mK, specific heat J/kgK, density kg/m3]; density 0 = no-mass layer of resistance thickness/conductivity. Read by validation/energyplus/mass_finishes.py (EnergyPlus) and scripts/mass_finishes.mts (our monthly and hourly engines).",
+ "width_m": 6.0,
+ "depth_m": 6.0,
+ "height_m": 3.0,
+ "window": {
+  "width_m": 5.0,
+  "height_m": 1.8,
+  "sill_m": 0.7,
+  "u_w_per_m2k": 1.4,
+  "shgc": 0.5
+ },
+ "external_wall": [
+  [
+   0.1,
+   0.77,
+   800,
+   1700
+  ],
+  [
+   0.12,
+   0.035,
+   1030,
+   15
+  ],
+  [
+   0.1,
+   0.51,
+   1000,
+   1400
+  ],
+  [
+   0.013,
+   0.16,
+   840,
+   950
+  ]
+ ],
+ "partition": [
+  [
+   0.0125,
+   0.21,
+   1000,
+   700
+  ],
+  [
+   0.17,
+   1.0,
+   0,
+   0
+  ],
+  [
+   0.0125,
+   0.21,
+   1000,
+   700
+  ]
+ ],
+ "materials": {
+  "screed": [
+   0.065,
+   0.41,
+   840,
+   1200
+  ],
+  "concrete": [
+   0.25,
+   1.13,
+   1000,
+   2000
+  ],
+  "carpet": [
+   0.01,
+   0.06,
+   1300,
+   200
+  ],
+  "void": [
+   0.18,
+   1.0,
+   0,
+   0
+  ],
+  "tile": [
+   0.015,
+   0.057,
+   840,
+   300
+  ],
+  "skim": [
+   0.003,
+   0.5,
+   1000,
+   1300
+  ],
+  "plasterboard": [
+   0.0125,
+   0.21,
+   1000,
+   700
+  ],
+  "chipboard": [
+   0.022,
+   0.13,
+   1600,
+   650
+  ],
+  "joist_void": [
+   0.18,
+   1.0,
+   0,
+   0
+  ]
+ },
+ "cases": {
+  "exposed": [
+   "skim",
+   "concrete",
+   "screed"
+  ],
+  "carpet": [
+   "skim",
+   "concrete",
+   "screed",
+   "carpet"
+  ],
+  "ceiling_void": [
+   "tile",
+   "void",
+   "concrete",
+   "screed"
+  ],
+  "carpet_and_void": [
+   "tile",
+   "void",
+   "concrete",
+   "screed",
+   "carpet"
+  ],
+  "lightweight": [
+   "plasterboard",
+   "joist_void",
+   "chipboard",
+   "carpet"
+  ]
+ },
+ "gains": {
+  "w_per_m2": 30.0,
+  "radiant_fraction": 0.5,
+  "weekday_on": [
+   8,
+   18
+  ]
+ },
+ "infiltration_ach": 0.5,
+ "setpoints": {
+  "heat_c": 20.0,
+  "cool_c": 24.0
+ },
+ "notes": "void: a sealed ceiling void, R 0.18 m2K/W (ISO 6946 unventilated air space, mid value between upward 0.16 and downward 0.22). tile: mineral fibre ceiling tile. carpet: carpet + underlay ~R 0.17. Gains: 30 W/m2 (people, lights, equipment) 08:00-18:00 weekdays. Free-running runs (no heating or cooling) use free_running_ach as a simple stand-in for opened windows, so the room does not sit above 26 C all year. lightweight: no concrete at all (plasterboard ceiling, joist void, chipboard deck, carpet), the no-mass baseline to measure each finish's share of the benefit against.",
+ "free_running_ach": 4.0
+}

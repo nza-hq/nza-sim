@@ -89,9 +89,13 @@ export function resolveConstructions(doc: ModelDocument, items: readonly Library
   const missing: Missing[] = []
   const said = new Set<string>()
   const drafts: string[] = []
-  doc.surfaces.forEach((s, i) => {
-    const key = s.construction_ref.key
-    const path = `surfaces[${i}].construction_ref.key`
+  // Brief 124: a finish on an inside face is a library construction too, pinned and resolved the same way.
+  const refs = doc.surfaces.flatMap((s, i) => [
+    { s, key: s.construction_ref.key, path: `surfaces[${i}].construction_ref.key` },
+    ...(s.inside_finish ? [{ s, key: s.inside_finish.key, path: `surfaces[${i}].inside_finish.key` }] : []),
+    ...(s.inside_finish_b ? [{ s, key: s.inside_finish_b.key, path: `surfaces[${i}].inside_finish_b.key` }] : []),
+  ])
+  refs.forEach(({ s, key, path }) => {
     if (key.startsWith('unassigned:')) {
       const what = KIND_WORDS[key.split(':')[1]] ?? SURFACE_WORDS[s.kind] ?? s.kind
       const k = `unassigned|${key}`
