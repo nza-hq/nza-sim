@@ -119,6 +119,7 @@ Brief [`docs/briefs/archive/119_cooling-emitters_COMPLETED.md`](docs/briefs/arch
   - **F2–F8:** labels and wording (MIS 3005-D Issue 3.0 cl. 5.5.1; 0.5 ach from the MCS calculator; suspended floors understated; vent wind printed).
   - **F9:** four tests added.
   - **F10:** anchor 133.2 on this branch.
+- **Suggestions (Brief 123, for Chris):** a library construction for a cold loft's roof slopes (uninsulated, tiles on felt on rafters), so the loft's slopes need no stand-in roof type.
 - **Suggestions:** a floor-type field (solid or suspended), so a suspended floor is counted against the design outdoor temperature (MIS 3005-D cl. 5.5.1(d)); review F2.
 - **P5 (16 Nov):** final report `docs/audit/117/06_final_report.md`; brief archived; CLAUDE.md Systems line added.
 - **Next:** Brief 119 (cooling emitters, standard emitter sizes; schema 2.7), then Brief 112.
