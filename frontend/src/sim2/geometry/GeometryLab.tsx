@@ -39,7 +39,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
@@ -75,6 +75,8 @@ const UnifiedScheduleEditor = lazy(() => import('../../components/shared/schedul
 import { GAIN_COLOURS } from '../../components/modules/gains/gainColours.js'
 // @ts-expect-error untyped JS from today's app
 import GlazingInspector from '../../components/library/GlazingInspector.jsx'
+// @ts-expect-error untyped JS from today's app (Brief 115: today's discharge coefficients, read)
+import { computeCd } from '../../utils/openingCoefficients.js'
 // @ts-expect-error untyped JS from today's app (the schedule pop-out, reused)
 import SchedulePopout from '../../components/shared/SchedulePopout.jsx'
 import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
@@ -234,7 +236,7 @@ type Giver = { name: string | null; rooms: boolean; now: string[]; onGive: (all:
 export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab, api, onPlan }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void; api?: React.MutableRefObject<EditorApi | null>; onPlan?: (p: Plan) => void } = {}) {
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
-  const [plan, setPlan] = useState<Plan>(emptyPlan)
+  const [plan, setPlan] = useState<Plan>(newPlan)
   // The project's own profiles first, then the library's (Brief 118 P5).
   const profile = (key: string | null | undefined) => profileOf(plan, key)
   const profilesFor = (t: OwnProfile['schedule_type']) => profilesOfKind(plan, t)
@@ -1461,7 +1463,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <option value="exposed">Exposed</option>
               </select>
             </div>
-            <p className="gl-hint">How much wind reaches the building: it drives air leakage and the vents. One value for the whole site.</p>
+            <p className="gl-hint">How much wind reaches the building: it drives air leakage and the vents in today's fixed air method. One value for the whole site.</p>
+            <div className="gl-row gl-librow"><span>Terrain</span>
+              <select className="gl-sel" aria-label="Terrain" value={bi.terrain ?? ''} onChange={(e) => ((q: Partial<BuildingInputs>) => commit({ ...plan, building: { ...bi, ...q } }))({ terrain: (e.target.value || null) as BuildingInputs['terrain'] })}>
+                <option value="">Not set</option>
+                {AIR_TERRAINS.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+              </select>
+            </div>
+            <p className="gl-hint">{(bi.air_method ?? 'today') === 'weather_driven' ? 'What lies around the site: it sets how the wind grows with height, for the weather-driven air (Fabric, Air leakage).' : 'Used by weather-driven air (Fabric, Air leakage); this model uses the fixed method.'}</p>
             <h4>Weather</h4>
             <div ref={setWeatherEl} />
             <p className="gl-hint">An EPW file from this computer, or one your organisation has saved. Every result is worked out on it, and names it.</p>
@@ -1523,6 +1532,24 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                     </select>
                   </div>
                   <p className="gl-hint">Use the air test result if there is one, or the Part L target for a new building. The list gives typical values to start from; type over them. Empty stays unset.</p>
+                  <h4>How air moves</h4>
+                  <div className="gl-row gl-librow"><span>Method</span>
+                    <select className="gl-sel" aria-label="Air method" value={bi.air_method ?? 'today'} onChange={(e) => setBi(e.target.value === 'weather_driven' ? { air_method: 'weather_driven', air_exponent: bi.air_exponent ?? 0.67, single_sided_turbulence: bi.single_sided_turbulence ?? true } : { air_method: 'today' })}>
+                      <option value="today">Fixed (today's NZA Sim: q50 ÷ 20, vents by wind)</option>
+                      <option value="weather_driven">Weather-driven (wind and stack, every hour)</option>
+                    </select>
+                  </div>
+                  {(bi.air_method ?? 'today') === 'weather_driven' ? <>
+                    <div className="gl-row gl-typed"><span>Crack exponent n</span><Num value={bi.air_exponent ?? ''} step={0.01} min={0.5} max={1} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 && v <= 1 ? v : null; if (n !== (bi.air_exponent ?? null)) setBi({ air_exponent: n }) }} /></div>
+                    <label className="gl-row gl-librow"><span>Wind turbulence, one-sided rooms</span><input type="checkbox" aria-label="Single-sided wind turbulence" checked={bi.single_sided_turbulence === true} onChange={(e) => setBi({ single_sided_turbulence: e.target.checked })} /></label>
+                    <div className="gl-row gl-librow"><span>Terrain</span>
+                      <select className="gl-sel" aria-label="Terrain" value={bi.terrain ?? ''} onChange={(e) => setBi({ terrain: (e.target.value || null) as BuildingInputs['terrain'] })}>
+                <option value="">Not set</option>
+                {AIR_TERRAINS.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+              </select>
+                    </div>
+                    <p className="gl-hint">Each room's air is worked out every hour from the wind (by terrain and height), the stack between inside and out, its leakage as cracks (n, 0.67 is usual), its trickle vents and its opening windows (Fabric, Windows; when they open is on Controls). The one-sided wind term is EN 16798-7's, for rooms whose open windows are all on one side.</p>
+                  </> : <p className="gl-hint">Fixed: leakage is q50 ÷ 20 air changes all year and vents follow the wind only, as today's NZA Sim. Opening windows need weather-driven air.</p>}
                 </>
               ) : (
                 <>
@@ -1567,7 +1594,49 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             W/m²K
           </label>
         </div>
-        <p className="gl-hint">{usage(at).n ? `Used on ${usage(at).text}: a change here changes all of it. Copy it for an exception.` : 'Not used yet.'}{elem === 'door' ? ' The library has no door constructions yet, so a door needs a typed U.' : ''}{elem === 'partition' ? " Every wall between zones takes this type. The library's internal wall is a draft (plaster, block, plaster from existing library layers) waiting for Chris to check." : ''}</p>
+        {at.element === 'glazing' && (() => {
+          const o = at.opening ?? null, v = at.trickle ?? null
+          const wd = (plan.building?.air_method ?? 'today') === 'weather_driven'
+          const setO = (q: Partial<WindowOpening>) => setFT(at.id, { opening: { ...(o ?? { style: null, openable_fraction: null, opening_angle_deg: null, cd: null }), ...q } })
+          const setV = (q: Partial<TrickleVent>) => setFT(at.id, { trickle: { ...(v ?? { area_mm2: null, cd: null, flow_mode: null }), ...q } })
+          const n = (label: string, val: number | null | undefined, on: (x: number | null) => void, step: number, unit?: string, max?: number) => (
+            <div className="gl-row gl-typed"><span>{label}</span><Num value={val ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(x) => on(Number.isFinite(x) && x >= 0 && (max == null || x <= max) ? x : null)} /></div>
+          )
+          const angled = WINDOW_STYLES.find((x) => x.key === o?.style)?.angle ?? true
+          return <>
+            <h4>Opens</h4>
+            <div className="gl-row gl-librow"><span>How it opens</span>
+              <select className="gl-sel" aria-label={`How ${at.name} open`} value={o ? o.style ?? 'unset' : ''} onChange={(e) => e.target.value === '' ? setFT(at.id, { opening: null }) : setO({ style: e.target.value === 'unset' ? null : e.target.value as WindowStyle })}>
+                <option value="">Does not open</option>
+                {o && o.style == null && <option value="unset">Opens (style not set)</option>}
+                {WINDOW_STYLES.map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
+              </select>
+            </div>
+            {o && <>
+              {n('Share of the glass that opens', o.openable_fraction, (x) => setO({ openable_fraction: x }), 0.05, undefined, 1)}
+              {angled && n('Widest opening angle', o.opening_angle_deg, (x) => setO({ opening_angle_deg: x }), 5, '°', 180)}
+              <div className="gl-row gl-typed"><span>Discharge coefficient</span><Num value={o.cd ?? ''} step={0.05} min={0} max={1} onCommit={(x) => setO({ cd: Number.isFinite(x) && x > 0 && x <= 1 ? x : null })} />{o.cd == null && <button type="button" className="ap-link" onClick={() => setO({ cd: computeCd({ type: 'orifice' }) })}>Use 0.61</button>}</div>
+              <p className="gl-hint">{wd ? 'Effective area per EN 16798-7 from the style, the share that opens and the angle. 0.61 is a sharp-edged opening (CIBSE Guide A §4.6). When they open is set per space type on Controls.' : 'Opening windows count only with weather-driven air (Fabric, Air leakage); this model uses the fixed method, so they stay shut.'}</p>
+            </>}
+            <h4>Trickle vent</h4>
+            <label className="gl-row gl-librow"><span>Each window has one</span><input type="checkbox" aria-label={`${at.name} have trickle vents`} checked={!!v} onChange={(e) => setFT(at.id, { trickle: e.target.checked ? { area_mm2: null, cd: null, flow_mode: null } : null })} /></label>
+            {v && <>
+              {n('Equivalent area', v.area_mm2, (x) => setV({ area_mm2: x && x > 0 ? x : null }), 500, 'mm²')}
+              <div className="gl-row gl-typed"><span>Discharge coefficient</span><Num value={v.cd ?? ''} step={0.05} min={0} max={1} onCommit={(x) => setV({ cd: Number.isFinite(x) && x > 0 && x <= 1 ? x : null })} /></div>
+              {!wd && (
+                <div className="gl-row gl-librow"><span>Air flows</span>
+                  <select className="gl-sel" aria-label={`Trickle vent flow, ${at.name}`} value={v.flow_mode ?? ''} onChange={(e) => setV({ flow_mode: (e.target.value || null) as TrickleVent['flow_mode'] })}>
+                    <option value="">Not set</option>
+                    <option value="single_sided">In and out on one side</option>
+                    <option value="cross">Across the room</option>
+                  </select>
+                </div>
+              )}
+              <p className="gl-hint">The maker's equivalent area for one vent (2,500 to 5,000 mm² is common). Always open. {wd ? 'Placed at the window head; the room\'s pressure decides which way air goes.' : 'Today\'s method needs whether air crosses the room.'}</p>
+            </>}
+          </>
+        })()}
+        <p className="gl-hint">{usage(at).n ? `Used on ${usage(at).text}: a change here changes all of it. Copy it for an exception.` : 'Not used yet.'}{elem === 'door' ? " The library's door is a draft awaiting Chris's review; type a U if you know the door's." : ''}{elem === 'partition' ? " Every wall between zones takes this type. The library's internal wall is a draft (plaster, block, plaster from existing library layers) waiting for Chris to check." : ''}</p>
       </>
     )
     const isRooms = elem === 'roof' || elem === 'floor'
@@ -2067,8 +2136,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     setNote(`Applied: the controls of ${row?.name ?? 'the building'}.`)
     setCtlDraft(null)
   }
-  const SERVICE_COLOUR: Record<string, string> = { heating: '#C2410C', cooling: '#2563EB', dhw: '#7C3AED', ventilation: '#0F766E', lighting: '#CA8A04', other: '#6B7280' }
-  const SERVICE_NAME: Record<string, string> = { heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', ventilation: 'Ventilation', lighting: 'Lighting', other: 'Other loads' }
+  const SERVICE_COLOUR: Record<string, string> = { heating: '#C2410C', cooling: '#2563EB', dhw: '#7C3AED', ventilation: '#0F766E', windows: '#0891B2', lighting: '#CA8A04', other: '#6B7280' }
+  const SERVICE_NAME: Record<string, string> = { heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', ventilation: 'Ventilation', windows: 'Opening windows', lighting: 'Lighting', other: 'Other loads' }
   const controlsLeft = () => {
     const rows = ctlMap?.rows ?? []
     return (
@@ -2078,7 +2147,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             <h3>Controls</h3>
             <p className="gl-say">How each system is told to run: who controls it, what it follows and what it is set to. Choose one to change it.</p>
             {!rows.length && <p className="gl-hint">No systems serve the rooms yet. Give rooms their systems on Systems first.</p>}
-            {(['heating', 'cooling', 'dhw', 'ventilation', 'lighting', 'other'] as const).map((sv) => {
+            {(['heating', 'cooling', 'dhw', 'ventilation', 'windows', 'lighting', 'other'] as const).map((sv) => {
               const its = rows.filter((r) => r.service === sv)
               return its.length ? (
                 <div key={sv} className="ap-ctlgroup">
@@ -2149,7 +2218,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const controlsRight = () => {
     const row = ctlMap?.rows.find((r) => r.key === ctlSel)
     if (!row) return <div className="gl-sec"><p className="gl-say">Choose a system on the left or in the control map to set how it runs.</p></div>
-    const x = ctlPlan.systems.find((y) => y.id === row.control.ref)
+    const x = row.service === 'windows' ? undefined : ctlPlan.systems.find((y) => y.id === row.control.ref)
     const ld = row.service === 'other' ? (ctlPlan.other_loads ?? []).find((y) => y.id === row.control.ref) : undefined
     const c = (ctlPlan.controls ?? []).find((y) => y.kind === row.control.kind && y.ref === row.control.ref)
     const served = x ? ctlPlan.spaces.filter((sp) => ctlPlan.rooms.some((r) => r.space === sp.id && r.systems?.[x.service] === x.id)) : []
@@ -2174,7 +2243,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return (
       <div className="gl-sec ap-ctlright">
         <h3><i style={{ background: SERVICE_COLOUR[row.service] }} />{row.name} <small>{SERVICE_NAME[row.service]}</small></h3>
-        {row.service !== 'other' && <>
+        {row.service !== 'other' && row.service !== 'windows' && <>
           <div className="gl-row gl-librow"><span>Controlled by</span>
             <select className="gl-sel" aria-label="Controlled by" value={c?.controller ?? ''} onChange={(e) => dCtl(row.control.kind, row.control.ref, { controller: (e.target.value || null) as PlanControl['controller'] })}>
               <option value="">Not stated</option>
@@ -2184,6 +2253,42 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           <div className="gl-row gl-typed"><span>Note</span><input className="gl-in" aria-label="Control note" defaultValue={c?.note ?? ''} key={`${row.key}-${c?.note ?? ''}`} placeholder="e.g. BMS optimiser, TRVs" onBlur={(e) => e.target.value.trim() !== (c?.note ?? '') && dCtl(row.control.kind, row.control.ref, { note: e.target.value.trim() || null })} /></div>
           <p className="ap-default">Recorded, not yet used in the calculation.</p>
         </>}
+        {row.service === 'windows' && (() => {
+          const sp = ctlPlan.spaces.find((q) => q.id === row.control.ref)
+          if (!sp) return null
+          const w: WindowRule = sp.windows ?? { rule: null, open_above_c: null, open_fraction: null, hours: null, controller: null }
+          const setW = (q: Partial<WindowRule>) => dSpace(sp.id, { windows: { ...w, ...q } })
+          return <>
+            <div className="gl-row gl-librow"><span>Opened</span>
+              <select className="gl-sel" aria-label="Who opens the windows" value={w.controller ?? ''} onChange={(e) => setW({ controller: (e.target.value || null) as WindowRule['controller'] })}>
+                <option value="">Not stated</option>
+                <option value="manual">By hand</option>
+                <option value="local">By local controls (actuators)</option>
+                <option value="central_bms">By the BMS</option>
+              </select>
+            </div>
+            <div className="gl-row gl-librow"><span>Rule</span>
+              <select className="gl-sel" aria-label="Window rule" value={w.rule ?? ''} onChange={(e) => setW({ rule: (e.target.value || null) as WindowRule['rule'] })}>
+                <option value="">Not set</option>
+                <option value="temperature">When the room is warm</option>
+                <option value="timetable">To a timetable</option>
+              </select>
+            </div>
+            {w.rule === 'temperature' && num('Open above', w.open_above_c, (n) => setW({ open_above_c: n }), 'Windows open above')}
+            {w.rule === 'temperature' && sp.heat_c != null && <p className="gl-hint">Above the heating's {sp.heat_c} °C, and only when it is warmer inside than out.</p>}
+            <div className="gl-row gl-typed"><span>How far</span><Num value={w.open_fraction ?? ''} step={0.1} min={0} max={1} onCommit={(n) => setW({ open_fraction: Number.isFinite(n) && n >= 0 && n <= 1 ? n : null })} /></div>
+            <div className="gl-row gl-librow"><span>{w.rule === 'timetable' ? 'Open in' : 'May open in'}</span>
+              <select className="gl-sel" aria-label="Window hours" value={w.hours ?? 'always_on'} onChange={(e) => setW({ hours: e.target.value === 'always_on' ? null : e.target.value })}>
+                <option value="always_on">Any hour</option>
+                {profOptions(profilesFor('ventilation'))}
+              </select>
+            </div>
+            {(ctlMap?.rows.filter((r) => r.service === 'windows').length ?? 0) > 1 && (
+              <button type="button" className="ap-link" onClick={() => { const ids = new Set(ctlMap!.rows.filter((r) => r.service === 'windows').map((r) => r.control.ref)); draft((bp) => ({ ...bp, spaces: bp.spaces.map((q) => (ids.has(q.id) ? { ...q, windows: { ...w } } : q)) })) }}>Use this rule for every space type with opening windows</button>
+            )}
+            <p className="gl-hint">For every room of {sp.name} with opening windows. "How far" is 0 to 1 of their widest (the style and angle are on Fabric, Windows). By hand and automated windows follow the same rule here; the choice is recorded.</p>
+          </>
+        })()}
         {x && (x.service === 'heating' || x.service === 'cooling') && <>
           <h4>{x.service === 'heating' ? 'Set to, and when' : 'Set to'}</h4>
           {!served.length && <p className="gl-hint">No space type's rooms use it.</p>}
@@ -2759,7 +2864,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 </div>
                 <div className="gl-btns">
                   <button type="button" className="gl-btn quiet" onClick={() => fitTo(plan.blocks.flat())}>Fit to screen</button>
-                  <button type="button" className="gl-btn quiet" onClick={() => { commit({ ...emptyPlan(), storey_height_m: plan.storey_height_m }); setSel(null); toMode('outline'); setTool('rect') }}>Clear all</button>
+                  <button type="button" className="gl-btn quiet" onClick={() => { commit({ ...newPlan(), storey_height_m: plan.storey_height_m }); setSel(null); toMode('outline'); setTool('rect') }}>Clear all</button>
                 </div>
               </div>}
               {mode === 'outline' && (
