@@ -18,6 +18,7 @@ import { ModelDocument } from '../../schema/model'
 import { LEGACY_INTERNAL_HEAT_CAPACITY_J_PER_K_M2, TODAY, upgradeDocument } from '../../schema/upgrade'
 import { resolveConstructions } from '../../../sim2/run/library'
 import { build } from './massRoom'
+import { toEnergyPlus } from '../../energyplus/toEnergyPlus'
 import { MOS, readMos } from './denver'
 
 const SPEC = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../../../../validation/energyplus/mass_finishes_spec.json'), 'utf8'))
@@ -54,6 +55,14 @@ describe('Brief 124 D3: finishes on inside faces', () => {
     const e: any = structuredClone(doc)
     e.surfaces.find((s: any) => s.id === 'north').inside_finish_b = { key: 'finish_carpet' }
     expect(() => ModelDocument.parse(e)).toThrow('inside_finish_b is for a surface between zones')
+  })
+  it('Run in EnergyPlus takes the finishes too: the same slab stack as the hourly run', () => {
+    const fin = build(SPEC, weather, 'denver', 'carpet_and_void', 10_000, true, { finishes: true })
+    const ours = runModel(fin.doc, weather, fin.lib, OPTS)
+    const ep = toEnergyPlus(fin.doc, weather, fin.lib, ours).epjson
+    const slab = Object.entries(ep.BuildingSurface_Detailed ?? ep['BuildingSurface:Detailed']).find(([n]) => n.toLowerCase() === 'slab')![1] as any
+    const cons = ep.Construction[slab.construction_name] as Record<string, string>
+    expect(Object.keys(cons).length).toBe(5)  // tile, void, concrete, screed, carpet (skim is not in this case)
   })
   it('the library resolves and pins a finish like a construction', () => {
     const { doc } = build(SPEC, weather, 'denver', 'carpet', 10_000, true, { finishes: true })

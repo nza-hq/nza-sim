@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
 import engineFingerprint from './plugins/engineFingerprint.js'
+import energyplus from './plugins/energyplus.js'
 
 // Engine/app SHA stamped into exports (brief bridgwater-baseline-model1 D4).
 // Captured at dev-server / build start; git short SHA of the working tree.
@@ -35,6 +36,8 @@ export default defineConfig({
     react(),
     // Brief 102a: `virtual:engine-fingerprint`, the instant engine's content hash for the run key.
     engineFingerprint(),
+    // Brief 123: "Run in EnergyPlus" on this computer (/api/sim2/energyplus, ahead of the /api proxy).
+    energyplus(),
   ],
   server: {
     port: VITE_PORT,

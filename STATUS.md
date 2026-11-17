@@ -16,6 +16,17 @@
   - Re-measure the v2 anchor on IT15.
 - **Suggestion:** several storeys in the workspace (a concrete frame's middle floors cannot be drawn yet).
 
+## 🔧 Brief 123 — Simulate v2: Run in EnergyPlus — IN REVIEW 17 Nov 2026 on `sim2/123-energyplus` (on `chris/121-setpoint-profiles`)
+
+Brief [`docs/briefs/active/123_run-in-energyplus.md`](docs/briefs/active/123_run-in-energyplus.md) (Linzie 17 Nov 10:27: "Instant, 15 minutes, then Energy+").
+
+- **Translator** `thermal/energyplus/toEnergyPlus.ts`: the model document to epJSON + an hourly schedules file, at the run's own U-values, bridging, air and vent coefficients; refuses weather-driven air and other things it cannot carry yet, in words; every approximation a note on screen.
+- **Runner** `frontend/plugins/energyplusRunner.js` + Vite middleware `plugins/energyplus.js` (`/api/sim2/energyplus/status`, `/runs`, `/runs/:id`). Runs on the computer with `npm run dev` and EnergyPlus installed (`ENERGYPLUS_DIR`, else `C:\EnergyPlusV25-2-0`). No cloud server: that would be an account/cost decision for Linzie. Rule 5 deviation stated in the brief (v2 is TypeScript; Python path untouched).
+- **Check** ([`01_check.md`](docs/audit/123/01_check.md)): Bridgewater heating −9.6 %, cooling +10.8 %, EUI 131.9 · 132.5; community centre heating +5.0 %, cooling −1.5 %, EUI 108.5 · 107.5. Open: run B's office morning cooling peak (14.1 · 33.0 kW).
+- **Workspace**: "Run in EnergyPlus" beside Run; Heat flow shows both columns, by zone, by month and the notes. Browser check at 1440×900 on the community centre (Gatwick): EnergyPlus 4.1 s, figures as the script's.
+- Tests `toEnergyPlus.test.ts` (6). 525 tests pass (4 skip), build clean.
+- **Next:** Linzie's review; IT15 dev server restart to pick up the runner.
+
 ## 🔧 Brief 122 — Simulate v2: the instant estimate — IN PROGRESS 17 Nov 2026 (engine on `chris/122-instant-engine`, workspace on `sim2/122-instant`)
 
 Brief [`docs/briefs/active/122_instant-estimate.md`](docs/briefs/active/122_instant-estimate.md) (Linzie 17 Nov 08:20: "an instant calculation, almost like an Excel spreadsheet"). P1–P3 the engine thread's, P0/P4/P5 the editor's.
