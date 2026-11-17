@@ -1,5 +1,7 @@
 # Current brief
 
+**Brief 122 — Simulate v2: the instant estimate (spreadsheet-fast on Site, Shape and Fabric) — ACTIVE on `sim2/122-instant`.** Brief [`active/122_instant-estimate.md`](active/122_instant-estimate.md) (Linzie 17 Nov 08:20).
+
 **Brief 121 — Simulate v2: setpoints as profiles — IN PROGRESS on `chris/121-setpoint-profiles` (on top of 115).** Brief [`active/121_setpoint-profiles.md`](active/121_setpoint-profiles.md). P1–P3 done (engine, referee by equivalence to 109, community centre); P4 screens are the editor thread's.
 
 **Brief 115 — Simulate v2: natural ventilation, opening windows and air leakage — IN PROGRESS on `chris/115-air-movement`.**
