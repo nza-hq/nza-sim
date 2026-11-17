@@ -47,14 +47,13 @@ export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'pr
  */
 export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }
 export function runOptionsFor(doc: ModelDocument): RunOptions {
-  // Brief 120: a zone on a system with a stated capacity is limited too, so it steps in quarter hours the same way.
-  const onPlant = (zid: string) => doc.system_groups.some((g) => g.enabled && (g.service === 'heating' || g.service === 'cooling') && g.capacity_kw != null && g.zones.includes(zid))
-  // Brief 121: a setpoint profile steps the setpoint as hours do.
-  const toHours = (z: ModelDocument['zones'][number]) => z.setpoints.hours_ref != null || z.setpoints.heat_ref != null || z.setpoints.cool_ref != null
-  // Brief 115 review F1, Linzie 17 Nov 08:18 ("I'd rather keep it fast"): opening windows do not by themselves move the
-  // run to quarter hours. Decided once an hour, a window stays open (or shut) for the whole hour; the office referee then
-  // overstates hours above 25 °C (312 against EnergyPlus's 199) and the warmest hour (+0.87 K). The editor says so.
-  return doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && toHours(z)) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
+  // Linzie 17 Nov 10:27, "Instant, 15 minutes, then Energy+": the monthly estimate is the instant tier (Brief 122), so
+  // the run is the accurate tier and every document runs in quarter hours: windows decide every 15 minutes (Brief 115
+  // review F1: the office referee passes every gate at 4 steps an hour and fails them at 1), as do heating hours with
+  // limited emitters or plant (Brief 109 review F3, Brief 120). Fifty rooms with opening windows take about 11 s in
+  // the container (budget about 15 s, Linzie). RUN_OPTIONS (1 step) stays for the referees and speed scripts.
+  void doc
+  return QUARTER_HOUR_OPTIONS
 }
 
 /** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */
@@ -136,7 +135,7 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
 export interface Summary {
   engine: ModelResults['engine']
   run_ms: number
-  /** Steps the year was run in per hour: 1, or 4 when a limited zone is heated to hours (review F3, runOptionsFor). */
+  /** Steps the year was run in per hour: 4 from the product (runOptionsFor, Linzie 17 Nov 10:27); a caller's own options may differ. */
   steps_per_hour: number
   weather: { file_name: string; station: string; sha256: string }
   building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number; monthly: Monthly }

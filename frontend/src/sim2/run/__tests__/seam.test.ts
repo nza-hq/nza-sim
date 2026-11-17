@@ -36,7 +36,7 @@ describe('simulate', () => {
     const r = simulate(d, { weather: WEATHER })
     if (!r.ok) throw new Error(JSON.stringify(r.missing))
     const lib = Object.fromEntries(CONSTRUCTIONS.map((c) => [c.key, bodyFromLibrary(c.body)]))
-    const direct = runModel(d, W, lib, RUN_OPTIONS)
+    const direct = runModel(d, W, lib, QUARTER_HOUR_OPTIONS)  // the product's run (runOptionsFor)
     expect(r.summary.zones.map((z) => z.heating_kwh)).toEqual(direct.zones.map((z) => z.annual.heating_kwh))
     expect(r.summary.building.heating_kwh).toBeCloseTo(direct.zones.reduce((s, z) => s + z.annual.heating_kwh, 0), 9)
     expect(r.summary.building.cooling_kwh).toBeGreaterThan(0)
@@ -137,8 +137,8 @@ describe('simulate', () => {
     // Monday-morning recovery; and their hours below are the hours in use (review F6).
     const steady = structuredClone(d)
     for (const z of steady.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null }
-    // Review F3: a limited zone heated to hours runs in quarter hours; the same building unlimited keeps one step.
-    expect(r.summary.steps_per_hour).toBe(1); expect(c.summary.steps_per_hour).toBe(4)
+    // Linzie 17 Nov 10:27: every product run is in quarter hours (it was only limited zones heated to hours, review F3).
+    expect(r.summary.steps_per_hour).toBe(4); expect(c.summary.steps_per_hour).toBe(4)
     const s = simulate(steady, { weather: WEATHER, options: QUARTER_HOUR_OPTIONS })
     if (!s.ok) throw new Error(JSON.stringify(s.missing))
     c.summary.emitters!.zones.forEach((z, i) => {
@@ -482,7 +482,7 @@ describe('Brief 119: cooling units in the emitter summary', () => {
     expect(em.zones).toEqual([])  // a cooling-only unit is not a heating emitter
     expect(em.cooling).toHaveLength(1)
     const c = em.cooling[0], z = r.results.zones[2]
-    const free = simulate(d, { weather: WEATHER, options: { ...RUN_OPTIONS, emitter_limit: 'none' } })
+    const free = simulate(d, { weather: WEATHER, options: { ...QUARTER_HOUR_OPTIONS, emitter_limit: 'none' } })
     if (!free.ok) throw new Error('free run')
     expect(c).toMatchObject({ id: z3.id, cap_w: 12000, unmet_hours: z.annual.unmet_cooling_hours, max_c: z.annual.max_control_c, hours_at_cap: z.cooling_units!.hours_at_cap })
     expect(c.peak_w).toBe(free.results.zones[2].annual.peak_cooling_w)
