@@ -45,7 +45,7 @@ describe('run copies (Rule 8: removed, not muted)', () => {
       expect(z.ventilation).toEqual([])
       expect(z.emitters).toEqual([])
       expect(z.profile_refs).toEqual({ occupancy: null, lighting: [], equipment: [], auxiliary: [] })
-      expect(z.setpoints).toEqual({ heat_c: 21, cool_c: null, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' })
+      expect(z.setpoints).toEqual({ heat_c: 21, cool_c: null, setback_c: null, hours_ref: null, heat_ref: null, cool_ref: null, control_strategy: 'active_setpoint' })
     }
     // The envelope stays: surfaces, infiltration, bridging, capacity.
     expect(f.surfaces).toEqual(d.surfaces)

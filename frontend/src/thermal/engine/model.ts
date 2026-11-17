@@ -835,12 +835,47 @@ export function zoneSetpointHours(doc: ModelDocument, hours: Weather['hours']): 
   let cal: ReturnType<typeof calendar> | null = null
   return doc.zones.map((z, zi) => {
     const sp = z.setpoints, p = `zones[${zi}].setpoints`
-    if (sp.hours_ref == null) {
+    // Brief 121: setpoints that follow temperature profiles.
+    const heatRef = sp.heat_ref ?? null, coolRef = sp.cool_ref ?? null
+    const tempProfile = (ref: string, k: 'heat_ref' | 'cool_ref') => {
+      const t = doc.profiles.find((q) => q.id === ref)
+      if (!t || t.kind !== 'temperature') throw new ModelError(`no temperature profile "${ref}"`, `${p}.${k}`)
+      return t
+    }
+    const extreme = (t: Extract<ModelDocument['profiles'][number], { kind: 'temperature' }>, f: (...x: number[]) => number) =>
+      f(...t.day_types.weekday, ...t.day_types.saturday, ...t.day_types.sunday)
+    const heatT = heatRef != null ? tempProfile(heatRef, 'heat_ref') : null
+    const coolT = coolRef != null ? tempProfile(coolRef, 'cool_ref') : null
+    if (heatT) {
+      if (sp.setback_c != null) throw new ModelError('the heating profile carries the setback; leave setback_c empty', `${p}.setback_c`)
+      if (sp.heat_c == null) throw new ModelError('a heating profile needs heat_c, the in-use setpoint emitters and design heat loss read: the profile\'s highest value', `${p}.heat_c`)
+      const top = extreme(heatT, Math.max)
+      if (sp.heat_c !== top) throw new ModelError(`heat_c (${sp.heat_c} °C) must be the heating profile's highest value (${top} °C)`, `${p}.heat_c`)
+    }
+    if (coolT) {
+      if (sp.cool_c == null) throw new ModelError('a cooling profile needs cool_c: the profile\'s lowest value', `${p}.cool_c`)
+      const low = extreme(coolT, Math.min)
+      if (sp.cool_c !== low) throw new ModelError(`cool_c (${sp.cool_c} °C) must be the cooling profile's lowest value (${low} °C)`, `${p}.cool_c`)
+    }
+    if (sp.hours_ref == null && !heatT && !coolT) {
       if (sp.setback_c != null) throw new ModelError('a setback needs the hours it applies outside (hours_ref)', `${p}.hours_ref`)
       return null
     }
-    const prof = doc.profiles.find((q) => q.id === sp.hours_ref)
-    if (!prof) throw new ModelError(`no profile "${sp.hours_ref}"`, `${p}.hours_ref`)
+    cal ??= calendar(hours)
+    const prof = sp.hours_ref == null ? null : doc.profiles.find((q) => q.id === sp.hours_ref)
+    if (sp.hours_ref != null && !prof) throw new ModelError(`no profile "${sp.hours_ref}"`, `${p}.hours_ref`)
+    if (prof == null) {
+      // Profiles and no hours: in use every hour; the profiles give each hour's setpoints.
+      const H = hours.count
+      const heat = new Float64Array(H), cool = new Float64Array(H), use = new Uint8Array(H).fill(1)
+      for (let h = 0; h < H; h++) {
+        const d = cal.day[h], hr = cal.hourOfDay[h]
+        heat[h] = heatT ? heatT.day_types[d][hr] : sp.heat_c ?? NaN
+        cool[h] = coolT ? coolT.day_types[d][hr] : sp.cool_c ?? NaN
+        if (heat[h] >= cool[h]) throw new ModelError(`the heating setpoint (${heat[h]} °C) reaches the cooling setpoint (${cool[h]} °C) at hour ${h}`, `${p}.${heatT ? 'heat_ref' : 'cool_ref'}`)
+      }
+      return { hourly: { heat_c: heat, cool_c: cool }, in_use: use, in_use_hours: H }
+    }
     const pi = doc.profiles.indexOf(prof)
     if (prof.kind !== 'schedule') throw new ModelError(`profile "${prof.id}" is ${prof.kind}, not a schedule`, `${p}.hours_ref`)
     if (sp.heat_c == null && sp.cool_c == null) throw new ModelError('hours are given, but neither a heating nor a cooling setpoint', p)
@@ -851,17 +886,18 @@ export function zoneSetpointHours(doc: ModelDocument, hours: Weather['hours']): 
     for (const dt of ['weekday', 'saturday', 'sunday'] as const) {
       prof.day_types[dt].forEach((f, hr) => {
         if (!(f >= 0 && f <= 1)) throw new ModelError(`${dt} hour ${hr}: ${f} must be 0 to 1`, `profiles[${pi}].day_types.${dt}`)
-        if (sp.setback_c == null && sp.heat_c != null && f !== 0 && f !== 1) throw new ModelError(`${dt} hour ${hr}: a part value (${f}) needs a setback to scale from; give 0 (off) or 1 (on), or state setback_c`, `profiles[${pi}].day_types.${dt}`)
+        if (sp.setback_c == null && sp.heat_c != null && !heatT && f !== 0 && f !== 1) throw new ModelError(`${dt} hour ${hr}: a part value (${f}) needs a setback to scale from; give 0 (off) or 1 (on), or state setback_c`, `profiles[${pi}].day_types.${dt}`)
       })
     }
-    cal ??= calendar(hours)
     const H = hours.count
     const heat = new Float64Array(H), cool = new Float64Array(H), use = new Uint8Array(H)
     let n = 0
     for (let h = 0; h < H; h++) {
-      const f = prof.day_types[cal.day[h]][cal.hourOfDay[h]]
-      heat[h] = sp.heat_c == null ? NaN : sp.setback_c != null ? sp.setback_c + f * (sp.heat_c - sp.setback_c) : f > 0 ? sp.heat_c : NaN
-      cool[h] = sp.cool_c != null && f > 0 ? sp.cool_c : NaN
+      const d = cal.day[h], hr = cal.hourOfDay[h]
+      const f = prof.day_types[d][hr]
+      heat[h] = heatT ? heatT.day_types[d][hr] : sp.heat_c == null ? NaN : sp.setback_c != null ? sp.setback_c + f * (sp.heat_c - sp.setback_c) : f > 0 ? sp.heat_c : NaN
+      cool[h] = sp.cool_c != null && f > 0 ? (coolT ? coolT.day_types[d][hr] : sp.cool_c) : NaN
+      if ((heatT || coolT) && heat[h] >= cool[h]) throw new ModelError(`the heating setpoint (${heat[h]} °C) reaches the cooling setpoint (${cool[h]} °C) at hour ${h}`, `${p}.${heatT ? 'heat_ref' : coolT ? 'cool_ref' : 'heat_c'}`)
       if (f === 1) { use[h] = 1; n++ }
     }
     return { hourly: { heat_c: heat, cool_c: cool }, in_use: use, in_use_hours: n }

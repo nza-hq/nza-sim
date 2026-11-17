@@ -48,7 +48,9 @@ export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { s
 export function runOptionsFor(doc: ModelDocument): RunOptions {
   // Brief 120: a zone on a system with a stated capacity is limited too, so it steps in quarter hours the same way.
   const onPlant = (zid: string) => doc.system_groups.some((g) => g.enabled && (g.service === 'heating' || g.service === 'cooling') && g.capacity_kw != null && g.zones.includes(zid))
-  return doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
+  // Brief 121: a setpoint profile steps the setpoint as hours do.
+  const toHours = (z: ModelDocument['zones'][number]) => z.setpoints.hours_ref != null || z.setpoints.heat_ref != null || z.setpoints.cool_ref != null
+  return doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && toHours(z)) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
 }
 
 /** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */
@@ -670,9 +672,10 @@ function engineMissing(e: unknown, doc: ModelDocument): Missing | null {
  * its setback is the capped run's, shown by the heating hours panel.
  */
 export function steadyDocument(doc: ModelDocument): ModelDocument {
-  if (!doc.zones.some((z) => z.setpoints.hours_ref != null)) return doc
+  if (!doc.zones.some((z) => z.setpoints.hours_ref != null || z.setpoints.heat_ref != null || z.setpoints.cool_ref != null)) return doc
   const d = structuredClone(doc)
-  for (const z of d.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null }
+  // Brief 121: setpoint profiles go too; heat_c and cool_c are their in-use values.
+  for (const z of d.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null; z.setpoints.heat_ref = null; z.setpoints.cool_ref = null }
   return d
 }
 

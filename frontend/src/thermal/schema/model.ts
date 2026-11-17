@@ -420,6 +420,14 @@ export const Zone = z
         cool_c: finite.nullable(),
         setback_c: finite.nullable(),
         hours_ref: z.string().nullable(),
+        /**
+         * Brief 121: the heating setpoint each hour from a temperature profile (in every hour; the profile carries any
+         * setback, so setback_c is empty). heat_c stays the in-use setpoint (emitter rating, design heat loss) and must
+         * be the profile's highest value.
+         */
+        heat_ref: id.nullable().default(null),
+        /** Brief 121: the cooling setpoint each hour from a temperature profile (cooling still only in hours_ref's hours); cool_c its lowest value. */
+        cool_ref: id.nullable().default(null),
         /** Today's `control_strategy` ('active_setpoint' or free running). */
         control_strategy: z.string().nullable(),
       })
@@ -941,7 +949,12 @@ export const ModelDocument = z
       if (p.kind === 'lighting' && p.lux != null && p.magnitude != null) ctx.addIssue({ code: 'custom', path: ['profiles', i], message: `lighting "${p.id}" states both lux and a W/m²: keep one` })
     })
     const profileIds = new Set(doc.profiles.map((p) => p.id))
+    const tempIds = new Set(doc.profiles.filter((p) => p.kind === 'temperature').map((p) => p.id))
     doc.zones.forEach((z0, i) => {
+      for (const k of ['heat_ref', 'cool_ref'] as const) {
+        const r = z0.setpoints[k]
+        if (r != null && !tempIds.has(r)) ctx.addIssue({ code: 'custom', path: ['zones', i, 'setpoints', k], message: `temperature profile "${r}" does not exist` })
+      }
       const refs = [z0.profile_refs.occupancy, ...z0.profile_refs.lighting, ...z0.profile_refs.equipment, ...z0.profile_refs.auxiliary]
       refs.forEach((r) => {
         if (r != null && !profileIds.has(r)) ctx.addIssue({ code: 'custom', path: ['zones', i, 'profile_refs'], message: `zone "${z0.id}" refers to profile "${r}", which does not exist` })
