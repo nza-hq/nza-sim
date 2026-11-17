@@ -59,7 +59,8 @@ export interface NetworkZone {
    * step. The heat of each line is reported in terms.air_lines_w. `record_w`: the step's share of the hour when it
    * is recorded, 0 in the warm-up days.
    */
-  air_at?: ((h: number, room_c: number, te: number, out: Float64Array, record_w: number) => void) | null
+  /** `frac`: how far this step is through the hour (1 at its end); with linear outdoor temperature, weather read hourly is interpolated by it, as EnergyPlus does between hours. */
+  air_at?: ((h: number, room_c: number, te: number, out: Float64Array, record_w: number, frac: number) => void) | null
   /** How many lines air_at writes (required with it). */
   air_lines?: number
   /** Brief 108: heating's share to the air when it differs from cooling's (the emitters'). Absent: hc_convective_fraction. */
@@ -961,7 +962,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   }
 
   /** One step of hour h at outdoor temperature te; recorded outputs add w (1 / steps per hour) of their value. */
-  const sub = (h: number, te: number, record: boolean, w: number) => {
+  const sub = (h: number, te: number, record: boolean, w: number, frac = 1) => {
     if (tarp) tarpCoefficients()
     if (anyCapAt) for (let z = 0; z < Z; z++) { const f = capAt[z]; if (f) { capW[z] = f(ctlPrev[z]); if (record) capRec[z]![h] += w * capW[z] } }
     if (anySpH) for (let z = 0; z < Z; z++) {
@@ -976,7 +977,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     const zi0 = h * Z * 3
     for (let z = 0; z < Z; z++) {
       hv[z] = zIn[zi0 + 3 * z]
-      if (anyAirAt && airAt[z]) { const g = airG[z]!; airAt[z]!(h, airPrev[z], te, g, record ? w : 0); for (let i = 0; i < g.length; i++) hv[z] += g[i] }
+      if (anyAirAt && airAt[z]) { const g = airG[z]!; airAt[z]!(h, airPrev[z], te, g, record ? w : 0, frac); for (let i = 0; i < g.length; i++) hv[z] += g[i] }
       const sol = zIn[zi0 + 3 * z + 1]
       const beam = zIn[zi0 + 3 * z + 2]
       const ogw = ogIn[z] ? ogIn[z]![h] : 0, ogc = ogCh[z] ? ogCh[z]![h] : ogC[z]
@@ -1102,7 +1103,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     else {
       // The reading before hour 0 is the warm-up day's last hour (the warm-up repeats the first day).
       const prev = linear ? inp.theta_e[h > 0 ? h - 1 : Math.min(23, H - 1)] : cur
-      for (let s = 1; s <= N; s++) sub(h, prev + ((cur - prev) * s) / N, record, 1 / N)
+      for (let s = 1; s <= N; s++) sub(h, prev + ((cur - prev) * s) / N, record, 1 / N, linear ? s / N : 1)
     }
   }
 

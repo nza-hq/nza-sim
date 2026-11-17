@@ -179,12 +179,20 @@ export interface AirStep { open_factor: number; p_z: number; iterations: number;
  * One room, one step: the conductance of each line (W/K, in AIR_LINES order) into `out`, from the room's air
  * temperature at the last step, the outdoor temperature `te` this step and hour h's wind.
  */
-export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: number, te: number, out: Float64Array): AirStep {
+export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: number, te: number, out: Float64Array, frac = 1): AirStep {
   const w = wx.w[h]
   const rhoO = rhoAir(wx.p_std, te, w), rhoZ = rhoAir(wx.p_std, room_c, w)
   const muO = muAir(te), muZ = muAir(room_c), muAve = 0.5 * (muO + muZ)
   const tAveK = 0.5 * (te + room_c) + 273.15
-  const U = wx.wind_speed[h], dir = wx.wind_direction[h]
+  // Between hours (frac < 1) the wind is read on a straight line from the hour before, as the outdoor temperature is
+  // and as EnergyPlus interpolates its weather between hours (direction the short way round).
+  let U = wx.wind_speed[h], dir = wx.wind_direction[h]
+  if (frac < 1) {
+    const hp = h > 0 ? h - 1 : Math.min(23, wx.wind_speed.length - 1)
+    U = wx.wind_speed[hp] + (U - wx.wind_speed[hp]) * frac
+    const d0 = wx.wind_direction[hp], dd = ((dir - d0) % 360 + 540) % 360 - 180
+    dir = (d0 + dd * frac + 360) % 360
+  }
   const qw = 0.5 * rhoAir(wx.p_hour[h], te, w) * U * U
   const nexp = m.n
   // C_T for flow in (outside upwind) and out (room upwind).
@@ -281,15 +289,20 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   for (let i = 0; i < 4; i++) out[i] = 0
   if (!(hi > -Infinity)) return { open_factor: factor, p_z: 0, iterations: 0, m_in: 0 }
   lo -= 1e-9; hi += 1e-9
-  let P = 0.5 * (lo + hi), it = 0
-  for (; it < 100; it++) {
+  // Newton inside the bracket; a step that falls outside it, or two steps that do not halve it, give way to bisection
+  // (the openings' derivatives are EnergyPlus's derivative factors, not always the true slope).
+  let P = 0.5 * (lo + hi), it = 0, slow = 0, width = hi - lo
+  for (; it < 200; it++) {
     const [f, df] = flowAt(P, null)
     if (f > 0) lo = P; else hi = P
     if (Math.abs(f) < 1e-12 || hi - lo < 1e-10) break
-    let next = df > 0 ? P + f / df : NaN
-    if (!(next > lo && next < hi)) next = 0.5 * (lo + hi)
+    if (hi - lo > 0.5 * width) slow++; else slow = 0
+    width = hi - lo
+    let next = df > 0 && slow < 2 ? P + f / df : NaN
+    if (!(next > lo && next < hi)) { next = 0.5 * (lo + hi); slow = 0 }
     P = next
   }
+  if (it >= 200) throw new AirflowError(`the room's air pressure did not settle at hour ${h}`, 'air')
   const rec = new Float64Array(3)
   flowAt(P, rec)
   const cp = cpAir(w)
