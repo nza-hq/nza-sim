@@ -82,6 +82,7 @@ import { computeCd } from '../../utils/openingCoefficients.js'
 import SchedulePopout from '../../components/shared/SchedulePopout.jsx'
 import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
+import { ROOF_STYLES, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, planRoof } from './roof'
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
 
@@ -1766,6 +1767,70 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     )
   }
 
+  // ─── Brief 123: the roof's shape (Shape, roof tab) ─────────────────────────────────────────────────────────────
+  const roofShapePanel = () => {
+    const rec: RoofRecipe = plan.roof ?? { style: 'flat' }
+    const r = planRoof(plan.blocks, rec)
+    const refused = r.blocks.find((b) => b.refused)?.refused
+    const set = (next: RoofRecipe, text: string) => {
+      commit({ ...plan, roof: next })
+      setChanges((cs) => [{ text, effect: null, depth: past.length + 1 }, ...cs].slice(0, 30))
+    }
+    const pitched = rec.style !== 'flat'
+    return (
+      <div className="gl-sec">
+        <h3>Shape</h3>
+        <div className="gl-chips gl-roof-styles" role="group" aria-label="Roof shape">
+          {ROOF_STYLES.map((s) => (
+            <button key={s.key} type="button" aria-pressed={rec.style === s.key} onClick={() => rec.style !== s.key && set(defaultRoof(s.key), `the roof → ${s.name.toLowerCase()}`)}>
+              <RoofIcon style={s.key} />{s.name}
+            </button>
+          ))}
+        </div>
+        {pitched && (
+          <>
+            <div className="gl-row">
+              <span>Pitch</span>
+              <span className="gl-num"><input className="gl-in" type="number" min={1} max={75} step={1} aria-label="Roof pitch" value={(rec as { pitch_deg: number }).pitch_deg} onChange={(e) => { const v = Number(e.target.value); if (v > 0 && v < 90) set({ ...rec, pitch_deg: v } as RoofRecipe, `roof pitch → ${v}°`) }} /><small>°</small></span>
+            </div>
+            {rec.style === 'gable' && (
+              <div className="gl-row">
+                <span>Ridge along</span>
+                <select className="gl-sel" aria-label="Ridge along" value={rec.ridge_axis} onChange={(e) => set({ ...rec, ridge_axis: e.target.value as 'longest' | 'shortest' }, `ridge → the ${e.target.value} side`)}>
+                  <option value="longest">The longest side</option>
+                  <option value="shortest">The shortest side</option>
+                </select>
+              </div>
+            )}
+            {rec.style === 'mono' && (
+              <div className="gl-row">
+                <span>High side</span>
+                <select className="gl-sel" aria-label="High side" value={String(rec.high_side)} onChange={(e) => set({ ...rec, high_side: e.target.value as 'N' | 'E' | 'S' | 'W' }, `high side → ${e.target.value}`)}>
+                  <option value="N">North</option><option value="E">East</option><option value="S">South</option><option value="W">West</option>
+                </select>
+              </div>
+            )}
+            <div className="gl-row">
+              <span>Insulated at</span>
+              <select className="gl-sel" aria-label="Insulated at" value={rec.insulation ?? 'ceiling'} onChange={(e) => set({ ...rec, insulation: e.target.value as 'ceiling' | 'slope' }, e.target.value === 'ceiling' ? 'roof insulated at the ceiling (cold loft)' : 'roof insulated in the slope (warm roof)')}>
+                <option value="ceiling">The ceiling (cold loft above)</option>
+                <option value="slope">The slope (room open to the roof)</option>
+              </select>
+            </div>
+            {refused ? <p className="gl-hint gl-warn">{refused}</p> : (
+              <dl className="gl-roof-sums">
+                <dt>Roof slopes</dt><dd>{f1(r.slope_m2)} m²</dd>
+                {r.wall_m2 > 0 && <><dt>{rec.style === 'mono' ? 'End and high walls' : 'Gable walls'}</dt><dd>{f1(r.wall_m2)} m²</dd></>}
+                {(rec.insulation ?? 'ceiling') === 'ceiling' ? <><dt>Ceiling to the loft</dt><dd>{f1(r.ceiling_m2)} m²</dd><dt>Loft</dt><dd>{f1(r.void_m3)} m³, unheated</dd></> : <><dt>Roof space added to the rooms</dt><dd>{f1(r.void_m3)} m³</dd></>}
+              </dl>
+            )}
+            <p className="gl-hint">The run uses a flat roof until the engine takes the loft (Brief 123 P4). The shape and these areas are saved with the plan.</p>
+          </>
+        )}
+      </div>
+    )
+  }
+
   // ─── Profiles (Brief 110b): the project's hour-by-hour patterns, pointed at by space types and systems ─────────
   /** What a space type points at, by profile key (a "with occupancy" relationship reads the occupancy profile). */
   const spaceUses = (sp: SpaceType): string[] => {
@@ -2880,6 +2945,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {shown.blocks.map((b, i) => <polygon key={`s${i}`} className={`gl-shell${chosenBlocks.has(i) || (drag && drag.kind === 'corner' && drag.block === i) ? ' chosen' : ''}`} points={P(b)} />)}
         {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Shape turns the whole outline orange (floor lighter, dashed). */}
         {mode === 'outline' && (shapeTab === 'roof' || shapeTab === 'floor') && shown.blocks.map((b, i) => <polygon key={`hl${i}`} className={`gl-surf-on ${shapeTab}`} points={P(b)} />)}
+        {/* Brief 123: the ridge and hip lines of a pitched roof, on Shape. */}
+        {mode === 'outline' && plan.roof && plan.roof.style !== 'flat' && shown.blocks.map((b, i) => blockRoof(b, plan.roof).lines.map(([a, c], j) => <line key={`rg${i}-${j}`} className={`gl-ridge${shapeTab === 'roof' ? ' on' : ''}`} x1={toPx([a[0], a[1]])[0]} y1={toPx([a[0], a[1]])[1]} x2={toPx([c[0], c[1]])[0]} y2={toPx([c[0], c[1]])[1]} />))}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
           return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />
@@ -3356,6 +3423,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <p className="gl-hint">Choosing one puts it on every room. To give rooms different {el === 'floor' ? 'floors' : 'roofs'}, or to make a new one, use Fabric.</p>
                 <div className="gl-btns"><button type="button" className="gl-btn quiet" onClick={() => { setFkind(el); toMode('fabric') }}>Open on Fabric →</button></div>
               </div>
+              {el === 'roof' && roofShapePanel()}
             </div>
           </aside>
         )
@@ -3505,4 +3573,10 @@ function Num({ value, unit, auto, step, min = 0, max, onCommit, onChange }: { va
       {unit && <small>{unit}</small>}
     </span>
   )
+}
+
+/** Brief 123: a small picture of each roof shape, end on. */
+function RoofIcon({ style }: { style: RoofStyle }) {
+  const d = style === 'flat' ? 'M3 9h18v9H3z' : style === 'mono' ? 'M3 12l18-6v12H3z' : style === 'gable' ? 'M3 11l9-6 9 6v7H3z' : 'M3 11l5-5h8l5 5v7H3z'
+  return <svg className="gl-roof-ico" width="22" height="18" viewBox="0 0 24 20" aria-hidden="true"><path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
 }

@@ -529,3 +529,13 @@
 .gl-surf-on.floor { fill: rgba(226, 143, 44, .14); stroke: #F0B46A; stroke-width: 7; stroke-dasharray: 12 6; }
 .gl-room-ctx { fill: rgba(35, 85, 70, .05); stroke: #9AA5A0; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .gl-zname.gl-ctx { fill: #8A9690; font-weight: 500; pointer-events: none; }
+
+/* Brief 123: roof shapes on Shape */
+.gl-roof-styles button { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; }
+.gl-roof-ico { display: block; }
+.gl-roof-sums { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 10px 0 6px; font-size: 13px; }
+.gl-roof-sums dt { color: var(--gl-soft); }
+.gl-roof-sums dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.gl-warn { color: var(--gl-bad); }
+.gl-ridge { stroke: #7C8694; stroke-width: 1.5; stroke-dasharray: 6 4; pointer-events: none; }
+.gl-ridge.on { stroke: #9A5A12; stroke-width: 2.5; stroke-dasharray: none; }

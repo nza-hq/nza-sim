@@ -13,6 +13,7 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { type Plan, type PlacedWindow, type Span, type WallRun, type XY, edgesOf } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
+import { type BlockRoof, blockRoof } from './roof'
 
 // Colours from BuildingViewer3D, so the two read as one tool.
 const C = { floorOn: '#F2B872', wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
@@ -107,7 +108,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
-      {plan.blocks.map((b, i) => <Roof key={`r${i}`} ring={b} H={H} on={roofOn} hide={floorOn && !roofOn} />)}
+      {plan.blocks.map((b, i) => { const br = blockRoof(b, plan.roof); return br.style === 'flat' ? <Roof key={`r${i}`} ring={b} H={H} on={roofOn} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {runs.map((run) => (
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
@@ -175,6 +176,33 @@ function Roof({ ring, H, on, hide }: { ring: XY[]; H: number; on: boolean; hide:
     <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, H, 0]} castShadow={on} receiveShadow={on} renderOrder={on ? 0 : 2}>
       <meshStandardMaterial color={on ? C.select : C.slab} roughness={0.8} transparent={!on} opacity={on ? 1 : 0.16} depthWrite={on} />
     </mesh>
+  )
+}
+
+/** Brief 123: a pitched roof's faces (slopes and gable walls) from roof.ts; see-through unless the roof is chosen. */
+function Pitched({ roof, H, on, hide }: { roof: BlockRoof; H: number; on: boolean; hide: boolean }) {
+  const g = useMemo(() => {
+    const pos: number[] = []
+    for (const f of roof.faces) {
+      const p = f.pts.map(([x, y, z]) => [x, H + z, -y])
+      for (let i = 1; i + 1 < p.length; i++) pos.push(...p[0]!, ...p[i]!, ...p[i + 1]!) // every face is convex
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    geo.computeVertexNormals()
+    return geo
+  }, [roof, H])
+  const edges = useMemo(() => new THREE.EdgesGeometry(g, 1), [g])
+  if (hide) return null
+  return (
+    <group renderOrder={on ? 0 : 2}>
+      <mesh geometry={g} castShadow={on} receiveShadow={on}>
+        <meshStandardMaterial color={on ? C.select : C.slab} roughness={0.8} side={THREE.DoubleSide} transparent={!on} opacity={on ? 1 : 0.22} depthWrite={on} />
+      </mesh>
+      <lineSegments geometry={edges}>
+        <lineBasicMaterial color={on ? '#9A5A12' : '#7C8694'} transparent opacity={on ? 1 : 0.6} />
+      </lineSegments>
+    </group>
   )
 }
 
