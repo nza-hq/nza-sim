@@ -172,6 +172,16 @@ export function airWeather(hours: { dry_bulb: ArrayLike<number>; dew_point: Arra
   return { dry_bulb: hours.dry_bulb, wind_speed: hours.wind_speed, wind_direction: hours.wind_direction, w, p_hour: hours.pressure, p_std: stdPressure(elevation_m) }
 }
 
+const SCRATCH = new WeakMap<ZoneAirModel, { d0c: Float64Array; d0v: Float64Array; d0w: Float64Array; ww: Float64Array; rec: Float64Array; cpF: Float64Array; p: number }>()
+function scratchOf(m: ZoneAirModel) {
+  let s = SCRATCH.get(m)
+  if (!s) {
+    s = { d0c: new Float64Array(m.cracks.length), d0v: new Float64Array(m.vents.length), d0w: new Float64Array(m.windows.length), ww: new Float64Array(m.windows.length), rec: new Float64Array(3), cpF: new Float64Array(m.cp.length), p: NaN }
+    SCRATCH.set(m, s)
+  }
+  return s
+}
+
 /** One step's state for the report: whether windows were open and the room's pressure. */
 export interface AirStep { open_factor: number; p_z: number; iterations: number; /** Outdoor air coming in, kg/s (the turbulence term's too). */ m_in: number }
 
@@ -199,7 +209,8 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   const ctIn = Math.pow(RHO_REF / rhoO / ((te + 273.15) / tAveK), nexp - 1) * Math.pow(MU_REF / muAve, 2 * nexp - 1)
   const ctOut = Math.pow(RHO_REF / rhoZ / ((room_c + 273.15) / tAveK), nexp - 1) * Math.pow(MU_REF / muAve, 2 * nexp - 1)
   const lamIn = Math.sqrt(rhoO) / muO, lamOut = Math.sqrt(rhoZ) / muZ
-  const cpF = m.cp.map((t) => cpAt(t, dir))
+  const cpF = scratchOf(m).cpF
+  for (let i = 0; i < m.cp.length; i++) cpF[i] = cpAt(m.cp[i], dir)
   const dRhoStack = AIR.g * (rhoZ - rhoO)
 
   // Window opening this step.
@@ -221,89 +232,107 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
     }
   }
 
-  // Wind pressure on each path (fixed this step) and the stack-free part of Δp.
+  // Each path's pressure difference with the room at P = 0 (wind + stack), fixed this step.
   const nc = m.cracks.length, nv = m.vents.length, nw = factor > 0 ? m.windows.length : 0
-  const flowAt = (P: number, rec: Float64Array | null): [number, number] => {
-    let f = 0, df = 0
+  const sc = scratchOf(m)
+  const d0c = sc.d0c, d0v = sc.d0v, d0w = sc.d0w, ww = sc.ww
+  let lo = Infinity, hi = -Infinity
+  for (let i = 0; i < nc; i++) { const c = m.cracks[i]; const d = cpF[c.facade] * qw * c.wind * c.wind + c.z * dRhoStack; d0c[i] = d; if (d < lo) lo = d; if (d > hi) hi = d }
+  for (let i = 0; i < nv; i++) { const v = m.vents[i]; const d = cpF[v.facade] * qw * v.wind * v.wind + v.z * dRhoStack; d0v[i] = d; if (d < lo) lo = d; if (d > hi) hi = d }
+  for (let i = 0; i < nw; i++) {
+    const o = m.windows[i]
+    // EnergyPlus SimpleOpening with node N = outside, M = the room; PDROP at the opening's reference height.
+    const d = cpF[o.facade] * qw * o.wind * o.wind + o.z_ref * dRhoStack
+    d0w[i] = d; ww[i] = o.width * o.max_factor * factor
+    const top = d + o.height * dRhoStack
+    if (d < lo) lo = d; if (d > hi) hi = d; if (top < lo) lo = top; if (top > hi) hi = top
+  }
+  const drho = rhoO - rhoZ, gd = AIR.g * drho, sN = Math.sqrt(rhoO), sM = Math.sqrt(rhoZ)
+  const kIn = ctIn, kOut = ctOut
+  // Net flow into the room at room pressure P (kg/s), its slope (−dF/dP) and Σ|F|; with `rec`, the inflow per line.
+  let F_ = 0, D_ = 0, A_ = 0
+  const flowAt = (P: number, rec: Float64Array | null) => {
+    let f = 0, df = 0, sa = 0
     for (let i = 0; i < nc; i++) {
       const c = m.cracks[i]
-      const dp = cpF[c.facade] * qw * c.wind * c.wind + c.z * dRhoStack - P
+      const dp = d0c[i] - P
       let F: number, D: number
       if (dp >= 0) {
-        const FL = c.k * ctIn * lamIn * dp, FT = c.k * ctIn * Math.pow(dp, nexp)
-        if (FL <= FT) { F = FL; D = c.k * ctIn * lamIn } else { F = FT; D = dp > 0 ? (FT * nexp) / dp : 0 }
+        const FL = c.k * kIn * lamIn * dp, FT = dp > 0 ? c.k * kIn * Math.exp(nexp * Math.log(dp)) : 0
+        if (FL <= FT) { F = FL; D = c.k * kIn * lamIn } else { F = FT; D = (FT * nexp) / dp }
       } else {
         const a = -dp
-        const FL = c.k * ctOut * lamOut * a, FT = c.k * ctOut * Math.pow(a, nexp)
-        if (FL <= FT) { F = -FL; D = c.k * ctOut * lamOut } else { F = -FT; D = (FT * nexp) / a }
+        const FL = c.k * kOut * lamOut * a, FT = c.k * kOut * Math.exp(nexp * Math.log(a))
+        if (FL <= FT) { F = -FL; D = c.k * kOut * lamOut } else { F = -FT; D = (FT * nexp) / a }
       }
-      f += F; df += D
+      f += F; df += D; sa += F < 0 ? -F : F
       if (rec && F > 0) rec[0] += F
     }
     for (let i = 0; i < nv; i++) {
-      const v = m.vents[i]
-      const dp = cpF[v.facade] * qw * v.wind * v.wind + v.z * dRhoStack - P
-      const rho = dp >= 0 ? rhoO : rhoZ, a = Math.abs(dp)
-      const F = Math.sign(dp) * v.cdA * Math.sqrt(2 * rho * a)
-      f += F; if (a > 1e-12) df += Math.abs(F) / (2 * a)
+      const dp = d0v[i] - P
+      const a = dp < 0 ? -dp : dp
+      const F = (dp >= 0 ? 1 : -1) * m.vents[i].cdA * Math.sqrt(2 * (dp >= 0 ? rhoO : rhoZ) * a)
+      f += F; sa += F < 0 ? -F : F
+      if (a > 1e-12) df += (F < 0 ? -F : F) / (2 * a)
       if (rec && F > 0) rec[1] += F
     }
     for (let i = 0; i < nw; i++) {
       const o = m.windows[i]
-      // EnergyPlus SimpleOpening with node N = outside, M = the room; PDROP at the opening's reference height.
-      const pdrop = cpF[o.facade] * qw * o.wind * o.wind + o.z_ref * dRhoStack - P
-      const W = o.width * o.max_factor * factor, Hh = o.height
-      const drho = rhoO - rhoZ
-      if (Math.abs(drho) < AIR.min_rho_diff) {
-        const dmid = pdrop - 0.5 * Hh * AIR.g * drho
-        const rho = dmid >= 0 ? rhoO : rhoZ, a = Math.abs(dmid)
-        const F = Math.sign(dmid) * o.cd * W * Hh * Math.sqrt(2 * rho * a)
-        f += F; df += a > 1e-12 ? Math.abs(F) / (2 * a) : 0
+      const pdrop = d0w[i] - P
+      const W = ww[i], Hh = o.height
+      if ((drho < 0 ? -drho : drho) < AIR.min_rho_diff) {
+        const dmid = pdrop - 0.5 * Hh * gd
+        const a = dmid < 0 ? -dmid : dmid
+        const F = (dmid >= 0 ? 1 : -1) * o.cd * W * Hh * Math.sqrt(2 * (dmid >= 0 ? rhoO : rhoZ) * a)
+        f += F; sa += F < 0 ? -F : F; df += a > 1e-12 ? (F < 0 ? -F : F) / (2 * a) : 0
         if (rec && F > 0) rec[2] += F
         continue
       }
-      const gd = AIR.g * drho, Y = pdrop / gd, C = Math.SQRT2 * W * o.cd
-      const DF0 = (C * Math.sqrt(Math.abs(pdrop))) / Math.abs(gd)
-      const F0 = (2 / 3) * C * Math.sqrt(Math.abs(gd * Y)) * Math.abs(Y)
-      const DFH = C * Math.sqrt(Math.abs((Hh - Y) / gd))
-      const FH = (2 / 3) * DFH * Math.abs(gd * (Hh - Y))
-      const sN = Math.sqrt(rhoO), sM = Math.sqrt(rhoZ)
+      const Y = pdrop / gd, C = Math.SQRT2 * W * o.cd, agd = gd < 0 ? -gd : gd
+      const DF0 = (C * Math.sqrt(pdrop < 0 ? -pdrop : pdrop)) / agd
+      const ay = Y < 0 ? -Y : Y
+      const F0 = (2 / 3) * C * Math.sqrt(agd * ay) * ay
+      const hy = Hh - Y, ahy = hy < 0 ? -hy : hy
+      const DFH = C * Math.sqrt(ahy / agd)
+      const FH = (2 / 3) * DFH * agd * ahy
       let a = 0, b = 0, da = 0, db = 0
       if (Y <= 0) {
-        if (drho >= 0) { a = -sM * Math.abs(FH - F0); da = sM * Math.abs(DFH - DF0) } else { a = sN * Math.abs(FH - F0); da = sN * Math.abs(DFH - DF0) }
+        const x = FH - F0 < 0 ? F0 - FH : FH - F0, dx = DFH - DF0 < 0 ? DF0 - DFH : DFH - DF0
+        if (drho >= 0) { a = -sM * x; da = sM * dx } else { a = sN * x; da = sN * dx }
       } else if (Y >= Hh) {
-        if (drho >= 0) { a = sN * Math.abs(FH - F0); da = sN * Math.abs(DFH - DF0) } else { a = -sM * Math.abs(FH - F0); da = sM * Math.abs(DFH - DF0) }
+        const x = FH - F0 < 0 ? F0 - FH : FH - F0, dx = DFH - DF0 < 0 ? DF0 - DFH : DFH - DF0
+        if (drho >= 0) { a = sN * x; da = sN * dx } else { a = -sM * x; da = sM * dx }
       } else if (drho >= 0) { a = -sM * FH; da = sM * DFH; b = sN * F0; db = sN * DF0 } else { a = sN * FH; da = sN * DFH; b = -sM * F0; db = sM * DF0 }
-      f += a + b; df += da + db
+      f += a + b; df += da + db; sa += (a < 0 ? -a : a) + (b < 0 ? -b : b)
       if (rec) { if (a > 0) rec[2] += a; if (b > 0) rec[2] += b }
     }
-    return [f, df]
+    F_ = f; D_ = df; A_ = sa
   }
 
-  // Bracket: every path's pressure difference with P = 0, the lowest and highest.
-  let lo = Infinity, hi = -Infinity
-  const bound = (dp: number) => { if (dp < lo) lo = dp; if (dp > hi) hi = dp }
-  for (const c of m.cracks) bound(cpF[c.facade] * qw * c.wind * c.wind + c.z * dRhoStack)
-  for (const v of m.vents) bound(cpF[v.facade] * qw * v.wind * v.wind + v.z * dRhoStack)
-  for (let i = 0; i < nw; i++) { const o = m.windows[i]; const b0 = cpF[o.facade] * qw * o.wind * o.wind + o.z_ref * dRhoStack; bound(b0); bound(b0 + o.height * dRhoStack) }
   for (let i = 0; i < 4; i++) out[i] = 0
   if (!(hi > -Infinity)) return { open_factor: factor, p_z: 0, iterations: 0, m_in: 0 }
+  // The room's pressure lies between the paths' own (every flow one way beyond them). Newton inside that bracket; a
+  // step that falls outside it, or two that do not halve the imbalance, give way to bisection (the openings'
+  // derivatives are EnergyPlus's derivative factors, not always the true slope). Settled when the imbalance is below
+  // 1e-6 of the flows through the room, or 1e-9 kg/s (0.004 g an hour).
   lo -= 1e-9; hi += 1e-9
-  // Newton inside the bracket; a step that falls outside it, or two steps that do not halve it, give way to bisection
-  // (the openings' derivatives are EnergyPlus's derivative factors, not always the true slope).
-  let P = 0.5 * (lo + hi), it = 0, slow = 0, width = hi - lo
+  // Start from the room's pressure at the step before (it moves little from one step to the next).
+  let P = sc.p > lo && sc.p < hi ? sc.p : 0.5 * (lo + hi), it = 0, slow = 0, last = Infinity
   for (; it < 200; it++) {
-    const [f, df] = flowAt(P, null)
+    flowAt(P, null)
+    const f = F_, af = f < 0 ? -f : f
+    if (af <= 1e-9 + 1e-6 * A_ || hi - lo < 1e-10) break
     if (f > 0) lo = P; else hi = P
-    if (Math.abs(f) < 1e-12 || hi - lo < 1e-10) break
-    if (hi - lo > 0.5 * width) slow++; else slow = 0
-    width = hi - lo
-    let next = df > 0 && slow < 2 ? P + f / df : NaN
+    slow = af > 0.5 * last ? slow + 1 : 0
+    last = af
+    let next = D_ > 0 && slow < 2 ? P + f / D_ : NaN
     if (!(next > lo && next < hi)) { next = 0.5 * (lo + hi); slow = 0 }
     P = next
   }
   if (it >= 200) throw new AirflowError(`the room's air pressure did not settle at hour ${h}`, 'air')
-  const rec = new Float64Array(3)
+  sc.p = P
+  const rec = sc.rec
+  rec[0] = 0; rec[1] = 0; rec[2] = 0
   flowAt(P, rec)
   const cp = cpAir(w)
   out[0] = cp * rec[0]; out[1] = cp * rec[1]; out[2] = cp * rec[2]

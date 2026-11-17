@@ -1,0 +1,70 @@
+{
+ "source": "scripts/115_perf.mts",
+ "node": "v22.23.4",
+ "cases": [
+  {
+   "name": "one_room",
+   "zones": 1,
+   "median_ms": 80,
+   "ms": [
+    126,
+    80,
+    76,
+    76,
+    123
+   ],
+   "budget_ms": 100,
+   "heating_kwh": 3750.6574915315837,
+   "cooling_kwh": 0,
+   "room_hours_windows_open": 1457
+  },
+  {
+   "name": "one_room_4",
+   "zones": 1,
+   "median_ms": 235,
+   "ms": [
+    222,
+    235,
+    222,
+    323,
+    332
+   ],
+   "budget_ms": null,
+   "heating_kwh": 3742.354829909966,
+   "cooling_kwh": 0,
+   "room_hours_windows_open": 1810
+  },
+  {
+   "name": "fifty_rooms",
+   "zones": 50,
+   "median_ms": 3116,
+   "ms": [
+    3217,
+    3187,
+    3116,
+    3092,
+    3105
+   ],
+   "budget_ms": 2000,
+   "heating_kwh": 178969.6141097289,
+   "cooling_kwh": 13241.931599870146,
+   "room_hours_windows_open": 47983
+  },
+  {
+   "name": "fifty_rooms_today",
+   "zones": 50,
+   "median_ms": 1722,
+   "ms": [
+    1749,
+    1605,
+    1659,
+    1792,
+    1722
+   ],
+   "budget_ms": null,
+   "heating_kwh": 182396.85532927784,
+   "cooling_kwh": 50280.63786741328,
+   "room_hours_windows_open": 0
+  }
+ ]
+}

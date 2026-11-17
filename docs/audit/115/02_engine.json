@@ -24,11 +24,11 @@
   },
   "R1_q5": {
    "engine": {
-    "heat_kwh": 4482.667861184635,
+    "heat_kwh": 4482.667866029137,
     "cool_kwh": 0,
-    "inflow_t": 269.72889258979365,
+    "inflow_t": 269.72889442435445,
     "hours_open": 0,
-    "max_c": 31.050270516094077,
+    "max_c": 31.050270549093526,
     "hours_above_28": 188
    },
    "energyplus": {
@@ -39,15 +39,15 @@
     "max_c": 30.811,
     "hours_above_28": 168
    },
-   "hourly_inflow_r2": 0.999941937847721
+   "hourly_inflow_r2": 0.9999419378690534
   },
   "R1_q10": {
    "engine": {
-    "heat_kwh": 5417.861302194892,
+    "heat_kwh": 5417.861311798901,
     "cool_kwh": 0,
-    "inflow_t": 539.3011407283349,
+    "inflow_t": 539.3011445079677,
     "hours_open": 0,
-    "max_c": 31.378389156089117,
+    "max_c": 31.37838921120705,
     "hours_above_28": 166
    },
    "energyplus": {
@@ -58,15 +58,15 @@
     "max_c": 31.158,
     "hours_above_28": 149
    },
-   "hourly_inflow_r2": 0.9999584370153545
+   "hourly_inflow_r2": 0.9999584370343398
   },
   "R2_single": {
    "engine": {
-    "heat_kwh": 3742.3548238306116,
+    "heat_kwh": 3742.354829909966,
     "cool_kwh": 0,
-    "inflow_t": 469.12420287930775,
+    "inflow_t": 469.1242073522589,
     "hours_open": 1810,
-    "max_c": 31.67720597404734,
+    "max_c": 31.67720597272197,
     "hours_above_28": 141
    },
    "energyplus": {
@@ -77,15 +77,15 @@
     "max_c": 31.374,
     "hours_above_28": 119
    },
-   "hourly_inflow_r2": 0.9684249352626783
+   "hourly_inflow_r2": 0.9684249350637314
   },
   "R2_single_mod": {
    "engine": {
-    "heat_kwh": 3741.432269531244,
+    "heat_kwh": 3741.4322755181424,
     "cool_kwh": 0,
-    "inflow_t": 466.36713126617514,
+    "inflow_t": 466.3671350722138,
     "hours_open": 1816,
-    "max_c": 31.67745851477954,
+    "max_c": 31.67745851364353,
     "hours_above_28": 141
    },
    "energyplus": {
@@ -96,15 +96,15 @@
     "max_c": 31.375,
     "hours_above_28": 120
    },
-   "hourly_inflow_r2": 0.9719938575962591
+   "hourly_inflow_r2": 0.9719938582959937
   },
   "R2_cross": {
    "engine": {
-    "heat_kwh": 3994.193372344087,
+    "heat_kwh": 3994.1933687390583,
     "cool_kwh": 0,
-    "inflow_t": 3049.3494294047446,
+    "inflow_t": 3049.349447138786,
     "hours_open": 1640,
-    "max_c": 31.183155754852514,
+    "max_c": 31.183155792655,
     "hours_above_28": 95
    },
    "energyplus": {
@@ -115,13 +115,13 @@
     "max_c": 30.859,
     "hours_above_28": 82
    },
-   "hourly_inflow_r2": 0.9151458180573896
+   "hourly_inflow_r2": 0.9151458132313434
   },
   "R2_single_cooled": {
    "engine": {
-    "heat_kwh": 3742.5581569467395,
-    "cool_kwh": 79.11993998427934,
-    "inflow_t": 443.915177944149,
+    "heat_kwh": 3742.558162717539,
+    "cool_kwh": 79.11993979224663,
+    "inflow_t": 443.9174834848632,
     "hours_open": 1711,
     "max_c": 26.000000000000004,
     "hours_above_28": 0
@@ -134,13 +134,13 @@
     "max_c": 26,
     "hours_above_28": 0
    },
-   "hourly_inflow_r2": 0.9620100552459155
+   "hourly_inflow_r2": 0.9620121516346349
   },
   "R2_shut_cooled": {
    "engine": {
-    "heat_kwh": 3732.365184806363,
-    "cool_kwh": 146.41925679066637,
-    "inflow_t": 161.38634502214492,
+    "heat_kwh": 3732.3651902959614,
+    "cool_kwh": 146.41925652319264,
+    "inflow_t": 161.38634642006534,
     "hours_open": 0,
     "max_c": 26.000000000000004,
     "hours_above_28": 0
@@ -153,20 +153,20 @@
     "max_c": 26,
     "hours_above_28": 0
    },
-   "hourly_inflow_r2": 0.9998725339448548
+   "hourly_inflow_r2": 0.9998725340290435
   }
  },
  "own_effects": {
   "R1_q5_heating": {
-   "engine": 932.7205413905504,
+   "engine": 932.720546235053,
    "energyplus": 933.7450292180838
   },
   "R1_q10_heating": {
-   "engine": 1867.913982400808,
+   "engine": 1867.9139920048165,
    "energyplus": 1869.983421384486
   },
   "R2_windows_cooling": {
-   "engine": -67.29931680638703,
+   "engine": -67.29931673094602,
    "energyplus": -69.42564524014006
   }
  }
