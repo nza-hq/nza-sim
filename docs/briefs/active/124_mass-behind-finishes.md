@@ -68,7 +68,7 @@ There are no systems and no controls.
   - Rerun the 104/105/109 referees whose documents carried 250 kJ/K·m², with 10 kJ/K·m² on both sides.
   - Report Bridgewater v2 before and after.
   - Write it all up in `docs/audit/124/`.
-- **P4 (editor).**
+- **P4 (editor).** Done 17 Nov on `sim2/124-finishes`.
   - Floor finish and ceiling choice on the space templates (D4), pre-filled and editable on Fabric.
   - Written to `inside_finish` in `toDocument`.
   - The words "Carpet / Hard floor" and "Suspended ceiling / Exposed soffit", with an ⓘ citing the numbers from the investigation.

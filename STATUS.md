@@ -10,11 +10,16 @@
   - **Finishes.** `inside_finish` / `inside_finish_b` on surfaces, library finish constructions (drafts: `finish_carpet`, `finish_suspended_ceiling`).
   - **Monthly.** κ from ISO 13786's periodic method.
   - **Referee.** `docs/audit/124/01_referee.md`: hourly within 0.5 % of EnergyPlus on cooling; monthly +1.5 to +5.4 % of hourly; Bridgewater v2 about +1 %.
+- **P4 done (editor thread, `sim2/124-finishes`):**
+  - Every space type has a floor finish (Carpet / Hard floor) and a Suspended ceiling tick, "typical" until chosen (`finishesOf`, plan.ts): offices, meeting rooms, classrooms, bedrooms carpet + suspended; anything else hard + exposed (D4).
+  - On the space card (Finishes, with the ⓘ numbers) and on Fabric's Ground floor and Roof, one row per space type in use.
+  - `toDocument` writes `inside_finish` on each room's ground floor and on its flat roof or loft ceiling, and pins the finishes in `library_refs`.
+  - Found: both library ground floors are already "Carpet, screed, …", so no carpet is added on top of them (said on screen); a hard floor chosen on one is a document note. A floor construction without carpet is a Suggestion for Chris.
 - **Open:**
-  - P4 (editor): floor finish and ceiling tick on templates and Fabric.
   - Chris to review the two finish drafts.
   - Re-measure the v2 anchor on IT15.
 - **Suggestion:** several storeys in the workspace (a concrete frame's middle floors cannot be drawn yet).
+- **Suggestion (Brief 124 P4):** a library ground floor without carpet (slab, screed, insulation), so a hard floor can be modelled; both library ground floors have carpet in them today.
 
 ## 🔧 Brief 122 — Simulate v2: the instant estimate — IN PROGRESS 17 Nov 2026 (engine on `chris/122-instant-engine`, workspace on `sim2/122-instant`)
 

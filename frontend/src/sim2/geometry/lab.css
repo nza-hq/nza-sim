@@ -82,6 +82,7 @@
 .gl-num small { min-width: 18px; color: var(--gl-soft); font-size: 12px; white-space: nowrap; }
 .gl-say { margin: 0; font-size: 12px; line-height: 1.45; color: var(--gl-ink); }
 .gl-hint { margin: 0; font-size: 12px; line-height: 1.4; color: var(--gl-soft); }
+.gl-typical { font-size: 11px; color: var(--gl-soft); font-weight: 400; }
 .gl-warn { margin: 0; font-size: 12px; line-height: 1.4; color: #9A5B10; }
 .gl-err { margin: 0; font-size: 12px; line-height: 1.4; color: var(--gl-bad); font-weight: 600; }
 .gl-btn {

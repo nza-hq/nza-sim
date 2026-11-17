@@ -242,6 +242,26 @@ export const defaultFabric = (): FabricType[] => FABRIC_ELEMENTS.map((e) => ({ i
 
 /** A space type (archetype): what a kind of room is used for, and its comfort band. Rooms are given one; every value
  * is a library key, a typed number, or null (not set). Its systems are given separately (Systems step). */
+// ─── Brief 124: finishes on a room's floor and ceiling ───────────────────────────────────────────────────────────────
+export type FloorFinish = 'carpet' | 'hard'
+export type CeilingFinish = 'suspended' | 'exposed'
+/** The library finishes (Brief 124 D3); a hard floor and an exposed soffit add no layer. */
+export const FINISH_KEY: Record<FloorFinish | CeilingFinish, string | null> = { carpet: 'finish_carpet', hard: null, suspended: 'finish_suspended_ceiling', exposed: null }
+export const FINISH_NAME: Record<FloorFinish | CeilingFinish, string> = { carpet: 'Carpet', hard: 'Hard floor', suspended: 'Suspended ceiling', exposed: 'Exposed soffit' }
+/** Brief 124 D4: offices, meeting rooms, classrooms and hotel bedrooms are carpeted with a suspended ceiling; anything
+ * else (halls, kitchens, WCs, plant, stores and the rest) has a hard floor and an exposed ceiling. Read from the space
+ * type's "Used for" choice, its name and its use. */
+const CARPETED = /office|meeting|class|teaching|bedroom/i
+export function finishesOf(sp: Pick<SpaceType, 'name' | 'use' | 'borrowed' | 'floor_finish' | 'ceiling'> | undefined): { floor: FloorFinish; ceiling: CeilingFinish; floor_typical: boolean; ceiling_typical: boolean } {
+  const typical = !!sp && CARPETED.test(`${sp.borrowed ?? ''} ${sp.name} ${sp.use ?? ''}`)
+  return {
+    floor: sp?.floor_finish ?? (typical ? 'carpet' : 'hard'),
+    ceiling: sp?.ceiling ?? (typical ? 'suspended' : 'exposed'),
+    floor_typical: sp?.floor_finish == null,
+    ceiling_typical: sp?.ceiling == null,
+  }
+}
+
 export type SpaceType = {
   id: string
   name: string
@@ -267,6 +287,10 @@ export type SpaceType = {
   hot_water_litres?: number | null
   equipment_w_per_m2?: number | null
   equipment_baseload_w_per_m2?: number | null
+  /** Brief 124 (Linzie 17 Nov 16:35): the floor finish and the ceiling, typed. Null or absent: typical for the space
+   * (finishesOf), so every room always has both. */
+  floor_finish?: FloorFinish | null
+  ceiling?: CeilingFinish | null
   /** Comfort band the systems hold, °C, typed. */
   heat_c?: number | null
   cool_c?: number | null
