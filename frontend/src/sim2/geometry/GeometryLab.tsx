@@ -39,7 +39,7 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
@@ -73,6 +73,7 @@ import ConstructionInspector from '../../components/library/ConstructionInspecto
 // Today's schedule editor (Brief 37), imported as it is: the Profiles step's full centre (Brief 118 P5, Linzie 19:19).
 const UnifiedScheduleEditor = lazy(() => import('../../components/shared/scheduleEditor/UnifiedScheduleEditor.jsx'))
 import { GAIN_COLOURS } from '../../components/modules/gains/gainColours.js'
+import TempProfileEditor from './TempProfileEditor'
 // @ts-expect-error untyped JS from today's app
 import GlazingInspector from '../../components/library/GlazingInspector.jsx'
 // @ts-expect-error untyped JS from today's app (Brief 115: today's discharge coefficients, read)
@@ -172,13 +173,17 @@ const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, profile
 const MODES: Mode[] = ['outline', 'rooms', 'fabric', 'profiles', 'spaces', 'systems']
 const STEP_ICON: Record<Mode, IconName> = { outline: 'building', rooms: 'rooms', fabric: 'wall', profiles: 'profile', spaces: 'person', systems: 'heating' }
 const STEP_LINE: Record<Mode, string> = { outline: "The building's shape", rooms: 'Walls inside, and zones', fabric: 'What it is made of', profiles: 'When things happen, hour by hour', spaces: 'What each room is for', systems: 'What heats, cools and ventilates it' }
-type ProfileKind = 'occupancy' | 'lighting' | 'equipment' | 'ventilation'
+type ProfileKind = ProfileType
 /** The kinds the engine reads today. Heating hours and setback join when Brief 109 lands. */
 const PROFILE_KINDS: ReadonlyArray<{ key: ProfileKind; name: string; spark: string; icon: IconName; where: string }> = [
   { key: 'occupancy', name: 'Occupancy', spark: 'Occupancy', icon: 'person', where: 'a space type points at it on Spaces' },
   { key: 'lighting', name: 'Lighting', spark: 'Lighting', icon: 'lighting', where: 'a space type with its own lighting profile points at it on Spaces' },
   { key: 'equipment', name: 'Equipment', spark: 'Equipment', icon: 'power', where: 'a space type with its own equipment profile points at it on Spaces' },
-  { key: 'ventilation', name: 'Ventilation', spark: 'Ventilation', icon: 'ventilation', where: 'a ventilation system points at it on Systems' },
+  { key: 'dhw', name: 'Hot water', spark: 'Hot water drawn', icon: 'dhw', where: 'a space type\'s hot water follows it (Spaces)' },
+  { key: 'heating_setpoint', name: 'Heating setpoint', spark: 'Heating, °C', icon: 'heating', where: 'a space type\'s heating follows it (Controls, Heating)' },
+  { key: 'cooling_setpoint', name: 'Cooling setpoint', spark: 'Cooling, °C', icon: 'cooling', where: 'a space type\'s cooling follows it (Controls, Cooling)' },
+  { key: 'window_opening', name: 'Window opening', spark: 'Open', icon: 'openings', where: 'a space type\'s windows open to it (Controls, Windows)' },
+  { key: 'ventilation', name: 'Availability', spark: 'On', icon: 'ventilation', where: 'ventilation, and windows\' hours, follow it (Systems, Controls)' },
 ]
 const SPACE_COLOURS = ['#E0A84E', '#5B9BD5', '#6AA84F', '#C27BA0', '#45A5A0', '#D9734E', '#8E7CC3', '#A0A04A']
 const SYSTEM_COLOURS = ['#45A5A0', '#D9734E', '#8E7CC3', '#5B9BD5', '#E0A84E', '#6AA84F', '#C27BA0', '#A0A04A']
@@ -1673,6 +1678,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     if (sp.occupancy && sp.occupancy !== ALWAYS) out.push(sp.occupancy)
     if (sp.lighting && (sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill')) out.push(sp.lighting)
     if (sp.equipment && sp.equip_relationship === 'independent') out.push(sp.equipment)
+    if (sp.heat_profile) out.push(sp.heat_profile)
+    if (sp.cool_profile) out.push(sp.cool_profile)
+    if (sp.heat_hours && sp.heat_hours !== 'always_on') out.push(sp.heat_hours)
+    if (sp.windows?.hours) out.push(sp.windows.hours)
     return out
   }
   const roomUses = (r: Plan['rooms'][number]): string[] => {
@@ -1705,7 +1714,11 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const day_types = { weekday: next.weekday, saturday: next.saturday, sunday: next.sunday }
     const mm = next.monthly_multipliers ?? p0.monthly_multipliers ?? null
     const owns = plan.own_profiles ?? []
-    if (p0.own) return commit({ ...plan, own_profiles: owns.map((x) => (x.key === key ? { ...x, day_types, monthly_multipliers: mm } : x)) })
+    if (p0.own) return commit({
+      ...plan,
+      own_profiles: owns.map((x) => (x.key === key ? { ...x, day_types, monthly_multipliers: mm } : x)),
+      spaces: plan.spaces.map((sp) => ({ ...sp, ...(sp.heat_profile === key ? { heat_c: tempRange(day_types).hi } : {}), ...(sp.cool_profile === key ? { cool_c: tempRange(day_types).lo } : {}) })),
+    })
     let n = owns.length + 1
     while (owns.some((x) => x.key === `own_${n}`)) n++
     const k2 = `own_${n}`
@@ -1714,7 +1727,15 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       ...plan,
       own_profiles: [...owns, { key: k2, name: `${p0.name} (this project)`, schedule_type: p0.schedule_type as OwnProfile['schedule_type'], from: key, day_types, monthly_multipliers: mm }],
       profiles: [...(plan.profiles ?? []).filter((x) => x !== key), k2],
-      spaces: plan.spaces.map((sp) => ({ ...sp, occupancy: sw(sp.occupancy), lighting: sw(sp.lighting), equipment: sw(sp.equipment) })),
+      spaces: plan.spaces.map((sp) => ({
+        ...sp, occupancy: sw(sp.occupancy), lighting: sw(sp.lighting), equipment: sw(sp.equipment),
+        ...(sp.heat_profile !== undefined ? { heat_profile: sw(sp.heat_profile) } : {}),
+        ...(sp.cool_profile !== undefined ? { cool_profile: sw(sp.cool_profile) } : {}),
+        ...(sp.windows ? { windows: { ...sp.windows, hours: sw(sp.windows.hours) } } : {}),
+        // A setpoint profile's edit moves the in-use figure with it (heat_c / cool_c are its highest / lowest).
+        ...(sp.heat_profile === key ? { heat_c: tempRange(day_types).hi } : {}),
+        ...(sp.cool_profile === key ? { cool_c: tempRange(day_types).lo } : {}),
+      })),
       systems: plan.systems.map((y) => (y.schedule === key ? { ...y, schedule: k2 } : y)),
     })
     setProfSel(k2)
@@ -1722,6 +1743,25 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   }
   const renameProfile = (key: string, name: string) => commit({ ...plan, own_profiles: (plan.own_profiles ?? []).map((x) => (x.key === key ? { ...x, name } : x)) })
 
+  /** A new profile of the project's own: every hour at a value the person types (a share, or °C), then drawn in the middle. */
+  const [newVal, setNewVal] = useState('')
+  const newProfileRow = (t: ProfileType, name: string) => {
+    const temp = isTemperature(t)
+    const v = newVal.trim() === '' ? NaN : Number(newVal)
+    const ok = Number.isFinite(v) && (temp ? v >= 0 && v <= 40 : v >= 0 && v <= 1)
+    return (
+      <div className="gl-row gl-librow ap-newprof"><span>New, every hour at</span>
+        <span className="ap-newprof-in">
+          <input className="gl-in" type="number" step={temp ? 0.5 : 0.1} min={0} max={temp ? 40 : 1} value={newVal} aria-label={`New ${name.toLowerCase()} profile, every hour at`} placeholder={temp ? '°C' : '0 to 1'} onChange={(e) => setNewVal(e.target.value)} />
+          <button type="button" className="gl-btn quiet" disabled={!ok} onClick={() => {
+            const n = newOwnProfile(plan, t, `${name} ${(plan.own_profiles ?? []).filter((x) => x.schedule_type === t).length + 1}`, v)
+            commit({ ...plan, own_profiles: [...(plan.own_profiles ?? []), n.own], profiles: [...(plan.profiles ?? []), n.key] })
+            setProfSel(n.key); setNewVal('')
+          }}>Make</button>
+        </span>
+      </div>
+    )
+  }
   const profilesPanel = () => {
     const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
     const mine = projectProfiles().filter((k) => profile(k)!.schedule_type === kind.key)
@@ -1738,20 +1778,23 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         items={items} active={sel?.key ?? null}
         onActive={setProfSel}
         onRemove={(id) => { commit({ ...plan, profiles: (plan.profiles ?? []).filter((k) => k !== id), own_profiles: (plan.own_profiles ?? []).filter((x) => x.key !== id) }); if (profSel === id) setProfSel(null) }}
-        top={
+        top={<>
+          {newProfileRow(kind.key, kind.name)}
           <div className="gl-row gl-librow"><span>Add from the library</span>
             <select className="gl-sel" aria-label={`Add a ${kind.name.toLowerCase()} profile`} value="" onChange={(e) => { const k = e.target.value; if (k) { commit({ ...plan, profiles: [...(plan.profiles ?? []), k] }); setProfSel(k) } }}>
               <option value="">{others.length ? 'Choose one…' : 'None left in the library'}</option>
               {others.map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
             </select>
           </div>
-        }
+        </>}
         detail={sel ? (
           <>
             {sel.own
               ? <input className="gl-title-in ap-tname" aria-label="Profile name" defaultValue={sel.name} key={`${sel.key}-${sel.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== sel.name && renameProfile(sel.key, e.target.value.trim())} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
               : <h3 className="ap-pname">{sel.name}</h3>}
-            <Spark label={kind.spark} days={sel.day_types ?? null} />
+            {isTemperature(sel.schedule_type) && sel.day_types
+              ? <p className="gl-say">In use {tempRange(sel.day_types).hi} °C, lowest {tempRange(sel.day_types).lo} °C.</p>
+              : <Spark label={kind.spark} days={sel.day_types ?? null} />}
             <p className="gl-hint">{usersOf(sel.key).length ? `Used by ${usersOf(sel.key).join(', ')}.` : `Not used yet: ${kind.where}.`}</p>
             <p className="gl-hint">{sel.own
               ? "This project's own profile. Edit its hours in the editor in the middle; every space type and system using it follows."
@@ -2237,6 +2280,33 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         </select>
       </div>
     )
+    /** A profile that is only on or off (0 or 1 every hour): the only kind a temperature rule's window hours may be. */
+    const onOff = (p: { key: string }) => { const d = profile(p.key)?.day_types; return !!d && [...d.weekday, ...d.saturday, ...d.sunday].every((v) => v === 0 || v === 1) }
+    /** One figure, or a setpoint profile from Profiles (Brief 121): the profile's highest / lowest value is written as
+     * heat_c / cool_c and it carries any setback. */
+    const followsSel = (sp: SpaceType, t: 'heating_setpoint' | 'cooling_setpoint') => {
+      const heat = t === 'heating_setpoint'
+      const cur = (heat ? sp.heat_profile : sp.cool_profile) ?? ''
+      return (
+        <div className="gl-row gl-librow"><span>Follows</span>
+          <select className="gl-sel" aria-label={`${heat ? 'Heating' : 'Cooling'} setpoint follows, ${sp.name}`} value={cur} onChange={(e) => {
+            const k = e.target.value || null
+            const d = k ? profile(k)?.day_types : null
+            if (heat) dSpace(sp.id, k && d ? { heat_profile: k, heat_c: tempRange(d).hi, setback_c: null } : { heat_profile: null })
+            else dSpace(sp.id, k && d ? { cool_profile: k, cool_c: tempRange(d).lo } : { cool_profile: null })
+          }}>
+            <option value="">One temperature</option>
+            {profOptions(profilesFor(t))}
+          </select>
+        </div>
+      )
+    }
+    const tempLine = (key: string, what: 'heating' | 'cooling') => {
+      const d = profile(key)?.day_types
+      if (!d) return <p className="gl-err">That profile is missing.</p>
+      const { hi, lo } = tempRange(d)
+      return <p className="gl-hint">{what === 'heating' ? `Heating to ${hi} °C in use, down to ${lo} °C when the profile says (its lowest hour). Change the hours on Profiles.` : `Cooling to ${lo} °C at its coolest, and its other hours as the profile says. Change it on Profiles.`}</p>
+    }
     const num = (label: string, v: number | null | undefined, on: (n: number | null) => void, aria: string, unit = '°C') => (
       <div className="gl-row gl-typed"><span>{label}</span><Num value={v ?? ''} unit={unit} step={0.5} min={0} max={40} onCommit={(n) => on(Number.isFinite(n) ? n : null)} /><span className="sr-only">{aria}</span></div>
     )
@@ -2280,9 +2350,13 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             <div className="gl-row gl-librow"><span>{w.rule === 'timetable' ? 'Open in' : 'May open in'}</span>
               <select className="gl-sel" aria-label="Window hours" value={w.hours ?? 'always_on'} onChange={(e) => setW({ hours: e.target.value === 'always_on' ? null : e.target.value })}>
                 <option value="always_on">Any hour</option>
-                {profOptions(profilesFor('ventilation'))}
+                {/* 115 review F8: under "when the room is warm" the hours only say when they may open (0 or 1 each hour);
+                    part values (how far, hour by hour) work only to a timetable. */}
+                {profOptions((w.rule === 'timetable' ? [...profilesFor('window_opening'), ...profilesFor('ventilation')] : [...profilesFor('window_opening'), ...profilesFor('ventilation')].filter(onOff)))}
               </select>
             </div>
+            {w.rule === 'temperature' && <p className="gl-hint">These hours only say when the windows may open; How far sets how far. A profile that varies hour by hour needs "To a timetable".</p>}
+            {w.rule === 'temperature' && w.hours && !onOff({ key: w.hours }) && <p className="gl-hint gl-warn">{profile(w.hours)?.name ?? w.hours} has part values, so the run will refuse it under "When the room is warm". Choose an on/off profile, or use "To a timetable".</p>}
             {(ctlMap?.rows.filter((r) => r.service === 'windows').length ?? 0) > 1 && (
               <button type="button" className="ap-link" onClick={() => { const ids = new Set(ctlMap!.rows.filter((r) => r.service === 'windows').map((r) => r.control.ref)); draft((bp) => ({ ...bp, spaces: bp.spaces.map((q) => (ids.has(q.id) ? { ...q, windows: { ...w } } : q)) })) }}>Use this rule for every space type with opening windows</button>
             )}
@@ -2296,12 +2370,19 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             <div key={sp.id} className="ap-ctlspace">
               <p className="ap-ctlsp">{sp.name}</p>
               {x.service === 'heating' ? <>
-                {num('Heating to', sp.heat_c, (n) => dSpace(sp.id, { heat_c: n }), `Heating to, ${sp.name}`)}
-                {hoursSel(sp)}
-                {sp.heat_hours && num('Outside them', sp.setback_c, (n) => dSpace(sp.id, { setback_c: n }), `Setback, ${sp.name}`)}
-                {sp.heat_hours && sp.setback_c == null && <p className="gl-hint">Empty: heating off outside its hours.</p>}
+                {followsSel(sp, 'heating_setpoint')}
+                {sp.heat_profile ? <>
+                  {tempLine(sp.heat_profile, 'heating')}
+                  {hoursSel(sp)}
+                </> : <>
+                  {num('Heating to', sp.heat_c, (n) => dSpace(sp.id, { heat_c: n }), `Heating to, ${sp.name}`)}
+                  {hoursSel(sp)}
+                  {sp.heat_hours && num('Outside them', sp.setback_c, (n) => dSpace(sp.id, { setback_c: n }), `Setback, ${sp.name}`)}
+                  {sp.heat_hours && sp.setback_c == null && <p className="gl-hint">Empty: heating off outside its hours.</p>}
+                </>}
               </> : <>
-                {num('Cooling to', sp.cool_c, (n) => dSpace(sp.id, { cool_c: n }), `Cooling to, ${sp.name}`)}
+                {followsSel(sp, 'cooling_setpoint')}
+                {sp.cool_profile ? tempLine(sp.cool_profile, 'cooling') : num('Cooling to', sp.cool_c, (n) => dSpace(sp.id, { cool_c: n }), `Cooling to, ${sp.name}`)}
                 <div className="gl-row"><span>Hours</span><span className="ap-setc">{sp.heat_hours ? short(profile(sp.heat_hours)?.name ?? sp.heat_hours) : 'Every hour'} (the heating hours)</span></div>
               </>}
             </div>
@@ -2607,7 +2688,11 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         const accent = (GAIN_COLOURS as Record<string, string>)[profKind] ?? '#EA580C'
         return (
           <div className="gl-profedit">
-            {sel?.day_types ? (
+            {sel?.day_types && isTemperature(sel.schedule_type) ? (
+              <TempProfileEditor key={sel.key} days={sel.day_types} accent={(GAIN_COLOURS as Record<string, string>)[sel.schedule_type] ?? (sel.schedule_type === 'cooling_setpoint' ? '#2F6FB5' : '#C0392B')}
+                title={sel.name} line={sel.own ? `${kind.name}, °C each hour. Every space type using it follows.` : `${kind.name}, °C each hour · from the library: an edit makes this project's copy`}
+                onChange={(d) => editProfile(sel.key, d)} />
+            ) : sel?.day_types ? (
               <Suspense fallback={<p className="gl-hint">Opening the editor…</p>}>
                 <UnifiedScheduleEditor key={sel.key} schedule={{ ...sel.day_types, monthly_multipliers: sel.monthly_multipliers ?? Array(12).fill(1) }} onChange={(next: { weekday: number[]; saturday: number[]; sunday: number[]; monthly_multipliers?: number[] }) => editProfile(sel.key, next)} accent={accent} mode="live" enableExceptions={false} contextLabel={`${sel.name}${sel.own ? '' : ' · from the library: an edit makes this project\'s copy'}`} />
               </Suspense>
