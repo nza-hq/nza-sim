@@ -12,6 +12,9 @@ import { useEffect, useMemo, useRef } from 'react'
 import { shareModel, type ModelShare } from './modelChannel'
 // @ts-expect-error untyped JS component from today's app (Brief 110b: reused, not redrawn)
 import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
+// @ts-expect-error untyped JS component from today's app (17 Nov 2026: today's Systems Sankey, reused, not redrawn)
+import { SystemSankeyChart } from '../../components/modules/systems/SystemSankey.jsx'
+import { energyFlow, fuelSplit } from './energyFlow'
 import { createPortal } from '../workspace/portal'
 import { DesignHeatLoss } from './DesignHeatLoss'
 import { EmitterSizing } from './EmitterSizing'
@@ -66,6 +69,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   // The chosen zone's balance (heat from other zones included), or the building's.
   const zone = s && focusZone ? s.zones.find((z) => z.id === focusZone) ?? null : null
   const lines = useMemo(() => (s ? (zone ? balanceLines(zone.breakdown, zone.floor_m2) : balanceLines(s.breakdown, s.building.floor_m2)) : null), [s, zone])
+  // The building's energy, fuel to system to what it delivers (energy is building-wide, so not per zone).
+  const flow = useMemo(() => (s?.energy?.ok ? { flow: energyFlow(s.energy), split: fuelSplit(s.energy) } : null), [s])
   return (
     <>
       {createPortal(<><LevelSwitch run={run} /><ResultsStrip run={run} onOpen={onOpen} /></>, strip)}
@@ -87,6 +92,13 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
               <div className="rp-hb">
                 <p className="rp-hb-for">{zone ? `${zone.name || zone.id}, heat from the other zones included` : 'Whole building'} <i>estimate</i></p>
                 <HeatBalance lines={lines} />
+              </div>
+            )}
+            {flow && !zone && (
+              <div className="rp-hb rp-sankey">
+                <SystemSankeyChart systemsFlow={flow.flow} fuelSplit={flow.split} title="Energy flow, whole building"
+                  subtitle="Each fuel, the systems that use it and what they give · plant losses and heat from outside shown, so each box balances · hover for figures"
+                  exportTitle="Energy flow" />
               </div>
             )}
             <ResultsBody run={run} focusZone={focusZone} />

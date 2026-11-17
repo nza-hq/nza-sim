@@ -174,6 +174,1361 @@
     "library_type": "construction",
     "display_name": "Suspended ceiling (finish, draft, awaiting Chris)"
    }
+  },
+  {
+   "kind": "construction",
+   "key": "cavity_wall_unfilled_1960s",
+   "body": {
+    "name": "cavity_wall_unfilled_1960s",
+    "type": "wall",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Brick outer leaf, 50mm unfilled cavity, dense concrete block inner, plaster (1960s, as built)",
+    "epjson": {
+     "Material": {
+      "Cav60_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "Cav60_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "Cav60_Plaster": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {
+      "Cav60_AirCavity": {
+       "roughness": "Rough",
+       "thermal_resistance": 0.18
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "cavity_wall_unfilled_1960s": {
+       "outside_layer": "Cav60_BrickOuter",
+       "layer_2": "Cav60_AirCavity",
+       "layer_3": "Cav60_ConcreteBlock",
+       "layer_4": "Cav60_Plaster"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "One new number, the cavity's R 0.18 m2K/W (ISO 6946:2017 Table 8, unventilated air layer 25 mm or more, horizontal heat flow). Brick and block copy CavWall_Std_BrickOuter and CavWall_Std_ConcreteBlock from cavity_wall_standard; the plaster copies IntFloor_Plaster from interior_floor_ceiling (rows of Chris's library). U about 1.4 W/m2K with the standard surface resistances, near RdSAP's 1.5 for an unfilled cavity of 1950-66.",
+    "review": "Chris: confirm or edit (a lightweight block inner leaf gives about 1.0), then add to the library",
+    "library_type": "construction",
+    "display_name": "Wall: 1960s brick and block, unfilled cavity (draft, awaiting Chris)"
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "glazing_double_1990s",
+   "body": {
+    "name": "glazing_double_1990s",
+    "type": "glazing",
+    "u_value_W_per_m2K": 2.8,
+    "g_value": 0.72,
+    "thermal_mass": null,
+    "description": "Double glazing, 1990s, air filled, no low-e, aluminium frame",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "glazing_double_1990s_glass": {
+       "u_factor": 2.8,
+       "solar_heat_gain_coefficient": 0.72
+      }
+     },
+     "Construction": {
+      "glazing_double_1990s": {
+       "outside_layer": "glazing_double_1990s_glass"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Two new numbers, U 2.8 W/m2K and g 0.72 for the glass: typical published figures for 1990s air-filled double glazing with no low-e coating (6-12 mm gap). The frame is the run's own frame fraction, as for every window.",
+    "review": "Chris: confirm or edit, then add to the library",
+    "library_type": "construction",
+    "display_name": "Windows: 1990s double glazing, air filled (draft, awaiting Chris)"
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "glazing_single_metal",
+   "body": {
+    "name": "glazing_single_metal",
+    "type": "glazing",
+    "u_value_W_per_m2K": 5.7,
+    "g_value": 0.85,
+    "thermal_mass": null,
+    "description": "Single glazing, clear, in the original steel frames",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "glazing_single_metal_glass": {
+       "u_factor": 5.7,
+       "solar_heat_gain_coefficient": 0.85
+      }
+     },
+     "Construction": {
+      "glazing_single_metal": {
+       "outside_layer": "glazing_single_metal_glass"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Two new numbers, U 5.7 W/m2K and g 0.85: the usual figures for single clear glass. The frame is the run's own frame fraction.",
+    "review": "Chris: confirm or edit, then add to the library",
+    "library_type": "construction",
+    "display_name": "Windows: single glazed, original metal frames (draft, awaiting Chris)"
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "loft_ceiling_100mm",
+   "body": {
+    "name": "loft_ceiling_100mm",
+    "type": "roof",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Ceiling under a cold loft: 100mm mineral wool on plasterboard (layers loft side first)",
+    "epjson": {
+     "Material": {
+      "Loft100_MineralWool": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "Loft100_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "loft_ceiling_100mm": {
+       "outside_layer": "Loft100_MineralWool",
+       "layer_2": "Loft100_Plasterboard"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "No new numbers: the mineral wool copies CavWall_Std_MineralWool100 from cavity_wall_standard and the plasterboard PitchedRoof_Std_Plasterboard from pitched_roof_standard (rows of Chris's library). U about 0.35 W/m2K, a 1960s-80s loft topped up to 100 mm. For a pitched roof insulated at the ceiling (Shape, Roof).",
+    "review": "Chris: confirm or edit the depth, then add to the library",
+    "library_type": "construction",
+    "display_name": "Roof: ceiling to a cold loft, 100 mm mineral wool (draft, awaiting Chris)"
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "pitched_roof_uninsulated",
+   "body": {
+    "name": "pitched_roof_uninsulated",
+    "type": "roof",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Tiles, battens and felt with no insulation: the slopes of a cold loft",
+    "epjson": {
+     "Material": {
+      "RoofUnins_Tiles": {
+       "roughness": "Rough",
+       "thickness": 0.012,
+       "conductivity": 0.84,
+       "density": 1900,
+       "specific_heat": 800
+      }
+     },
+     "Material:NoMass": {
+      "RoofUnins_Felt": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 0.06
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "pitched_roof_uninsulated": {
+       "outside_layer": "RoofUnins_Tiles",
+       "layer_2": "RoofUnins_Felt"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "No new numbers: the tiles copy PitchedRoof_Std_Tiles and the felt PitchedRoof_Std_Membrane (R 0.06) from pitched_roof_standard (rows of Chris's library). The library had no uninsulated tiled roof for a cold loft's slopes (Shape, Roof asked for one).",
+    "review": "Chris: confirm, then add to the library",
+    "library_type": "construction",
+    "display_name": "Roof: tiles and felt, no insulation, for a loft's slopes (draft, awaiting Chris)"
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "ground_floor_uninsulated",
+   "body": {
+    "name": "ground_floor_uninsulated",
+    "type": "floor",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Screed and 150mm concrete slab on hardcore, no insulation (1960s, as built)",
+    "epjson": {
+     "Material": {
+      "GFUnins_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFUnins_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_uninsulated": {
+       "outside_layer": "GFUnins_Screed",
+       "layer_2": "GFUnins_ConcreteSlab"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "No new numbers: screed and slab copy GFloor_Std_Screed and GFloor_Std_ConcreteSlab from ground_floor_slab (rows of Chris's library), with no carpet (a carpet comes from the room's finish, Brief 124). The run puts the ground at the year's mean outdoor temperature with no soil, so these layers alone give U about 2.0; give the floor type a U from ISO 13370 for the building's floor (Fabric) until the engine has a ground model.",
+    "review": "Chris: confirm, then add to the library",
+    "library_type": "construction",
+    "display_name": "Ground floor: concrete slab, no insulation, no carpet (draft, awaiting Chris)"
+   }
+  },
+  {
+   "kind": "construction",
+   "key": "ground_floor_slab_hard",
+   "body": {
+    "name": "ground_floor_slab_hard",
+    "type": "floor",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Screed, 150mm concrete slab, 100mm XPS insulation, hardcore; no carpet (hard floor)",
+    "epjson": {
+     "Material": {
+      "GFHard_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFHard_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "GFHard_XPS100": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.033,
+       "density": 35,
+       "specific_heat": 1400
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_slab_hard": {
+       "outside_layer": "GFHard_Screed",
+       "layer_2": "GFHard_ConcreteSlab",
+       "layer_3": "GFHard_XPS100"
+      }
+     }
+    }
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "No new numbers: ground_floor_slab (Chris's library) without its carpet layer, so a hall, kitchen or corridor can have a hard floor and a carpeted room takes its carpet from its finish (Brief 124; the library's ground floors all had carpet in them).",
+    "review": "Chris: confirm, then add to the library",
+    "library_type": "construction",
+    "display_name": "Ground floor: insulated slab, hard floor, no carpet (draft, awaiting Chris)"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_classroom_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "school",
+    "zone_type": "classroom",
+    "time_resolution": "hourly",
+    "display_name": "School — Classroom occupancy",
+    "description": "Classroom: school day 08:30–15:15 with a lunch dip, empty at weekends, term time by month",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.05,
+      0.6,
+      0.95,
+      0.95,
+      0.95,
+      0.5,
+      0.95,
+      0.95,
+      0.4,
+      0.1,
+      0.05,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.85,
+     0.8,
+     0.9,
+     0.55,
+     0.85,
+     0.95,
+     0.7,
+     0.0,
+     0.85,
+     0.8,
+     1.0,
+     0.65
+    ],
+    "name": "school_classroom_occupancy"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted shape for a UK primary school day (doors 08:30, home 15:15, a lunch break), empty at weekends; monthly multipliers are the share of each month that is term time in a typical English school year (August none, Easter in April, two-week Christmas). Not from a published source.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Classroom occupancy"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_hall_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "school",
+    "zone_type": "hall",
+    "time_resolution": "hourly",
+    "display_name": "School — Hall occupancy",
+    "description": "Hall: assembly, PE in the morning, lunch sittings 12:00–13:30, after-school club and an evening let, term time by month",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.3,
+      0.6,
+      0.3,
+      0.3,
+      0.9,
+      0.6,
+      0.3,
+      0.2,
+      0.1,
+      0.0,
+      0.3,
+      0.3,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.85,
+     0.8,
+     0.9,
+     0.55,
+     0.85,
+     0.95,
+     0.7,
+     0.0,
+     0.85,
+     0.8,
+     1.0,
+     0.65
+    ],
+    "name": "school_hall_occupancy"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted shape for a UK primary school day (doors 08:30, home 15:15, a lunch break), empty at weekends; monthly multipliers are the share of each month that is term time in a typical English school year (August none, Easter in April, two-week Christmas). Not from a published source.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Hall occupancy"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_kitchen_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "school",
+    "zone_type": "kitchen",
+    "time_resolution": "hourly",
+    "display_name": "School — Kitchen occupancy",
+    "description": "Kitchen: cooks in from 07:00, lunch service 11:30–13:30, cleared by 15:00, term time by month",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.3,
+      0.8,
+      0.9,
+      0.9,
+      1.0,
+      1.0,
+      0.9,
+      0.5,
+      0.1,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.85,
+     0.8,
+     0.9,
+     0.55,
+     0.85,
+     0.95,
+     0.7,
+     0.0,
+     0.85,
+     0.8,
+     1.0,
+     0.65
+    ],
+    "name": "school_kitchen_occupancy"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted shape for a UK primary school day (doors 08:30, home 15:15, a lunch break), empty at weekends; monthly multipliers are the share of each month that is term time in a typical English school year (August none, Easter in April, two-week Christmas). Not from a published source.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Kitchen occupancy"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_office_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "school",
+    "zone_type": "office",
+    "time_resolution": "hourly",
+    "display_name": "School — Office and staff occupancy",
+    "description": "Office and staff room: staff in 07:30–18:00, a week of the summer holiday worked",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.3,
+      0.9,
+      0.9,
+      0.9,
+      0.9,
+      0.7,
+      0.9,
+      0.9,
+      0.9,
+      0.8,
+      0.5,
+      0.1,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.9,
+     0.9,
+     0.95,
+     0.8,
+     0.95,
+     0.95,
+     0.8,
+     0.4,
+     0.95,
+     0.9,
+     1.0,
+     0.8
+    ],
+    "name": "school_office_occupancy"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted shape for school staff areas (in before and after the pupils); monthly multipliers lower than term time because office staff work some holiday weeks. Not from a published source.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Office and staff occupancy"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_corridor_occupancy",
+   "body": {
+    "schedule_type": "occupancy",
+    "building_type": "school",
+    "zone_type": "corridor",
+    "time_resolution": "hourly",
+    "display_name": "School — Corridor occupancy",
+    "description": "Corridors: peaks at arrival, break, lunch and home time, term time by month",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.5,
+      0.2,
+      0.4,
+      0.2,
+      0.6,
+      0.3,
+      0.2,
+      0.6,
+      0.1,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.85,
+     0.8,
+     0.9,
+     0.55,
+     0.85,
+     0.95,
+     0.7,
+     0.0,
+     0.85,
+     0.8,
+     1.0,
+     0.65
+    ],
+    "name": "school_corridor_occupancy"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted shape for a UK primary school day (doors 08:30, home 15:15, a lunch break), empty at weekends; monthly multipliers are the share of each month that is term time in a typical English school year (August none, Easter in April, two-week Christmas). Not from a published source.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Corridor occupancy"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_lighting",
+   "body": {
+    "schedule_type": "lighting",
+    "building_type": "school",
+    "zone_type": "classroom",
+    "time_resolution": "hourly",
+    "display_name": "School — Lighting",
+    "description": "Lights on 07:30–17:00 on school days, term time by month",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.2,
+      0.9,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0.8,
+      0.4,
+      0.2,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     0.85,
+     0.8,
+     0.9,
+     0.55,
+     0.85,
+     0.95,
+     0.7,
+     0.0,
+     0.85,
+     0.8,
+     1.0,
+     0.65
+    ],
+    "name": "school_lighting"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted shape for a UK primary school day (doors 08:30, home 15:15, a lunch break), empty at weekends; monthly multipliers are the share of each month that is term time in a typical English school year (August none, Easter in April, two-week Christmas). Not from a published source.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Lighting"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_heating_setpoint",
+   "body": {
+    "schedule_type": "heating_setpoint",
+    "building_type": "school",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "School — Heating setpoint",
+    "description": "School heating: 20°C 06:00–16:00 on weekdays (warm by 08:30), 12°C frost and fabric setback otherwise",
+    "day_types": {
+     "weekday": [
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0
+     ],
+     "saturday": [
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0
+     ],
+     "sunday": [
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0,
+      12.0
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "school_heating_setpoint"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted: 20°C occupied (Building Bulletin 101's teaching-space comfort), 12°C setback, preheat from 06:00. Not from a published schedule.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Heating setpoint"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_cooling_setpoint",
+   "body": {
+    "schedule_type": "cooling_setpoint",
+    "building_type": "school",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "School — Cooling setpoint",
+    "description": "Where cooled (ICT, server): 25°C 07:00–17:00 on weekdays, 30°C otherwise",
+    "day_types": {
+     "weekday": [
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      25.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0
+     ],
+     "saturday": [
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0
+     ],
+     "sunday": [
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "school_cooling_setpoint"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted: 25°C occupied, 30°C otherwise. Not from a published schedule.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Cooling setpoint"
+   }
+  },
+  {
+   "kind": "profile",
+   "key": "school_ventilation_day",
+   "body": {
+    "schedule_type": "ventilation",
+    "building_type": "school",
+    "zone_type": "all",
+    "time_resolution": "hourly",
+    "display_name": "School — Ventilation, school day",
+    "description": "Fans on 07:00–17:00 on weekdays",
+    "day_types": {
+     "weekday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "saturday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "sunday": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "monthly_multipliers": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "name": "school_ventilation_day"
+   },
+   "provenance": {
+    "source": "drafted, pending review",
+    "drafted": "2026-11-17, Claude (Simulate v2 example-school thread), for the worked example school (Linzie 17 Nov 21:28: \"mix of old versus new fabric, different windows\")",
+    "basis": "Drafted: one hour either side of the school day. Not from a published schedule.",
+    "review": "Chris: confirm, edit or replace (e.g. with NCM's education activities), then add to the library",
+    "library_type": "schedule",
+    "display_name": "School — Ventilation, school day"
+   }
   }
  ]
 }

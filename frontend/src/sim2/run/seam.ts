@@ -121,6 +121,11 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
   // Brief 115 Rule 8: opening windows are Operation; they arrive with their controls at + Systems. Removed, not closed.
   for (const s of d.surfaces) s.openings = s.openings.filter((o) => o.kind !== 'operable')
   d.controls = d.controls.filter((c) => c.target.kind !== 'window')
+  // 17 Nov 2026 (example school): the control map names systems; at these levels the systems are gone, so their entries
+  // go too (they are recorded only and change no number). Without this, any plan with a control map failed the instant
+  // estimate on Site, Shape and Fabric ("no heating, cooling, hot water or other system").
+  const kept = new Set(d.zones.flatMap((z) => z.ventilation.map((v) => v.id)))
+  d.controls = d.controls.filter((c) => c.target.kind === 'window' || (c.target.kind === 'ventilation' && kept.has(c.target.ref)))
   if (level === 'fabric') {
     if (heatC == null || !Number.isFinite(heatC)) throw new Error('fabric level needs the heating setpoint')
     d.profiles = d.profiles.filter((p) => p.kind === 'schedule')
@@ -397,7 +402,9 @@ function controlOwner(d: ModelDocument, i: number): string {
   if (!c) return `controls[${i}]`
   const zi = d.zones.findIndex((z) => z.id === c.target.ref)
   if (c.target.kind === 'window' && zi >= 0) return `the windows in ${zoneName(d, String(zi))}`
-  if (c.target.kind === 'system') { const g = d.system_groups.find((x) => x.id === c.target.ref); if (g) return `"${g.label || g.id}"` }
+  if (c.target.kind === 'system' || c.target.kind === 'lighting') { const g = d.system_groups.find((x) => x.id === c.target.ref); if (g) return `"${g.label || g.id}"` }
+  // A ventilation system's control names its zone entries (`${id}_vent`, toDocument), which carry its label.
+  if (c.target.kind === 'ventilation') { const v = d.zones.flatMap((z) => z.ventilation).find((x) => x.id === c.target.ref); if (v) return `"${v.label || v.id}"` }
   return `the control of "${c.target.ref}"`
 }
 const profileLabel = (d: ModelDocument | null, i: string) => d?.profiles[Number(i)]?.label || d?.profiles[Number(i)]?.id || `profile ${i}`

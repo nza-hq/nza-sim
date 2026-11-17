@@ -96,7 +96,24 @@ describe('EnergyPlus input (Brief 123)', () => {
     for (const s of Object.values(ep['Schedule:File'] ?? {}) as any[]) expect(s.column_number).toBeLessThanOrEqual(cols)
   })
 
-  it('refuses weather-driven air in words', () => {
+  it('weather-driven air: each room takes the run\'s own hourly air (17 Nov 2026), labelled; no vents or fixed ach of its own', () => {
+    const d = structuredClone(prep.doc) as any
+    d.building.air = { ...d.building.air, method: 'weather_driven', exponent: 0.67, single_sided_turbulence: false }
+    d.building.site = { ...d.building.site, terrain: 'suburban' }
+    // Windows that open need a rule on the control map for weather-driven air; this check is about the air, so they stay shut.
+    for (const sf of d.surfaces) sf.openings = sf.openings.filter((o: any) => o.kind !== 'operable')
+    d.controls = d.controls.filter((c: any) => c.target.kind !== 'window')
+    const ours = simulate(d, { weather: WEATHER })
+    if (!ours.ok) throw new Error('run: ' + JSON.stringify(ours.missing))
+    const lib = preflight(d, WEATHER, CONSTRUCTIONS).library
+    const r = toEnergyPlus(d, W, lib, ours.results)
+    const inf = Object.values((r.epjson as any)['ZoneInfiltration:DesignFlowRate'] ?? {}) as any[]
+    expect(inf.length).toBeGreaterThan(0)
+    for (const o of inf) expect(o.design_flow_rate_calculation_method).toBe('Flow/Zone')
+    expect(r.notes.some((n: string) => /checks the fabric, sun, mass, gains and setpoints but not the air/.test(n))).toBe(true)
+    expect(Object.keys((r.epjson as any)['ZoneVentilation:WindandStackOpenArea'] ?? {})).toHaveLength(0)
+  })
+  it('weather-driven air with a run that has none (today\'s air): refused in words', () => {
     const d = structuredClone(prep.doc) as any
     d.building.air = { ...d.building.air, method: 'weather_driven' }
     const ours = simulate(doc, { weather: WEATHER })

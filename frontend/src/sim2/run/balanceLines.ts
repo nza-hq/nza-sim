@@ -38,6 +38,7 @@ const COLOUR: Record<string, string> = {
   interzone: '#0EA5E9',
   storage: '#9CA3AF',
   other_gains: '#9CA3AF',
+  intermittent_heating: '#CBD5E1',
 }
 
 export function balanceLines(breakdown: { term: string; kwh: number }[], floor_m2: number): BalanceLines {

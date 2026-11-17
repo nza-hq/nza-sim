@@ -26,7 +26,7 @@ import { BridgingError, computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K, heatFlowDirection } from './constants'
 import { GainsError, zoneGains } from './gains'
 import { GlazingError, simpleGlazingAngular, simpleGlazingOptics } from './glazing'
-import { finishLayers, groundTemperature, ModelError, surfaceLayers } from './model'
+import { finishLayers, groundTemperature, ModelError, surfaceLayers, zoneSetpointHours } from './model'
 import type { BreakdownLine } from './results'
 import { shadingFactor } from './shading'
 import { solarOnSurface, type SolarOptions } from './solar'
@@ -36,6 +36,10 @@ import type { SurfaceIrradiance, Weather } from './types'
 export const MONTHLY_CONSTANTS = {
   a_0: 1,
   tau_0_h: 15,
+  /** ISO 13790:2008 13.2.2, intermittent heating: the empirical correlation factor b_H,red and the reference time
+   * constant τ_H,0, h (17 Nov 2026). */
+  b_red: 3,
+  tau_H0_h: 15,
   /**
    * The effective heat capacity C_m, after ISO 13786:2017 Annex C (simplified): each inside face takes its layers'
    * heat capacity up to 0.10 m deep, half the element's thickness, or the first insulating layer, whichever comes
@@ -213,14 +217,17 @@ const util = (r: number, a: number) => {
 /**
  * The monthly estimate for every zone of a document. Errors as the hourly run's (`ModelError`, with the document path).
  * Each zone is taken alone at its own setpoints; heat between zones is not counted (in Fabric only every zone has the
- * same setpoint). Heating runs all year at `heat_c`; hours, setbacks and setpoint profiles are not modelled.
+ * same setpoint). Heating hours, setbacks and heating profiles (17 Nov 2026) reduce the month's heating by ISO
+ * 13790:2008 13.2.2's intermittent-heating factor a_H,red = 1 − b_red·(τ_H,0/τ)·γ_H·(1 − f_H,hr), b_red 3, τ_H,0 15 h,
+ * at least f_H,hr, where f_H,hr is the share of the month's hours at the heating setpoint (heat_c). Before, a school
+ * heated 06:00–16:00 on school days came out at about 2.5 times the hourly run's heating.
  */
 export function runMonthly(doc: ModelDocument, weather: Weather, library: Record<string, ConstructionBody>, options: MonthlyOptions): MonthlyResults {
   const t0 = now()
   const W = monthlyWeather(weather, options.solar)
   const notes: string[] = [
     'Monthly estimate (static): ISO 52016-1 monthly method. Not the hourly run.',
-    'Each room alone, heated all day at its heating setpoint; heating hours, setbacks and heat between rooms are not counted.',
+    'Each room alone; heat between rooms is not counted.',
   ]
   const zIndex = new Map(doc.zones.map((z, i) => [z.id, i]))
   const Zn = doc.zones.length
@@ -233,6 +240,23 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
   }
   const weatherAir = doc.building.air.method === 'weather_driven'
   if (weatherAir) notes.push('Weather-driven air is not in this estimate: leakage is q50 ÷ 20 and permanent vents use today\'s wind formula.')
+
+  // Intermittent heating (ISO 13790:2008 13.2.2): each month's share of hours at the heating setpoint.
+  let spHours: ReturnType<typeof zoneSetpointHours>
+  try { spHours = zoneSetpointHours(doc, weather.hours) } catch (e) { if (e instanceof ModelError) throw e; throw e }
+  const atSetpoint = spHours.map((sp, zi) => {
+    const heatC = doc.zones[zi].setpoints.heat_c
+    const f = new Array(12).fill(1) as number[]
+    if (!sp || heatC == null) return f
+    const on = new Array(12).fill(0) as number[], all = new Array(12).fill(0) as number[]
+    for (let h = 0; h < weather.hours.count; h++) {
+      const m = weather.hours.month[h] - 1
+      all[m]++
+      if (sp.hourly.heat_c[h] >= heatC - 0.05) on[m]++
+    }
+    return f.map((_, m) => (all[m] > 0 ? on[m] / all[m] : 1))
+  })
+  if (atSetpoint.some((f) => f.some((x) => x < 1))) notes.push('Heating hours and setbacks: taken by ISO 13790\'s monthly intermittent-heating factor (rooms that cool down outside their hours lose less heat); the hourly run follows them hour by hour.')
 
   // Per zone: conductances, mass, monthly gains (Wh), and the lines.
   interface ZB {
@@ -489,7 +513,14 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
       const lossH = lossAt(shown)
       const QhtH = lossH.reduce((s, l) => s + l.wh, 0)
       let QH = 0, QC = 0
-      if (heatC != null && QhtH > 0) QH = Math.max(0, QhtH - util(Qgn / QhtH, a) * Qgn)
+      let saved = 0
+      if (heatC != null && QhtH > 0) {
+        const cont = Math.max(0, QhtH - util(Qgn / QhtH, a) * Qgn)
+        const fhr = atSetpoint[zi]![m]!
+        const aRed = fhr >= 1 ? 1 : Math.max(fhr, Math.min(1, 1 - P.b_red * (P.tau_H0_h / tau) * (Qgn / QhtH) * (1 - fhr)))
+        QH = aRed * cont
+        saved = cont - QH
+      }
       if (coolC != null) {
         const QhtC = lossAt(coolC).reduce((s, l) => s + l.wh, 0)
         QC = QhtC > 0 ? Math.max(0, Qgn - util(QhtC / Qgn, a) * QhtC) : Math.max(0, Qgn - QhtC)
@@ -499,9 +530,10 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
       for (const l of lossH) add(l.term, l.surface_id, -l.wh / 1000)
       for (const l of T.gainLines) add(l.term, l.surface_id, l.wh[m] / 1000, l.profile_id ? { profile_id: l.profile_id } : {})
       add('heating', null, QH / 1000)
+      if (saved > 0) add('intermittent_heating', null, saved / 1000)
       add('cooling', null, -QC / 1000)
       // Closes the month (Rule 9): the gain not used at the heating setpoint, less what cooling removed.
-      add('gains_not_used', null, (QhtH - Qgn - QH + QC) / 1000)
+      add('gains_not_used', null, (QhtH - Qgn - QH - saved + QC) / 1000)
     }
     const sum = (a: number[]) => a.reduce((s, x) => s + x, 0)
     return {

@@ -8,7 +8,7 @@ import { BORROWS, borrow } from './borrow'
 import type { Plan, SpaceType } from './plan'
 
 export type BuildingUse = { id: string; name: string; type: string; main: string }
-const USE_NAMES: Record<string, string> = { hotel: 'Hotel', office: 'Office', retail: 'Shop' }
+const USE_NAMES: Record<string, string> = { hotel: 'Hotel', office: 'Office', retail: 'Shop', school: 'School' }
 
 /** The uses the library can fill: each library building type with at least one kind of room. */
 export const BUILDING_USES: BuildingUse[] = [...new Set(BORROWS.map((b) => b.type))].map((type) => ({

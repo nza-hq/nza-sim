@@ -29,7 +29,7 @@ import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from '.
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
 import type { XY } from './ported/zones'
-import { type BlockRoof, LOFT_ACH, blockRoof } from './roof'
+import { type BlockRoof, LOFT_ACH, areaInside, blockRoof, roofPieces } from './roof'
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
 const is21 = (SCHEMA_VERSION as string) !== '2.0'
@@ -37,7 +37,7 @@ const is22 = is21 && (SCHEMA_VERSION as string) !== '2.1'
 const is23 = is22 && (SCHEMA_VERSION as string) !== '2.2'
 const is24 = is23 && (SCHEMA_VERSION as string) !== '2.3'
 /** Brief 124: a library construction whose layers already include carpet (named so in the library). */
-export const carpetIn = (key: string | null | undefined) => /carpet/i.test(construction(key)?.name ?? '')
+export const carpetIn = (key: string | null | undefined) => { const n = construction(key)?.name ?? ''; return /carpet/i.test(n) && !/\b(no|without) carpet/i.test(n) }
 const is212 = Number((SCHEMA_VERSION as string).split('.')[1]) >= 12
 
 export type Built = {
@@ -264,11 +264,14 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
   }
   const floorOf = new Map(used.map((z) => [z.id, plan.rooms.filter((r) => r.zone === z.id).reduce((t, r) => t + ringArea(r.ring), 0)]))
   // Brief 123: the roof's shape. A block whose roof is pitched (and built) is roofed below; any other stays flat.
-  const rec = plan.roof && plan.roof.style !== 'flat' ? plan.roof : null
-  const roofs = rec ? plan.blocks.map((b, i) => roofsIn?.[i] ?? blockRoof(b, rec)) : []
-  roofs.forEach((r, i) => { if (r.refused) notes.push(`Block ${i + 1} keeps a flat roof: ${r.refused}`) })
+  // Roof parts (17 Nov 2026): a block may have parts, each a rectangle with its own recipe; `pieces` are the parts and
+  // the blocks without parts (whose recipe is plan.roof). With no parts, piece i is block i, as before.
+  const pieces = roofPieces(plan)
+  const recOf = (i: number) => { const r = pieces[i]?.recipe; return r && r.style !== 'flat' ? r : null }
+  const roofs = pieces.map((p, i) => (recOf(i) ? (p.part ? blockRoof(p.ring, p.recipe) : roofsIn?.[p.block] ?? blockRoof(p.ring, p.recipe)) : null))
+  roofs.forEach((r, i) => { if (r?.refused) notes.push(`${pieces[i]!.part ? `The ${pieces[i]!.name.toLowerCase()} roof` : `Block ${pieces[i]!.block + 1}`} keeps a flat roof: ${r.refused}`) })
   const pitched = (i: number) => (roofs[i] && roofs[i]!.style !== 'flat' ? roofs[i]! : null)
-  const cold = (rec?.insulation ?? 'ceiling') === 'ceiling'
+  const coldOf = (i: number) => (recOf(i)?.insulation ?? 'ceiling') === 'ceiling'
   const inside = (p: XY, ring: readonly XY[]) => {
     let c = false
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -282,13 +285,34 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     const i = plan.blocks.findIndex((b) => inside(c, b))
     return i < 0 ? 0 : i
   }
-  const loftId = (i: number) => (plan.blocks.length > 1 ? `loft_${i + 1}` : 'loft')
+  /** A room's floor under each roof piece: the whole room under its block's one piece, or split across its parts. */
+  const piecesOfRoom = (ring: readonly XY[]): Array<{ piece: number; a: number }> => {
+    const b = blockOfRoom(ring)
+    const mine = pieces.filter((p) => p.block === b)
+    if (mine.length === 1) return [{ piece: mine[0]!.index, a: ringArea(ring) }]
+    return mine.map((p) => ({ piece: p.index, a: areaInside(ring, p.ring) })).filter((x) => x.a > 1e-6)
+  }
+  const loftId = (i: number) => (pieces.length > 1 ? `loft_${i + 1}` : 'loft')
   /** A gable or raised wall takes the wall type of the outside wall it stands on (at the middle of its foot). */
-  const wallTypeUnder = (f: BlockRoof['faces'][number]) => {
+  /** Roof parts: the length of a run lying along the part's own outline (a part's walls are those of its own rooms). */
+  const alongPart = (r: (typeof runs)[number], ring: readonly XY[]) => ring.reduce((t, a, k) => {
+    const b = ring[(k + 1) % ring.length]!
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1
+    const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L
+    const off = (p: XY) => Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux)
+    if (off(r.a) > 0.05 || off(r.b) > 0.05) return t
+    const s0 = (r.a[0] - a[0]) * ux + (r.a[1] - a[1]) * uy, s1 = (r.b[0] - a[0]) * ux + (r.b[1] - a[1]) * uy
+    return t + Math.max(0, Math.min(L, Math.max(s0, s1)) - Math.max(0, Math.min(s0, s1)))
+  }, 0)
+  const wallTypeUnder = (f: BlockRoof['faces'][number], piece = -1) => {
+    const part = piece >= 0 && pieces[piece]?.part ? pieces[piece]!.ring : null
     const base = f.pts.filter((p) => Math.abs(p[2]) < 1e-6)
     const m: XY = base.length ? [base.reduce((t, p) => t + p[0], 0) / base.length, base.reduce((t, p) => t + p[1], 0) / base.length] : [f.pts[0]![0], f.pts[0]![1]]
     let best = { d: Infinity, run: -1, t: 0 }
     for (const r of runs) {
+      // A part's gable or raised wall standing where it meets another part takes its own wing's walls, not the
+      // other wing's (the nearest wall along the part's own outline).
+      if (part && alongPart(r, part) < 0.05) continue
       const L = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1]) || 1
       const t = Math.max(0, Math.min(L, ((m[0] - r.a[0]) * (r.b[0] - r.a[0]) + (m[1] - r.a[1]) * (r.b[1] - r.a[1])) / L))
       const d = Math.hypot(r.a[0] + ((r.b[0] - r.a[0]) * t) / L - m[0], r.a[1] + ((r.b[1] - r.a[1]) * t) / L - m[1])
@@ -296,8 +320,8 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     }
     return best.run >= 0 ? typeAt(plan, best.run, best.t) : firstType(plan, 'wall')
   }
-  const slopeRef = rec?.loft_slope_type ? constructionOf(rec.loft_slope_type) : { key: 'unassigned:roof:loft_slopes' }
-  if (rec && cold && roofs.some((_, i) => pitched(i)) && !rec.loft_slope_type) notes.push('The loft\'s roof slopes have no construction yet: choose what they are made of on Shape, Roof')
+  const slopeRef = (i: number) => { const t = recOf(i)?.loft_slope_type; return t ? constructionOf(t) : { key: 'unassigned:roof:loft_slopes' } }
+  if (pieces.some((_, i) => pitched(i) && coldOf(i) && !recOf(i)!.loft_slope_type)) notes.push('The loft\'s roof slopes have no construction yet: choose what they are made of on Shape, Roof')
   /** Warm roof: the extra height each zone gets from its share of the roof space. */
   const roofSpace = new Map<string, number>()
   const roofFace = (zone: string, i: number, share: number, type: string, f: BlockRoof['faces'][number], n: number, onLoft: boolean) => {
@@ -306,10 +330,9 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     add(zone, ext({
       id, kind: wall ? 'wall' : 'roof', zone_a: zone, zone_b: 'outside', facade: wall ? facade4(f.azimuth_deg ?? 0) : null,
       area_m2: r3(f.area_m2 * share), azimuth_deg: f.azimuth_deg == null ? null : r3(f.azimuth_deg), tilt_deg: r3(f.tilt_deg),
-      construction_ref: wall ? constructionOf(wallTypeUnder(f)) : onLoft ? slopeRef : constructionOf(type),
+      construction_ref: wall ? constructionOf(wallTypeUnder(f, i)) : onLoft ? slopeRef(i) : constructionOf(type),
       g_value: null, openings: [],
     }, wall ? 'wall' : 'roof'))
-    void i
   }
 
   // Roof and ground floor: one of each per zone, or one per type when the zone's rooms have different types.
@@ -318,16 +341,18 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     for (const e of ['roof', 'floor'] as const) {
       const byType = new Map<string, { a: number; block: number }>()
       for (const r of rs) {
-        const block = e === 'roof' && pitched(blockOfRoom(r.ring)) ? blockOfRoom(r.ring) : -1
-        const k = `${block}|${roomType(plan, r.id, e)}`
-        const g = byType.get(k) ?? { a: 0, block }
-        g.a += ringArea(r.ring)
-        byType.set(k, g)
+        for (const { piece, a: ra } of e === 'roof' ? piecesOfRoom(r.ring) : [{ piece: -1, a: ringArea(r.ring) }]) {
+          const block = e === 'roof' && pitched(piece) ? piece : -1
+          const k = `${block}|${roomType(plan, r.id, e)}`
+          const g = byType.get(k) ?? { a: 0, block }
+          g.a += ra
+          byType.set(k, g)
+        }
       }
       for (const [k, { a, block }] of byType) {
         const type = k.slice(k.indexOf('|') + 1)
         const pr = block >= 0 ? pitched(block) : null
-        if (e === 'roof' && pr && cold) {
+        if (e === 'roof' && pr && coldOf(block)) {
           // The room's roof type is now its ceiling, to the loft (layers run loft side first, as a roof's run outside first).
           const id = uid(`${z.id}_ceiling`)
           const surf = { ...ext({ id, kind: 'ceiling', zone_a: z.id, zone_b: loftId(block), facade: null, area_m2: r3(a), azimuth_deg: null, tilt_deg: 0, construction_ref: constructionOf(type), g_value: null, openings: [] }, 'other'), ...(is22 ? { inside_solar_absorptance_b: TODAY.inside_solar_absorptance } : {}) }
@@ -336,7 +361,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
           byZone.set(loftId(block), [...(byZone.get(loftId(block)) ?? []), id])
         } else if (e === 'roof' && pr) {
           // Warm roof: the slopes and gable walls over this zone's share of the block, and its share of the roof space.
-          const foot = ringArea(plan.blocks[block]!)
+          const foot = ringArea(pieces[block]!.ring)
           const share = foot > 0 ? a / foot : 0
           pr.faces.forEach((f, n) => roofFace(z.id, block, share, type, f, n, false))
           roofSpace.set(z.id, (roofSpace.get(z.id) ?? 0) + pr.void_m3 * share)
@@ -346,7 +371,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     }
   }
   // Cold roof: the loft's own slopes and gable walls, to outside.
-  const lofts = cold ? plan.blocks.map((b, i) => ({ i, b, r: pitched(i) })).filter((x) => x.r && byZone.has(loftId(x.i))) : []
+  const lofts = pieces.map((p, i) => ({ i, b: p.ring, r: pitched(i) })).filter((x) => x.r && coldOf(x.i) && byZone.has(loftId(x.i)))
   for (const { i, r } of lofts) r!.faces.forEach((f, n) => roofFace(loftId(i), i, 1, '', f, n, true))
 
   // Space types: a zone takes the space type covering most of its floor (a note says when its rooms differ).
@@ -535,9 +560,12 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
 
   const bi = plan.building ?? noBuildingInputs()
   const hw = plan.dhw ?? noDhw()
-  const noHw = used.filter((z) => !system(zoneSys(z.id, 'dhw')?.template)?.fuel)
-  const hwStated = used.some((z) => { const sp = spaceOf.get(z.id); return sp?.hot_water_basis != null && sp.hot_water_litres != null })
-  if (hwStated && noHw.length) notes.push(`Hot water use is stated, but ${noHw.map((z) => z.name ?? z.id).join(', ')} ${noHw.length > 1 ? 'have' : 'has'} no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)`)
+  // 17 Nov 2026 (example school): only a room that uses hot water needs a hot water system; a hall or corridor that
+  // states none is fine without one (the run never refused it; the note said it would).
+  const usesHw = (zid: string) => { const sp = spaceOf.get(zid); return sp?.hot_water_basis != null && sp.hot_water_litres != null && sp.hot_water_litres > 0 }
+  const noHw = used.filter((z) => usesHw(z.id) && !system(zoneSys(z.id, 'dhw')?.template)?.fuel)
+  const hwStated = used.some((z) => usesHw(z.id))
+  if (noHw.length) notes.push(`Hot water use is stated, but ${noHw.map((z) => z.name ?? z.id).join(', ')} ${noHw.length > 1 ? 'have' : 'has'} no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)`)
   if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && ([hw.storage_c, hw.tap_c, hw.cold_c].some((v) => v == null) || hw.shape === null)) notes.push('Hot water: a system is given but its temperatures or when it is used are not all stated (Systems, Hot water)')
   if (used.some((z) => system(zoneSys(z.id, 'dhw')?.template)?.fuel) && !hwStated) notes.push('Hot water: a system is given but no space type states how much is used (Spaces, Hot water)')
   const setbackNoted = new Set<string>()
@@ -604,11 +632,11 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
   const loftZones = lofts.map(({ i, b, r }) => {
     const foot = ringArea(b)
     return {
-      id: loftId(i), name: plan.blocks.length > 1 ? `Loft ${i + 1}` : 'Loft', floor: 1, storeys: 1,
+      id: loftId(i), name: pieces[i]!.part ? `Loft (${pieces[i]!.name})` : pieces.length > 1 ? `Loft ${i + 1}` : 'Loft', floor: 1, storeys: 1,
       polygon: b.map(([x, y]) => [r3(x), r3(y)]), area_m2: r3(foot), height_m: r3(foot > 0 ? r!.void_m3 / foot : 0),
       use_type: 'loft', rooms: null, profile_refs: { occupancy: null, lighting: [], equipment: [], auxiliary: [] },
       setpoints: { heat_c: null, cool_c: null, setback_c: null, hours_ref: null, control_strategy: null },
-      ventilation: [], infiltration_q50: null, infiltration_ach: rec?.loft_ach ?? LOFT_ACH,
+      ventilation: [], infiltration_q50: null, infiltration_ach: recOf(i)?.loft_ach ?? LOFT_ACH,
       ...(is21 ? { internal_heat_capacity_j_per_k_m2: 0 } : {}),
       surfaces: byZone.get(loftId(i)) ?? [],
       ...(is24 ? { emitters: [] } : {}),

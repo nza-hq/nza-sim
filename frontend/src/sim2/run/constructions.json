@@ -4,7 +4,7 @@
  "source_sha256": "c3891d6632c605671a54843cc4cc0e50b66f0ec2ecfc544b8b9c7f9d96d6b9f0",
  "exported_at": "2026-11-14T19:36:56+00:00",
  "additions": "docs/audit/102/library_additions.json",
- "additions_sha256": "d2efb1c7c0a781dfe035f3de43a66dd96065a2536bbbf35ca54f5d8bc9cb7eb0",
+ "additions_sha256": "deec116aad324c9f00700fbea8b8622ca48322f3c4395b96d90871fbfeb5c7f5",
  "constructions": [
   {
    "key": "bridgwater_ext_wall",
@@ -855,6 +855,277 @@
     }
    },
    "draft": "Suspended ceiling (finish, draft, awaiting Chris)"
+  },
+  {
+   "key": "cavity_wall_unfilled_1960s",
+   "body_hash": "6236927e901b663724bd0be1e02d2b2535ad9f47e7f89caf7bab85ffe27c65e2",
+   "body": {
+    "name": "cavity_wall_unfilled_1960s",
+    "type": "wall",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "medium",
+    "description": "Brick outer leaf, 50mm unfilled cavity, dense concrete block inner, plaster (1960s, as built)",
+    "epjson": {
+     "Material": {
+      "Cav60_BrickOuter": {
+       "roughness": "Rough",
+       "thickness": 0.102,
+       "conductivity": 0.77,
+       "density": 1700,
+       "specific_heat": 800
+      },
+      "Cav60_ConcreteBlock": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.51,
+       "density": 1400,
+       "specific_heat": 1000
+      },
+      "Cav60_Plaster": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.5,
+       "density": 1300,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {
+      "Cav60_AirCavity": {
+       "roughness": "Rough",
+       "thermal_resistance": 0.18
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "cavity_wall_unfilled_1960s": {
+       "outside_layer": "Cav60_BrickOuter",
+       "layer_2": "Cav60_AirCavity",
+       "layer_3": "Cav60_ConcreteBlock",
+       "layer_4": "Cav60_Plaster"
+      }
+     }
+    }
+   },
+   "draft": "Wall: 1960s brick and block, unfilled cavity (draft, awaiting Chris)"
+  },
+  {
+   "key": "glazing_double_1990s",
+   "body_hash": "3f8f1ff78f92b0aec3b62f1fca05f2c405ab78561aa45c7fdc63543f03e57b05",
+   "body": {
+    "name": "glazing_double_1990s",
+    "type": "glazing",
+    "u_value_W_per_m2K": 2.8,
+    "g_value": 0.72,
+    "thermal_mass": null,
+    "description": "Double glazing, 1990s, air filled, no low-e, aluminium frame",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "glazing_double_1990s_glass": {
+       "u_factor": 2.8,
+       "solar_heat_gain_coefficient": 0.72
+      }
+     },
+     "Construction": {
+      "glazing_double_1990s": {
+       "outside_layer": "glazing_double_1990s_glass"
+      }
+     }
+    }
+   },
+   "draft": "Windows: 1990s double glazing, air filled (draft, awaiting Chris)"
+  },
+  {
+   "key": "glazing_single_metal",
+   "body_hash": "94ad39f152ba496b05225795a05c7b8cb6f5f8789da91d1835468b302b0806df",
+   "body": {
+    "name": "glazing_single_metal",
+    "type": "glazing",
+    "u_value_W_per_m2K": 5.7,
+    "g_value": 0.85,
+    "thermal_mass": null,
+    "description": "Single glazing, clear, in the original steel frames",
+    "epjson": {
+     "Material": {},
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {
+      "glazing_single_metal_glass": {
+       "u_factor": 5.7,
+       "solar_heat_gain_coefficient": 0.85
+      }
+     },
+     "Construction": {
+      "glazing_single_metal": {
+       "outside_layer": "glazing_single_metal_glass"
+      }
+     }
+    }
+   },
+   "draft": "Windows: single glazed, original metal frames (draft, awaiting Chris)"
+  },
+  {
+   "key": "loft_ceiling_100mm",
+   "body_hash": "0354b8de1313be340a07ef169418f42ec41b10fe26a9c429dcfdb1b0291ddd57",
+   "body": {
+    "name": "loft_ceiling_100mm",
+    "type": "roof",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Ceiling under a cold loft: 100mm mineral wool on plasterboard (layers loft side first)",
+    "epjson": {
+     "Material": {
+      "Loft100_MineralWool": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.038,
+       "density": 15,
+       "specific_heat": 1030
+      },
+      "Loft100_Plasterboard": {
+       "roughness": "Smooth",
+       "thickness": 0.013,
+       "conductivity": 0.16,
+       "density": 950,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "loft_ceiling_100mm": {
+       "outside_layer": "Loft100_MineralWool",
+       "layer_2": "Loft100_Plasterboard"
+      }
+     }
+    }
+   },
+   "draft": "Roof: ceiling to a cold loft, 100 mm mineral wool (draft, awaiting Chris)"
+  },
+  {
+   "key": "pitched_roof_uninsulated",
+   "body_hash": "b64fd70731bf27c350f09663a19dea2e1214c77d03c6447688b146267fad99db",
+   "body": {
+    "name": "pitched_roof_uninsulated",
+    "type": "roof",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Tiles, battens and felt with no insulation: the slopes of a cold loft",
+    "epjson": {
+     "Material": {
+      "RoofUnins_Tiles": {
+       "roughness": "Rough",
+       "thickness": 0.012,
+       "conductivity": 0.84,
+       "density": 1900,
+       "specific_heat": 800
+      }
+     },
+     "Material:NoMass": {
+      "RoofUnins_Felt": {
+       "roughness": "MediumRough",
+       "thermal_resistance": 0.06
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "pitched_roof_uninsulated": {
+       "outside_layer": "RoofUnins_Tiles",
+       "layer_2": "RoofUnins_Felt"
+      }
+     }
+    }
+   },
+   "draft": "Roof: tiles and felt, no insulation, for a loft's slopes (draft, awaiting Chris)"
+  },
+  {
+   "key": "ground_floor_uninsulated",
+   "body_hash": "86dc3997e68ad9078de8df04fabe58dbcdc9bdc3efdc82066852780850116ecf",
+   "body": {
+    "name": "ground_floor_uninsulated",
+    "type": "floor",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Screed and 150mm concrete slab on hardcore, no insulation (1960s, as built)",
+    "epjson": {
+     "Material": {
+      "GFUnins_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFUnins_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_uninsulated": {
+       "outside_layer": "GFUnins_Screed",
+       "layer_2": "GFUnins_ConcreteSlab"
+      }
+     }
+    }
+   },
+   "draft": "Ground floor: concrete slab, no insulation, no carpet (draft, awaiting Chris)"
+  },
+  {
+   "key": "ground_floor_slab_hard",
+   "body_hash": "4ef31ff3133af9283ebe9e92fd01d54e9ebb2b7c06a1ce1007f29b3131eeabd3",
+   "body": {
+    "name": "ground_floor_slab_hard",
+    "type": "floor",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "high",
+    "description": "Screed, 150mm concrete slab, 100mm XPS insulation, hardcore; no carpet (hard floor)",
+    "epjson": {
+     "Material": {
+      "GFHard_Screed": {
+       "roughness": "MediumRough",
+       "thickness": 0.065,
+       "conductivity": 0.41,
+       "density": 1200,
+       "specific_heat": 840
+      },
+      "GFHard_ConcreteSlab": {
+       "roughness": "MediumRough",
+       "thickness": 0.15,
+       "conductivity": 1.13,
+       "density": 2000,
+       "specific_heat": 1000
+      },
+      "GFHard_XPS100": {
+       "roughness": "MediumRough",
+       "thickness": 0.1,
+       "conductivity": 0.033,
+       "density": 35,
+       "specific_heat": 1400
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "ground_floor_slab_hard": {
+       "outside_layer": "GFHard_Screed",
+       "layer_2": "GFHard_ConcreteSlab",
+       "layer_3": "GFHard_XPS100"
+      }
+     }
+    }
+   },
+   "draft": "Ground floor: insulated slab, hard floor, no carpet (draft, awaiting Chris)"
   }
  ]
 }

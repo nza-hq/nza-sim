@@ -10,7 +10,7 @@
  * Plan x east, y north, z up from the eaves (the top of the walls). Facing (azimuth) is the compass bearing a slope
  * faces downhill, degrees from north clockwise. Tilt is from horizontal (0 flat, 90 a wall).
  */
-import { area, type XY } from './ported/zones'
+import { area, ccw, type XY } from './ported/zones'
 
 export type RidgeAxisChoice = 'longest' | 'shortest'
 export type RoofFlat = { style: 'flat' }
@@ -331,4 +331,112 @@ export async function fetchServedRoofs(blocks: readonly (readonly XY[])[], recip
     if ((e as Error).name === 'AbortError') throw e
     return { ok: false, reason: 'the roof service is not reachable' }
   }
+}
+
+// ─── Roof parts: a wing with its own roof (17 Nov 2026, example school) ─────────────────────────────────────────────
+// Linzie (17 Nov 21:28): an extended building has "different roof pitches". Blocks that touch are joined into one, so
+// an L-shaped school is one block; a roof part is a rectangle of a block with its own recipe (style, pitch, where it is
+// insulated), worked out in the browser like any rectangle. A block with parts takes its roof from them; any other
+// block keeps the plan's one roof. Where a part meets a lower one, a gable or raised wall standing on that line is
+// taken as outside wall above the lower roof (it is, above that roof).
+
+/** One part of a block's roof: a rectangle inside the block, with its own shape. */
+export type RoofPart = { id: string; name: string; ring: XY[]; recipe: RoofRecipe }
+/** A piece of the whole roof: a block with no parts (its recipe is the plan's), or one part. */
+export type RoofPiece = { index: number; block: number; name: string; ring: XY[]; recipe: RoofRecipe | null; part: string | null }
+
+const centroid = (ring: readonly XY[]): XY => [ring.reduce((t, p) => t + p[0], 0) / ring.length, ring.reduce((t, p) => t + p[1], 0) / ring.length]
+export function insideRing(p: XY, ring: readonly XY[]): boolean {
+  let c = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]!, [xj, yj] = ring[j]!
+    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) c = !c
+  }
+  return c
+}
+/** The block a part belongs to: the one holding its middle (−1: none). */
+export const blockOfPart = (blocks: readonly (readonly XY[])[], part: Pick<RoofPart, 'ring'>) => blocks.findIndex((b) => insideRing(centroid(part.ring), b))
+
+/** The roof's pieces, in block order: each block's parts, or the block itself. */
+export function roofPieces(plan: { blocks: readonly (readonly XY[])[]; roof?: RoofRecipe | null; roof_parts?: readonly RoofPart[] | null }): RoofPiece[] {
+  const out: RoofPiece[] = []
+  const parts = plan.roof_parts ?? []
+  plan.blocks.forEach((b, bi) => {
+    const mine = parts.filter((p) => blockOfPart(plan.blocks, p) === bi)
+    // Parts count only while they still fill the block exactly (a block reshaped since keeps the plan's one roof).
+    if (mine.length && partsFit(b, mine)) for (const p of mine) out.push({ index: out.length, block: bi, name: p.name, ring: p.ring, recipe: p.recipe, part: p.id })
+    else out.push({ index: out.length, block: bi, name: plan.blocks.length > 1 ? `Block ${bi + 1}` : 'The building', ring: b as XY[], recipe: plan.roof ?? null, part: null })
+  })
+  return out
+}
+/** True when parts lie inside the block and add up to its floor (to 0.1 %). */
+export function partsFit(block: readonly XY[], parts: readonly Pick<RoofPart, 'ring'>[]): boolean {
+  const a = area(block)
+  const sum = parts.reduce((t, p) => t + areaInside(block, p.ring), 0)
+  const own = parts.reduce((t, p) => t + area(p.ring), 0)
+  return a > 0 && Math.abs(sum - a) <= a * 1e-3 && Math.abs(own - sum) <= a * 1e-3 && parts.every((p) => asRectangle(p.ring) != null)
+}
+/** Each piece's roof: a part worked out here (a rectangle), a whole block from `blockRoofs` (the service's) or here. */
+export const pieceRoofs = (pieces: readonly RoofPiece[], blockRoofs?: readonly (BlockRoof | undefined)[]): BlockRoof[] =>
+  pieces.map((p) => (p.part ? blockRoof(p.ring, p.recipe) : blockRoofs?.[p.block] ?? blockRoof(p.ring, p.recipe)))
+
+/**
+ * An L-shaped (or any one-inner-corner, square-cornered) block cut into two rectangles at its inner corner: `way` 0
+ * cuts along the inner corner's one side, 1 along the other. Null when the block is not that shape.
+ */
+export function splitAtCorner(ring0: readonly XY[], way: 0 | 1): [XY[], XY[]] | null {
+  const ring = ccw(ring0.filter((p, i) => {
+    const a = ring0[(i + ring0.length - 1) % ring0.length]!, b = ring0[(i + 1) % ring0.length]!
+    return Math.abs((p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0])) > 1e-6
+  }))
+  if (ring.length !== 6) return null
+  if (!ring.every((p, i) => { const q = ring[(i + 1) % 6]!; return Math.abs(p[0] - q[0]) < 1e-6 || Math.abs(p[1] - q[1]) < 1e-6 })) return null
+  const reflex = ring.map((p, i) => {
+    const a = ring[(i + 5) % 6]!, b = ring[(i + 1) % 6]!
+    return (p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0]) < 0
+  })
+  if (reflex.filter(Boolean).length !== 1) return null
+  const v = ring[reflex.indexOf(true)]!
+  const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1])
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+  const rect = (a: number, b: number, c: number, d: number): XY[] => [[a, c], [b, c], [b, d], [a, d]]
+  const filled = (r: XY[]) => insideRing(centroid(r), ring)
+  // Cut along y = v.y (across) or x = v.x (along); keep the two rectangles that lie inside the block.
+  const cands = way === 0
+    ? [rect(x0, x1, y0, v[1]), rect(x0, x1, v[1], y1), rect(x0, v[0], v[1], y1), rect(v[0], x1, v[1], y1), rect(x0, v[0], y0, v[1]), rect(v[0], x1, y0, v[1])]
+    : [rect(x0, v[0], y0, y1), rect(v[0], x1, y0, y1), rect(x0, v[0], y0, v[1]), rect(x0, v[0], v[1], y1), rect(v[0], x1, y0, v[1]), rect(v[0], x1, v[1], y1)]
+  const inside = (r: XY[]) => filled(r) && r.every((p) => insideRing([p[0] + (centroid(r)[0] - p[0]) * 1e-3, p[1] + (centroid(r)[1] - p[1]) * 1e-3], ring))
+  const full = cands.slice(0, 2).filter(inside)
+  const rest = cands.slice(2).filter(inside)
+  const pick = full.length === 1 ? [full[0]!, ...rest.filter((r) => !overlaps(r, full[0]!))] : []
+  if (pick.length !== 2) return null
+  const total = area(ring)
+  return Math.abs(area(pick[0]!) + area(pick[1]!) - total) < 1e-6 ? [pick[0]!, pick[1]!] : null
+}
+const overlaps = (a: XY[], b: XY[]) => {
+  const bx = (r: XY[]) => [Math.min(...r.map((p) => p[0])), Math.max(...r.map((p) => p[0])), Math.min(...r.map((p) => p[1])), Math.max(...r.map((p) => p[1]))]
+  const [a0, a1, a2, a3] = bx(a), [b0, b1, b2, b3] = bx(b)
+  return Math.min(a1!, b1!) - Math.max(a0!, b0!) > 1e-6 && Math.min(a3!, b3!) - Math.max(a2!, b2!) > 1e-6
+}
+
+/** The area of a room's floor inside a convex piece (Sutherland–Hodgman), m². */
+export function areaInside(poly: readonly XY[], convex: readonly XY[]): number {
+  const clip = ccw([...convex] as XY[])
+  let out: XY[] = [...poly] as XY[]
+  for (let i = 0; i < clip.length && out.length; i++) {
+    const a = clip[i]!, b = clip[(i + 1) % clip.length]!
+    const side = (p: XY) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+    const input = out
+    out = []
+    for (let j = 0; j < input.length; j++) {
+      const p = input[j]!, q = input[(j + 1) % input.length]!
+      const sp = side(p), sq = side(q)
+      if (sp >= -1e-9) out.push(p)
+      if ((sp >= -1e-9) !== (sq >= -1e-9)) {
+        const t = sp / (sp - sq)
+        out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t])
+      }
+    }
+  }
+  return out.length >= 3 ? area(out) : 0
 }

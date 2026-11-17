@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
@@ -40,6 +40,9 @@ export default defineConfig({
     energyplus(),
   ],
   server: {
+    // 17 Nov 2026: the Model workspace's "Open an example" reads the worked examples in docs/examples (and nothing else
+    // outside frontend/).
+    fs: { allow: [searchForWorkspaceRoot(process.cwd()), '../docs/examples'] },
     port: VITE_PORT,
     strictPort: VITE_STRICT,
     proxy: {

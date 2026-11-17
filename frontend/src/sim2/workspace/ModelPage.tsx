@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import GeometryLab from '../geometry/GeometryLab'
+import ModelExamples from './ModelExamples'
 import ModelSave, { type EditorApi } from './ModelSave'
 import ModelWorkspace from './ModelWorkspace'
 import type { StepId } from './steps'
@@ -13,7 +14,7 @@ export default function ModelPage() {
   const [plan, setPlan] = useState<unknown>(null)
   return (
     <ModelWorkspace
-      header={<ModelSave api={api} plan={plan} />}
+      header={<><ModelSave api={api} plan={plan} /><ModelExamples api={api} plan={plan} /></>}
       render={({ step, slots, centre, setCentre, openRight }) => <GeometryLab slots={slots} step={step} onStep={onStep} centreTab={centre} onCentreTab={setCentre} onOpenRight={openRight} api={api} onPlan={setPlan} />}
     />
   )

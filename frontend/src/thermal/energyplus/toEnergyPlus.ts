@@ -34,6 +34,7 @@ import { groundTemperature, ModelError, surfaceLayers, zoneSetpointHours } from 
 import { zoneGains } from '../engine/gains'
 import { zoneVentilation } from '../engine/ventilation'
 import { zoneCooling, zoneEmitters } from '../engine/emitters'
+import { airWeather, rhoAir } from '../engine/airflow'
 
 export class EnergyPlusInputError extends Error {
   constructor(message: string, readonly path: string) { super(`${path}: ${message}`); this.name = 'EnergyPlusInputError' }
@@ -135,7 +136,19 @@ function layersForU(layers: Layer[], tilt: number, boundary: 'outside' | 'ground
   r.forEach((x, i) => { if (x > r[li]) li = i })
   const others = R_si + R_se + r.reduce((s, x) => s + x, 0) - r[li]
   const want = 1 / u - others
-  if (!(want > 1e-4)) throw new EnergyPlusInputError(`U ${u.toFixed(3)} W/m²K (with this zone's thermal bridging) is above what the other layers and films allow (${(1 / (others + 1e-4)).toFixed(3)})`, path)
+  if (!(want > 1e-4)) {
+    // 17 Nov 2026 (example school): a leaky wall with its zone's bridging on a small area can ask for more than the
+    // largest layer alone can give; every layer's resistance is then scaled by one factor instead (the films stay).
+    const all = 1 / u - R_si - R_se
+    const sum = r.reduce((t, x) => t + x, 0)
+    if (!(all > 1e-4) || !(sum > 0)) throw new EnergyPlusInputError(`U ${u.toFixed(3)} W/m²K (with this zone's thermal bridging) is above what the surface films alone allow (${(1 / (R_si + R_se)).toFixed(3)})`, path)
+    const f = all / sum
+    out.forEach((l, i) => {
+      if (l.kind === 'Material:NoMass') l.thermal_resistance = r[i] * f
+      else l.conductivity = (l.thickness as number) / (r[i] * f)
+    })
+    return out
+  }
   const l = out[li]
   if (l.kind === 'Material:NoMass') l.thermal_resistance = want
   else l.conductivity = (l.thickness as number) / want
@@ -145,12 +158,18 @@ function layersForU(layers: Layer[], tilt: number, boundary: 'outside' | 'ground
 export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Record<string, ConstructionBody>, ours: ModelResults): EnergyPlusInput {
   const H = weather.hours.count
   if (H !== 8760) throw new EnergyPlusInputError(`the weather file has ${H} hours; EnergyPlus runs here take a 8,760-hour year`, 'weather')
-  if (doc.building.air.method === 'weather_driven') {
-    throw new EnergyPlusInputError("weather-driven air (opening windows, wind and stack) is not carried to EnergyPlus yet; switch the building's air to today's method for an EnergyPlus run", 'building.air.method')
-  }
   if (ours.zones.length !== doc.zones.length) throw new EnergyPlusInputError('the hourly run does not match the building (run it again)', 'zones')
   const notes: string[] = []
   const note = (s: string) => { if (!notes.includes(s)) notes.push(s) }
+  // Weather-driven air (17 Nov 2026; before, refused): EnergyPlus's own air model (AirflowNetwork) is not built yet,
+  // so each room is given the outdoor air the hourly run worked out for it, hour by hour (leakage, vents, windows opened
+  // by its rule and an extract fan's make-up air, results.air.inflow_kg_per_h), as volume at the hour's outdoor
+  // density. EnergyPlus then checks everything else (fabric, sun, mass, gains, setpoints) with the run's air. A room
+  // the run gave today's leakage (no outside wall, review F4) keeps it, as under today's method.
+  const weatherAir = doc.building.air.method === 'weather_driven'
+  const airWx = weatherAir ? airWeather(weather.hours, weather.header.elevation) : null
+  const airOf = (zi: number) => (weatherAir && ours.zones[zi].air?.leakage === 'weather' ? ours.zones[zi].air! : null)
+  if (weatherAir && ours.zones.some((z) => !z.air)) throw new EnergyPlusInputError('the hourly run has no weather-driven air for every room (run it again)', 'building.air.method')
   const shaded: string[] = []
   const ep: Record<string, Record<string, Obj>> = {}
   const put = (type: string, name: string, o: Obj) => { (ep[type] ??= {})[name] = o }
@@ -413,6 +432,7 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
       // would overstate a single-sided vent about twentyfold. No stack: the document states no height difference.
       s.openings.forEach((op, j) => {
         if (op.kind !== 'permanent_vent' || !(op.area_m2 > 0)) return
+        if (airOf(zi)) return
         const k = ventsRan.get(s.id)?.shift()
         if (k == null) throw new EnergyPlusInputError('the hourly run has no flow for this vent (run it again)', `${p}.openings[${j}]`)
         put('ZoneVentilation:WindandStackOpenArea', epName(`${s.id}_vent${j + 1}`), {
@@ -425,7 +445,25 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
     }
 
     // ── Air leakage: the run's air change rate from q50, constant (today's method) ──────────────────────────────
-    const ach = readZoneConductances(r).infiltration.ach
+    const za = airOf(zi)
+    if (za) {
+      const q = new Float64Array(H)
+      let peak = 0
+      for (let h = 0; h < H; h++) {
+        q[h] = za.inflow_kg_per_h[h] / 3600 / rhoAir(airWx!.p_hour[h], weather.hours.dry_bulb[h], airWx!.w[h])
+        if (q[h] > peak) peak = q[h]
+      }
+      if (peak > 0) {
+        const an = epName(`${zn}_air`)
+        put('Schedule:File', an, cols.add(an, Float64Array.from(q, (v) => v / peak)))
+        put('ZoneInfiltration:DesignFlowRate', `${zn} air`, {
+          zone_or_zonelist_or_space_or_spacelist_name: zn, schedule_name: an, design_flow_rate_calculation_method: 'Flow/Zone', design_flow_rate: r6(peak),
+          constant_term_coefficient: 1, temperature_term_coefficient: 0, velocity_term_coefficient: 0, velocity_squared_term_coefficient: 0,
+        })
+      }
+      note('Air: the building uses weather-driven air, which EnergyPlus is not given its own way yet (its AirflowNetwork). Each room takes the outdoor air the hourly run worked out for it, hour by hour (leakage, vents, windows opened by their rule, an extract fan\'s make-up air), so EnergyPlus checks the fabric, sun, mass, gains and setpoints but not the air.')
+    }
+    const ach = za ? 0 : readZoneConductances(r).infiltration.ach
     if (ach > 0) put('ZoneInfiltration:DesignFlowRate', `${zn} leakage`, {
       zone_or_zonelist_or_space_or_spacelist_name: zn, schedule_name: 'Always On', design_flow_rate_calculation_method: 'AirChanges/Hour', air_changes_per_hour: r6(ach),
       constant_term_coefficient: 1, temperature_term_coefficient: 0, velocity_term_coefficient: 0, velocity_squared_term_coefficient: 0,
@@ -478,6 +516,8 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
         for (let h = 0; h < H; h++) oaRun[h] += q * v.running[h]
         continue
       }
+      // Weather-driven air: an extract fan's air is in the room's air above (its make-up air through the openings).
+      if (v.kind === 'mev' && airOf(zi)) continue
       const vn = epName(`${zn}_${v.id}`)
       put('Schedule:File', vn, cols.add(vn, v.running))
       put('ZoneVentilation:DesignFlowRate', vn, {
