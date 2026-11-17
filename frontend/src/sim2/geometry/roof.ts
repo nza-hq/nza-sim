@@ -197,9 +197,104 @@ export function blockRoof(ring: readonly XY[], recipe: RoofRecipe | null | undef
   }
 }
 
-/** The whole roof: each block's, with totals. */
-export function planRoof(blocks: readonly (readonly XY[])[], recipe: RoofRecipe | null | undefined) {
-  const per = blocks.map((b) => blockRoof(b, recipe))
+/** The whole roof built in the browser (rectangles only): each block's, with totals. */
+export const planRoof = (blocks: readonly (readonly XY[])[], recipe: RoofRecipe | null | undefined) => roofTotals(blocks.map((b) => blockRoof(b, recipe)))
+
+// ─── Brief 123: faces from the roof service (decodED's, copied to services/roof) ───────────────────────────────────
+
+/** A face as the roof service returns it (decodED's RoofFace): a ring in metres, z up from the eave_m sent. */
+export type ServedFace = { id: string; role: string; geometry: number[][]; tilt_deg: number; azimuth_deg: number }
+export type ServedResult = { faces: ServedFace[]; flags: string[]; fell_back_to_flat?: boolean }
+
+/** The recipe as the service reads it (decodED's field names; flat with no parapet). */
+export function serviceRecipe(r: RoofRecipe): Record<string, unknown> {
+  const { insulation: _i, ...rest } = r
+  return r.style === 'flat' ? { style: 'flat', parapet_height_m: 0 } : rest
+}
+
+/** The plane through a face: z at (x, y). Faces are planar (the service builds them so). */
+function planeOf(pts: readonly XYZ[]): (x: number, y: number) => number {
+  let nx = 0, ny = 0, nz = 0
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1, z1] = pts[i]!, [x2, y2, z2] = pts[(i + 1) % pts.length]!
+    nx += (y1 - y2) * (z1 + z2); ny += (z1 - z2) * (x1 + x2); nz += (x1 - x2) * (y1 + y2)
+  }
+  const [x0, y0, z0] = pts[0]!
+  return Math.abs(nz) < 1e-12 ? () => z0 : (x, y) => z0 - (nx * (x - x0) + ny * (y - y0)) / nz
+}
+
+/** Volume between the eaves' level (z 0) and a face: its plan area × its height at the plan centroid (exact for a plane). */
+function volumeUnder(pts: readonly XYZ[]): number {
+  let a = 0, cx = 0, cy = 0
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1] = pts[i]!, [x2, y2] = pts[(i + 1) % pts.length]!
+    const c = x1 * y2 - x2 * y1
+    a += c; cx += (x1 + x2) * c; cy += (y1 + y2) * c
+  }
+  if (Math.abs(a) < 1e-12) return 0
+  return Math.abs(a / 2) * planeOf(pts)(cx / (3 * a), cy / (3 * a))
+}
+
+/**
+ * A block's roof from the service's faces: the slopes as given, the walls under them that the service does not
+ * return (a gable end, a mono-pitch's raised wall) worked out from where the slopes rise above an outside wall, the
+ * ridge, hip and valley lines for the plan, the loft volume and the rise.
+ */
+export function fromServed(ring: readonly XY[], style: RoofStyle, served: ServedResult): BlockRoof {
+  if (served.fell_back_to_flat || !served.faces.length) return flatRoof(ring, `The roof service could not build this roof (${served.flags.join('; ') || 'no faces'}), so this block keeps a flat roof.`)
+  const slopes: RoofFace[] = served.faces.map((f) => {
+    const pts = f.geometry.map(([x, y, z]) => [x!, y!, z ?? 0] as XYZ)
+    return { kind: 'slope', pts, tilt_deg: f.tilt_deg, azimuth_deg: f.tilt_deg < 1 ? null : f.azimuth_deg, area_m2: faceArea(pts) }
+  })
+  const ON = 1e-4
+  const walls: RoofFace[] = []
+  const onBoundary = (p: XYZ) => ring.some((a, i) => {
+    const b = ring[(i + 1) % ring.length]!
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1])
+    const t = ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / (L * L)
+    return t > -ON && t < 1 + ON && Math.abs((p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])) / L < ON
+  })
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length]!
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1])
+    const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L
+    const up = new Map<string, XYZ>()
+    for (const f of slopes) for (const p of f.pts) {
+      if (p[2] < ON) continue
+      const t = (p[0] - a[0]) * ux + (p[1] - a[1]) * uy
+      if (t < -ON || t > L + ON || Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux) > ON) continue
+      up.set(`${p[0].toFixed(4)},${p[1].toFixed(4)},${p[2].toFixed(4)}`, p)
+    }
+    if (!up.size) return
+    const top = [...up.values()].sort((p, q) => ((q[0] - a[0]) * ux + (q[1] - a[1]) * uy) - ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy))
+    const pts: XYZ[] = [[a[0], a[1], 0], [b[0], b[1], 0], ...top]
+    const area = faceArea(pts)
+    if (area > 1e-6) walls.push({ kind: 'wall', pts, tilt_deg: 90, azimuth_deg: bearing(uy, -ux), area_m2: area })
+  })
+  // Lines: face edges off the outline (ridges, hips, valleys), each once.
+  const seen = new Set<string>()
+  const lines: Array<[XYZ, XYZ]> = []
+  const k = (p: XYZ) => `${p[0].toFixed(3)},${p[1].toFixed(3)},${p[2].toFixed(3)}`
+  for (const f of slopes) f.pts.forEach((p, i) => {
+    const q = f.pts[(i + 1) % f.pts.length]!
+    if (onBoundary(p) && onBoundary(q) && p[2] < ON && q[2] < ON) return
+    if (p[2] < ON && q[2] < ON) return
+    const id = [k(p), k(q)].sort().join('|')
+    if (seen.has(id)) return
+    seen.add(id)
+    lines.push([p, q])
+  })
+  return {
+    style,
+    faces: [...slopes, ...walls],
+    lines,
+    rise_m: Math.max(0, ...slopes.flatMap((f) => f.pts.map((p) => p[2]))),
+    void_m3: slopes.reduce((t, f) => t + volumeUnder(f.pts), 0),
+  }
+}
+
+/** Totals over the blocks' roofs, however they were built. */
+export function roofTotals(per: readonly BlockRoof[]) {
   const sum = (f: (r: BlockRoof) => number) => per.reduce((t, r) => t + f(r), 0)
   return {
     blocks: per,
@@ -207,5 +302,23 @@ export function planRoof(blocks: readonly (readonly XY[])[], recipe: RoofRecipe 
     wall_m2: sum((r) => r.faces.filter((f) => f.kind === 'wall').reduce((t, f) => t + f.area_m2, 0)),
     ceiling_m2: sum((r) => (r.style === 'flat' ? 0 : r.faces.filter((f) => f.kind === 'slope').reduce((t, f) => t + f.area_m2 * Math.cos(rad(f.tilt_deg)), 0))),
     void_m3: sum((r) => r.void_m3),
+  }
+}
+
+/** Ask NZA Sim's backend for the blocks' roofs (it asks the roof service). Null when the service is not answering. */
+export async function fetchServedRoofs(blocks: readonly (readonly XY[])[], recipe: RoofRecipe, signal?: AbortSignal): Promise<{ ok: true; blocks: BlockRoof[] } | { ok: false; reason: string }> {
+  try {
+    const r = await fetch('/api/roof/construct-batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ buildings: blocks.map((b, i) => ({ id: `b${i}`, footprint: b, roof: serviceRecipe(recipe), eave_m: 0 })) }),
+      signal,
+    })
+    if (!r.ok) return { ok: false, reason: `the roof service is not running (${r.status})` }
+    const body = (await r.json()) as { results: Record<string, ServedResult> }
+    return { ok: true, blocks: blocks.map((b, i) => fromServed(b, recipe.style, body.results[`b${i}`] ?? { faces: [], flags: ['no answer for this block'] })) }
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e
+    return { ok: false, reason: 'the roof service is not reachable' }
   }
 }

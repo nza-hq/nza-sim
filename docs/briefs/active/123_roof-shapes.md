@@ -121,6 +121,13 @@ Later, if she wants them, from decodED's list:
   - Vitest against hand sums.
   - A 10 × 20 m gable at 35°: slope 244.1 m², gable walls 2 × 17.5 m².
 
+### P2b: decodED's roof service, brought in (editor; Linzie 17 Nov 10:47)
+- Linzie: "have a look at the decodED roof service because I think it's already done the work for us. Bring that in if it works. Don't start again from scratch."
+- `services/roof/` is copied unchanged from decodED @ e5174c5 (`PROVENANCE.md`; Diverged: no). It runs as its own process on `127.0.0.1:8009`. `api/roof_launcher.py` starts it from NZA Sim's backend when a `roof` conda env exists. `api/routers/roof.py` (`POST /api/roof/construct-batch`) is the browser's only way to it, so CGAL never reaches a browser.
+- The service builds the faces for every outline: gable and hip on an L, T or U through CGAL's straight skeleton, with valleys. `roof.ts` `fromServed` adds the walls under them that the service does not return (gable ends, a mono-pitch's raised wall), plus the lines and the loft volume.
+- Rectangles are also worked out in the browser, so a rectangle has its roof at once and still works with the service down. Tests check this against the service's recorded answers (`__fixtures__/roof_service.json`): slopes, walls and loft agree to 1e-4. Any other outline keeps a flat roof, with the reason, when the service does not answer.
+- Checked: in the container (CGAL 5.6), 147 of the service's own tests pass. In the browser, on the community centre's L: gable 835.0 m² of slope (684 m² ÷ cos 35°), 59.5 m² of gable walls, and a 1,554 m³ loft; hip 835.0 m² and 1,424 m³.
+
 ### P3: Shape screens (editor)
 - Covers: the roof tab's passport, the 3D faces, the plan ridge lines and the gable walls in elevation.
 - Verify:

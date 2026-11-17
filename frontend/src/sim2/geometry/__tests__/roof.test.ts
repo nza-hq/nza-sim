@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { asRectangle, blockRoof, defaultRoof, planRoof } from '../roof'
+import { asRectangle, blockRoof, defaultRoof, fromServed, planRoof, roofTotals, type ServedResult } from '../roof'
+import served from '../__fixtures__/roof_service.json'
 import type { XY } from '../ported/zones'
 
 // 20 m east–west by 10 m north–south, anticlockwise.
@@ -81,5 +82,45 @@ describe('Brief 123 roof faces', () => {
     expect(t.ceiling_m2).toBeCloseTo(200, 6)
     expect(t.slope_m2).toBeCloseTo(200 / cos35, 6)
     expect(planRoof([RECT], null).ceiling_m2).toBe(0)
+  })
+})
+
+
+describe('Brief 123 faces from the roof service (decodED, recorded answers)', () => {
+  const C = (served as unknown as { cases: Record<string, { footprint: XY[]; roof: { style: 'gable' | 'hip' | 'mono' }; result: ServedResult }> }).cases
+  const of = (k: string) => fromServed(C[k]!.footprint, C[k]!.roof.style, C[k]!.result)
+
+  it('on a rectangle the service and the browser agree: slopes, walls, loft', () => {
+    for (const [k, st] of [['rect_gable', 'gable'], ['rect_hip', 'hip'], ['rect_mono', 'mono']] as const) {
+      const a = roofTotals([of(k)])
+      const b = planRoof([RECT], defaultRoof(st))
+      expect(a.slope_m2).toBeCloseTo(b.slope_m2, 4)
+      expect(a.wall_m2).toBeCloseTo(b.wall_m2, 4)
+      expect(a.void_m3).toBeCloseTo(b.void_m3, 4)
+      expect(of(k).rise_m).toBeCloseTo(blockRoof(RECT, defaultRoof(st)).rise_m, 6)
+    }
+  })
+
+  it('an L: slopes cover the footprint at the pitch, ceiling is the footprint', () => {
+    for (const k of ['L_gable', 'L_hip']) {
+      const t = roofTotals([of(k)])
+      expect(t.slope_m2).toBeCloseTo(300 / cos35, 4)
+      expect(t.ceiling_m2).toBeCloseTo(300, 4)
+    }
+    // The gable's two wing ends: 10 m wide, rising 5 × tan 35°.
+    expect(roofTotals([of('L_gable')]).wall_m2).toBeCloseTo(2 * 0.5 * 10 * 5 * tan35, 4)
+    expect(roofTotals([of('L_hip')]).wall_m2).toBe(0)
+    // Hip over the L, below the gable over the L.
+    expect(of('L_hip').void_m3).toBeLessThan(of('L_gable').void_m3)
+    expect(of('L_hip').void_m3).toBeGreaterThan(0)
+  })
+
+  it('a mono-pitch over an L: one plane, the walls under its raised edges', () => {
+    const r = of('L_mono')
+    const t10 = Math.tan((10 * Math.PI) / 180)
+    expect(roofTotals([r]).slope_m2).toBeCloseTo(300 / Math.cos((10 * Math.PI) / 180), 4)
+    expect(r.rise_m).toBeCloseTo(20 * t10, 6)
+    // Volume of a plane rising north over the L: ∫ y·tan dA = tan × (first moment of area about y = 0).
+    expect(r.void_m3).toBeCloseTo(t10 * (20 * 10 * 5 + 10 * 10 * 15), 4)
   })
 })
