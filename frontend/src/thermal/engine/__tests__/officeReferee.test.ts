@@ -80,3 +80,11 @@ describe.skipIf(!have)('Brief 115: the community centre office against EnergyPlu
     expect(Math.abs(pct(O.mixed_cooling))).toBeLessThanOrEqual(S.gates.mixed_cooling_own_effect_pct)
   })
 })
+
+describe('Brief 115 review F10: the office window is the community centre\'s top-hung window as the engine reads it', () => {
+  it('0.098 (the spec) is windowEffectiveArea for 30 % of the glass, top-hung at 20°, to the spec\'s three places', async () => {
+    const { windowEffectiveArea } = await import('../airflow')
+    const f = windowEffectiveArea({ openable_fraction: 0.3, style: 'top_hung', opening_angle_deg: 20 }, 'office')
+    expect(Math.abs(f - OFFICE_SPEC.window.openable_fraction)).toBeLessThan(5e-4)
+  })
+})

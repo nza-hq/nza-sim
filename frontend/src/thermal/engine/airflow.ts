@@ -43,9 +43,12 @@
  * between). 'timetable': open by `open_fraction` × the profile's value. A window's widest opening is its
  * `openable_fraction` × its style's angle factor (`windowEffectiveArea`).
  *
- * Single-sided turbulence (switchable, `building.air.single_sided_turbulence`): when every open window in a room is on
- * one facade, EN 16798-7's single-sided wind term q = ½·A_open·√0.001·U₁₀ (m³/s) is added as its own line (U₁₀ the
- * wind at 10 m on site). Not refereed: EnergyPlus has no exact counterpart (stated).
+ * Single-sided turbulence (switchable, `building.air.single_sided_turbulence`; review F2): when every open window in a
+ * room is on one facade, the turbulent part of the De Gids–Phaff single-sided correlation (as in EN 15242 / EN 16798-7,
+ * U_eff = √(C₁U² + C₂HΔT + C₃), q = ½·A_open·U_eff) is added to the windows' own flow. The wind and stack parts (C₁, C₂)
+ * are already in the pressure balance, so only C₃ = 0.01 m²/s² is added, in quadrature as the correlation has it:
+ * q_total = √(q_windows² + (½·A_open·√C₃)²). The line is the increase over the windows' own flow. Not refereed:
+ * EnergyPlus has no counterpart (stated); hand values in airflow.test.ts.
  */
 
 export class AirflowError extends Error {
@@ -65,6 +68,8 @@ export const AIR = {
   crack_bands: 3,
   /** EN 16798-7's single-sided wind coefficient C_wnd (1/(m/s)), as in EN 15242. */
   c_wnd: 0.001,
+  /** De Gids–Phaff turbulence constant C₃, m²/s² (review F2). */
+  c_turb: 0.01,
   /** EnergyPlus SimpleOpening's default least density difference for two-way flow, kg/m³. */
   min_rho_diff: 1e-4,
 } as const
@@ -158,6 +163,13 @@ export interface ZoneAirModel {
   cp: Float64Array[]
   /** The site's 10 m wind ÷ the weather file's. */
   wind10: number
+  /** Review F4: the room has leakage but no outside wall; its leakage is today's q50 ÷ 20 (model.ts), not here. */
+  fixed_leakage?: boolean
+  /**
+   * Review F3: extract fans (MEV) as a fixed flow out of the room each hour, m³/s (of room air); null: none. The air
+   * they draw comes in through the room's leakage, vents and windows, and is counted on those lines.
+   */
+  extract?: Float64Array | null
 }
 
 export interface AirWeather {
@@ -241,6 +253,7 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   const sc = scratchOf(m)
   const d0c = sc.d0c, d0v = sc.d0v, d0w = sc.d0w, ww = sc.ww
   let lo = Infinity, hi = -Infinity
+  const ext = m.extract ? m.extract[h] * rhoZ : 0
   for (let i = 0; i < nc; i++) { const c = m.cracks[i]; const d = cpF[c.facade] * qw * c.wind * c.wind + c.z * dRhoStack; d0c[i] = d; if (d < lo) lo = d; if (d > hi) hi = d }
   for (let i = 0; i < nv; i++) { const v = m.vents[i]; const d = cpF[v.facade] * qw * v.wind * v.wind + v.z * dRhoStack; d0v[i] = d; if (d < lo) lo = d; if (d > hi) hi = d }
   for (let i = 0; i < nw; i++) {
@@ -310,7 +323,7 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
       f += a + b; df += da + db; sa += (a < 0 ? -a : a) + (b < 0 ? -b : b)
       if (rec) { if (a > 0) rec[2] += a; if (b > 0) rec[2] += b }
     }
-    F_ = f; D_ = df; A_ = sa
+    F_ = f - ext; D_ = df; A_ = sa + ext
   }
 
   for (let i = 0; i < 4; i++) out[i] = 0
@@ -320,6 +333,12 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   // derivatives are EnergyPlus's derivative factors, not always the true slope). Settled when the imbalance is below
   // 1e-6 of the flows through the room, or 1e-9 kg/s (0.004 g an hour).
   lo -= 1e-9; hi += 1e-9
+  // An extract fan pulls the room below every path's pressure: widen the bracket down until the paths can supply it.
+  if (ext > 0) {
+    let span = Math.max(1, hi - lo)
+    for (let k = 0; k < 60; k++) { flowAt(lo, null); if (F_ > 0) break; hi = lo; lo -= span; span *= 2 }
+    if (!(F_ > 0)) throw new AirflowError(`the extract fans could not draw their air at hour ${h}`, 'air')
+  }
   // Start from the room's pressure at the step before (it moves little from one step to the next).
   let P = sc.p > lo && sc.p < hi ? sc.p : 0.5 * (lo + hi), it = 0, slow = 0, last = Infinity
   for (; it < 200; it++) {
@@ -346,12 +365,29 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
     if (m.windows.every((o) => o.facade === f0)) {
       let A = 0
       for (const o of m.windows) A += o.width * o.max_factor * factor * o.height
-      mt = rhoO * 0.5 * A * Math.sqrt(AIR.c_wnd) * U * m.wind10
+      // In quadrature with the windows' own inflow (rec[2], kg/s): only the increase is this line.
+      const qt = rhoO * turbulenceFlow(A), qw = rec[2]
+      mt = Math.sqrt(qw * qw + qt * qt) - qw
       out[3] = cp * mt
     }
   }
   return { open_factor: factor, p_z: P, iterations: it, m_in: rec[0] + rec[1] + rec[2] + mt }
 }
+
+/**
+ * Review F8: under a temperature rule the opening profile says only when the windows may open (0 or 1), as EnergyPlus's
+ * venting availability schedule does; how far is `open_fraction` and the modulation. Part values are for timetables
+ * (EnergyPlus's Constant venting with an opening-factor schedule). Refused by name, not rounded.
+ */
+function openingProfile(f: Float64Array, rule: string, path: string): Float64Array {
+  if (rule === 'temperature') for (let h = 0; h < f.length; h++) if (f[h] !== 0 && f[h] !== 1) {
+    throw new AirflowError(`a window that opens by temperature takes its hours as 0 (shut) or 1 (may open), not ${f[h]} (hour ${h}); say how far with open_fraction, or use a timetable rule`, path)
+  }
+  return f
+}
+
+/** The turbulent part of the single-sided correlation alone, m³/s, for an open area A (m²): ½·A·√C₃ (review F2). */
+export function turbulenceFlow(A: number): number { return 0.5 * A * Math.sqrt(AIR.c_turb) }
 
 // ─── Building the model from the document ─────────────────────────────────────────────────────────────────────────
 
@@ -359,13 +395,13 @@ interface DocLike {
   building: { air: { method: string; exponent: number | null; single_sided_turbulence: boolean | null }; site: { terrain?: string | null } }
   zones: { id: string; floor: number; storeys: number; height_m: number; infiltration_q50: number | null; infiltration_ach: number | null }[]
   surfaces: { id: string; kind: string; zone_a: string; zone_b: string; area_m2: number; azimuth_deg: number | null; tilt_deg: number; openings: any[] }[]
-  controls: { id: string; target: { kind: string; ref: string }; rule: string | null; open_fraction: number | null; open_above_ref: string | null; open_above_c?: number | null; min_open_h: number | null; min_closed_h: number | null; modulation: { full_open_below_dk: number; min_open_above_dk: number; min_fraction: number } | null }[]
+  controls: { id: string; target: { kind: string; ref: string }; hours_ref?: string | null; rule: string | null; open_fraction: number | null; open_above_ref: string | null; open_above_c?: number | null; min_open_h: number | null; min_closed_h: number | null; modulation: { full_open_below_dk: number; min_open_above_dk: number; min_fraction: number } | null }[]
 }
 
 /**
  * Every zone's air model, from the document. `envelopeArea` is each zone's envelope area as today's method takes it;
- * `hoursOf` turns a schedule profile into hourly fractions; `windows` false leaves windows out (Rule 8: at "Fabric
- * only" and "+ Spaces" there are no windows in the run).
+ * `hoursOf` turns a schedule profile into hourly fractions and `tempOf` a temperature profile into hourly °C. Rule 8
+ * (no windows at "Fabric only" and "+ Spaces") is done before this, in the seam's `levelDocument`.
  */
 export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (ref: string, path: string) => Float64Array,
   tempOf: (ref: string, path: string) => Float64Array = (_r, p) => { throw new AirflowError('temperature profiles need the weather calendar', p) }): ZoneAirModel[] {
@@ -407,8 +443,10 @@ export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (r
     const kTot = (RHO_REF * q50 * envelopeArea[zi]) / 3600 / Math.pow(50, n)
     const wallArea = walls.reduce((t, { s }) => t + s.area_m2, 0)
     const cracks: Crack[] = []
-    if (kTot > 0) {
-      if (!(wallArea > 0)) throw new AirflowError('a room with air leakage needs an outside wall to carry it (roof and floor leakage is put on the walls)', `${zp}.infiltration_q50`)
+    // Review F4: a room with leakage but no outside wall (an inner room under a roof) has no facade for the wind to act
+    // on, so its leakage is today's q50 ÷ 20 air changes (stated per room: `fixed_leakage`), not refused.
+    const fixedLeakage = kTot > 0 && !(wallArea > 0)
+    if (kTot > 0 && !fixedLeakage) {
       for (const { s } of walls) for (let b = 0; b < AIR.crack_bands; b++) {
         const z = base + ((b + 0.5) * Hz) / AIR.crack_bands
         cracks.push({ z, wind: windFactor(z, terrain), facade: facadeIndex(s.azimuth_deg!), k: (kTot * s.area_m2) / wallArea / AIR.crack_bands })
@@ -446,16 +484,16 @@ export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (r
       if (c.min_open_h != null || c.min_closed_h != null) throw new AirflowError('least open and closed times are not modelled yet; leave empty', `${cp}.${c.min_open_h != null ? 'min_open_h' : 'min_closed_h'}`)
       if (c.open_above_ref != null && c.open_above_c != null) throw new AirflowError('the windows open above a temperature profile or one temperature: keep one', `${cp}.open_above_c`)
       if (c.rule === 'temperature' && c.open_above_c == null && c.open_above_ref == null) throw new AirflowError('a window that opens by temperature needs the temperature it opens above (one figure, or a temperature profile)', `${cp}.open_above_c`)
-      const hrs = (c as any).hours_ref as string | null
+      const hrs = c.hours_ref ?? null
       const md = c.modulation
       if (md && !(md.min_open_above_dk > md.full_open_below_dk)) throw new AirflowError('the upper difference must be above the lower', `${cp}.modulation`)
       rule = {
         rule: c.rule as 'temperature' | 'timetable', open_fraction: c.open_fraction, open_above_c: c.open_above_c ?? null,
         open_above_h: c.rule === 'temperature' && c.open_above_ref != null ? tempOf(c.open_above_ref, `${cp}.open_above_ref`) : null,
-        hours: hrs != null ? hoursOf(hrs, `${cp}.hours_ref`) : null,
+        hours: hrs != null ? openingProfile(hoursOf(hrs, `${cp}.hours_ref`), c.rule, `${cp}.hours_ref`) : null,
         modulation: md ? { lower_dk: md.full_open_below_dk, upper_dk: md.min_open_above_dk, min_fraction: md.min_fraction } : null,
       }
     }
-    return { n, cracks, vents, windows, rule, turbulence: air.single_sided_turbulence === true, cp: facades.map((a) => tables.get(a)!), wind10: windFactor(10, terrain) }
+    return { n, cracks, vents, windows, rule, fixed_leakage: fixedLeakage, turbulence: air.single_sided_turbulence === true, cp: facades.map((a) => tables.get(a)!), wind10: windFactor(10, terrain) }
   })
 }

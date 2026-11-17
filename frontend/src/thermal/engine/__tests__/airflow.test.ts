@@ -13,7 +13,7 @@
  */
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { AIR, airWeather, buildAirModels, cpAt, cpTable, rhoAir, swamiChandra, windFactor, windowEffectiveArea, zoneAirStep, type AirWeather, type ZoneAirModel } from '../airflow'
+import { AIR, airWeather, buildAirModels, turbulenceFlow, cpAt, cpTable, rhoAir, swamiChandra, windFactor, windowEffectiveArea, zoneAirStep, type AirWeather, type ZoneAirModel } from '../airflow'
 import { REFEREE_OPTIONS, runModel } from '../model'
 import { readZoneTermKwh } from '../results'
 import { ModelDocument } from '../../schema/model'
@@ -90,6 +90,25 @@ describe('Brief 115: one room, one step', () => {
     expect(st.m_in / hand).toBeLessThan(1.02)
     expect(out[2]).toBeCloseTo(st.m_in * 1004.84, 6)
   })
+  it('single-sided turbulence (review F2): De Gids–Phaff C₃ in quadrature with the windows\' own flow, hand values', () => {
+    expect(turbulenceFlow(1)).toBeCloseTo(0.05, 12)                 // ½·1·√0.01
+    const Hh = 1.2, Wd = 0.8, cd = 0.6
+    const win = { z_ref: 1, wind: 1, facade: 0, cd, width: Wd, height: Hh, max_factor: 1 }
+    const rule = { rule: 'timetable' as const, open_fraction: 1, open_above_c: null, open_above_h: null, hours: null, modulation: null }
+    // Still and isothermal: the windows carry nothing, so the line is the turbulence alone, ρ·½·A·√C₃.
+    const o0 = new Float64Array(4)
+    const s0 = zoneAirStep(box({ windows: [win], rule, turbulence: true }), wx(20), 0, 20, 20, o0)
+    const rho20 = rhoAir(101325, 20, 0)
+    expect(s0.m_in).toBeCloseTo(rho20 * 0.5 * Wd * Hh * 0.1, 9)
+    // Warm room: √(q_w² + q_t²) − q_w on top of the two-way flow.
+    const off = new Float64Array(4), on = new Float64Array(4)
+    const a = zoneAirStep(box({ windows: [win], rule }), wx(0), 0, 20, 0, off)
+    const b = zoneAirStep(box({ windows: [win], rule, turbulence: true }), wx(0), 0, 20, 0, on)
+    const qt = rhoAir(101325, 0, 1e-5) * 0.5 * Wd * Hh * 0.1
+    expect(b.m_in).toBeCloseTo(Math.sqrt(a.m_in ** 2 + qt ** 2), 9)
+    expect(on[2]).toBeCloseTo(off[2], 9)
+    expect(on[3]).toBeGreaterThan(0)
+  })
   it('cross-flow, isothermal: equal windows in series take half the wind pressure each', () => {
     const cd = 0.6, A = 0.5, U = 4
     const m = box({
@@ -118,8 +137,6 @@ describe('Brief 115: one room, one step', () => {
     expect(f(25, 5)).toBeCloseTo(0.8 * 0.2, 12)     // ΔT 20 ≥ 15: least
     m.rule!.hours = new Float64Array([0])
     expect(f(25, 22)).toBe(0)
-    m.rule!.hours = new Float64Array([0.5])          // the opening profile's value scales how far they open
-    expect(f(25, 22)).toBeCloseTo(0.4, 12)
     m.rule!.hours = null
     m.rule!.open_above_h = new Float64Array([26])    // a temperature profile's hour in place of open_above_c
     expect(f(25, 22)).toBe(0)
@@ -198,6 +215,50 @@ describe('Brief 115: runModel under weather-driven air', () => {
     expect(() => ModelDocument.parse(tt)).toThrow('opens by its hours')
     const low = structuredClone(flat26); low.profiles.at(-1).day_types.sunday[3] = low.zones[0].setpoints.heat_c
     expect(() => run(low)).toThrow('controls[0].open_above_ref')
+    // Review F8: under a temperature rule the opening profile is 0 or 1 (when they may open); part values only for timetables.
+    const part = weatherDriven()
+    part.profiles.push({ id: 'half', kind: 'schedule', day_types: { weekday: Array(24).fill(0.5), saturday: Array(24).fill(0.5), sunday: Array(24).fill(0.5) } })
+    part.controls[0].hours_ref = 'half'
+    expect(() => run(part)).toThrow('controls[0].hours_ref: a window that opens by temperature takes its hours as 0 (shut) or 1')
+  })
+  it('review F3: an extract fan is a fixed flow in the room\'s balance, its air through the leakage; natural entries beside windows refused', () => {
+    const base = weatherDriven(); for (const c of base.controls) c.open_fraction = 0
+    const fan = structuredClone(base)
+    fan.zones[0].ventilation = [{ id: 'fan', kind: 'mev', enabled: true, flow_rate: 30, flow_rate_basis: 'constant', sfp_w_per_l_s: 1, recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
+    const runV = (d: any) => runModel(ModelDocument.parse(d), W, LIB, { ...REFEREE_OPTIONS, ventilation: 'document' })
+    const a = runV(base), b = runV(fan)
+    const z = b.zones[0]
+    expect(Math.abs(z.closure.sum_kwh)).toBeLessThan(1e-3)
+    // Every hour at least the fan's 30 l/s comes in (Denver, 1,600 m: room air about 0.92 to 1.05 kg/m³).
+    for (let h = 0; h < 8760; h++) expect(z.air!.inflow_kg_per_h[h]).toBeGreaterThan(0.03 * 0.9 * 3600)
+    // Its own conductance is not added again: the fan's line is 0 and the leakage line carries the air.
+    expect(z.breakdown.find((l) => l.term === 'mechanical_ventilation')!.kwh).toBe(0)
+    expect(readZoneTermKwh(z, 'infiltration')).toBeLessThan(readZoneTermKwh(a.zones[0], 'infiltration'))
+    expect(z.annual.heating_kwh).toBeGreaterThan(a.zones[0].annual.heating_kwh)
+    const nat = weatherDriven()
+    nat.zones[0].ventilation = [{ id: 'nat', kind: 'natural', enabled: true, flow_rate: 1, flow_rate_basis: 'ach', recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
+    expect(() => runV(nat)).toThrow('zones[0].ventilation[0]: the room\'s opening windows give its natural ventilation')
+  })
+  it('review F4: an inner room under a roof keeps today\'s leakage (q50 ÷ 20), stated, and its extract fan as before', () => {
+    const d = weatherDriven()
+    const mid = d.zones[1], west = d.zones[0]
+    // Its outside walls become partitions to the west room; its windows and vents go.
+    const drop = new Set<string>()
+    for (const sf of d.surfaces) if (sf.zone_a === mid.id && sf.zone_b === 'outside' && sf.tilt_deg === 90) {
+      if (sf.kind === 'glazing') drop.add(sf.id)
+      else { Object.assign(sf, { kind: 'partition', zone_b: west.id, openings: [], azimuth_deg: null, solar_absorptance: null, thermal_emissivity: null, frame_fraction: null, g_value: null, facade: null, construction_ref: { key: 'partition' }, inside_solar_absorptance_b: sf.inside_solar_absorptance }); west.surfaces.push(sf.id) }
+    }
+    d.surfaces = d.surfaces.filter((sf: any) => !drop.has(sf.id))
+    for (const z of d.zones) z.surfaces = z.surfaces.filter((id: string) => !drop.has(id))
+    d.controls = d.controls.filter((c: any) => c.target.ref !== mid.id)
+    mid.ventilation = [{ id: 'wc', kind: 'mev', enabled: true, flow_rate: 10, flow_rate_basis: 'constant', sfp_w_per_l_s: 1, recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
+    const r = runModel(ModelDocument.parse(d), W, LIB, { ...REFEREE_OPTIONS, ventilation: 'document' })
+    const z = r.zones[1]
+    expect(z.air!.leakage).toBe('q50_over_20')
+    expect(r.zones[0].air!.leakage).toBe('weather')
+    expect(readZoneTermKwh(z, 'infiltration')).toBeLessThan(0)
+    expect(z.breakdown.find((l) => l.term === 'mechanical_ventilation')!.kwh).toBeLessThan(0)
+    expect(Math.abs(z.closure.sum_kwh)).toBeLessThan(1e-3)
   })
   it('a vent under weather-driven air needs cd and height, not today\'s flow_mode', () => {
     const d = weatherDriven()
