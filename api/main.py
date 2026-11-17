@@ -29,6 +29,8 @@ from api.routers import scenarios as scenarios_router
 from api.routers import weather as weather_router
 from api.routers import consumption as consumption_router
 from api.routers import ep_backend as ep_backend_router
+from api.routers import roof as roof_router
+from api import roof_launcher
 from api.db.database import init_db
 
 
@@ -36,7 +38,13 @@ from api.db.database import init_db
 async def lifespan(app: FastAPI):
     """Initialise the database (create tables, seed library) on startup."""
     await init_db()
+    # Brief 123: the roof service (copied from decodED) starts beside the backend, in the background, so a
+    # missing conda env or a slow first compile never holds the backend up.
+    import asyncio
+    roof_task = asyncio.create_task(roof_launcher.start())
     yield
+    roof_task.cancel()
+    roof_launcher.stop()
 
 
 app = FastAPI(
@@ -62,6 +70,7 @@ app.include_router(scenarios_router.router)
 app.include_router(weather_router.router)
 app.include_router(consumption_router.router)
 app.include_router(ep_backend_router.router)
+app.include_router(roof_router.router)
 
 
 @app.get("/api/health")

@@ -82,7 +82,7 @@ import { computeCd } from '../../utils/openingCoefficients.js'
 import SchedulePopout from '../../components/shared/SchedulePopout.jsx'
 import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
-import { ROOF_STYLES, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, planRoof } from './roof'
+import { type BlockRoof, ROOF_STYLES, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, fetchServedRoofs, roofTotals } from './roof'
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
 
@@ -256,6 +256,30 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // The project's own profiles first, then the library's (Brief 118 P5).
   const profile = (key: string | null | undefined) => profileOf(plan, key)
   const profilesFor = (t: OwnProfile['schedule_type']) => profilesOfKind(plan, t)
+  // ─── Brief 123: the roof's faces, from the roof service (decodED's, through NZA Sim's backend) ───────────────
+  // Rectangles are also worked out in the browser (the same numbers; tested against the service's answers), so a
+  // rectangular block has its roof at once and when the service is not running. Any other outline waits for the
+  // service, and keeps a flat roof with the reason when it does not answer.
+  const roofKey = JSON.stringify([plan.blocks, plan.roof ?? null])
+  const [served, setServed] = useState<{ key: string; res: Awaited<ReturnType<typeof fetchServedRoofs>> } | null>(null)
+  useEffect(() => {
+    const rec = plan.roof
+    if (!rec || rec.style === 'flat' || !plan.blocks.length) return
+    const ac = new AbortController()
+    const key = roofKey
+    const t = setTimeout(() => { fetchServedRoofs(plan.blocks, rec, ac.signal).then((res) => setServed({ key, res })).catch(() => {}) }, 150)
+    return () => { clearTimeout(t); ac.abort() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roofKey])
+  const roofs: BlockRoof[] = useMemo(() => {
+    const rec = plan.roof
+    const local = plan.blocks.map((b) => blockRoof(b, rec))
+    if (!rec || rec.style === 'flat') return local
+    const mine = served && served.key === roofKey ? served.res : null
+    if (mine?.ok) return mine.blocks
+    return local.map((r) => (r.refused ? { ...r, refused: mine ? `This shape needs the roof service for any block that is not a rectangle, and ${mine.reason}, so this block keeps a flat roof for now.` : 'Working out this roof…' } : r))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roofKey, served])
   const [past, setPast] = useState<Plan[]>([])
   const [future, setFuture] = useState<Plan[]>([])
   /** While a preview is worked out, a give writes here instead of to the plan (preview, then apply). */
@@ -1770,7 +1794,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // ─── Brief 123: the roof's shape (Shape, roof tab) ─────────────────────────────────────────────────────────────
   const roofShapePanel = () => {
     const rec: RoofRecipe = plan.roof ?? { style: 'flat' }
-    const r = planRoof(plan.blocks, rec)
+    const r = roofTotals(roofs)
     const refused = r.blocks.find((b) => b.refused)?.refused
     const set = (next: RoofRecipe, text: string) => {
       commit({ ...plan, roof: next })
@@ -2888,7 +2912,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D roofs={roofs} roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -2946,7 +2970,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Shape turns the whole outline orange (floor lighter, dashed). */}
         {mode === 'outline' && (shapeTab === 'roof' || shapeTab === 'floor') && shown.blocks.map((b, i) => <polygon key={`hl${i}`} className={`gl-surf-on ${shapeTab}`} points={P(b)} />)}
         {/* Brief 123: the ridge and hip lines of a pitched roof, on Shape. */}
-        {mode === 'outline' && plan.roof && plan.roof.style !== 'flat' && shown.blocks.map((b, i) => blockRoof(b, plan.roof).lines.map(([a, c], j) => <line key={`rg${i}-${j}`} className={`gl-ridge${shapeTab === 'roof' ? ' on' : ''}`} x1={toPx([a[0], a[1]])[0]} y1={toPx([a[0], a[1]])[1]} x2={toPx([c[0], c[1]])[0]} y2={toPx([c[0], c[1]])[1]} />))}
+        {mode === 'outline' && plan.roof && plan.roof.style !== 'flat' && roofs.map((br, i) => br.lines.map(([a, c], j) => <line key={`rg${i}-${j}`} className={`gl-ridge${shapeTab === 'roof' ? ' on' : ''}`} x1={toPx([a[0], a[1]])[0]} y1={toPx([a[0], a[1]])[1]} x2={toPx([c[0], c[1]])[0]} y2={toPx([c[0], c[1]])[1]} />))}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
           return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />

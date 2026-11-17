@@ -39,9 +39,11 @@ type Props = {
   roofOn?: boolean
   /** Linzie, 17 Nov 10:29: the ground floor tinted a lighter orange when it is chosen. */
   floorOn?: boolean
+  /** Brief 123: each block's roof (from the roof service or the browser); absent, worked out here. */
+  roofs?: BlockRoof[]
 }
 
-export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false }: Props) {
+export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs }: Props) {
   const H = plan.storey_height_m
   // The camera starts on the building as it was when 3D opened; edits after that do not move it.
   const [start] = useState(() => {
@@ -108,7 +110,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
-      {plan.blocks.map((b, i) => { const br = blockRoof(b, plan.roof); return br.style === 'flat' ? <Roof key={`r${i}`} ring={b} H={H} on={roofOn} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} hide={floorOn && !roofOn} /> })}
+      {plan.blocks.map((b, i) => { const br = roofs?.[i] ?? blockRoof(b, plan.roof); return br.style === 'flat' ? <Roof key={`r${i}`} ring={b} H={H} on={roofOn} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {runs.map((run) => (
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
