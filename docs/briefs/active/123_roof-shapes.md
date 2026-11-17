@@ -48,7 +48,7 @@ Later, if she wants them, from decodED's list:
 ## Design
 
 ### The recipe
-- Each block on the plan carries a roof recipe, copied from decodED's types (with a provenance header, as decodED copies from nza-twin-lab). The fields are:
+- The building carries one roof recipe, applied to each block (`Plan.roof`; absent means flat, as today). Per-block styles can follow if a building needs two. The recipe is copied from decodED's types (with a provenance header, as decodED copies from nza-twin-lab). The fields are:
   - `style`: flat, mono, gable or hip.
   - `pitch_deg`.
   - For a gable, the ridge axis (`longest` or `shortest`).
@@ -69,10 +69,11 @@ Later, if she wants them, from decodED's list:
   - Mono-pitch: 1 sloped face, plus 2 triangular gable walls and 1 raised wall.
   - Gable: 2 slopes, plus 2 triangular gable walls.
   - Hip: 2 trapezia and 2 triangles.
-- **Other outlines** (an L drawn as one shape, a triangle) need a straight skeleton for hip and gable, which is what decodED's CGAL service does. In this brief such a block gets one of two treatments:
-  - (a) split into rectangles where it splits cleanly, each with its own roof meeting at a valley; or
-  - (b) left flat and labelled "roof shape needs a rectangle: split the block".
-- Nothing guesses at a skeleton. A server-side skeleton (decodED's service behind NZA Sim's backend) is a follow-up only if she wants complex outlines.
+- **Other outlines** (an L drawn as one shape, a triangle) need a straight skeleton for hip and gable, which is what decodED's CGAL service does. Blocks that touch are joined, so an L cannot be split into two rectangles on the plan. In this brief such a block stays flat, labelled "this roof shape needs a rectangular block for now". Nothing guesses at a skeleton.
+- **Open, for Linzie (an L is common, and the community centre is one):**
+  - (a) Run decodED's roof service (CGAL, server side, never in the browser) behind NZA Sim's backend. This is exact and reuses our module, but needs the service running beside NZA Sim.
+  - (b) Write a straight skeleton in TypeScript for right-angled outlines (L, T, U). This is instant, but it is our own code to referee.
+  - Asked when P3 is in front of her.
 - Gable and raised walls are external walls of the top storey (cold roof: of the loft). They carry the wall type and can take windows like any wall.
 - The tests:
   - The faces' plan areas sum to the footprint.
@@ -108,7 +109,7 @@ Later, if she wants them, from decodED's list:
 ### P0: Brief on disk (this commit)
 
 ### P1: The recipe on the plan (editor)
-- Covers: `Plan` blocks' roof recipe, defaults, the copy of decodED's types with provenance, plan save and load, and the plan version bump.
+- Covers: `Plan.roof` (the building's recipe), defaults, the copy of decodED's types with provenance, and plan save and load.
 - Older plans load as flat, unchanged.
 - Verify:
   - Vitest: round trip, and old plans load flat.
