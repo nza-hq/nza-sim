@@ -20,3 +20,11 @@
 .mw-save-btn { margin-left: auto; padding: 4px 12px; border-radius: 6px; border: 1px solid #1E5A4A; background: #1E5A4A; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
 .mw-save-btn:disabled { background: #fff; color: #9CA3AF; border-color: #E5E7EB; cursor: default; }
 .mw-save-err { flex-basis: 100%; margin: 0; color: #B5322B; }
+
+/* The right closes (Linzie, 17 Nov 00:31). Closed, it takes no room; a tab at the edge opens it again. */
+.mw-right.mw-shut { border-left: 0; }
+.mw-right.mw-shut .mw-close { display: none; }
+.mw-close { position: absolute; top: 10px; left: -12px; z-index: 20; width: 24px; height: 24px; border: 1px solid #E2E8F0; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.1); background: #fff; color: #64748B; font: 600 15px/1 Inter, system-ui, sans-serif; cursor: pointer; }
+.mw-close:hover { color: #0F172A; border-color: #94A3B8; }
+.mw-open { position: absolute; top: 8px; right: 0; z-index: 6; padding: 6px 10px; border: 1px solid #E2E8F0; border-right: 0; border-radius: 8px 0 0 8px; background: #fff; color: #334155; font: 600 12px Inter, system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.mw-open:hover { color: #0F172A; }

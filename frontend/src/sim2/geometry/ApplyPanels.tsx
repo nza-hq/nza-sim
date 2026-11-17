@@ -8,7 +8,8 @@
  *
  * These are the two panels' frames; what goes in a type's detail is the step's own (GeometryLab).
  */
-import { type ReactNode, useState } from 'react'
+import { createContext, type ReactNode, useContext, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon, { type IconName } from '../icons/Icon'
 
 export type Swatch = { colour: string; unset?: boolean }
@@ -35,6 +36,8 @@ export function ChooseList(props: {
   onRenameZone?: (id: string, name: string) => void
   onRenameRoom?: (id: string, name: string) => void
   onRemoveZone?: (id: string) => void
+  /** The line under the list; null for none. */
+  hint?: string | null
 }) {
   const { rows, zones, chosen, nav } = props
   const all = rows.length > 0 && rows.every((r) => chosen.has(r.id))
@@ -47,7 +50,7 @@ export function ChooseList(props: {
           {nav.tabs.map((t) => <button key={t.key} type="button" role="tab" aria-selected={nav.by === t.key} onClick={() => nav.onBy(t.key)} title={t.name}>{t.icon && <Icon name={t.icon} size={18} />}<span>{t.name}</span></button>)}
         </div>
       )}
-      <h3>Choose <small>{chosen.size ? `${chosen.size} of ${rows.length} rooms` : 'nothing yet'}{chosen.size > 0 && <button type="button" className="ap-link" onClick={props.onNone}>Clear</button>}</small></h3>
+      <h3>{nav && nav.by !== 'rooms' ? 'In this project' : 'Choose'} <small>{chosen.size ? `${chosen.size} of ${rows.length} rooms` : nav && nav.by !== 'rooms' ? '' : 'nothing yet'}{chosen.size > 0 && <button type="button" className="ap-link" onClick={props.onNone}>Clear</button>}</small></h3>
       {nav && nav.by !== 'rooms' ? <NavItems sections={nav.sections} rows={rows} chosen={chosen} onChoose={props.onChoose} /> : (
       <div className="ap-rows" role="listbox" aria-multiselectable="true" aria-label="Rooms">
         <div className="ap-row ap-whole" role="option" aria-selected={all} onClick={() => props.onChoose(all ? [] : rows.map((r) => r.id), false)}>
@@ -88,13 +91,13 @@ export function ChooseList(props: {
         <button type="button" className="gl-btn quiet ap-new" onClick={props.onNewZone}>{chosen.size ? `+ New zone from the ${chosen.size === 1 ? 'room' : `${chosen.size} rooms`} chosen` : '+ New zone'}</button>
       )}
       {props.extra}
-      <p className="gl-hint">Tap a room here or on the drawing; Ctrl or Shift adds more. Esc lets go. Double-click a name to rename it.</p>
+      {props.hint !== null && <p className="gl-hint">{props.hint ?? 'Tap a room here or on the drawing; Ctrl or Shift adds more. Esc lets go. Double-click a name to rename it.'}</p>}
     </div>
   )
 }
 
 export type NavItem = { id: string; name: string; swatch: Swatch; rooms: string[]; active?: boolean; onPick?: () => void; onRename?: (name: string) => void; /** Instead of choosing its rooms (walls choose their wall parts). */ choose?: () => void; count?: number; what?: string }
-export type NavSection = { title?: string; items: NavItem[]; onNew?: { label: string; run: () => void } }
+export type NavSection = { title?: string; items: NavItem[]; onNew?: { label: string; run: () => void }; /** More ways to add one (from the library). */ add?: ReactNode }
 
 /** A name that a double-click turns into a box: Enter or leaving it keeps the change, Esc drops it. */
 export function EditName({ name, onRename }: { name: string; onRename?: (name: string) => void }) {
@@ -109,10 +112,10 @@ export function EditName({ name, onRename }: { name: string; onRename?: (name: s
 function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]; rows: Row[]; chosen: ReadonlySet<string>; onChoose: (ids: string[], add: boolean) => void }) {
   const tick = (on: boolean, part = false) => <span className={`ap-tick${on ? ' on' : part ? ' part' : ''}`} aria-hidden="true" />
   const nameOf = (id: string) => rows.find((r) => r.id === id)?.name ?? id
-  if (!sections.some((s) => s.items.length || s.onNew)) return <p className="gl-hint">Nothing of this kind in the project yet.</p>
+  if (!sections.some((s) => s.items.length || s.onNew || s.add)) return <p className="gl-hint">Nothing of this kind in the project yet.</p>
   return (
     <div className="ap-rows" role="listbox" aria-multiselectable="true" aria-label="Navigate">
-      {sections.map((s, i) => (!s.items.length && !s.onNew ? null : (
+      {sections.map((s, i) => (!s.items.length && !s.onNew && !s.add ? null : (
         <div key={s.title ?? i} className="ap-zone">
           {s.title && <div className="ap-navsec">{s.title}</div>}
           {s.items.map((it) => {
@@ -127,12 +130,18 @@ function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]
               </div>
             )
           })}
+          {!s.items.length && <p className="gl-hint">None in this project yet.</p>}
           {s.onNew && <button type="button" className="ap-link ap-newin" onClick={s.onNew.run}>{s.onNew.label}</button>}
+          {s.add}
         </div>
       )))}
     </div>
   )
 }
+
+/** Where the Apply bar goes: the middle, over the drawing (Linzie, 17 Nov 00:31: do most of it in the middle). Null:
+ * at the foot of the right, as before (the standalone lab, or the middle showing results). */
+export const ApplyBarTarget = createContext<HTMLElement | null>(null)
 
 export type Kind = { key: string; name: string; icon: IconName }
 export type Item = { id: string; name: string; swatch: Swatch; line: string; used: string; removable: boolean }
@@ -163,8 +172,18 @@ export function GivePanel(props: {
   } | null
 }) {
   const active = props.items.find((x) => x.id === props.active)
+  const barTo = useContext(ApplyBarTarget)
+  const g = props.give
   return (
     <aside className="gl-panel gl-right ap-give" aria-label="Give">
+      {g && !g.preview && barTo && createPortal(
+        <div className="ap-bar" role="region" aria-label="Apply">
+          <span className="ap-bar-what">{g.what}{g.now && <small>{g.now}</small>}</span>
+          <button type="button" className="gl-btn ap-apply" disabled={!!g.why} onClick={g.onApply} title={g.why ?? undefined}>{g.label}</button>
+          <button type="button" className="ap-link" onClick={g.onAll}>To the whole building</button>
+        </div>,
+        barTo,
+      )}
       {props.kinds && (
         <div className="ap-kinds" role="tablist" aria-label="Kind">
           {props.kinds.map((k) => (
@@ -182,6 +201,7 @@ export function GivePanel(props: {
           {props.body}
           {!props.body && (
             <>
+              {active && <p className="ap-activename"><Sw s={active.swatch} /><b>{active.name}</b><small>{active.used}</small></p>}
               <div className="ap-items" role="radiogroup" aria-label={props.title}>
                 {props.items.map((x) => (
                   <div key={x.id} className="ap-item" role="radio" aria-checked={x.id === props.active} tabIndex={0} onClick={() => props.onActive(x.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && props.onActive(x.id)}>
@@ -194,7 +214,7 @@ export function GivePanel(props: {
                 {!props.items.length && <p className="gl-hint">None made yet.</p>}
               </div>
               <div className="gl-btns">
-                {props.onNew && <button type="button" className="gl-btn quiet" onClick={props.onNew}>+ {props.newLabel ?? 'New type'}</button>}
+                {props.onNew && <button type="button" className="gl-btn quiet ap-rnew" onClick={props.onNew}>+ {props.newLabel ?? 'New type'}</button>}
                 {active && props.onCopy && <button type="button" className="gl-btn quiet" onClick={() => props.onCopy!(active.id)}>Copy</button>}
                 {active && props.onRemove && active.removable && <button type="button" className="gl-btn quiet" onClick={() => props.onRemove!(active.id)}>Delete</button>}
               </div>
@@ -222,13 +242,13 @@ export function GivePanel(props: {
             </>
           )}
         </div>
-      ) : props.give && (
+      ) : props.give && !barTo && (
         <div className="ap-foot">
           <p className="ap-what">{props.give.what}</p>
           {props.give.now && <p className="ap-now">{props.give.now}</p>}
           <button type="button" className="gl-btn ap-apply" disabled={!!props.give.why} onClick={props.give.onApply}>{props.give.label}</button>
           {props.give.why && <p className="ap-why">{props.give.why}</p>}
-          <button type="button" className="ap-link" onClick={props.give.onAll}>Preview on the whole building</button>
+          <button type="button" className="ap-link" onClick={props.give.onAll}>Apply to the whole building</button>
         </div>
       )}
     </aside>
