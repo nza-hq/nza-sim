@@ -1,0 +1,575 @@
+{
+ "source": "scripts/122_referee.mts",
+ "weather": {
+  "file": "USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw",
+  "sha256": "3cc3dc0c7bcc93e7203e8d9aab657d384315f5a0c86cdede23f792d437a0309f"
+ },
+ "heat_c": 21,
+ "gate_heating_pct": 10,
+ "cases": {
+  "bridgewater_one_zone": {
+   "zones": 1,
+   "air_method": "today",
+   "heating": {
+    "monthly_kwh": 147991,
+    "hourly_kwh": 140473,
+    "diff_pct": 5.4,
+    "pass": true
+   },
+   "monthly_heating_kwh": {
+    "monthly": [
+     34839,
+     26834,
+     17737,
+     6202,
+     554,
+     0,
+     0,
+     0,
+     151,
+     7879,
+     20063,
+     33732
+    ],
+    "hourly": [
+     33166,
+     25883,
+     17142,
+     6915,
+     227,
+     0,
+     0,
+     0,
+     0,
+     6537,
+     18569,
+     32034
+    ]
+   },
+   "zones_heating": [
+    {
+     "name": "Whole building",
+     "monthly_kwh": 147991,
+     "hourly_kwh": 140473,
+     "diff_pct": 5.4
+    }
+   ],
+   "lines_kwh": {
+    "conduction": {
+     "monthly_kwh": -132114,
+     "hourly_kwh": -1106599
+    },
+    "bridging": {
+     "monthly_kwh": -26825,
+     "hourly_kwh": -36284
+    },
+    "infiltration": {
+     "monthly_kwh": -29740,
+     "hourly_kwh": -40227
+    },
+    "permanent_vents": {
+     "monthly_kwh": -25019,
+     "hourly_kwh": -30955
+    },
+    "opaque_solar_absorbed": {
+     "monthly_kwh": 10154,
+     "hourly_kwh": 1692064
+    },
+    "sky_longwave": {
+     "monthly_kwh": -11456,
+     "hourly_kwh": -803219
+    },
+    "solar_transmitted": {
+     "monthly_kwh": 132803,
+     "hourly_kwh": 132803
+    },
+    "glazing_solar_absorbed": {
+     "monthly_kwh": 26205,
+     "hourly_kwh": 59692
+    },
+    "solar_lost_through_glazing": {
+     "monthly_kwh": -12428,
+     "hourly_kwh": -7791
+    },
+    "heating": {
+     "monthly_kwh": 147991,
+     "hourly_kwh": 140473
+    },
+    "cooling": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 0
+    },
+    "gains_not_used": {
+     "monthly_kwh": -79572,
+     "hourly_kwh": null
+    },
+    "storage": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 43
+    }
+   },
+   "ms": {
+    "first": 31.32,
+    "cached": 1.59,
+    "hourly": 244.9468320000001
+   },
+   "notes": [
+    "Monthly estimate (static): ISO 52016-1 monthly method. Not the hourly run.",
+    "Each room alone, heated all day at its heating setpoint; heating hours, setbacks and heat between rooms are not counted."
+   ]
+  },
+  "bridgewater_five_storeys": {
+   "zones": 5,
+   "air_method": "today",
+   "heating": {
+    "monthly_kwh": 142575,
+    "hourly_kwh": 137658,
+    "diff_pct": 3.6,
+    "pass": true
+   },
+   "monthly_heating_kwh": {
+    "monthly": [
+     34473,
+     26367,
+     16834,
+     4645,
+     219,
+     0,
+     0,
+     0,
+     91,
+     6847,
+     19674,
+     33425
+    ],
+    "hourly": [
+     33670,
+     26031,
+     16685,
+     5817,
+     117,
+     0,
+     0,
+     0,
+     0,
+     4091,
+     18649,
+     32599
+    ]
+   },
+   "zones_heating": [
+    {
+     "name": "Storey 1",
+     "monthly_kwh": 38474,
+     "hourly_kwh": 35686,
+     "diff_pct": 7.8
+    },
+    {
+     "name": "Storey 2",
+     "monthly_kwh": 21404,
+     "hourly_kwh": 21468,
+     "diff_pct": -0.3
+    },
+    {
+     "name": "Storey 3",
+     "monthly_kwh": 21404,
+     "hourly_kwh": 21126,
+     "diff_pct": 1.3
+    },
+    {
+     "name": "Storey 4",
+     "monthly_kwh": 21404,
+     "hourly_kwh": 21951,
+     "diff_pct": -2.5
+    },
+    {
+     "name": "Storey 5",
+     "monthly_kwh": 39888,
+     "hourly_kwh": 37427,
+     "diff_pct": 6.6
+    }
+   ],
+   "lines_kwh": {
+    "conduction": {
+     "monthly_kwh": -132114,
+     "hourly_kwh": -1107056
+    },
+    "bridging": {
+     "monthly_kwh": -26825,
+     "hourly_kwh": -36865
+    },
+    "infiltration": {
+     "monthly_kwh": -29740,
+     "hourly_kwh": -40751
+    },
+    "permanent_vents": {
+     "monthly_kwh": -25019,
+     "hourly_kwh": -31471
+    },
+    "opaque_solar_absorbed": {
+     "monthly_kwh": 10154,
+     "hourly_kwh": 1692064
+    },
+    "sky_longwave": {
+     "monthly_kwh": -11456,
+     "hourly_kwh": -803219
+    },
+    "solar_transmitted": {
+     "monthly_kwh": 132803,
+     "hourly_kwh": 132803
+    },
+    "glazing_solar_absorbed": {
+     "monthly_kwh": 26205,
+     "hourly_kwh": 59692
+    },
+    "solar_lost_through_glazing": {
+     "monthly_kwh": -4624,
+     "hourly_kwh": -2899
+    },
+    "heating": {
+     "monthly_kwh": 142575,
+     "hourly_kwh": 137658
+    },
+    "cooling": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 0
+    },
+    "gains_not_used": {
+     "monthly_kwh": -81960,
+     "hourly_kwh": null
+    },
+    "storage": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 44
+    }
+   },
+   "ms": {
+    "first": 3.98,
+    "cached": 10.92,
+    "hourly": 659.7215530000001
+   },
+   "notes": [
+    "Monthly estimate (static): ISO 52016-1 monthly method. Not the hourly run.",
+    "Each room alone, heated all day at its heating setpoint; heating hours, setbacks and heat between rooms are not counted."
+   ]
+  },
+  "community_centre_as_saved": {
+   "zones": 9,
+   "air_method": "today",
+   "heating": {
+    "monthly_kwh": 43246,
+    "hourly_kwh": 42615,
+    "diff_pct": 1.5,
+    "pass": true
+   },
+   "monthly_heating_kwh": {
+    "monthly": [
+     8899,
+     7088,
+     5381,
+     3026,
+     1115,
+     47,
+     0,
+     29,
+     527,
+     2928,
+     5508,
+     8697
+    ],
+    "hourly": [
+     8685,
+     6957,
+     5257,
+     3193,
+     1249,
+     58,
+     13,
+     28,
+     522,
+     2829,
+     5340,
+     8484
+    ]
+   },
+   "zones_heating": [
+    {
+     "name": "Café",
+     "monthly_kwh": 5649,
+     "hourly_kwh": 5712,
+     "diff_pct": -1.1
+    },
+    {
+     "name": "Kitchen",
+     "monthly_kwh": 3236,
+     "hourly_kwh": 3094,
+     "diff_pct": 4.6
+    },
+    {
+     "name": "Reception",
+     "monthly_kwh": 3861,
+     "hourly_kwh": 3866,
+     "diff_pct": -0.1
+    },
+    {
+     "name": "Open-plan office",
+     "monthly_kwh": 6793,
+     "hourly_kwh": 6765,
+     "diff_pct": 0.4
+    },
+    {
+     "name": "Meeting room",
+     "monthly_kwh": 3007,
+     "hourly_kwh": 3041,
+     "diff_pct": -1.1
+    },
+    {
+     "name": "Comms room",
+     "monthly_kwh": 1659,
+     "hourly_kwh": 1558,
+     "diff_pct": 6.4
+    },
+    {
+     "name": "Store",
+     "monthly_kwh": 1805,
+     "hourly_kwh": 1867,
+     "diff_pct": -3.3
+    },
+    {
+     "name": "WCs",
+     "monthly_kwh": 1927,
+     "hourly_kwh": 1883,
+     "diff_pct": 2.3
+    },
+    {
+     "name": "Main hall",
+     "monthly_kwh": 15310,
+     "hourly_kwh": 14827,
+     "diff_pct": 3.3
+    }
+   ],
+   "lines_kwh": {
+    "conduction": {
+     "monthly_kwh": -34721,
+     "hourly_kwh": -509323
+    },
+    "bridging": {
+     "monthly_kwh": -8008,
+     "hourly_kwh": -8864
+    },
+    "infiltration": {
+     "monthly_kwh": -14249,
+     "hourly_kwh": -15874
+    },
+    "permanent_vents": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 0
+    },
+    "opaque_solar_absorbed": {
+     "monthly_kwh": 4667,
+     "hourly_kwh": 823405
+    },
+    "sky_longwave": {
+     "monthly_kwh": -2716,
+     "hourly_kwh": -357122
+    },
+    "solar_transmitted": {
+     "monthly_kwh": 13076,
+     "hourly_kwh": 13076
+    },
+    "glazing_solar_absorbed": {
+     "monthly_kwh": 5563,
+     "hourly_kwh": 12191
+    },
+    "solar_lost_through_glazing": {
+     "monthly_kwh": -279,
+     "hourly_kwh": -138
+    },
+    "heating": {
+     "monthly_kwh": 43246,
+     "hourly_kwh": 42615
+    },
+    "cooling": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 0
+    },
+    "gains_not_used": {
+     "monthly_kwh": -6580,
+     "hourly_kwh": null
+    },
+    "storage": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 35
+    }
+   },
+   "ms": {
+    "first": 19.99,
+    "cached": 3.53,
+    "hourly": 936.892331
+   },
+   "notes": [
+    "Monthly estimate (static): ISO 52016-1 monthly method. Not the hourly run.",
+    "Each room alone, heated all day at its heating setpoint; heating hours, setbacks and heat between rooms are not counted."
+   ]
+  },
+  "community_centre_today_air": {
+   "zones": 9,
+   "air_method": "today",
+   "heating": {
+    "monthly_kwh": 43246,
+    "hourly_kwh": 42615,
+    "diff_pct": 1.5,
+    "pass": true
+   },
+   "monthly_heating_kwh": {
+    "monthly": [
+     8899,
+     7088,
+     5381,
+     3026,
+     1115,
+     47,
+     0,
+     29,
+     527,
+     2928,
+     5508,
+     8697
+    ],
+    "hourly": [
+     8685,
+     6957,
+     5257,
+     3193,
+     1249,
+     58,
+     13,
+     28,
+     522,
+     2829,
+     5340,
+     8484
+    ]
+   },
+   "zones_heating": [
+    {
+     "name": "Café",
+     "monthly_kwh": 5649,
+     "hourly_kwh": 5712,
+     "diff_pct": -1.1
+    },
+    {
+     "name": "Kitchen",
+     "monthly_kwh": 3236,
+     "hourly_kwh": 3094,
+     "diff_pct": 4.6
+    },
+    {
+     "name": "Reception",
+     "monthly_kwh": 3861,
+     "hourly_kwh": 3866,
+     "diff_pct": -0.1
+    },
+    {
+     "name": "Open-plan office",
+     "monthly_kwh": 6793,
+     "hourly_kwh": 6765,
+     "diff_pct": 0.4
+    },
+    {
+     "name": "Meeting room",
+     "monthly_kwh": 3007,
+     "hourly_kwh": 3041,
+     "diff_pct": -1.1
+    },
+    {
+     "name": "Comms room",
+     "monthly_kwh": 1659,
+     "hourly_kwh": 1558,
+     "diff_pct": 6.4
+    },
+    {
+     "name": "Store",
+     "monthly_kwh": 1805,
+     "hourly_kwh": 1867,
+     "diff_pct": -3.3
+    },
+    {
+     "name": "WCs",
+     "monthly_kwh": 1927,
+     "hourly_kwh": 1883,
+     "diff_pct": 2.3
+    },
+    {
+     "name": "Main hall",
+     "monthly_kwh": 15310,
+     "hourly_kwh": 14827,
+     "diff_pct": 3.3
+    }
+   ],
+   "lines_kwh": {
+    "conduction": {
+     "monthly_kwh": -34721,
+     "hourly_kwh": -509323
+    },
+    "bridging": {
+     "monthly_kwh": -8008,
+     "hourly_kwh": -8864
+    },
+    "infiltration": {
+     "monthly_kwh": -14249,
+     "hourly_kwh": -15874
+    },
+    "permanent_vents": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 0
+    },
+    "opaque_solar_absorbed": {
+     "monthly_kwh": 4667,
+     "hourly_kwh": 823405
+    },
+    "sky_longwave": {
+     "monthly_kwh": -2716,
+     "hourly_kwh": -357122
+    },
+    "solar_transmitted": {
+     "monthly_kwh": 13076,
+     "hourly_kwh": 13076
+    },
+    "glazing_solar_absorbed": {
+     "monthly_kwh": 5563,
+     "hourly_kwh": 12191
+    },
+    "solar_lost_through_glazing": {
+     "monthly_kwh": -279,
+     "hourly_kwh": -138
+    },
+    "heating": {
+     "monthly_kwh": 43246,
+     "hourly_kwh": 42615
+    },
+    "cooling": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 0
+    },
+    "gains_not_used": {
+     "monthly_kwh": -6580,
+     "hourly_kwh": null
+    },
+    "storage": {
+     "monthly_kwh": 0,
+     "hourly_kwh": 35
+    }
+   },
+   "ms": {
+    "first": 4.84,
+    "cached": 3.82,
+    "hourly": 957.3829670000005
+   },
+   "notes": [
+    "Monthly estimate (static): ISO 52016-1 monthly method. Not the hourly run.",
+    "Each room alone, heated all day at its heating setpoint; heating hours, setbacks and heat between rooms are not counted."
+   ]
+  }
+ }
+}

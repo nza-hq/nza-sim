@@ -2,6 +2,20 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 Brief 124 — Simulate v2: thermal mass behind finishes — IN PROGRESS 17 Nov 2026 on `chris/124-mass-finishes` (off `chris/121-setpoint-profiles`)
+
+- Linzie 15:16 asked whether mass behind carpet / a ceiling void counts; 16:34 chose "Fix engines and workspace"; 16:35 finishes always defaulted from templates.
+- **P1–P3, P5 done (engine thread):**
+  - **Contents.** 10 kJ/K·m² (ISO 52016-1 Table B.17, as HEM-TP-07) replaces today's 250 kJ/K·m² on the air node. Schema 2.12; the upgrade swaps an exact 250,000.
+  - **Finishes.** `inside_finish` / `inside_finish_b` on surfaces, library finish constructions (drafts: `finish_carpet`, `finish_suspended_ceiling`).
+  - **Monthly.** κ from ISO 13786's periodic method.
+  - **Referee.** `docs/audit/124/01_referee.md`: hourly within 0.5 % of EnergyPlus on cooling; monthly +1.5 to +5.4 % of hourly; Bridgewater v2 about +1 %.
+- **Open:**
+  - P4 (editor): floor finish and ceiling tick on templates and Fabric.
+  - Chris to review the two finish drafts.
+  - Re-measure the v2 anchor on IT15.
+- **Suggestion:** several storeys in the workspace (a concrete frame's middle floors cannot be drawn yet).
+
 ## 🔧 Brief 122 — Simulate v2: the instant estimate — IN PROGRESS 17 Nov 2026 (engine on `chris/122-instant-engine`, workspace on `sim2/122-instant`)
 
 Brief [`docs/briefs/active/122_instant-estimate.md`](docs/briefs/active/122_instant-estimate.md) (Linzie 17 Nov 08:20: "an instant calculation, almost like an Excel spreadsheet"). P1–P3 the engine thread's, P0/P4/P5 the editor's.

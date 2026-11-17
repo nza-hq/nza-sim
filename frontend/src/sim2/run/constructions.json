@@ -4,7 +4,7 @@
  "source_sha256": "c3891d6632c605671a54843cc4cc0e50b66f0ec2ecfc544b8b9c7f9d96d6b9f0",
  "exported_at": "2026-11-14T19:36:56+00:00",
  "additions": "docs/audit/102/library_additions.json",
- "additions_sha256": "5002e99c6198a1990d871439e9b6d1a31ef9d57fc9dc1f3b4c2eab3783bb17d1",
+ "additions_sha256": "d2efb1c7c0a781dfe035f3de43a66dd96065a2536bbbf35ca54f5d8bc9cb7eb0",
  "constructions": [
   {
    "key": "bridgwater_ext_wall",
@@ -787,6 +787,74 @@
     }
    },
    "draft": "External door: solid timber, 44 mm (draft, awaiting Chris)"
+  },
+  {
+   "key": "finish_carpet",
+   "body_hash": "c5f66cbb20f266b60368709351b62c31a426b694b140c4881d9ceb6aead6e49c",
+   "body": {
+    "name": "finish_carpet",
+    "type": "finish",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Finish: carpet and underlay on a floor (layers from the structure to the room)",
+    "epjson": {
+     "Material": {
+      "Finish_Carpet": {
+       "roughness": "MediumRough",
+       "thickness": 0.01,
+       "conductivity": 0.06,
+       "density": 200,
+       "specific_heat": 1300
+      }
+     },
+     "Material:NoMass": {},
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "finish_carpet": {
+       "outside_layer": "Finish_Carpet"
+      }
+     }
+    }
+   },
+   "draft": "Carpet (finish, draft, awaiting Chris)"
+  },
+  {
+   "key": "finish_suspended_ceiling",
+   "body_hash": "44c34fde5a43db402762ff6e2ad33babf6c0d010f46a89b32db9e88d09381dc3",
+   "body": {
+    "name": "finish_suspended_ceiling",
+    "type": "finish",
+    "u_value_W_per_m2K": null,
+    "g_value": null,
+    "thermal_mass": "low",
+    "description": "Finish: suspended ceiling, sealed void and 15 mm mineral-fibre tile (layers from the structure to the room)",
+    "epjson": {
+     "Material": {
+      "Finish_CeilingTile": {
+       "roughness": "MediumRough",
+       "thickness": 0.015,
+       "conductivity": 0.057,
+       "density": 300,
+       "specific_heat": 840
+      }
+     },
+     "Material:NoMass": {
+      "Finish_CeilingVoid": {
+       "roughness": "Smooth",
+       "thermal_resistance": 0.18
+      }
+     },
+     "WindowMaterial:SimpleGlazingSystem": {},
+     "Construction": {
+      "finish_suspended_ceiling": {
+       "outside_layer": "Finish_CeilingVoid",
+       "layer_2": "Finish_CeilingTile"
+      }
+     }
+    }
+   },
+   "draft": "Suspended ceiling (finish, draft, awaiting Chris)"
   }
  ]
 }

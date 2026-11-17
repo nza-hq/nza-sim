@@ -280,6 +280,15 @@ export const Surface = z
     inside_solar_absorptance_b: finite.gt(0).max(1).nullable(),
     /** Schema 2.2: internal mass only. True: flat, zone_a face up (takes the beam). False: upright. Null otherwise. */
     faces_up: z.boolean().nullable(),
+    /**
+     * Schema 2.12 (Brief 124 D3, Linzie 17 Nov): a finish on zone_a's inside face (carpet on a floor, a suspended
+     * ceiling under a slab or roof), a library construction whose layers are added on that face, inside the structure.
+     * A stated U stays the structure's; the finish adds its resistance. Absent or null: none (a hard floor, an exposed
+     * soffit). Not on glazing.
+     */
+    inside_finish: z.object({ key: id }).strict().nullable().optional(),
+    /** Schema 2.12: the same on zone_b's face, for a surface between zones or internal mass only. */
+    inside_finish_b: z.object({ key: id }).strict().nullable().optional(),
   })
   .strict()
 export type Surface = z.infer<typeof Surface>
@@ -724,7 +733,7 @@ export const ControlEntry = z
 export type ControlEntry = z.infer<typeof ControlEntry>
 const WINDOW_FIELDS = ['rule', 'open_fraction', 'open_above_ref', 'open_above_c', 'min_open_h', 'min_closed_h', 'operation', 'modulation', 'adaptive_category'] as const
 
-export const SCHEMA_VERSION = '2.11' as const
+export const SCHEMA_VERSION = '2.12' as const
 
 export const ModelDocument = z
   .object({
@@ -793,6 +802,8 @@ export const ModelDocument = z
       if (internalMass && s.faces_up == null) issue(`internal mass "${s.id}" needs faces_up`, ['faces_up'])
       if (internalMass && s.faces_up != null && s.tilt_deg !== (s.faces_up ? 180 : 90)) issue(`internal mass "${s.id}" with faces_up ${s.faces_up} must have tilt ${s.faces_up ? 180 : 90}`, ['tilt_deg'])
       if (!internalMass && s.faces_up != null) issue(`faces_up is for internal mass only ("${s.id}")`, ['faces_up'])
+      if (s.kind === 'glazing' && s.inside_finish) issue(`glazing "${s.id}" takes no inside finish`, ['inside_finish'])
+      if (!internalMass && !interzone && s.inside_finish_b) issue(`inside_finish_b is for a surface between zones or internal mass only ("${s.id}")`, ['inside_finish_b'])
       if (interzone || internalMass) {
         if (s.solar_absorptance != null || s.thermal_emissivity != null || s.frame_fraction != null || s.g_value != null || s.azimuth_deg != null || s.facade != null) {
           issue(`surface "${s.id}" has no outside face: solar_absorptance, thermal_emissivity, frame_fraction, g_value, azimuth_deg and facade must be null`)

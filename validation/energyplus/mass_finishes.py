@@ -49,7 +49,7 @@ def construction(ep: dict, cname: str, rows: list, tag: str, reverse_as: str | N
         put(list(reversed(names)), reverse_as)
 
 
-def model(case: str, conditioned: bool, iso_conv: bool) -> dict:
+def model(case: str, conditioned: bool, iso_conv: bool, contents: float = 0.0) -> dict:
     W, D, H = SPEC["width_m"], SPEC["depth_m"], SPEC["height_m"]
     on, off = SPEC["gains"]["weekday_on"]
     ep: dict = {
@@ -140,6 +140,13 @@ def model(case: str, conditioned: bool, iso_conv: bool) -> dict:
         ep["ZoneHVAC:EquipmentConnections"] = {"conn": {"zone_name": "room", "zone_conditioning_equipment_list_name": "eq",
                                                         "zone_air_inlet_node_or_nodelist_name": "supply", "zone_air_node_name": "air",
                                                         "zone_return_air_node_or_nodelist_name": "return"}}
+    if contents > 0:
+        # Brief 124 D1: the contents on the air node, as our engine puts them (contents x floor on top of the air's
+        # 0.33 Wh/m3K x volume), given to EnergyPlus as a multiplier on the zone air's heat capacity.
+        mult = 1 + contents * W * D / (1188.0 * W * D * H)
+        ep["ZoneCapacitanceMultiplier:ResearchSpecial"] = {"contents": {"zone_or_zonelist_name": "room",
+            "temperature_capacity_multiplier": mult, "humidity_capacity_multiplier": 1, "carbon_dioxide_capacity_multiplier": 1,
+            "generic_contaminant_capacity_multiplier": 1}}
     if iso_conv:
         ep["SurfaceProperty:ConvectionCoefficients:MultipleSurface"] = {"ext": {"surface_type": "AllExteriorSurfaces",
             "convection_coefficient_1_location": "Outside", "convection_coefficient_1_type": "Value", "convection_coefficient_1": 20.0}}
@@ -174,14 +181,15 @@ def main() -> None:
     ap.add_argument("--epw", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--runs", default=None)
+    ap.add_argument("--contents", type=float, default=0.0, help="J/K per m2 of floor on the air node (Brief 124: 10000)")
     a = ap.parse_args()
     runs = Path(a.runs or tempfile.mkdtemp(prefix="mass_"))
-    res = {"epw": Path(a.epw).name, "cases": {}}
+    res = {"epw": Path(a.epw).name, "contents_j_per_k_m2": a.contents, "cases": {}}
     for case in SPEC["cases"]:
         row = {}
         for conv in ("base", "iso_conv"):
-            c = run(a.energyplus, model(case, True, conv == "iso_conv"), Path(a.epw), runs / f"{case}_{conv}_cond")
-            f = run(a.energyplus, model(case, False, conv == "iso_conv"), Path(a.epw), runs / f"{case}_{conv}_free")
+            c = run(a.energyplus, model(case, True, conv == "iso_conv", a.contents), Path(a.epw), runs / f"{case}_{conv}_cond")
+            f = run(a.energyplus, model(case, False, conv == "iso_conv", a.contents), Path(a.epw), runs / f"{case}_{conv}_free")
             row[conv] = {"heat_kwh": c["heat_kwh"], "cool_kwh": c["cool_kwh"], "peak_cool_w": c["peak_cool_w"],
                          "free": {k: f[k] for k in ("max_c", "hours_over_26", "hours_over_28")}, "warnings": c["warnings"] + f["warnings"]}
         res["cases"][case] = row

@@ -43,8 +43,12 @@ export const TODAY = {
   outside_emissivity: 0.9,
   /** FRAME_FRACTION (~927). */
   frame_fraction: 0.2,
-  /** internal_mass_J_per_K_per_m2 default (~887). */
-  internal_heat_capacity_j_per_k_m2: 250_000,
+  /**
+   * Brief 124 D1: the zone's contents (furniture) on the air node, J/K per m² of floor: BS EN ISO 52016-1:2017 Table
+   * B.17's suggested default, as UK HEM-TP-07 §2 (v2.0, Oct 2025) uses it. The drawn fabric carries every other mass.
+   * B.17's figure includes the air; the engine adds the air's ρ·c·V on top (about 3.6 kJ/K·m² in a 3 m room), stated.
+   */
+  internal_heat_capacity_j_per_k_m2: 10_000,
   /** resolveCd fallback (instantCalc.js 221). */
   vent_cd: 0.25,
   /** resolveFlowMode fallback (instantCalc.js 210). */
@@ -107,11 +111,18 @@ export function stateTodaysGainInputs(p: Obj): void {
 type Obj = Record<string, any>
 
 /** Returns a current-schema document from any supported stored version, or throws naming the version. */
+/**
+ * Today's engine's internal mass (instantCalc.js TUNE_INTERNAL_MASS / internal_mass_J_per_K_per_m2, ~887), 250 kJ/K
+ * per m² of floor on the air node. Brief 124 (Linzie 17 Nov) retired it: with the fabric drawn layer by layer it hides
+ * the finishes, and against EnergyPlus it puts heating 40–50 % low and overheating to nothing (docs/audit/124/).
+ */
+export const LEGACY_INTERNAL_HEAT_CAPACITY_J_PER_K_M2 = 250_000
+
 export function upgradeDocument(input: unknown): ModelDocument {
   const doc = structuredClone(input) as Obj
   const from = doc?.schema_version
   if (from === SCHEMA_VERSION) return ModelDocument.parse(doc)
-  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7' && from !== '2.8' && from !== '2.9' && from !== '2.10') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
+  if (from !== '2.0' && from !== '2.1' && from !== '2.2' && from !== '2.3' && from !== '2.4' && from !== '2.5' && from !== '2.6' && from !== '2.7' && from !== '2.8' && from !== '2.9' && from !== '2.10' && from !== '2.11') throw new Error(`cannot upgrade a model document of schema version ${JSON.stringify(from)}`)
   if (from === '2.0') to21(doc)
   if (from === '2.0' || from === '2.1') to22(doc)
   // Review F1 (Brief 112): from 2.3 on, a null gain input means "not stated" and stays null (the engine names it).
@@ -120,12 +131,12 @@ export function upgradeDocument(input: unknown): ModelDocument {
   to25(doc)
   to26(doc)
   // As before 2.11 for every older version; a 2.10 document has had all three.
-  const before210 = from !== '2.10'
+  const before210 = from !== '2.10' && from !== '2.11'
   if (before210 && from !== '2.7') to27(doc)
   if (before210 && from !== '2.8') to28(doc)
   if (before210 && from !== '2.9') to29(doc)
-  to210(doc)
-  to211(doc)
+  if (from !== '2.11') { to210(doc); to211(doc) }
+  to212(doc)
   doc.schema_version = SCHEMA_VERSION
   return ModelDocument.parse(doc)
 }
@@ -140,6 +151,17 @@ function to210(doc: Obj): void {
   for (const z of doc.zones as Obj[]) for (const v of z.ventilation as Obj[]) { v.runs ??= null; v.demand_min_fraction ??= null }
   doc.other_loads ??= []
   doc.controls ??= []
+}
+
+/**
+ * 2.11 → 2.12 (Brief 124 D2): a zone holding today's 250 kJ/K·m² (a constant, never a figure anyone typed) takes the
+ * ISO 52016-1 contents default instead; any other figure stays as stated. No surface has a finish (a hard floor and an
+ * exposed soffit, as every document so far has been run).
+ */
+function to212(doc: Obj): void {
+  for (const z of doc.zones as Obj[]) {
+    if (z.internal_heat_capacity_j_per_k_m2 === LEGACY_INTERNAL_HEAT_CAPACITY_J_PER_K_M2) z.internal_heat_capacity_j_per_k_m2 = TODAY.internal_heat_capacity_j_per_k_m2
+  }
 }
 
 /**

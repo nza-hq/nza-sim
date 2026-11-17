@@ -23,10 +23,10 @@ import type { ConstructionBody, Element, Layer } from './elements'
 import { ElementError, innerElement, opaqueElement, windowElement } from './elements'
 import { AirError, infiltration, ventCoefficient, type Vent } from './air'
 import { BridgingError, computeBridging } from './bridging'
-import { ENGINE_CONSTANTS as K } from './constants'
+import { ENGINE_CONSTANTS as K, heatFlowDirection } from './constants'
 import { GainsError, zoneGains } from './gains'
 import { GlazingError, simpleGlazingAngular, simpleGlazingOptics } from './glazing'
-import { groundTemperature, ModelError } from './model'
+import { finishLayers, groundTemperature, ModelError, surfaceLayers } from './model'
 import type { BreakdownLine } from './results'
 import { shadingFactor } from './shading'
 import { solarOnSurface, type SolarOptions } from './solar'
@@ -43,6 +43,13 @@ export const MONTHLY_CONSTANTS = {
    */
   kappa_depth_m: 0.1,
   insulating_conductivity_w_per_mk: 0.1,
+  /**
+   * Brief 124 D5: 'periodic' takes each face's κ from ISO 13786:2017's periodic (24 h) method over the whole layer
+   * stack with its surface resistances, so mass behind a finish counts in part; 'simplified' is the 10 cm rule above
+   * (all or nothing at the first insulating layer), kept for the record.
+   */
+  kappa_method: 'periodic' as 'periodic' | 'simplified',
+  kappa_period_s: 86_400,
 } as const
 
 export interface MonthlyOptions {
@@ -135,6 +142,51 @@ function opticsOn(weather: Weather, W: MonthlyWeather, sun: MonthlySun, az: numb
   return o
 }
 
+/** A 2×2 complex matrix [[a, b], [c, d]], each entry [re, im]. */
+type C = [number, number]
+type M = [C, C, C, C]
+const cmul = (x: C, y: C): C => [x[0] * y[0] - x[1] * y[1], x[0] * y[1] + x[1] * y[0]]
+const cadd = (x: C, y: C): C => [x[0] + y[0], x[1] + y[1]]
+const mmul = (a: M, b: M): M => [
+  cadd(cmul(a[0], b[0]), cmul(a[1], b[2])), cadd(cmul(a[0], b[1]), cmul(a[1], b[3])),
+  cadd(cmul(a[2], b[0]), cmul(a[3], b[2])), cadd(cmul(a[2], b[1]), cmul(a[3], b[3])),
+]
+const resistanceMatrix = (r: number): M => [[1, 0], [-r, 0], [0, 0], [1, 0]]
+
+/** ISO 13786:2017 eq. (6)–(9): one homogeneous layer's heat transfer matrix at period T. */
+function layerMatrix(l: Layer): M {
+  if (l.kind === 'Material:NoMass') return resistanceMatrix(l.thermal_resistance ?? 0)
+  const d = l.thickness ?? 0, k = l.conductivity ?? 0, rho = l.density ?? 0, cp = l.specific_heat ?? 0
+  if (!(rho > 0 && cp > 0)) return resistanceMatrix(k > 0 ? d / k : 0)
+  const delta = Math.sqrt((k * MONTHLY_CONSTANTS.kappa_period_s) / (Math.PI * rho * cp)), x = d / delta
+  const ch = Math.cosh(x), sh = Math.sinh(x), c = Math.cos(x), sn = Math.sin(x)
+  const z11: C = [ch * c, sh * sn]
+  const z12: C = [(-delta / (2 * k)) * (sh * c + ch * sn), (-delta / (2 * k)) * (ch * sn - sh * c)]
+  const z21: C = [(-k / delta) * (sh * c - ch * sn), (-k / delta) * (sh * c + ch * sn)]
+  return [z11, z12, z21, z11]
+}
+
+/**
+ * Brief 124 D5: κ₁·A of one inside face, J/K, after ISO 13786:2017 (periodic method, 24 h): the matrix of the whole
+ * stack from this face (surface resistance R_s1, the layers from this face, R_s2 on the far side), and
+ * κ₁ = T/2π · |(Z₁₁ − 1)/Z₁₂| (eq. 18). A finish's resistance reduces the mass behind it in part, not to nothing.
+ */
+function facePeriodicCapacity(layersFromFace: Layer[], rs1: number, rs2: number, area: number): number {
+  let z = resistanceMatrix(rs1)
+  for (const l of layersFromFace) z = mmul(layerMatrix(l), z)
+  z = mmul(resistanceMatrix(rs2), z)
+  const num: C = [z[0][0] - 1, z[0][1]], den = z[1]
+  const mag = Math.hypot(num[0], num[1]) / Math.hypot(den[0], den[1])
+  return (MONTHLY_CONSTANTS.kappa_period_s / (2 * Math.PI)) * mag * area
+}
+
+const rsi = (tiltDeg: number) => { const d = heatFlowDirection(tiltDeg); return d === 'upward' ? K.R_si_upward : d === 'downward' ? K.R_si_downward : K.R_si_horizontal }
+
+/** κ·A of one inside face, J/K, by the method in MONTHLY_CONSTANTS (Brief 124 D5). */
+function faceKappa(layersFromFace: Layer[], rs1: number, rs2: number, area: number): number {
+  return MONTHLY_CONSTANTS.kappa_method === 'periodic' ? facePeriodicCapacity(layersFromFace, rs1, rs2, area) : faceCapacity(layersFromFace, area)
+}
+
 /** κ·A of one inside face, J/K, from the layers in order from that face (ISO 13786 Annex C, simplified). */
 function faceCapacity(layersFromFace: Layer[], area: number): number {
   const total = layersFromFace.reduce((s, l) => s + (l.kind === 'Material:NoMass' ? 0 : l.thickness ?? 0), 0)
@@ -206,10 +258,12 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
       const layers = b.layers ?? []
       const ref = s.construction_ref
       if (zb !== undefined) {
+        // Brief 124 (D3): with both inside faces' finishes.
+        const layers = surfaceLayers(s, library, path)
         // Between zones or within one: mass only (heat between zones is not counted). Layers run zone_b → zone_a.
         const e = wrap(() => innerElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, layers, path }))
-        Z[za].cm += faceCapacity([...layers].reverse(), s.area_m2)
-        Z[zb].cm += faceCapacity(layers, s.area_m2)
+        Z[za].cm += faceKappa([...layers].reverse(), rsi(s.tilt_deg), rsi(180 - s.tilt_deg), s.area_m2)
+        Z[zb].cm += faceKappa(layers, rsi(180 - s.tilt_deg), rsi(s.tilt_deg), s.area_m2)
         Z[za].inside.push({ area: s.area_m2, alpha: s.inside_solar_absorptance ?? null, window: null, floor: s.tilt_deg > 120 })
         Z[zb].inside.push({ area: s.area_m2, alpha: s.inside_solar_absorptance_b ?? null, window: null, floor: 180 - s.tilt_deg > 120 })
         // Brief 123 P4: a ceiling to an unconditioned loft carries heat (ISO 13789 6.4, below); its area is in the room's
@@ -271,10 +325,11 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
       if (s.kind === 'roof') T.hasRoof = true
       if (ground) T.hasGround = true
       const stated = num(ref.u_value_override) ?? num((b as { u_value_override?: unknown }).u_value_override) ?? num(b.u_value_W_per_m2K)
-      const e = wrap(() => opaqueElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, boundary: ground ? 'ground' : 'outside', layers, stated_u: stated, emissivity: ground ? null : s.thermal_emissivity, path }))
+      const fin = wrap(() => finishLayers(s.inside_finish, library, `${path}.inside_finish`))
+      const e = wrap(() => opaqueElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, boundary: ground ? 'ground' : 'outside', layers, stated_u: stated, emissivity: ground ? null : s.thermal_emissivity, path, inside_finish: fin }))
       const ua = e.u_w_per_m2k * s.area_m2
       T.lossLines.push({ term: 'conduction', surface_id: s.id, h: ua, ground })
-      T.cm += faceCapacity([...layers].reverse(), s.area_m2)
+      T.cm += faceKappa([...layers, ...fin].reverse(), rsi(s.tilt_deg), ground ? 0 : K.R_se, s.area_m2)
       if (s.inside_solar_absorptance == null) throw new ModelError('required', `${path}.inside_solar_absorptance`)
       T.inside.push({ area: s.area_m2, alpha: s.inside_solar_absorptance, window: null, floor: s.tilt_deg > 120 })
       if (outside) {

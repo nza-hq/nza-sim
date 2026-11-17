@@ -12,7 +12,7 @@ import { AIR_LINES, AirflowError, airWeather, buildAirModels, zoneAirStep, type 
 import { ScheduleError, scheduleFractions, temperatureHours } from './pumps'
 import { computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K } from './constants'
-import { ElementError, innerElement, layerFaceNode, opaqueElement, windowElement, type ConstructionBody, type Element } from './elements'
+import { ElementError, innerElement, layerFaceNode, opaqueElement, windowElement, type ConstructionBody, type Element, type Layer } from './elements'
 import { runNetwork } from './network'
 import type { BreakdownLine, ModelResults, PlantResults, ZoneResults } from './results'
 import { shadingFactor } from './shading'
@@ -20,7 +20,7 @@ import { solarOnSurface, type SolarOptions } from './solar'
 import { simpleGlazingAngular, simpleGlazingOptics } from './glazing'
 import type { Weather } from './types'
 import { runZone } from './zone'
-import type { ModelDocument } from '../schema/model'
+import type { ModelDocument, Surface } from '../schema/model'
 import { calendar, GainsError, zoneGains, type ZoneGains } from './gains'
 import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
 import { EmitterError, zoneCooling, zoneEmitters, type ZoneCooling, type ZoneEmitters } from './emitters'
@@ -196,7 +196,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         const ia = s.inside_solar_absorptance, ib = s.inside_solar_absorptance_b
         if (ia == null) throw new ModelError('required', `${path}.inside_solar_absorptance`)
         if (ib == null) throw new ModelError('required', `${path}.inside_solar_absorptance_b`)
-        elements.push(innerElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, layers: b.layers ?? [], path }))
+        elements.push(innerElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, layers: surfaceLayers(s, library, path), path }))
         kinds.push(s.kind); zoneA.push(za); zoneB.push(zbZone); insideAlpha.push(ia); insideAlphaB.push(ib)
         absorbed.push(new Float64Array(H))
         // Brief 123 P4: a ceiling to an unconditioned loft is not a slab between storeys (its junction is the roof's, at the
@@ -287,6 +287,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
       elements.push(opaqueElement({
         id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, boundary: ground ? 'ground' : 'outside',
         layers: b.layers ?? [], stated_u: stated, emissivity: ground ? null : s.thermal_emissivity, path,
+        inside_finish: finishLayers(s.inside_finish, library, `${path}.inside_finish`),
       }))
       kinds.push(s.kind); zoneA.push(za); zoneB.push(null)
       const a = new Float64Array(H)
@@ -336,6 +337,26 @@ interface Solved {
  * Brief 103 number is unchanged; anything else runs on the network solver (runNetwork). Both take their elements from
  * the same builder and give their results through the same breakdown.
  */
+/** Brief 124 (D3): the layers of a finish named on a surface face, from the structure to the room, from the library given to the engine; none for null. */
+export function finishLayers(ref: { key: string } | null | undefined, library: Record<string, ConstructionBody>, path: string): Layer[] {
+  if (!ref) return []
+  const b = library[ref.key]
+  if (!b) throw new ModelError(`finish "${ref.key}" is not in the library given to the engine`, `${path}.key`)
+  if (!b.layers?.length) throw new ModelError(`finish "${ref.key}" has no layers`, `${path}.key`)
+  return b.layers
+}
+
+/**
+ * Brief 124 (D3): a surface's whole layer stack, first layer first: zone_b's finish (turned room-first), the construction,
+ * zone_a's finish.
+ * For a surface facing outside or the ground there is no zone_b finish (the schema refuses one).
+ */
+export function surfaceLayers(s: Pick<Surface, 'construction_ref' | 'inside_finish' | 'inside_finish_b'>, library: Record<string, ConstructionBody>, path: string): Layer[] {
+  const b = library[s.construction_ref.key]
+  if (!b) throw new ModelError(`construction "${s.construction_ref.key}" is not in the library given to the engine`, `${path}.construction_ref.key`)
+  return [...[...finishLayers(s.inside_finish_b, library, `${path}.inside_finish_b`)].reverse(), ...(b.layers ?? []), ...finishLayers(s.inside_finish, library, `${path}.inside_finish`)]
+}
+
 export function runModel(doc: ModelDocument, weather: Weather, library: Record<string, ConstructionBody>, options: RunOptions): ModelResults {
   const t0 = now()
   const H = weather.hours.count
@@ -547,7 +568,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const el = elements[k]
     if (el.kind !== 'opaque') throw new ModelError(`surface "${s.id}" is not an opaque floor`, `zones[${zi}].emitters[${ej}].source_surface_id`)
     let node: number
-    try { node = layerFaceNode(library[s.construction_ref.key].layers ?? [], el.boundary, sl.layer_index, p) } catch (e) {
+    // Brief 124: the layer index counts the construction's own layers; a finish on zone_b's face comes first in the stack.
+    const offset = el.boundary === 'zone' ? finishLayers(s.inside_finish_b, library, p).length : 0
+    try { node = layerFaceNode(surfaceLayers(s, library, p), el.boundary, sl.layer_index + offset, p) } catch (e) {
       if (e instanceof ElementError) throw new ModelError(e.message.slice(e.path.length + 2), p)
       throw e
     }

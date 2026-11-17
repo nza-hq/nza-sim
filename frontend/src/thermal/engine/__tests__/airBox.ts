@@ -54,7 +54,7 @@ export function airBoxDocument(caseName: string, S: any = AIR_SPEC) {
     })
   }
   const doc = ModelDocument.parse({
-    schema_version: '2.11',
+    schema_version: '2.12',
     building: {
       id: `air-box-${caseName}`, name: `Air box ${caseName}`, decoded_building_key: null,
       site: { lat: 41.98, lon: -87.92, name: 'Chicago O\'Hare', exposure: null, ground: { method: 'annual_mean_outdoor' }, terrain: S.terrain.engine },

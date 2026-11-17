@@ -161,6 +161,8 @@ export function innerElement(args: { id: string; area_m2: number; tilt_deg: numb
 export function opaqueElement(args: {
   id: string; area_m2: number; tilt_deg: number; boundary: 'outside' | 'ground'
   layers: Layer[]; stated_u: number | null; emissivity: number | null; path: string
+  /** Brief 124: a finish on the inside face (carpet, a suspended ceiling), added after the stated U is met, so it adds its resistance. */
+  inside_finish?: Layer[]
 }): Element {
   const { id, area_m2, tilt_deg, boundary, path } = args
   if (!(area_m2 > 0)) throw new ElementError('area must be > 0', `${path}.area_m2`)
@@ -181,6 +183,12 @@ export function opaqueElement(args: {
     const f = want / lr
     for (const s of segs) if (s.layer === li) s.r *= f
     u = args.stated_u
+  }
+  const fin = args.inside_finish ?? []
+  if (fin.length) {
+    const fs = layerSegments(fin, `${path}.inside_finish`).map((g) => ({ ...g, layer: args.layers.length + g.layer }))
+    segs.push(...fs)
+    u = 1 / (1 / u + fs.reduce((t, g) => t + g.r, 0))
   }
   const h_re = boundary === 'ground' ? 0 : K.h_re_per_emissivity * need(args.emissivity, `${path}.thermal_emissivity`)
   const f_sky = boundary === 'ground' ? 0 : (1 + Math.cos((tilt_deg * Math.PI) / 180)) / 2
