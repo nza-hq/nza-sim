@@ -39,12 +39,12 @@ import { type PointerEvent as RPointerEvent, Suspense, lazy, useEffect, useMemo,
 import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
-import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
-import { CONSTRUCTION_SETS, SET_ELEMENTS } from '../library/sets'
+import { CONSTRUCTION_SETS, DEFAULT_DOOR, SET_ELEMENTS } from '../library/sets'
 import { applySet, setById } from './applySet'
 import { BUILDING_USES, applyUse, roomKindsOf, useById } from './applyUse'
 import Spark from './Spark'
@@ -60,6 +60,7 @@ import EmbeddedResults from '../run/EmbeddedResults'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { lightingWm2 } from '../../thermal/engine/lighting'
 import { defaultPumps } from '../../thermal/catalogue/auxiliaryDefaults'
+import { CATALOGUES, catalogueItem } from '../../thermal/catalogue'
 import { PUMP_CURVE } from '../../thermal/engine/pumps'
 import { controlMap, hoursOnMonday } from './controls'
 import { buildDocument } from './toDocument'
@@ -74,7 +75,11 @@ const UnifiedScheduleEditor = lazy(() => import('../../components/shared/schedul
 import { GAIN_COLOURS } from '../../components/modules/gains/gainColours.js'
 // @ts-expect-error untyped JS from today's app
 import GlazingInspector from '../../components/library/GlazingInspector.jsx'
-import { DOOR, type DoorSpec, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
+// @ts-expect-error untyped JS from today's app (Brief 115: today's discharge coefficients, read)
+import { computeCd } from '../../utils/openingCoefficients.js'
+// @ts-expect-error untyped JS from today's app (the schedule pop-out, reused)
+import SchedulePopout from '../../components/shared/SchedulePopout.jsx'
+import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
@@ -231,7 +236,7 @@ type Giver = { name: string | null; rooms: boolean; now: string[]; onGive: (all:
 export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab, api, onPlan }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void; api?: React.MutableRefObject<EditorApi | null>; onPlan?: (p: Plan) => void } = {}) {
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
-  const [plan, setPlan] = useState<Plan>(emptyPlan)
+  const [plan, setPlan] = useState<Plan>(newPlan)
   // The project's own profiles first, then the library's (Brief 118 P5).
   const profile = (key: string | null | undefined) => profileOf(plan, key)
   const profilesFor = (t: OwnProfile['schedule_type']) => profilesOfKind(plan, t)
@@ -239,7 +244,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [future, setFuture] = useState<Plan[]>([])
   /** While a preview is worked out, a give writes here instead of to the plan (preview, then apply). */
   const capture = useRef<{ plan: Plan | null } | null>(null)
-  const commit = (next: Plan) => {
+  const commit = (next0: Plan) => {
+    const next = withDefaultDoor(plan, next0, DEFAULT_DOOR)
     if (capture.current) { capture.current.plan = next; return }
     setPast((p) => [...p.slice(-100), plan])
     setFuture([])
@@ -1457,7 +1463,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <option value="exposed">Exposed</option>
               </select>
             </div>
-            <p className="gl-hint">How much wind reaches the building: it drives air leakage and the vents. One value for the whole site.</p>
+            <p className="gl-hint">How much wind reaches the building: it drives air leakage and the vents in today's fixed air method. One value for the whole site.</p>
+            <div className="gl-row gl-librow"><span>Terrain</span>
+              <select className="gl-sel" aria-label="Terrain" value={bi.terrain ?? ''} onChange={(e) => ((q: Partial<BuildingInputs>) => commit({ ...plan, building: { ...bi, ...q } }))({ terrain: (e.target.value || null) as BuildingInputs['terrain'] })}>
+                <option value="">Not set</option>
+                {AIR_TERRAINS.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+              </select>
+            </div>
+            <p className="gl-hint">{(bi.air_method ?? 'today') === 'weather_driven' ? 'What lies around the site: it sets how the wind grows with height, for the weather-driven air (Fabric, Air leakage).' : 'Used by weather-driven air (Fabric, Air leakage); this model uses the fixed method.'}</p>
             <h4>Weather</h4>
             <div ref={setWeatherEl} />
             <p className="gl-hint">An EPW file from this computer, or one your organisation has saved. Every result is worked out on it, and names it.</p>
@@ -1519,6 +1532,24 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                     </select>
                   </div>
                   <p className="gl-hint">Use the air test result if there is one, or the Part L target for a new building. The list gives typical values to start from; type over them. Empty stays unset.</p>
+                  <h4>How air moves</h4>
+                  <div className="gl-row gl-librow"><span>Method</span>
+                    <select className="gl-sel" aria-label="Air method" value={bi.air_method ?? 'today'} onChange={(e) => setBi(e.target.value === 'weather_driven' ? { air_method: 'weather_driven', air_exponent: bi.air_exponent ?? 0.67, single_sided_turbulence: bi.single_sided_turbulence ?? true } : { air_method: 'today' })}>
+                      <option value="today">Fixed (today's NZA Sim: q50 ÷ 20, vents by wind)</option>
+                      <option value="weather_driven">Weather-driven (wind and stack, every hour)</option>
+                    </select>
+                  </div>
+                  {(bi.air_method ?? 'today') === 'weather_driven' ? <>
+                    <div className="gl-row gl-typed"><span>Crack exponent n</span><Num value={bi.air_exponent ?? ''} step={0.01} min={0.5} max={1} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 && v <= 1 ? v : null; if (n !== (bi.air_exponent ?? null)) setBi({ air_exponent: n }) }} /></div>
+                    <label className="gl-row gl-librow"><span>Wind turbulence, one-sided rooms</span><input type="checkbox" aria-label="Single-sided wind turbulence" checked={bi.single_sided_turbulence === true} onChange={(e) => setBi({ single_sided_turbulence: e.target.checked })} /></label>
+                    <div className="gl-row gl-librow"><span>Terrain</span>
+                      <select className="gl-sel" aria-label="Terrain" value={bi.terrain ?? ''} onChange={(e) => setBi({ terrain: (e.target.value || null) as BuildingInputs['terrain'] })}>
+                <option value="">Not set</option>
+                {AIR_TERRAINS.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+              </select>
+                    </div>
+                    <p className="gl-hint">Each room's air is worked out every hour from the wind (by terrain and height), the stack between inside and out, its leakage as cracks (n, 0.67 is usual), its trickle vents and its opening windows (Fabric, Windows; when they open is on Controls). The one-sided wind term is EN 16798-7's, for rooms whose open windows are all on one side.</p>
+                  </> : <p className="gl-hint">Fixed: leakage is q50 ÷ 20 air changes all year and vents follow the wind only, as today's NZA Sim. Opening windows need weather-driven air.</p>}
                 </>
               ) : (
                 <>
@@ -1563,7 +1594,49 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             W/m²K
           </label>
         </div>
-        <p className="gl-hint">{usage(at).n ? `Used on ${usage(at).text}: a change here changes all of it. Copy it for an exception.` : 'Not used yet.'}{elem === 'door' ? ' The library has no door constructions yet, so a door needs a typed U.' : ''}{elem === 'partition' ? " Every wall between zones takes this type. The library's internal wall is a draft (plaster, block, plaster from existing library layers) waiting for Chris to check." : ''}</p>
+        {at.element === 'glazing' && (() => {
+          const o = at.opening ?? null, v = at.trickle ?? null
+          const wd = (plan.building?.air_method ?? 'today') === 'weather_driven'
+          const setO = (q: Partial<WindowOpening>) => setFT(at.id, { opening: { ...(o ?? { style: null, openable_fraction: null, opening_angle_deg: null, cd: null }), ...q } })
+          const setV = (q: Partial<TrickleVent>) => setFT(at.id, { trickle: { ...(v ?? { area_mm2: null, cd: null, flow_mode: null }), ...q } })
+          const n = (label: string, val: number | null | undefined, on: (x: number | null) => void, step: number, unit?: string, max?: number) => (
+            <div className="gl-row gl-typed"><span>{label}</span><Num value={val ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(x) => on(Number.isFinite(x) && x >= 0 && (max == null || x <= max) ? x : null)} /></div>
+          )
+          const angled = WINDOW_STYLES.find((x) => x.key === o?.style)?.angle ?? true
+          return <>
+            <h4>Opens</h4>
+            <div className="gl-row gl-librow"><span>How it opens</span>
+              <select className="gl-sel" aria-label={`How ${at.name} open`} value={o ? o.style ?? 'unset' : ''} onChange={(e) => e.target.value === '' ? setFT(at.id, { opening: null }) : setO({ style: e.target.value === 'unset' ? null : e.target.value as WindowStyle })}>
+                <option value="">Does not open</option>
+                {o && o.style == null && <option value="unset">Opens (style not set)</option>}
+                {WINDOW_STYLES.map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
+              </select>
+            </div>
+            {o && <>
+              {n('Share of the glass that opens', o.openable_fraction, (x) => setO({ openable_fraction: x }), 0.05, undefined, 1)}
+              {angled && n('Widest opening angle', o.opening_angle_deg, (x) => setO({ opening_angle_deg: x }), 5, '°', 180)}
+              <div className="gl-row gl-typed"><span>Discharge coefficient</span><Num value={o.cd ?? ''} step={0.05} min={0} max={1} onCommit={(x) => setO({ cd: Number.isFinite(x) && x > 0 && x <= 1 ? x : null })} />{o.cd == null && <button type="button" className="ap-link" onClick={() => setO({ cd: computeCd({ type: 'orifice' }) })}>Use 0.61</button>}</div>
+              <p className="gl-hint">{wd ? 'Effective area per EN 16798-7 from the style, the share that opens and the angle. 0.61 is a sharp-edged opening (CIBSE Guide A §4.6). When they open is set per space type on Controls.' : 'Opening windows count only with weather-driven air (Fabric, Air leakage); this model uses the fixed method, so they stay shut.'}</p>
+            </>}
+            <h4>Trickle vent</h4>
+            <label className="gl-row gl-librow"><span>Each window has one</span><input type="checkbox" aria-label={`${at.name} have trickle vents`} checked={!!v} onChange={(e) => setFT(at.id, { trickle: e.target.checked ? { area_mm2: null, cd: null, flow_mode: null } : null })} /></label>
+            {v && <>
+              {n('Equivalent area', v.area_mm2, (x) => setV({ area_mm2: x && x > 0 ? x : null }), 500, 'mm²')}
+              <div className="gl-row gl-typed"><span>Discharge coefficient</span><Num value={v.cd ?? ''} step={0.05} min={0} max={1} onCommit={(x) => setV({ cd: Number.isFinite(x) && x > 0 && x <= 1 ? x : null })} /></div>
+              {!wd && (
+                <div className="gl-row gl-librow"><span>Air flows</span>
+                  <select className="gl-sel" aria-label={`Trickle vent flow, ${at.name}`} value={v.flow_mode ?? ''} onChange={(e) => setV({ flow_mode: (e.target.value || null) as TrickleVent['flow_mode'] })}>
+                    <option value="">Not set</option>
+                    <option value="single_sided">In and out on one side</option>
+                    <option value="cross">Across the room</option>
+                  </select>
+                </div>
+              )}
+              <p className="gl-hint">The maker's equivalent area for one vent (2,500 to 5,000 mm² is common). Always open. {wd ? 'Placed at the window head; the room\'s pressure decides which way air goes.' : 'Today\'s method needs whether air crosses the room.'}</p>
+            </>}
+          </>
+        })()}
+        <p className="gl-hint">{usage(at).n ? `Used on ${usage(at).text}: a change here changes all of it. Copy it for an exception.` : 'Not used yet.'}{elem === 'door' ? " The library's door is a draft awaiting Chris's review; type a U if you know the door's." : ''}{elem === 'partition' ? " Every wall between zones takes this type. The library's internal wall is a draft (plaster, block, plaster from existing library layers) waiting for Chris to check." : ''}</p>
       </>
     )
     const isRooms = elem === 'roof' || elem === 'floor'
@@ -1624,6 +1697,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   }
   /** Brief 118 P5: an edit to a profile. The project's own is changed; a library one is never changed: the edit makes
    * the project's own copy, and this project's space types and ventilation systems move to it. */
+  /** The profile open in today's schedule pop-out (from a space type's day charts), by key. */
+  const [schedPop, setSchedPop] = useState<string | null>(null)
   const editProfile = (key: string, next: { weekday: number[]; saturday: number[]; sunday: number[]; monthly_multipliers?: number[] }) => {
     const p0 = profile(key)
     if (!p0) return
@@ -1643,6 +1718,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       systems: plan.systems.map((y) => (y.schedule === key ? { ...y, schedule: k2 } : y)),
     })
     setProfSel(k2)
+    setSchedPop((p) => (p === key ? k2 : p))
   }
   const renameProfile = (key: string, name: string) => commit({ ...plan, own_profiles: (plan.own_profiles ?? []).map((x) => (x.key === key ? { ...x, name } : x)) })
 
@@ -1755,7 +1831,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {opt('Use', 'use', USES as Array<{ key: string; name: string }>)}
             <h4 className="gl-h4i"><Icon name="person" size={18} />People</h4>
             {opt('Occupancy', 'occupancy', [{ key: ALWAYS, name: 'In all the time (100%)' }, ...profilesFor('occupancy')])}
-            <Spark label="Occupancy" days={sp.occupancy === ALWAYS ? { weekday: Array(24).fill(1) } : profile(sp.occupancy ?? '')?.day_types ?? null} />
+            <Spark label="Occupancy" days={sp.occupancy === ALWAYS ? { weekday: Array(24).fill(1) } : profile(sp.occupancy ?? '')?.day_types ?? null} onEdit={sp.occupancy && sp.occupancy !== ALWAYS ? () => setSchedPop(sp.occupancy) : undefined} />
             <div className="gl-row gl-librow"><span>Count people</span>
               <select className="gl-sel" aria-label="Count people" value={sp.people_basis ?? 'per_m2'} onChange={(e) => setSpace(sp.id, { people_basis: e.target.value as 'per_m2' | 'per_room' })}>
                 <option value="per_m2">Per m² of floor</option>
@@ -1776,14 +1852,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {sp.lux == null && sp.lighting_w_per_m2 != null && <p className="gl-hint">Stated, not from lux. Type the light needed above to work it out from the luminaires instead.</p>}
             {onControlsLine('Switched', lightRelName(sp), null)}
             {sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill'
-              ? <Spark label="Lighting" days={profile(sp.lighting ?? '')?.day_types ?? null} />
+              ? <Spark label="Lighting" days={profile(sp.lighting ?? '')?.day_types ?? null} onEdit={sp.lighting ? () => setSchedPop(sp.lighting) : undefined} />
               : sp.light_relationship === 'always_on' ? <Spark label="Lighting" days={{ weekday: Array(24).fill(1) }} /> : null}
             <h4 className="gl-h4i"><Icon name="power" size={18} />Equipment</h4>
             {typed('In use', 'equipment_w_per_m2', 0.5, 'W/m²')}
             {typed('Always on', 'equipment_baseload_w_per_m2', 0.5, 'W/m²')}
             {opt('Follows', 'equip_relationship', RELATIONSHIPS.filter((x) => x.key !== 'proportional_with_spill'))}
             {sp.equip_relationship === 'independent' && opt('Its profile', 'equipment', profilesFor('equipment'))}
-            {sp.equip_relationship === 'independent' && <Spark label="Equipment" days={profile(sp.equipment ?? '')?.day_types ?? null} />}
+            {sp.equip_relationship === 'independent' && <Spark label="Equipment" days={profile(sp.equipment ?? '')?.day_types ?? null} onEdit={sp.equipment ? () => setSchedPop(sp.equipment) : undefined} />}
             <p className="gl-hint">"With occupancy" uses the occupancy profile above, so lighting and equipment rise and fall with the people.</p>
             <h4 className="gl-h4i"><Icon name="dhw" size={18} />Hot water</h4>
             <div className="gl-row gl-librow"><span>Used</span>
@@ -1823,7 +1899,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return i < 0 ? null : SYSTEM_COLOURS[(i + 3) % SYSTEM_COLOURS.length]!
   }
   const curEmit = emitterTypes.find((x) => x.id === activeEmit) ?? emitterTypes[0] ?? null
-  const emitUnset = (t: EmitterType) => t.rated_output_w == null || t.radiant_fraction == null || (isWet(t.kind) && [t.rated_flow_c, t.rated_return_c, t.rated_room_c, t.exponent_n].some((v) => v == null))
+  const emitHeats = (t: EmitterType) => !coolingKind(t.kind) || t.heats !== false
+  const emitUnset = (t: EmitterType) => (emitHeats(t) ? t.rated_output_w == null || t.radiant_fraction == null || (isWet(t.kind) && [t.rated_flow_c, t.rated_return_c, t.rated_room_c, t.exponent_n].some((v) => v == null)) : t.cooling_output_w == null)
   const roomEmitters = (r: Plan['rooms'][number]) => (r.emitters ?? []).filter((e) => e.count > 0 && emitterTypes.some((t) => t.id === e.type))
   const emitName = (r: Plan['rooms'][number]) => roomEmitters(r).map((e) => `${e.count} × ${emitterTypes.find((t) => t.id === e.type)!.name}`).join(', ')
   const newEmitter = (from?: EmitterType) => {
@@ -1841,12 +1918,26 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const items: Item[] = emitterTypes.map((t) => {
       const n = plan.rooms.reduce((s2, r) => s2 + (r.emitters ?? []).filter((e) => e.type === t.id).reduce((a, e) => a + e.count, 0), 0)
       const kind = EMITTER_KINDS.find((k) => k.key === t.kind)!.name
-      return { id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, line: [kind, t.rated_output_w != null ? `${t.rated_output_w} W each` : 'output not set'].join(' · '), used: n ? `${n} in rooms` : 'not used', removable: !n }
+      return { id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, line: [kind, ...(emitHeats(t) ? [t.rated_output_w != null ? `${t.rated_output_w} W each` : 'output not set'] : []), ...(coolingKind(t.kind) && t.cooling_output_w != null ? [`cools ${t.cooling_output_w} W each`] : []), ...(emitHeats(t) ? [] : ['cools only'])].join(' · '), used: n ? `${n} in rooms` : 'not used', removable: !n }
     })
     const wet = x ? isWet(x.kind) : false
-    const num = (label: string, k: 'rated_output_w' | 'radiant_fraction' | 'rated_flow_c' | 'rated_return_c' | 'rated_room_c' | 'exponent_n', step: number, unit?: string, max?: number) => x && (
-      <div className="gl-row gl-typed"><span>{label}</span><Num value={x[k] ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 && (max == null || v <= max) ? v : k === 'radiant_fraction' && v === 0 ? 0 : x[k]; if (n !== x[k]) setEmit(x.id, { [k]: n }) }} /></div>
+    const heats = x ? emitHeats(x) : true
+    const cools = x ? coolingKind(x.kind) : false
+    // A figure typed over a catalogue item's no longer is the catalogue's: the reference goes (the run would refuse it).
+    const RATED = ['rated_output_w', 'rated_flow_c', 'rated_return_c', 'rated_room_c', 'exponent_n']
+    const num = (label: string, k: 'rated_output_w' | 'radiant_fraction' | 'rated_flow_c' | 'rated_return_c' | 'rated_room_c' | 'exponent_n' | 'cooling_output_w', step: number, unit?: string, max?: number) => x && (
+      <div className="gl-row gl-typed"><span>{label}</span><Num value={x[k] ?? ''} unit={unit} step={step} min={0} max={max} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 && (max == null || v <= max) ? v : k === 'radiant_fraction' && v === 0 ? 0 : k === 'cooling_output_w' && !Number.isFinite(v) ? null : x[k]; if (n !== x[k]) setEmit(x.id, { [k]: n, ...(RATED.includes(k) && x.catalogue ? { catalogue: null } : {}) }) }} /></div>
     )
+    const cat = x?.catalogue ? catalogueItem(x.catalogue.catalogue, x.catalogue.item) : null
+    const pickItem = (ref: string) => {
+      if (!x) return
+      if (!ref) return setEmit(x.id, { catalogue: null })
+      const [c, id] = ref.split('|') as [string, string]
+      const got = catalogueItem(c, id)
+      if (!got) return
+      const { catalogue: cg, item: it } = got
+      setEmit(x.id, { catalogue: { catalogue: c, item: id }, rated_output_w: it.output_w, rated_flow_c: cg.rating.flow_c, rated_return_c: cg.rating.return_c, rated_room_c: cg.rating.room_c, exponent_n: it.exponent_n, ...(x.name.startsWith('Radiator') ? { name: `${cg.maker} ${it.height_mm} × ${it.length_mm}` } : {}) })
+    }
     return (
       <GivePanel
         kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
@@ -1860,13 +1951,35 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           <>
             <input className="gl-title-in ap-tname" aria-label="Emitter name" defaultValue={x.name} key={`${x.id}-${x.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== x.name && setEmit(x.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
             <div className="gl-row gl-librow"><span>Kind</span>
-              <select className="gl-sel" aria-label="Emitter kind" value={x.kind} onChange={(e) => setEmit(x.id, { kind: e.target.value as EmitterKind })}>
+              <select className="gl-sel" aria-label="Emitter kind" value={x.kind} onChange={(e) => { const k = e.target.value as EmitterKind; const m = /^(?:Radiator|Underfloor heating|Fan coil|VRF indoor unit|Electric heater|Other) (\d+)$/.exec(x.name); setEmit(x.id, { kind: k, ...(k !== 'radiator' ? { catalogue: null } : {}), ...(m ? { name: `${EMITTER_KINDS.find((q) => q.key === k)!.name} ${m[1]}` } : {}) }) }}>
                 {EMITTER_KINDS.map((k) => <option key={k.key} value={k.key}>{k.name}</option>)}
               </select>
             </div>
-            {num(wet ? 'Output of one, rated' : 'Output of one', 'rated_output_w', 50, 'W')}
-            {num('Radiant share', 'radiant_fraction', 0.05, undefined, 1)}
-            {wet && (
+            {cools && (
+              <>
+                <h4>Cooling</h4>
+                {num('Cooling of one', 'cooling_output_w', 100, 'W')}
+                <label className="gl-row gl-librow"><span>Heats as well</span><input type="checkbox" aria-label="Heats as well" checked={heats} onChange={(e) => setEmit(x.id, e.target.checked ? { heats: true } : { heats: false, catalogue: null })} /></label>
+                <p className="gl-hint">The unit's sensible cooling from the maker's data, held fixed. A room with cooling units has its cooling capped at their total; empty, its cooling is not capped.</p>
+                {heats && <h4>Heating</h4>}
+              </>
+            )}
+            {x.kind === 'radiator' && (
+              <div className="gl-row gl-librow"><span>From a catalogue</span>
+                <select className="gl-sel" aria-label="Catalogue radiator" value={x.catalogue ? `${x.catalogue.catalogue}|${x.catalogue.item}` : ''} onChange={(e) => pickItem(e.target.value)}>
+                  <option value="">Typed in</option>
+                  {Object.values(CATALOGUES).map((c) => [...new Set(c.items.map((i) => i.height_mm))].map((h) => (
+                    <optgroup key={`${c.id}${h}`} label={`${c.title}, ${h} mm high`}>
+                      {c.items.filter((i) => i.height_mm === h).map((i) => <option key={i.id} value={`${c.id}|${i.id}`}>{`${i.length_mm} mm long, ${i.output_w} W (${i.id})`}</option>)}
+                    </optgroup>
+                  )))}
+                </select>
+              </div>
+            )}
+            {cat && <p className="gl-hint">From {cat.catalogue.title}, {cat.item.type}, {cat.item.height_mm} × {cat.item.length_mm} mm, code {cat.item.id}: {cat.item.output_w} W at {cat.catalogue.rating.flow_c}/{cat.catalogue.rating.return_c}/{cat.catalogue.rating.room_c} °C, n {cat.item.exponent_n}, as printed. The run checks these figures against it.</p>}
+            {heats && num(wet ? 'Output of one, rated' : 'Output of one', 'rated_output_w', 50, 'W')}
+            {heats && num('Radiant share', 'radiant_fraction', 0.05, undefined, 1)}
+            {heats && wet && (
               <>
                 <h4>Rated at (EN 442)</h4>
                 {num('Flow', 'rated_flow_c', 1, '°C')}
@@ -1876,7 +1989,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <p className="gl-hint">From the maker's data. A new radiator starts at the EN 442 rating, 75/65/20 °C. n is about 1.3 for panel radiators, 1.1 underfloor, 1.0 fan coils. Its output is re-rated at the heating system's design flow and return.</p>
               </>
             )}
-            {!wet && <p className="gl-hint">A fixed output, not fed by the heating system's water.</p>}
+            {heats && !wet && <p className="gl-hint">A fixed output, not fed by the heating system's water.</p>}
             <div className="gl-row gl-typed ap-count"><span>How many in each room</span><Num value={emitCount} step={1} min={0} onCommit={(v) => setEmitCount(Number.isFinite(v) && v >= 0 ? Math.round(v) : 1)} /></div>
             <p className="gl-hint">Apply puts this many in each chosen room (0 takes them out). A room's emitters cap the heat it can get; a room with none is not capped.</p>
           </>
@@ -2023,8 +2136,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     setNote(`Applied: the controls of ${row?.name ?? 'the building'}.`)
     setCtlDraft(null)
   }
-  const SERVICE_COLOUR: Record<string, string> = { heating: '#C2410C', cooling: '#2563EB', dhw: '#7C3AED', ventilation: '#0F766E', lighting: '#CA8A04', other: '#6B7280' }
-  const SERVICE_NAME: Record<string, string> = { heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', ventilation: 'Ventilation', lighting: 'Lighting', other: 'Other loads' }
+  const SERVICE_COLOUR: Record<string, string> = { heating: '#C2410C', cooling: '#2563EB', dhw: '#7C3AED', ventilation: '#0F766E', windows: '#0891B2', lighting: '#CA8A04', other: '#6B7280' }
+  const SERVICE_NAME: Record<string, string> = { heating: 'Heating', cooling: 'Cooling', dhw: 'Hot water', ventilation: 'Ventilation', windows: 'Opening windows', lighting: 'Lighting', other: 'Other loads' }
   const controlsLeft = () => {
     const rows = ctlMap?.rows ?? []
     return (
@@ -2034,7 +2147,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             <h3>Controls</h3>
             <p className="gl-say">How each system is told to run: who controls it, what it follows and what it is set to. Choose one to change it.</p>
             {!rows.length && <p className="gl-hint">No systems serve the rooms yet. Give rooms their systems on Systems first.</p>}
-            {(['heating', 'cooling', 'dhw', 'ventilation', 'lighting', 'other'] as const).map((sv) => {
+            {(['heating', 'cooling', 'dhw', 'ventilation', 'windows', 'lighting', 'other'] as const).map((sv) => {
               const its = rows.filter((r) => r.service === sv)
               return its.length ? (
                 <div key={sv} className="ap-ctlgroup">
@@ -2105,7 +2218,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const controlsRight = () => {
     const row = ctlMap?.rows.find((r) => r.key === ctlSel)
     if (!row) return <div className="gl-sec"><p className="gl-say">Choose a system on the left or in the control map to set how it runs.</p></div>
-    const x = ctlPlan.systems.find((y) => y.id === row.control.ref)
+    const x = row.service === 'windows' ? undefined : ctlPlan.systems.find((y) => y.id === row.control.ref)
     const ld = row.service === 'other' ? (ctlPlan.other_loads ?? []).find((y) => y.id === row.control.ref) : undefined
     const c = (ctlPlan.controls ?? []).find((y) => y.kind === row.control.kind && y.ref === row.control.ref)
     const served = x ? ctlPlan.spaces.filter((sp) => ctlPlan.rooms.some((r) => r.space === sp.id && r.systems?.[x.service] === x.id)) : []
@@ -2130,7 +2243,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return (
       <div className="gl-sec ap-ctlright">
         <h3><i style={{ background: SERVICE_COLOUR[row.service] }} />{row.name} <small>{SERVICE_NAME[row.service]}</small></h3>
-        {row.service !== 'other' && <>
+        {row.service !== 'other' && row.service !== 'windows' && <>
           <div className="gl-row gl-librow"><span>Controlled by</span>
             <select className="gl-sel" aria-label="Controlled by" value={c?.controller ?? ''} onChange={(e) => dCtl(row.control.kind, row.control.ref, { controller: (e.target.value || null) as PlanControl['controller'] })}>
               <option value="">Not stated</option>
@@ -2140,6 +2253,42 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           <div className="gl-row gl-typed"><span>Note</span><input className="gl-in" aria-label="Control note" defaultValue={c?.note ?? ''} key={`${row.key}-${c?.note ?? ''}`} placeholder="e.g. BMS optimiser, TRVs" onBlur={(e) => e.target.value.trim() !== (c?.note ?? '') && dCtl(row.control.kind, row.control.ref, { note: e.target.value.trim() || null })} /></div>
           <p className="ap-default">Recorded, not yet used in the calculation.</p>
         </>}
+        {row.service === 'windows' && (() => {
+          const sp = ctlPlan.spaces.find((q) => q.id === row.control.ref)
+          if (!sp) return null
+          const w: WindowRule = sp.windows ?? { rule: null, open_above_c: null, open_fraction: null, hours: null, controller: null }
+          const setW = (q: Partial<WindowRule>) => dSpace(sp.id, { windows: { ...w, ...q } })
+          return <>
+            <div className="gl-row gl-librow"><span>Opened</span>
+              <select className="gl-sel" aria-label="Who opens the windows" value={w.controller ?? ''} onChange={(e) => setW({ controller: (e.target.value || null) as WindowRule['controller'] })}>
+                <option value="">Not stated</option>
+                <option value="manual">By hand</option>
+                <option value="local">By local controls (actuators)</option>
+                <option value="central_bms">By the BMS</option>
+              </select>
+            </div>
+            <div className="gl-row gl-librow"><span>Rule</span>
+              <select className="gl-sel" aria-label="Window rule" value={w.rule ?? ''} onChange={(e) => setW({ rule: (e.target.value || null) as WindowRule['rule'] })}>
+                <option value="">Not set</option>
+                <option value="temperature">When the room is warm</option>
+                <option value="timetable">To a timetable</option>
+              </select>
+            </div>
+            {w.rule === 'temperature' && num('Open above', w.open_above_c, (n) => setW({ open_above_c: n }), 'Windows open above')}
+            {w.rule === 'temperature' && sp.heat_c != null && <p className="gl-hint">Above the heating's {sp.heat_c} °C, and only when it is warmer inside than out.</p>}
+            <div className="gl-row gl-typed"><span>How far</span><Num value={w.open_fraction ?? ''} step={0.1} min={0} max={1} onCommit={(n) => setW({ open_fraction: Number.isFinite(n) && n >= 0 && n <= 1 ? n : null })} /></div>
+            <div className="gl-row gl-librow"><span>{w.rule === 'timetable' ? 'Open in' : 'May open in'}</span>
+              <select className="gl-sel" aria-label="Window hours" value={w.hours ?? 'always_on'} onChange={(e) => setW({ hours: e.target.value === 'always_on' ? null : e.target.value })}>
+                <option value="always_on">Any hour</option>
+                {profOptions(profilesFor('ventilation'))}
+              </select>
+            </div>
+            {(ctlMap?.rows.filter((r) => r.service === 'windows').length ?? 0) > 1 && (
+              <button type="button" className="ap-link" onClick={() => { const ids = new Set(ctlMap!.rows.filter((r) => r.service === 'windows').map((r) => r.control.ref)); draft((bp) => ({ ...bp, spaces: bp.spaces.map((q) => (ids.has(q.id) ? { ...q, windows: { ...w } } : q)) })) }}>Use this rule for every space type with opening windows</button>
+            )}
+            <p className="gl-hint">For every room of {sp.name} with opening windows. "How far" is 0 to 1 of their widest (the style and angle are on Fabric, Windows). By hand and automated windows follow the same rule here; the choice is recorded.</p>
+          </>
+        })()}
         {x && (x.service === 'heating' || x.service === 'cooling') && <>
           <h4>{x.service === 'heating' ? 'Set to, and when' : 'Set to'}</h4>
           {!served.length && <p className="gl-hint">No space type's rooms use it.</p>}
@@ -2451,7 +2600,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
       {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
       {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
-      {mode === 'profiles' && centreTab !== 'heat-flow' && (() => {
+      {mode === 'profiles' && (centreTab ?? 'drawing') === 'drawing' && (() => {
         // Brief 118 P5: Profiles gets the full centre, with today's schedule editor (no drawing).
         const sel = profSel ? profile(profSel) : null
         const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
@@ -2468,7 +2617,19 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </div>
         )
       })()}
-      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {schedPop && (() => {
+        const sel = profile(schedPop)
+        if (!sel?.day_types) return null
+        const accent = (GAIN_COLOURS as Record<string, string>)[sel.schedule_type] ?? '#EA580C'
+        return (
+          <SchedulePopout isOpen onClose={() => setSchedPop(null)} title={`Schedule · ${sel.name}`} accent={accent} persistKey="nza-sim2-schedule-popout-position">
+            <Suspense fallback={<p className="gl-hint">Opening the editor…</p>}>
+              <UnifiedScheduleEditor key={sel.key} schedule={{ ...sel.day_types, monthly_multipliers: sel.monthly_multipliers ?? Array(12).fill(1) }} onChange={(next: { weekday: number[]; saturday: number[]; sunday: number[]; monthly_multipliers?: number[] }) => editProfile(sel.key, next)} accent={accent} mode="live" enableExceptions={false} contextLabel={`${sel.name}${sel.own ? '' : ' · from the library: an edit makes this project\'s copy'}`} />
+            </Suspense>
+          </SchedulePopout>
+        )
+      })()}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} showMonthly={centreTab === 'monthly'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
@@ -2476,7 +2637,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </Suspense>
         </div>
       )}
-      {onControls && centreTab !== 'heat-flow' && controlMapView()}
+      {onControls && (centreTab ?? 'drawing') === 'drawing' && controlMapView()}
       {note && <div className="gl-note" role="status">{note}</div>}
       <div className="gl-viewswitch" role="group" aria-label="View">
         <button type="button" aria-pressed={shownLook === 'plan'} onClick={() => setLook('plan')}>Plan</button>
@@ -2703,7 +2864,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 </div>
                 <div className="gl-btns">
                   <button type="button" className="gl-btn quiet" onClick={() => fitTo(plan.blocks.flat())}>Fit to screen</button>
-                  <button type="button" className="gl-btn quiet" onClick={() => { commit({ ...emptyPlan(), storey_height_m: plan.storey_height_m }); setSel(null); toMode('outline'); setTool('rect') }}>Clear all</button>
+                  <button type="button" className="gl-btn quiet" onClick={() => { commit({ ...newPlan(), storey_height_m: plan.storey_height_m }); setSel(null); toMode('outline'); setTool('rect') }}>Clear all</button>
                 </div>
               </div>}
               {mode === 'outline' && (

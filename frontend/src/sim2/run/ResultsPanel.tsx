@@ -408,7 +408,7 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
             </div>
           </div>
           {/* Brief 112 (Rule 8): lighting heat needs the luminaires' efficacy, a Systems object. */}
-          {run.level === 'spaces' && <p className="rp-none">Lighting heat appears at + Systems, because it depends on the luminaires.</p>}
+          {run.level === 'spaces' && <p className="rp-none">Lighting heat appears at + Systems, because it depends on the luminaires. Window ventilation appears at + Systems too, with its controls.</p>}
 
           <h3>Energy used <i>estimate</i></h3>
           {s.energy === null ? (

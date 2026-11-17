@@ -139,7 +139,15 @@ export type EmitterType = {
   rated_return_c: number | null
   rated_room_c: number | null
   exponent_n: number | null
+  /** Schema 2.7 (Brief 119): false only for a unit that cools and does not heat. Left out: it heats. */
+  heats?: boolean
+  /** One unit's sensible cooling, W (fan coils, VRF indoor units, other); null or left out: it does not cool. */
+  cooling_output_w?: number | null
+  /** The catalogue item its rated figures were taken from (thermal/catalogue); the run checks them against it. */
+  catalogue?: { catalogue: string; item: string } | null
 }
+/** Brief 119: the kinds that can cool a room. */
+export const coolingKind = (k: EmitterKind) => k === 'fan_coil' || k === 'vrf_indoor' || k === 'other'
 export const isWet = (k: EmitterKind) => EMITTER_KINDS.find((x) => x.key === k)!.wet
 
 /** Uses a zone can be given: the zone types today's schedule editor offers (UnifiedScheduleEditor.jsx). */
@@ -176,7 +184,47 @@ export type Win = {
 export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition'
 /** A fabric type: a library construction (by key) and, optionally, a U-value the user typed over it (W/m²K). Both
  * null: not set yet, and the model document says so (`unassigned:…`). */
-export type FabricType = { id: string; element: FabricElement; name: string; construction: string | null; u: number | null; /** Brief 118: the construction set it came from, until changed by hand. */ template?: string | null }
+export type FabricType = {
+  id: string; element: FabricElement; name: string; construction: string | null; u: number | null
+  /** Brief 118: the construction set it came from, until changed by hand. */ template?: string | null
+  /** Brief 115 (windows only): how the window opens. Null or left out: it does not open. Every figure typed; null not set. */
+  opening?: WindowOpening | null
+  /** Brief 115 (windows only): a trickle vent in each window's frame. Null or left out: none. */
+  trickle?: TrickleVent | null
+}
+export const WINDOW_STYLES = [
+  { key: 'side_hung', name: 'Side-hung', angle: true },
+  { key: 'top_hung', name: 'Top-hung', angle: true },
+  { key: 'bottom_hung', name: 'Bottom-hung', angle: true },
+  { key: 'centre_pivot', name: 'Centre-pivot', angle: true },
+  { key: 'sliding', name: 'Sliding', angle: false },
+  { key: 'louvre', name: 'Louvre', angle: false },
+] as const
+export type WindowStyle = (typeof WINDOW_STYLES)[number]['key']
+/** The opening part of a window type: its style, the share of the glass that opens, its widest angle (hung and pivot
+ * windows) and its discharge coefficient. */
+export type WindowOpening = { style: WindowStyle | null; openable_fraction: number | null; opening_angle_deg: number | null; cd: number | null }
+/** A trickle vent in every window of the type: its equivalent area (mm², as the maker states it), discharge
+ * coefficient, and, for today's fixed air method only, whether air crosses the room or stays on one side. */
+export type TrickleVent = { area_mm2: number | null; cd: number | null; flow_mode: 'single_sided' | 'cross' | null }
+/** Brief 115: when a space type's windows open (Controls step). One rule for every room of the space type. */
+export type WindowRule = {
+  rule: 'temperature' | 'timetable' | null
+  /** A temperature rule opens above this, °C, when warmer than outside. */
+  open_above_c: number | null
+  /** How far they open, 0 to 1 of their widest. */
+  open_fraction: number | null
+  /** The hours they may open (a schedule profile key), or null: any hour. */
+  hours: string | null
+  /** Who opens them: by hand (manual), local controls or the BMS. */
+  controller: Controller | null
+}
+export const AIR_TERRAINS = [
+  { key: 'open', name: 'Open country (flat, few obstructions)' },
+  { key: 'suburban', name: 'Suburban (low buildings, trees)' },
+  { key: 'urban', name: 'Urban (town centre)' },
+  { key: 'city', name: 'City (tall buildings around)' },
+] as const
 /** A stretch [t0, t1] of run `wall` given fabric type `type` for an element on walls (walls, windows, doors; absent
  * element = wall). Later stretches win where they overlap. */
 export type TypeSpan = { wall: number; t0: number; t1: number; type: string; element?: 'wall' | 'glazing' | 'door'; at?: { a: XY; b: XY } }
@@ -226,6 +274,8 @@ export type SpaceType = {
    * the temperature outside them, °C (null: off outside them). */
   heat_hours?: string | null
   setback_c?: number | null
+  /** Brief 115 (edited on Controls): when this space type's opening windows open. Null or left out: not stated. */
+  windows?: WindowRule | null
   /** How the gains enter the zone (schema 2.3 profile fields), visible and editable on the space type. A new space
    * type starts from today's engine values (TODAY in thermal/schema/upgrade.ts). */
   radiant_fraction?: number | null
@@ -250,6 +300,13 @@ export type BuildingInputs = {
   /** Brief 117: warm-up allowance after a setback, W/m² (null: none), and the wind for permanent vents, m/s. */
   warm_up_w_per_m2?: number | null
   vent_wind_m_s?: number | null
+  /** Brief 115: how air leakage and openings are worked out. Left out: 'today' (a plan saved before 115). */
+  air_method?: 'today' | 'weather_driven'
+  /** Weather-driven only: the cracks' flow exponent n, and whether single-sided rooms take EN 16798-7's wind term. */
+  air_exponent?: number | null
+  single_sided_turbulence?: boolean | null
+  /** Weather-driven only: the terrain around the site (the wind's profile with height). */
+  terrain?: 'open' | 'suburban' | 'urban' | 'city' | null
 }
 /** Hot water, for the whole building (the schema's service-level fields): stored, tap and cold-supply temperatures,
  * daily demand per person or per m² of floor, a circulation pump, and when it is used (shown as 'flat' until changed). Typed; null is not stated. */
@@ -361,6 +418,10 @@ export function hotWaterOnSpaces(plan: Plan): Plan {
   return { ...plan, spaces, dhw: { ...hw, basis: null, litres: null } }
 }
 
+/** A new model in the workspace: empty, with weather-driven air (Linzie, 16 Nov 08:34: new models default to it; a
+ * plan saved before keeps today's). Its exponent (0.67) and the one-sided wind term (on) are the method's usual
+ * values, shown and editable on Fabric, Air leakage; the terrain stays unset. */
+export const newPlan = (): Plan => ({ ...emptyPlan(), building: { ...noBuildingInputs(), air_method: 'weather_driven', air_exponent: 0.67, single_sided_turbulence: true } })
 export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], fabric_types: defaultFabric(), wall_spans: [], spaces: [], building: noBuildingInputs(), next: { room: 1, zone: 1, system: 1 } })
 
 /** A new zone with nothing assigned. */

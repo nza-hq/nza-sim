@@ -20,6 +20,7 @@
  *   height?:      number      (total px, default 320)
  *   unit?:        string      ('kWh', 'MWh', or 'kWh/m²·a')
  *   gia_m2?:      number      (optional — when set + unit === 'kWh/m²·a', values divided by gia)
+ *   upLabel?, downLabel?: legend words for each side (default 'Gains ↑' / 'Losses ↓'; Simulate v2's Monthly tab says what it plots)
  *
  * Bar scaling: maxBar = max across months of max(sum of gains, sum of losses).
  * Both halves use the same maxBar so the visual magnitude on either side is
@@ -54,6 +55,8 @@ export default function DivergingMonthlyChart({
   height = 320,
   unit = 'kWh',
   gia_m2 = 0,
+  upLabel = 'Gains ↑',
+  downLabel = 'Losses ↓',
 }) {
   // Convert to display unit (intensity is /m² — only when caller asked).
   const conv = (v) => unit === 'kWh/m²·a' && gia_m2 > 0 ? v / gia_m2 : v
@@ -154,7 +157,7 @@ export default function DivergingMonthlyChart({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xxs text-mid-grey">
         {G.length > 0 && (
           <div className="flex items-center gap-3">
-            <span className="text-mid-grey/70 italic">Gains ↑</span>
+            <span className="text-mid-grey/70 italic">{upLabel}</span>
             {G.map(s => (
               <div key={s.key} className="flex items-center gap-1">
                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: s.color, opacity: 0.85 }} />
@@ -165,7 +168,7 @@ export default function DivergingMonthlyChart({
         )}
         {L.length > 0 && (
           <div className="flex items-center gap-3 ml-auto">
-            <span className="text-mid-grey/70 italic">Losses ↓</span>
+            <span className="text-mid-grey/70 italic">{downLabel}</span>
             {L.map(s => (
               <div key={s.key} className="flex items-center gap-1">
                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: s.color, opacity: 0.85 }} />

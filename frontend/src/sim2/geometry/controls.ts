@@ -10,15 +10,16 @@ import { CONTROLLERS, type Plan, type PlanControl, type Service, monthsText } fr
 export type Week = number[]
 type Days = { weekday: number[]; saturday: number[]; sunday: number[] }
 type DocProfile = { id: string; kind: string; label?: string; day_types?: Days; schedule?: Days; relationship_to_occupancy?: string }
-type DocZone = { id: string; name: string; profile_refs: { occupancy: string | null; lighting: string[] }; setpoints: { heat_c: number | null; cool_c: number | null; setback_c: number | null; hours_ref: string | null }; ventilation: Array<{ id: string; label?: string; runs?: string | null; control_schedule_ref?: string | null; demand_min_fraction?: number | null }> }
+type DocZone = { id: string; name: string; surfaces?: string[]; profile_refs: { occupancy: string | null; lighting: string[] }; setpoints: { heat_c: number | null; cool_c: number | null; setback_c: number | null; hours_ref: string | null }; ventilation: Array<{ id: string; label?: string; runs?: string | null; control_schedule_ref?: string | null; demand_min_fraction?: number | null }> }
 type DocGroup = { id: string; service: string; label?: string; zones: string[]; pumps?: { runs: string; schedule_ref: string | null; season_months?: number[] | null } }
-type Doc = { zones: DocZone[]; system_groups: DocGroup[]; profiles: DocProfile[] }
+type Doc = { zones: DocZone[]; system_groups: DocGroup[]; profiles: DocProfile[]; surfaces?: Array<{ id: string; openings?: Array<{ kind: string }> }> }
 
 export type MapRow = {
   /** Unique on the map: `${kind}:${plan id}`. */
   key: string
-  control: Pick<PlanControl, 'kind' | 'ref'>
-  service: Service | 'other'
+  /** `window`: a space type's window rule (ref = the space type's id), Brief 115. */
+  control: { kind: PlanControl['kind'] | 'window'; ref: string }
+  service: Service | 'other' | 'windows'
   name: string
   controller: string
   follows: string
@@ -140,6 +141,24 @@ export function controlMap(plan: Plan, doc: Doc | null): { occupied: Week | null
         week: null, weekNote: 'Heats as water is drawn',
       })
     }
+  }
+  // Brief 115: opening windows, one row per space type whose rooms have them in the document.
+  const opensIn = (z: DocZone) => (z.surfaces ?? []).some((sid) => doc?.surfaces?.find((s) => s.id === sid)?.openings?.some((o) => o.kind === 'operable'))
+  for (const sp of plan.spaces) {
+    const zs = (doc?.zones ?? []).filter((z) => plan.rooms.some((r) => r.zone === z.id && r.space === sp.id) && opensIn(z))
+    if (!zs.length) continue
+    const w = sp.windows ?? null
+    const hours = w?.hours && w.hours !== 'always_on' ? w.hours : null
+    const d = hours ? daysOf(prof(hours)) : null
+    rows.push({
+      key: `window:${sp.id}`, control: { kind: 'window', ref: sp.id }, service: 'windows', name: `Windows · ${sp.name}`,
+      controller: w?.controller ? CONTROLLERS.find((x) => x.key === w.controller)!.name : 'Not stated',
+      follows: !w?.rule ? 'not stated' : w.rule === 'temperature' ? `the room above ${w.open_above_c ?? '?'} °C and warmer than outside${hours ? `, within ${schedName(hours)}` : ''}` : hours ? schedName(hours) : 'every hour',
+      setTo: w?.open_fraction != null ? `${Math.round(w.open_fraction * 100)} % of their widest` : null, runs: null,
+      week: hours ? (d ? weekOf(d) : null) : w?.rule ? ALL : null,
+      weekNote: !w?.rule ? 'No window rule yet: the run asks for one' : w.rule === 'temperature' ? null : null,
+    })
+    if (w?.rule === 'temperature' && w.open_above_c != null && sp.heat_c != null && !(w.open_above_c > sp.heat_c)) flags.push(`Windows · ${sp.name}: open above ${w.open_above_c} °C, not above the heating's ${sp.heat_c} °C; they would open while it heats, so the run refuses it`)
   }
   for (const l of plan.other_loads ?? []) {
     rows.push({

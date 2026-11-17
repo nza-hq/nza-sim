@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, profileOf, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -152,6 +152,43 @@ export function buildDocument(plan0: Plan): Built {
   }
   const doorIds = new Set<string>()
   let windowsPlaced = 0
+  // Brief 115: a window type's opening and trickle vent become the glazing surface's openings. Opening windows are
+  // only in weather-driven air (today's method has none); under today's method a trickle vent states its flow mode.
+  const am = (plan.building ?? noBuildingInputs()).air_method ?? 'today'
+  const openingsNoted = new Set<string>()
+  const openingsOf = (typeId: string | null | undefined, ws: Array<{ sill_m: number; height_m: number }>) => {
+    const t = plan.fabric_types.find((x) => x.id === typeId)
+    if (!t || !ws.length) return []
+    const sill = Math.min(...ws.map((x) => x.sill_m)), head = Math.max(...ws.map((x) => x.sill_m + x.height_m))
+    if (ws.some((x) => Math.abs(x.sill_m - sill) > 1e-9 || Math.abs(x.sill_m + x.height_m - head) > 1e-9) && !openingsNoted.has(`h${t.id}`) && (t.opening || t.trickle)) {
+      openingsNoted.add(`h${t.id}`); notes.push(`${t.name}: windows of different heights share a wall; their openings run from the lowest sill to the highest head, which overstates the stack flow a little`)
+    }
+    const out: Record<string, unknown>[] = []
+    const o = t.opening
+    if (o) {
+      if (am !== 'weather_driven') {
+        if (!openingsNoted.has(`o${t.id}`)) { openingsNoted.add(`o${t.id}`); notes.push(`${t.name}: opening windows count only with weather-driven air (Fabric, Air leakage)`) }
+      } else if (o.openable_fraction == null) {
+        if (!openingsNoted.has(`f${t.id}`)) { openingsNoted.add(`f${t.id}`); notes.push(`${t.name}: say how much of each window opens (Fabric, Windows); until then they stay shut`) }
+      } else {
+        const angled = WINDOW_STYLES.find((x) => x.key === o.style)?.angle ?? true
+        out.push({
+          kind: 'operable', openable_fraction: o.openable_fraction, ...(o.cd != null ? { cd: o.cd } : {}),
+          ...(o.style ? { style: o.style } : {}), opening_angle_deg: angled ? o.opening_angle_deg : null, sill_m: r3(sill), head_m: r3(head),
+        })
+      }
+    }
+    const v = t.trickle
+    if (v && v.area_mm2 == null) {
+      if (!openingsNoted.has(`v${t.id}`)) { openingsNoted.add(`v${t.id}`); notes.push(`${t.name}: give the trickle vent's equivalent area (Fabric, Windows); until then it is left out`) }
+    } else if (v) {
+      out.push({
+        kind: 'permanent_vent', area_m2: Math.round(v.area_mm2! * ws.length) / 1e6, ...(v.cd != null ? { cd: v.cd } : {}),
+        ...(am === 'weather_driven' ? { height_m: r3(head) } : v.flow_mode ? { flow_mode: v.flow_mode } : {}),
+      })
+    }
+    return out
+  }
   const taken = new Set<number>()
   for (const w of walls) {
     // Windows whose middle falls on this zone's stretch of the run (each window once: a middle exactly on a zone line
@@ -190,7 +227,7 @@ export function buildDocument(plan0: Plan): Built {
         id: uid(`${w.zone}_glazing_${w.run + 1}`), kind: 'glazing', zone_a: w.zone, zone_b: 'outside', facade: facade4(w.azimuth_deg),
         area_m2: r3(glz), azimuth_deg: w.azimuth_deg, tilt_deg: 90,
         construction_ref: constructionOf(w.glazing), g_value: gOf(w.glazing),
-        wwr: r3(glz / gross), window_count: wins.length, openings: [],
+        wwr: r3(glz / gross), window_count: wins.length, openings: openingsOf(w.glazing, wins),
         // Same mapping as today's tool (building.shading_overhang → overhang, offset 0); one depth per glazing surface,
         // so it is written only when every window on it has the same depth.
         ...(shade(wins)),
@@ -296,11 +333,17 @@ export function buildDocument(plan0: Plan): Built {
       const t = (plan.emitter_types ?? []).find((x) => x.id === tid)
       if (!t) return []
       const wet = isWet(t.kind)
+      // Brief 119 (2.7): a cooling kind may state its cooling; one that does not heat leaves every heating field empty.
+      const cools = coolingKind(t.kind)
+      const heats = cools ? t.heats !== false : true
+      const cooling = { heats, cooling_output_w: cools ? t.cooling_output_w ?? null : null, catalogue_ref: heats && t.catalogue ? t.catalogue : null }
+      if (!heats) return [{ id: `${zid}_${t.id}`, label: t.name, kind: t.kind, count, rated_output_w: null, radiant_fraction: null, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null, ...cooling }]
       if (wet && !feeds) notes.push(`${t.name}: fed by a heating system, but its zone has none given`)
       return [{
         id: `${zid}_${t.id}`, label: t.name, kind: t.kind, count, rated_output_w: t.rated_output_w, radiant_fraction: t.radiant_fraction,
         system_group_id: wet ? feeds : null,
         rated_flow_c: wet ? t.rated_flow_c : null, rated_return_c: wet ? t.rated_return_c : null, rated_room_c: wet ? t.rated_room_c : null, exponent_n: wet ? t.exponent_n : null,
+        ...cooling,
       }]
     })
   }
@@ -505,14 +548,14 @@ export function buildDocument(plan0: Plan): Built {
       id: 'building_1',
       name: 'Geometry prototype',
       decoded_building_key: null,
-      site: { lat: null, lon: null, name: null, exposure: bi.exposure, ...(is21 ? { ground: { method: 'annual_mean_outdoor' } } : {}) },
+      site: { lat: null, lon: null, name: null, exposure: bi.exposure, ...(is21 ? { ground: { method: 'annual_mean_outdoor' } } : {}), terrain: am === 'weather_driven' ? bi.terrain ?? null : null },
       orientation_deg: 0,
       reported_floor_area_m2: null,
       thermal_bridging: bi.tb_multiplier != null ? { mode: 'iso14683_auto', multiplier: bi.tb_multiplier, alpha_pct: null } : { mode: null, multiplier: null, alpha_pct: null },
       thermal_mass: { mode: null, category: null },
       opening_defaults: {},
-      // Brief 115: today's air method until the workspace offers weather-driven air (P6).
-      air: { method: 'today', exponent: null, single_sided_turbulence: null },
+      // Brief 115: the air method chosen on Fabric, Air leakage; a plan saved before it keeps today's.
+      air: am === 'weather_driven' ? { method: 'weather_driven', exponent: bi.air_exponent ?? null, single_sided_turbulence: bi.single_sided_turbulence ?? null } : { method: 'today', exponent: null, single_sided_turbulence: null },
       // Brief 117/120: the design heat loss's conditions, only once an outdoor temperature is chosen.
       ...(bi.design_outdoor != null ? { design: { outdoor: typeof bi.design_outdoor === 'number' ? { stated_c: bi.design_outdoor } : { from_weather: bi.design_outdoor }, warm_up_w_per_m2: bi.warm_up_w_per_m2 ?? null, vent_wind_m_s: bi.vent_wind_m_s ?? null } } : {}),
     },
@@ -546,6 +589,19 @@ export function buildDocument(plan0: Plan): Built {
         if (!there) return []
         return [{ id: `ctl_${c.kind}_${c.ref}`, target: { kind: c.kind, ref }, controller: c.controller, hours_ref: null, note: c.note?.trim() || null }]
       })
+      // Brief 115: one window entry per zone with opening windows, from its space type's window rule (Controls).
+      // Nothing is filled: a zone whose space type states no rule gets no entry, and the run asks for one.
+      for (const z of zones) {
+        const opens = (z.surfaces as string[]).some((sid) => (surfaces.find((s) => s.id === sid)?.openings as Array<{ kind: string }> | undefined)?.some((o) => o.kind === 'operable'))
+        const wr = spaceOf.get(z.id as string)?.windows
+        if (!opens || !wr || !wr.controller) continue
+        ctl.push({
+          id: `ctl_window_${z.id}`, target: { kind: 'window', ref: z.id as string }, controller: wr.controller,
+          hours_ref: wr.hours && wr.hours !== 'always_on' ? scheduleRef(wr.hours) : null, note: null,
+          rule: wr.rule, open_fraction: wr.open_fraction, open_above_c: wr.rule === 'temperature' ? wr.open_above_c : null,
+          operation: wr.controller === 'manual' ? 'by_hand' : 'automated',
+        } as never)
+      }
       return ctl.length ? { controls: ctl } : {}
     })(),
     weather_ref: { kind: 'legacy', id: 'unassigned' },

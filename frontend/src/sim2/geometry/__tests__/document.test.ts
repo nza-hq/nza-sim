@@ -388,8 +388,8 @@ describe('emitters in rooms (schema 2.4)', () => {
     const doc = b.doc as any
     const n = p.rooms.length
     expect(doc.zones[0].emitters).toEqual([
-      { id: `${doc.zones[0].id}_e1`, label: 'Radiator', kind: 'radiator', count: 2 * n, rated_output_w: 500, radiant_fraction: 0.3, system_group_id: 'heating_y1', rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3 },
-      { id: `${doc.zones[0].id}_e2`, label: 'Panel heater', kind: 'electric', count: n, rated_output_w: 1000, radiant_fraction: 0.1, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null },
+      { id: `${doc.zones[0].id}_e1`, label: 'Radiator', kind: 'radiator', count: 2 * n, rated_output_w: 500, radiant_fraction: 0.3, system_group_id: 'heating_y1', rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1.3, heats: true, cooling_output_w: null, catalogue_ref: null },
+      { id: `${doc.zones[0].id}_e2`, label: 'Panel heater', kind: 'electric', count: n, rated_output_w: 1000, radiant_fraction: 0.1, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null, heats: true, cooling_output_w: null, catalogue_ref: null },
     ])
     expect(doc.system_groups.find((g: any) => g.id === 'heating_y1')).toMatchObject({ design_flow_c: 45, design_return_c: 40 })
   })
@@ -422,5 +422,42 @@ describe('the Profiles step (Brief 110b)', () => {
     const p = upgradePlan(JSON.parse(JSON.stringify(fx.plan)))
     const a = buildDocument(p), b = buildDocument({ ...p, profiles: ['hotel_bedroom_occupancy', 'hotel_ventilation_timer'] })
     expect(JSON.stringify(b.doc)).toBe(JSON.stringify(a.doc))
+  })
+})
+
+describe('a drawn door can run (overnight fix)', () => {
+  it('drawing a door gives a door type with no construction the library door, keeping a typed U', async () => {
+    const { withDefaultDoor } = await import('../facade')
+    const { emptyPlan } = await import('../plan')
+    const p0 = emptyPlan()
+    const doorType = { id: 'ft_door', element: 'door' as const, name: 'Doors', construction: null, u: 1.8 }
+    const prev = { ...p0, fabric_types: [...p0.fabric_types, doorType as any] }
+    const next = { ...prev, windows: [...prev.windows, { door: true } as any] }
+    const out = withDefaultDoor(prev, next, 'timber_door_solid')
+    expect(out.fabric_types.find((t) => t.id === 'ft_door')).toMatchObject({ construction: 'timber_door_solid', u: 1.8 })
+    // No door added: a cleared door type stays cleared.
+    expect(withDefaultDoor(next, next, 'timber_door_solid')).toBe(next)
+  })
+})
+
+describe('cooling units and catalogue radiators (Brief 119 in the workspace)', () => {
+  it('a cool-only fan coil leaves its heating fields empty, a catalogue radiator carries its reference, and the run caps cooling', async () => {
+    const { catalogueItem } = await import('../../../thermal/catalogue')
+    const fp: XY[] = [[0, 0], [10, 0], [10, 8], [0, 8]]
+    let p = fitRooms(emptyPlan(), [fp]).plan
+    const it0 = catalogueItem('stelrad-vita-compact', '76452210')!.item
+    p = {
+      ...p,
+      systems: [{ id: 'y1', service: 'heating', name: 'Boiler', template: 'gas_boiler_heating', design_flow_c: 70, design_return_c: 50 }],
+      emitter_types: [
+        { id: 'e1', name: 'Stelrad', kind: 'radiator', rated_output_w: it0.output_w, radiant_fraction: 0.3, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: it0.exponent_n, catalogue: { catalogue: 'stelrad-vita-compact', item: '76452210' } },
+        { id: 'e2', name: 'Fan coil', kind: 'fan_coil', rated_output_w: 900, radiant_fraction: 0.1, rated_flow_c: 75, rated_return_c: 65, rated_room_c: 20, exponent_n: 1, heats: false, cooling_output_w: 2000 },
+      ],
+      rooms: p.rooms.map((r) => ({ ...r, systems: { heating: 'y1' }, emitters: [{ type: 'e1', count: 2 }, { type: 'e2', count: 1 }] })),
+    }
+    const doc = buildDocument(p).doc as any
+    const [rad, fc] = doc.zones[0].emitters
+    expect(rad).toMatchObject({ heats: true, catalogue_ref: { catalogue: 'stelrad-vita-compact', item: '76452210' }, rated_output_w: 1371 })
+    expect(fc).toMatchObject({ heats: false, cooling_output_w: 2000, rated_output_w: null, radiant_fraction: null, system_group_id: null, exponent_n: null, catalogue_ref: null })
   })
 })
