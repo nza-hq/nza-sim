@@ -217,6 +217,13 @@ describe('simulate', () => {
     expect(e.end_uses.reduce((a, l) => a + l.kwh, 0)).toBeCloseTo(e.total_kwh, 6)
     expect(e.eui_kwh_per_m2).toBeCloseTo(e.total_kwh / r.summary.building.floor_m2, 9)
     expect(e.systems.find((s) => s.service === 'heating' && s.fuel === 'electricity' && s.efficiency === 3)).toBeDefined()
+    // Load profiles (17 Nov 2026): each hourly line sums to its end-use row (Rule 9: the profile and the table are one quantity).
+    for (const l of e.end_uses) {
+      const h = e.hourly.filter((x) => x.end_use === l.end_use && x.fuel === l.fuel)
+      const kwh = h.reduce((a, x) => a + x.w.reduce((b, w) => b + w, 0), 0) / 1000
+      expect(kwh).toBeCloseTo(l.kwh, 3)
+    }
+    expect(e.hourly.every((x) => x.w.length === 8760)).toBe(true)
     const d = await doc()
     d.system_groups = d.system_groups.filter((g: any) => g.service !== 'heating')
     const r2 = simulate(d, { weather: WEATHER })

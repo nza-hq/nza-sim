@@ -203,6 +203,12 @@ export interface Summary {
         pumps: (PumpResult & { label: string; kwh: number })[]
         /** Brief 114: lifts, external lighting and other loads outside the rooms. */
         other_loads: (OtherLoadResult & { kwh: number })[]
+        /**
+         * 17 Nov 2026 (load profiles, Linzie's end goal): each end use's energy by fuel hour by hour, W (8,760 values),
+         * regrouped from the systems engine's own hourly draws in the same way as `end_uses` (each line sums to its
+         * `end_uses` kWh; Rule 9, Rule 11). Not a second calculation.
+         */
+        hourly: { end_use: EndUse; fuel: Fuel; w: Float64Array }[]
       }
     | { ok: false; missing: Missing[] }
     /** Brief 111: no systems at this level, so no energy. */
@@ -905,7 +911,19 @@ export function energyOf(doc: ModelDocument, results: ModelResults, weather: Wea
     // Review F8: the kWh is the end-use line's (Rule 11), read through readEntryKwh.
     pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, kwh: readEntryKwh(s, 'pumps', p.id), label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
     other_loads: s.other_loads.map((o) => ({ ...o, kwh: readEntryKwh(s, 'auxiliary', o.id) })),
+    hourly: hourlyLines(s),
   }
+}
+
+/** The systems engine's hourly draws grouped as its end-use lines are (systems.ts, Totals): groups by service and fuel, the rest as electricity. */
+function hourlyLines(s: Extract<ReturnType<typeof runSystems>, { ok: true }>['systems']): { end_use: EndUse; fuel: Fuel; w: Float64Array }[] {
+  const H = s.electricity_w.length
+  const m = new Map<string, { end_use: EndUse; fuel: Fuel; w: Float64Array }>()
+  const at = (end_use: EndUse, fuel: Fuel) => { const k = `${end_use}|${fuel}`; let l = m.get(k); if (!l) { l = { end_use, fuel, w: new Float64Array(H) }; m.set(k, l) } return l.w }
+  for (const g of s.groups) { const w = at(g.service, g.fuel); for (let h = 0; h < H; h++) w[h] += g.fuel_w[h] }
+  for (const u of s.ungrouped) { const w = at(u.end_use, 'electricity'); for (let h = 0; h < H; h++) w[h] += u.w[h] }
+  const order = s.end_uses.map((l) => `${l.end_use}|${l.fuel}`)
+  return [...m.entries()].filter(([k, l]) => order.includes(k) && l.w.some((v) => v > 0)).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0])).map(([, l]) => l)
 }
 
 /**

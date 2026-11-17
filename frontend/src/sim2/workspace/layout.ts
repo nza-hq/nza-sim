@@ -7,6 +7,7 @@ export const MODEL_CENTRE_TABS = [
   { id: 'drawing', label: 'Drawing' },
   { id: 'heat-flow', label: 'Heat flow' },
   { id: 'monthly', label: 'Monthly' },
+  { id: 'profiles', label: 'Load profiles' },
 ] as const
 export type CentreTab = (typeof MODEL_CENTRE_TABS)[number]['id']
 export type Layout = { left: number; right: number; centre: CentreTab; rightOpen: boolean }

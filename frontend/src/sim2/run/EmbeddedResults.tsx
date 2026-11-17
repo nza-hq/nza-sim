@@ -15,6 +15,7 @@ import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 // @ts-expect-error untyped JS component from today's app (17 Nov 2026: today's Systems Sankey, reused, not redrawn)
 import { SystemSankeyChart } from '../../components/modules/systems/SystemSankey.jsx'
 import { energyFlow, fuelSplit } from './energyFlow'
+import { LoadProfiles } from './LoadProfiles'
 import { createPortal } from '../workspace/portal'
 import { DesignHeatLoss } from './DesignHeatLoss'
 import { EmitterSizing } from './EmitterSizing'
@@ -31,7 +32,7 @@ import './run.css'
 const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric'])
 const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
 
-export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
+export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */
   step?: StepId
   doc: unknown
@@ -45,6 +46,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   showBody: boolean
   /** The Monthly centre tab: today's diverging monthly chart, fed by this run's months. */
   showMonthly?: boolean
+  /** The Load profiles centre tab: the run's energy hour by hour, by end use and fuel (today's full-year chart). */
+  showProfiles?: boolean
   focusZone: string | null
   weatherEl: HTMLElement | null
   /** Brief 118 P4: where a heating system's passport wants its design heat loss and emitter check. */
@@ -111,6 +114,16 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
           <div className="rp-flow-in">
             <h2>Monthly heating and cooling{zone ? `, ${zone.name || zone.id}` : ', whole building'}</h2>
             {run.hold && est ? <MonthlyEstimate estimate={est} zone={estZone} /> : s ? <MonthlyDemand summary={s} zone={zone} /> : <p className="gl-hint">{run.state.kind === 'missing' ? 'The months need a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The months need a run: choose a weather file on Site.'}</p>}
+          </div>
+        </div>,
+        centre,
+      )}
+      {showProfiles && createPortal(
+        <div className="rp-flow" role="tabpanel" aria-label="Load profiles">
+          <div className="rp-flow-in">
+            <h2>Load profiles, whole building</h2>
+            {s?.energy?.ok ? <LoadProfiles energy={s.energy} />
+              : <p className="gl-hint">{s && s.energy && !s.energy.ok ? 'Load profiles need the energy: some system inputs are still unset (see Heat flow).' : s ? 'Load profiles are energy, so they need the systems: choose "+ Systems" above the results.' : run.state.kind === 'running' ? 'Working it out…' : 'Load profiles need a full-year run: press Run in the bar above.'}</p>}
           </div>
         </div>,
         centre,
