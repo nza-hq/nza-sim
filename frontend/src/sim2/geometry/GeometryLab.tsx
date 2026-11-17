@@ -2355,6 +2355,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 {profOptions((w.rule === 'timetable' ? [...profilesFor('window_opening'), ...profilesFor('ventilation')] : [...profilesFor('window_opening'), ...profilesFor('ventilation')].filter(onOff)))}
               </select>
             </div>
+            {(plan.building?.air_method ?? 'today') === 'weather_driven' && w.rule && <p className="gl-hint">The run decides the windows every 15 minutes, from the room's temperature and the hours above.</p>}
             {w.rule === 'temperature' && <p className="gl-hint">These hours only say when the windows may open; How far sets how far. A profile that varies hour by hour needs "To a timetable".</p>}
             {w.rule === 'temperature' && w.hours && !onOff({ key: w.hours }) && <p className="gl-hint gl-warn">{profile(w.hours)?.name ?? w.hours} has part values, so the run will refuse it under "When the room is warm". Choose an on/off profile, or use "To a timetable".</p>}
             {(ctlMap?.rows.filter((r) => r.service === 'windows').length ?? 0) > 1 && (
@@ -2601,6 +2602,11 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <>
                 <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div>
                 {onControlsLine('Runs', ventRunsText(x), `ventilation:${x.id}`)}
+                {/* Brief 115 review F3: under weather-driven air, extract fans pull their air through the room's cracks, vents
+                    and windows, and a natural entry is refused where the room's own windows open. */}
+                {plan.building?.air_method === 'weather_driven' && (system(x.template)?.type === 'mev'
+                  ? <p className="gl-hint">With weather-driven air, this extract's air comes in through the rooms' air leakage, vents and open windows, and shows on those lines. Its own Ventilation line reads 0, so nothing is counted twice.</p>
+                  : !mech && <p className="gl-hint">With weather-driven air, a room's opening windows are its natural ventilation, so the run refuses this entry in a room whose windows open. Use it only in rooms without opening windows.</p>)}
               </>
             )}
             {service === 'heating' && x.template && (
