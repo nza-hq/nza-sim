@@ -199,7 +199,11 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         elements.push(innerElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, layers: b.layers ?? [], path }))
         kinds.push(s.kind); zoneA.push(za); zoneB.push(zbZone); insideAlpha.push(ia); insideAlphaB.push(ib)
         absorbed.push(new Float64Array(H))
-        if ((s.kind === 'floor' || s.kind === 'ceiling') && zbZone !== za) { Z.sharedSlabs++; zones[zbZone].sharedSlabs++ }
+        // Brief 123 P4: a ceiling to an unconditioned loft is not a slab between storeys (its junction is the roof's, at the
+        // loft's eaves), and its area is in the room's envelope for leakage: the air barrier is at the ceiling (P4.2).
+        const loftA = doc.zones[za].conditioning === 'unconditioned', loftB = doc.zones[zbZone].conditioning === 'unconditioned'
+        if (loftA !== loftB) zones[loftA ? zbZone : za].envelopeArea += s.area_m2
+        else if ((s.kind === 'floor' || s.kind === 'ceiling') && zbZone !== za) { Z.sharedSlabs++; zones[zbZone].sharedSlabs++ }
         continue
       }
       Z.envelopeArea += s.area_m2
@@ -666,8 +670,11 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       }
     }
     if (al) { infW += kwh(al[0]) * 1000; ventW += kwh(al[1]) * 1000 }
-    lines.push({ term: 'heating', surface_id: null, kwh: kwh(run.heating_w) })
-    lines.push({ term: 'cooling', surface_id: null, kwh: -kwh(run.cooling_w) })
+    // Brief 123: an unheated loft has no heating or cooling line (nothing serves it), not a zero one.
+    if (doc.zones[zi].conditioning !== 'unconditioned') {
+      lines.push({ term: 'heating', surface_id: null, kwh: kwh(run.heating_w) })
+      lines.push({ term: 'cooling', surface_id: null, kwh: -kwh(run.cooling_w) })
+    }
     const mine: number[] = []
     elements.forEach((e, k) => {
       if (zoneA[k] === zi || zoneB[k] === zi) mine.push(k)

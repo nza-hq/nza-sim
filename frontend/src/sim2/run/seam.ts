@@ -126,6 +126,7 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
     d.profiles = d.profiles.filter((p) => p.kind === 'schedule')
     for (const z of d.zones) {
       z.profile_refs = { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
+      if (z.conditioning === 'unconditioned') continue  // Brief 123: the loft stays unheated at every level
       z.setpoints = { heat_c: heatC, cool_c: null, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' }
     }
   }
@@ -142,6 +143,8 @@ export interface Summary {
   /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
   zones: {
     id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; heated: boolean; cooled: boolean
+    /** Brief 123: true for an unheated loft (floats; not in the building's floor area). */
+    unconditioned: boolean
     /** The zone's own balance by term, kWh a year (Brief 106 P2, review F3): every term, heat from the other zones included. */
     breakdown: { term: BreakdownLine['term']; kwh: number }[]
     monthly: Monthly
@@ -445,6 +448,8 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
     // A zone that states its control and one setpoint is heated only (or cooled only): the other side floats, and the
     // engine is told so by a null setpoint (no system for it, Rule 8). With no control stated, both are still to set.
     const sp = z.setpoints
+    // Brief 123: an unheated loft has no setpoints (the schema refuses them); it needs only its air.
+    if (z.conditioning === 'unconditioned') return
     if (sp.control_strategy == null || (sp.heat_c == null && sp.cool_c == null)) {
       if (sp.heat_c == null) missing.push(explain(`zones[${i}].setpoints.heat_c`, 'required', doc))
       if (sp.cool_c == null) missing.push(explain(`zones[${i}].setpoints.cool_c`, 'required', doc))
@@ -562,7 +567,7 @@ export function simulate(
     },
     zones: results.zones.map((z, i) => ({
       id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh,
-      heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true),
+      heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, unconditioned: doc.zones[i].conditioning === 'unconditioned', breakdown: byTerm([z], true),
       monthly: monthly(z.hourly.heating_w, z.hourly.cooling_w), by_surface: bySurface([z], true), window_solar: windowSolar([z]),
       hours: hoursOf[i] && doc.zones[i].setpoints.heat_c != null ? zoneHours(z, doc.zones[i].setpoints, hoursOf[i]!, weather.weather.hours.dry_bulb, options.control) : null,
       short: {
@@ -926,7 +931,7 @@ export function instantEstimate(doc: ModelDocument, deps: { weather: WeatherChoi
     ok: true,
     estimate: {
       label: 'Monthly estimate (static)', engine: r.engine, run_ms: r.run_ms,
-      building: { floor_m2: doc.zones.reduce((s, z) => s + z.area_m2, 0), heating_kwh: r.zones.reduce((s, z) => s + z.heating_kwh, 0), cooling_kwh: r.zones.reduce((s, z) => s + z.cooling_kwh, 0) },
+      building: { floor_m2: readDocFloorM2(doc), heating_kwh: r.zones.reduce((s, z) => s + z.heating_kwh, 0), cooling_kwh: r.zones.reduce((s, z) => s + z.cooling_kwh, 0) },
       monthly: { heating_kwh: sum12((z) => z.monthly.heating_kwh), cooling_kwh: sum12((z) => z.monthly.cooling_kwh) },
       breakdown: byTerm(r.zones),
       zones: r.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: z.floor_m2, heating_kwh: z.heating_kwh, cooling_kwh: z.cooling_kwh, monthly: z.monthly, breakdown: byTerm([z]) })),

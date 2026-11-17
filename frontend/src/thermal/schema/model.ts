@@ -450,6 +450,14 @@ export const Zone = z
      * it is taken to sit at, for the heat lost to it from the rooms next to it. Left out reads as null; nothing is filled.
      */
     design_internal_c: z.union([finite, z.literal('follow_heat_c')]).nullable().default(null),
+    /**
+     * Brief 123 P4: 'unconditioned', a space nothing heats or cools (a ventilated loft under a cold roof). It floats:
+     * no setpoints, emitters, ventilation entries, profile references, systems or controls (Rule 8: absent, refused if
+     * present). Its air is its own `infiltration_ach`; its floor area is not the building's. Left out: 'conditioned'.
+     */
+    conditioning: z.enum(['conditioned', 'unconditioned']).default('conditioned'),
+    /** Brief 123: what the unconditioned space is ('ventilated_loft'); null for a conditioned zone. */
+    unconditioned_kind: z.enum(['ventilated_loft']).nullable().default(null),
   })
   .strict()
 export type Zone = z.infer<typeof Zone>
@@ -816,8 +824,27 @@ export const ModelDocument = z
         if (!want.has(zid)) ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" is listed by zone "${zid}", which it does not face` })
       }
     })
+    // Brief 123 P4: an unconditioned zone is absent from everything that conditions or occupies it (Rule 8), each named.
+    const uncond = new Set(doc.zones.filter((z0) => z0.conditioning === 'unconditioned').map((z0) => z0.id))
+    doc.zones.forEach((z0, i) => {
+      const at = (k: (string | number)[], m: string) => ctx.addIssue({ code: 'custom', path: ['zones', i, ...k], message: m })
+      if (z0.conditioning !== 'unconditioned') {
+        if (z0.unconditioned_kind != null) at(['unconditioned_kind'], 'only an unconditioned zone has an unconditioned_kind')
+        return
+      }
+      if (z0.unconditioned_kind == null) at(['unconditioned_kind'], "required for an unconditioned zone ('ventilated_loft')")
+      const sp = z0.setpoints
+      for (const k of ['heat_c', 'cool_c', 'setback_c', 'hours_ref', 'heat_ref', 'cool_ref', 'control_strategy'] as const) if (sp[k] != null) at(['setpoints', k], 'an unconditioned zone has no setpoints: nothing heats or cools it')
+      if (z0.emitters.length) at(['emitters'], 'an unconditioned zone has no emitters')
+      if (z0.ventilation.length) at(['ventilation'], 'an unconditioned zone has no ventilation entries: its air is its infiltration_ach')
+      const pr = z0.profile_refs
+      if (pr.occupancy != null || pr.lighting.length || pr.equipment.length || pr.auxiliary.length) at(['profile_refs'], 'an unconditioned zone has no people, lighting or equipment')
+      if (z0.infiltration_q50 != null) at(['infiltration_q50'], 'an unconditioned zone states its air as infiltration_ach')
+      if (z0.infiltration_ach == null) at(['infiltration_ach'], 'required: the unconditioned space\'s air changes an hour')
+    })
     doc.system_groups.forEach((g, i) => {
       g.zones.forEach((zid, j) => {
+        if (uncond.has(zid)) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'zones', j], message: `zone "${zid}" is unconditioned: no system serves it` })
         if (!zoneIds.has(zid)) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'zones', j], message: `system group "${g.id}" serves zone "${zid}", which does not exist` })
       })
     })
@@ -926,6 +953,7 @@ export const ModelDocument = z
       if (ctlIds.has(c.id)) ctx.addIssue({ code: 'custom', path: [...at, 'id'], message: `control id "${c.id}" is used twice` })
       ctlIds.add(c.id)
       const key = `${c.target.kind}|${c.target.ref}`
+      if (c.target.kind === 'window' && uncond.has(c.target.ref)) ctx.addIssue({ code: 'custom', path: [...at, 'target', 'ref'], message: `zone "${c.target.ref}" is unconditioned: its windows have no rule` })
       if (targets.has(key)) ctx.addIssue({ code: 'custom', path: [...at, 'target'], message: `${c.target.kind} "${c.target.ref}" has two control entries; keep one` })
       targets.add(key)
       const g = doc.system_groups.find((x) => x.id === c.target.ref)

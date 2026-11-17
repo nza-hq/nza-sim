@@ -169,7 +169,8 @@ export function checkServed(groups: readonly GroupResult[], heatingKwh: number, 
 export type SystemsAnswer = { ok: true; systems: SystemsResults } | { ok: false; missing: SystemsMissing[] }
 
 /** The building's floor area, m²: the zones' summed. One place, read by the systems and the seam (review F8). */
-export const readDocFloorM2 = (doc: ModelDocument) => doc.zones.reduce((s, z) => s + z.area_m2, 0)
+/** The building's floor area: conditioned zones only (Brief 123: an unheated loft is not floor area). */
+export const readDocFloorM2 = (doc: ModelDocument) => doc.zones.reduce((s, z) => s + (z.conditioning === 'unconditioned' ? 0 : z.area_m2), 0)
 export const readSystemsTotalKwh = (s: SystemsResults) => FUELS.reduce((a, f) => a + s.by_fuel[f], 0)
 /** The v2 delivered-energy EUI, kWh/m² a year (Rule 11: read only here; not the instant engine's, not EnergyPlus's). */
 export const readSystemsEui = (s: SystemsResults) => readSystemsTotalKwh(s) / s.floor_m2  // runSystems refuses a zero floor
