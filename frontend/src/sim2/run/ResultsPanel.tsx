@@ -478,9 +478,15 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
                   <td>{z.cooled ? mwh(z.cooling_kwh) : <span className="rp-none">not cooled</span>}</td>
                 </tr>,
                 ...(zoneOpen === z.id ? [<BalanceRows key={`${z.id}-balance`} lines={z.breakdown} indent />] : []),
+                ...(zoneOpen === z.id && z.air && z.air.hours_windows_open > 0 ? [<tr key={`${z.id}-win`} className="rp-zone-line"><td colSpan={3} className="rp-none">Windows open in {z.air.hours_windows_open.toLocaleString('en-GB')} hours of the year</td></tr>] : []),
               ])}
             </tbody>
           </table>
+          {/* Brief 115 review F4: a room with no outside wall keeps today's air leakage under weather-driven air. */}
+          {(() => {
+            const inner = s.zones.filter((z) => z.air?.leakage === 'q50_over_20')
+            return inner.length > 0 && <p className="rp-foot">{inner.map((z) => z.name || z.id).join(', ')} {inner.length === 1 ? 'has' : 'have'} no outside wall, so {inner.length === 1 ? 'its' : 'their'} air leakage stays at q50 ÷ 20 air changes, as in the fixed method; the wind and stack work only on rooms with outside walls.</p>
+          })()}
 
           <h3>Where the heat goes <i>estimate</i></h3>
           <table className="rp-table rp-breakdown">
