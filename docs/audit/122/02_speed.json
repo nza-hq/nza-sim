@@ -1,0 +1,28 @@
+{
+ "source": "scripts/122_perf.mts",
+ "weather": "validation/fixtures/weather/USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw",
+ "cases": [
+  {
+   "name": "five_storeys",
+   "zones": 5,
+   "first_ms": 33.6,
+   "cached_median_ms": 1.91,
+   "budget_ms": null,
+   "pass": null,
+   "hourly_median_ms": 240,
+   "monthly_heating_kwh": 141187,
+   "hourly_heating_kwh": 136062
+  },
+  {
+   "name": "fifty_rooms",
+   "zones": 50,
+   "first_ms": 10.84,
+   "cached_median_ms": 6.84,
+   "budget_ms": 10,
+   "pass": true,
+   "hourly_median_ms": 1461,
+   "monthly_heating_kwh": 185929,
+   "hourly_heating_kwh": 180598
+  }
+ ]
+}

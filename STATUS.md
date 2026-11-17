@@ -2,6 +2,15 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 Brief 122 — Simulate v2: the instant estimate — IN PROGRESS 17 Nov 2026 (engine on `chris/122-instant-engine`, workspace on `sim2/122-instant`)
+
+Brief [`docs/briefs/active/122_instant-estimate.md`](docs/briefs/active/122_instant-estimate.md) (Linzie 17 Nov 08:20: "an instant calculation, almost like an Excel spreadsheet"). P1–P3 the engine thread's, P0/P4/P5 the editor's.
+
+- **P1** `thermal/engine/monthly.ts`: ISO 52016-1 monthly quasi-steady method per zone over the hourly run's own inputs (element builders, bridging, infiltration, vents, sun and glazing optics, gain profiles). A Static engine, labelled "Monthly estimate (static)" (Rule 7), its own result (Rule 11). Every term a line; `gains_not_used` closes each month (Rule 9). Tests `monthly.test.ts` (4: hand-calculated box to the kWh, closure, no glazing, bridging, cooling).
+- **P2** ([`01_referee.md`](docs/audit/122/01_referee.md)): against the hourly run's Fabric only, Gatwick (Yeovilton not in the container): Bridgewater one zone +4.1 %, five storeys +4.1 %, community centre +1.5 %; gate ±10 %, all pass, first run, nothing tuned. Per storey −1.9 to +8.3 %.
+- **P3** seam `instantEstimate(doc, { weather })` (`instant.test.ts`), speed ([`02_speed.json`](docs/audit/122/02_speed.json)): fifty rooms 6.8 ms after the first call (budget 10 ms, pass); first call on a weather file 11–34 ms (sun cached per weather).
+- **Next:** P4 workspace and P5 close (editor thread).
+
 ## 🔧 Brief 121 — Simulate v2: setpoints as profiles — IN PROGRESS 17 Nov 2026 on `chris/121-setpoint-profiles` (on top of 115)
 
 Brief [`docs/briefs/active/121_setpoint-profiles.md`](docs/briefs/active/121_setpoint-profiles.md). Linzie 17 Nov 00:31 ("Aren't temperature set points a profile?"); written and built overnight at the coordinator's go (00:42).
