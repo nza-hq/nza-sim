@@ -2280,6 +2280,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         </select>
       </div>
     )
+    /** A profile that is only on or off (0 or 1 every hour): the only kind a temperature rule's window hours may be. */
+    const onOff = (p: { key: string }) => { const d = profile(p.key)?.day_types; return !!d && [...d.weekday, ...d.saturday, ...d.sunday].every((v) => v === 0 || v === 1) }
     /** One figure, or a setpoint profile from Profiles (Brief 121): the profile's highest / lowest value is written as
      * heat_c / cool_c and it carries any setback. */
     const followsSel = (sp: SpaceType, t: 'heating_setpoint' | 'cooling_setpoint') => {
@@ -2348,9 +2350,13 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             <div className="gl-row gl-librow"><span>{w.rule === 'timetable' ? 'Open in' : 'May open in'}</span>
               <select className="gl-sel" aria-label="Window hours" value={w.hours ?? 'always_on'} onChange={(e) => setW({ hours: e.target.value === 'always_on' ? null : e.target.value })}>
                 <option value="always_on">Any hour</option>
-                {profOptions([...profilesFor('window_opening'), ...profilesFor('ventilation')])}
+                {/* 115 review F8: under "when the room is warm" the hours only say when they may open (0 or 1 each hour);
+                    part values (how far, hour by hour) work only to a timetable. */}
+                {profOptions((w.rule === 'timetable' ? [...profilesFor('window_opening'), ...profilesFor('ventilation')] : [...profilesFor('window_opening'), ...profilesFor('ventilation')].filter(onOff)))}
               </select>
             </div>
+            {w.rule === 'temperature' && <p className="gl-hint">These hours only say when the windows may open; How far sets how far. A profile that varies hour by hour needs "To a timetable".</p>}
+            {w.rule === 'temperature' && w.hours && !onOff({ key: w.hours }) && <p className="gl-hint gl-warn">{profile(w.hours)?.name ?? w.hours} has part values, so the run will refuse it under "When the room is warm". Choose an on/off profile, or use "To a timetable".</p>}
             {(ctlMap?.rows.filter((r) => r.service === 'windows').length ?? 0) > 1 && (
               <button type="button" className="ap-link" onClick={() => { const ids = new Set(ctlMap!.rows.filter((r) => r.service === 'windows').map((r) => r.control.ref)); draft((bp) => ({ ...bp, spaces: bp.spaces.map((q) => (ids.has(q.id) ? { ...q, windows: { ...w } } : q)) })) }}>Use this rule for every space type with opening windows</button>
             )}
