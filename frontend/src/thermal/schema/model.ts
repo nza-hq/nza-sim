@@ -148,7 +148,23 @@ export const ConstructionRef = z
 
 // ─── Surfaces ───────────────────────────────────────────────────────────────────────────────────
 
-/** An opening in a wall surface: a permanent vent (always open) or an operable opening (controlled). */
+/**
+ * Schema 2.11 (Brief 115): how a window opens. The effective area is worked out in one place
+ * (thermal/engine/airflow.ts `windowEffectiveArea`, Rule 11).
+ */
+export const WINDOW_STYLES = ['side_hung', 'top_hung', 'bottom_hung', 'centre_pivot', 'sliding', 'louvre'] as const
+
+/**
+ * An opening in a wall surface: a permanent vent (always open) or an operable opening (controlled).
+ *
+ * Schema 2.11 (Brief 115), read only when `building.air.method` is 'weather_driven':
+ * - A permanent vent states `height_m`, its centre's height above the zone's floor. Its `flow_mode` is not used: the
+ *   room's pressure balance decides which way air goes through each opening.
+ * - An operable opening is a window: it sits on a glazing surface and opens the glazing area × `openable_fraction`.
+ *   It states its `style`, its opening angle (`opening_angle_deg`, for hung and pivot windows), its discharge
+ *   coefficient `cd`, and `sill_m` / `head_m`, the bottom and top of the opening above the zone's floor. When it opens
+ *   is the zone's window entry on the control map (`controls[]`, target kind 'window').
+ */
 export const Opening = z.discriminatedUnion('kind', [
   z
     .object({
@@ -156,6 +172,7 @@ export const Opening = z.discriminatedUnion('kind', [
       area_m2: nonNeg,
       cd: finite.optional(),
       flow_mode: z.string().optional(),
+      height_m: nonNeg.nullable().optional(),
     })
     .strict(),
   z
@@ -165,6 +182,10 @@ export const Opening = z.discriminatedUnion('kind', [
       cd: finite.optional(),
       flow_mode: z.string().optional(),
       control_ref: z.string().nullable().optional(),
+      style: z.enum(WINDOW_STYLES).optional(),
+      opening_angle_deg: finite.min(0).max(180).nullable().optional(),
+      sill_m: nonNeg.optional(),
+      head_m: nonNeg.optional(),
     })
     .strict(),
 ])
@@ -535,6 +556,8 @@ export const DESIGN_FROM_WEATHER = ['heating_99_6', 'heating_99'] as const
  * - `warm_up_w_per_m2`: an allowance for warming the room up after a setback, W per m² of floor; null for none.
  * - `vent_wind_m_s`: the wind speed at which permanent vents are counted; required only when a zone has vents.
  */
+export const AIR_TERRAINS = ['open', 'suburban', 'urban', 'city'] as const
+
 export const DesignConditions = z
   .object({
     outdoor: z.union([
@@ -563,6 +586,27 @@ export const Building = z
          * (a constant equal to the EPW's annual mean dry bulb); ISO 13370 methods are later options.
          */
         ground: z.object({ method: z.literal('annual_mean_outdoor') }).strict(),
+        /**
+         * Schema 2.11 (Brief 115): the terrain around the site, for the wind's profile with height (EnergyPlus's
+         * terrain classes). Required by weather-driven air; null otherwise.
+         */
+        terrain: z.enum(AIR_TERRAINS).nullable().default(null),
+      })
+      .strict(),
+    /**
+     * Schema 2.11 (Brief 115): how air leakage and openings are worked out.
+     * - 'today': today's NZA Sim, n = q50 × envelope area ÷ volume ÷ 20, and wind-only vents (air.ts). Every older
+     *   document is upgraded to it, so Bridgewater stays 133.2.
+     * - 'weather_driven': each room's pressure balance every step, with wind by terrain and height, stack from its own
+     *   and the outdoor temperature, power-law cracks from its q50 (exponent stated), vents and windows as orifices,
+     *   windows opened by the zone's window rule (thermal/engine/airflow.ts). `single_sided_turbulence`: add EN 16798-7's
+     *   single-sided wind term for rooms whose open windows are all on one facade, as its own line.
+     */
+    air: z
+      .object({
+        method: z.enum(['today', 'weather_driven']),
+        exponent: finite.positive().max(1).nullable(),
+        single_sided_turbulence: z.boolean().nullable(),
       })
       .strict(),
     /** The box's orientation: degrees the north facade is turned clockwise from true north. */
@@ -631,6 +675,8 @@ export const ControlEntry = z
     rule: z.enum(['temperature', 'adaptive', 'timetable']).nullable().default(null),
     open_fraction: fraction.nullable().default(null),
     open_above_ref: id.nullable().default(null),
+    /** Schema 2.11 (Brief 115): a window that opens by temperature opens when the room is above this, °C, and warmer than outside. */
+    open_above_c: finite.nullable().default(null),
     min_open_h: nonNeg.nullable().default(null),
     min_closed_h: nonNeg.nullable().default(null),
     operation: z.enum(['by_hand', 'automated']).nullable().default(null),
@@ -639,9 +685,9 @@ export const ControlEntry = z
   })
   .strict()
 export type ControlEntry = z.infer<typeof ControlEntry>
-const WINDOW_FIELDS = ['rule', 'open_fraction', 'open_above_ref', 'min_open_h', 'min_closed_h', 'operation', 'modulation', 'adaptive_category'] as const
+const WINDOW_FIELDS = ['rule', 'open_fraction', 'open_above_ref', 'open_above_c', 'min_open_h', 'min_closed_h', 'operation', 'modulation', 'adaptive_category'] as const
 
-export const SCHEMA_VERSION = '2.10' as const
+export const SCHEMA_VERSION = '2.11' as const
 
 export const ModelDocument = z
   .object({
@@ -829,6 +875,18 @@ export const ModelDocument = z
       if (v.runs === 'schedule' && (v.control_schedule_ref == null || !schedIds.has(v.control_schedule_ref))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans that run to a schedule need a schedule profile' })
       if (v.runs === 'demand' && (v.control_schedule_ref == null || (v.control_schedule_ref !== 'always_on' && !schedIds.has(v.control_schedule_ref)))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans on demand need the hours they may run: always_on or a schedule profile' })
     }))
+    // Brief 115: weather-driven air states its terrain, crack exponent and the single-sided choice; 'today' none of them.
+    {
+      const air = doc.building.air, at = ['building', 'air']
+      if (air.method === 'weather_driven') {
+        if (doc.building.site.terrain == null) ctx.addIssue({ code: 'custom', path: ['building', 'site', 'terrain'], message: 'weather-driven air needs the terrain (open, suburban, urban or city)' })
+        if (air.exponent == null) ctx.addIssue({ code: 'custom', path: [...at, 'exponent'], message: 'weather-driven air needs the cracks\' flow exponent (0.67 is usual)' })
+        if (air.single_sided_turbulence == null) ctx.addIssue({ code: 'custom', path: [...at, 'single_sided_turbulence'], message: 'say whether single-sided rooms take EN 16798-7\'s wind turbulence term' })
+      } else {
+        if (air.exponent != null) ctx.addIssue({ code: 'custom', path: [...at, 'exponent'], message: 'today\'s air method has no crack exponent; leave empty' })
+        if (air.single_sided_turbulence != null) ctx.addIssue({ code: 'custom', path: [...at, 'single_sided_turbulence'], message: 'today\'s air method has no single-sided term; leave empty' })
+      }
+    }
     // Brief 114: the control map. One entry per target, which must exist; window fields only on a window entry.
     const ventIds = new Set(doc.zones.flatMap((z0) => z0.ventilation.map((v) => v.id)))
     const ctlIds = new Set<string>(), targets = new Set<string>()

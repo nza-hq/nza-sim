@@ -517,6 +517,8 @@ export function buildDocument(plan0: Plan): Built {
       thermal_bridging: bi.tb_multiplier != null ? { mode: 'iso14683_auto', multiplier: bi.tb_multiplier, alpha_pct: null } : { mode: null, multiplier: null, alpha_pct: null },
       thermal_mass: { mode: null, category: null },
       opening_defaults: {},
+      // Brief 115: today's air method until the workspace offers weather-driven air (P6).
+      air: { method: 'today', exponent: null, single_sided_turbulence: null },
       // Brief 117/120: the design heat loss's conditions, only once an outdoor temperature is chosen.
       ...(bi.design_outdoor != null ? { design: { outdoor: typeof bi.design_outdoor === 'number' ? { stated_c: bi.design_outdoor } : { from_weather: bi.design_outdoor }, warm_up_w_per_m2: bi.warm_up_w_per_m2 ?? null, vent_wind_m_s: bi.vent_wind_m_s ?? null } } : {}),
     },

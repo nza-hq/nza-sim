@@ -200,7 +200,7 @@ describe('(d) refusals, by name', () => {
     old.schema_version = '2.4'
     for (const z of old.zones) for (const e of z.emitters) { delete e.source_surface_id; delete e.source_layer_index }
     const up = upgradeDocument(old)
-    expect(up.schema_version).toBe('2.10')
+    expect(up.schema_version).toBe('2.11')
     expect(up.zones[0].emitters[0].source_surface_id).toBeNull()
     expect(up.zones[0].emitters[0].source_layer_index).toBeNull()
   })

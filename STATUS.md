@@ -2,7 +2,15 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## ✅ Brief 114 — Simulate v2: the Controls step and back-of-house energy — CLOSED 16 Nov 2026 on `chris/114-controls` (stacked on 120, which includes 112; editor P4 merged in)
+## 🔧 Brief 115 — Simulate v2: natural ventilation, opening windows and air leakage — IN PROGRESS 16 Nov 2026 on `chris/115-air-movement`
+
+Brief [`docs/briefs/active/115_natural-ventilation-and-air-leakage.md`](docs/briefs/active/115_natural-ventilation-and-air-leakage.md) (Linzie approved 16 Nov 15:06). Building (leakage, vents) and Operation (windows, through Controls); nothing in Systems.
+
+- **P0** ([`00_reconnaissance.md`](docs/audit/115/00_reconnaissance.md)): EnergyPlus 25.2 AirflowNetwork equations read from source and mirrored; quirks stated; EN 16798-7 not held, equations as published in secondary sources (labelled).
+- **P1 schema 2.11** ([`01_schema.md`](docs/audit/115/01_schema.md)): `building.air` (method today / weather_driven, exponent, turbulence switch), `site.terrain`, vent `height_m`, window `style` / `opening_angle_deg` / `sill_m` / `head_m`, control `open_above_c`. Upgrade writes 'today' explicitly; nothing guessed.
+- **P2/P3 engine** (`thermal/engine/airflow.ts`; `network.ts` per-step `air_at` hook; `model.ts`): one pressure per room per step, cracks, vents, two-way windows, temperature and timetable rules with EnergyPlus's modulation, single-sided turbulence. Breakdown lines infiltration, permanent_vents, window_ventilation, single_sided_turbulence (Rule 9, closes per room); `ZoneResults.air` (inflow kg/h, open fraction, hours open). Rule 8: `levelDocument` removes windows and window entries at fabric and + Spaces. Open-above must be above the heating setpoint in every allowed hour. Tests `airflow.test.ts` (13). 472 tests pass (2 skip), build clean, Bridgewater digest unchanged (`2da3e6b5…e58b`). **Next:** P4 referees R1 (leakage), R2 (windows).
+
+ Simulate v2: the Controls step and back-of-house energy — CLOSED 16 Nov 2026 on `chris/114-controls` (stacked on 120, which includes 112; editor P4 merged in)
 
 Brief [`docs/briefs/archive/114_controls-and-back-of-house_COMPLETED.md`](docs/briefs/archive/114_controls-and-back-of-house_COMPLETED.md). Linzie 16 Nov 00:57: back-of-house auxiliary energy with defaults (pumps, inverter or not; fans, continuous or not) and "almost a little BMS section", one place to see how the building is controlled. Engine parts here; P4 (Systems "Pumps and fans", the Controls tab and its control map) is the editor thread's.
 

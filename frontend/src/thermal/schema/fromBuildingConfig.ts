@@ -511,6 +511,8 @@ export async function fromBuildingConfig(input: ConverterInput, options: Convert
       category: src.take(`${B}.thermal_mass_category`, 'building.thermal_mass.category') ?? null,
     },
     opening_defaults: openingDefaults,
+    // Brief 115: today's tool's air method (n50/20, wind-only vents), so the converted building runs as today.
+    air: { method: 'today' as const, exponent: null, single_sided_turbulence: null },
   }
 
   // ── Weather ────────────────────────────────────────────────────────────────────────────────
