@@ -2,6 +2,15 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 Brief 121 — Simulate v2: setpoints as profiles — IN PROGRESS 17 Nov 2026 on `chris/121-setpoint-profiles` (on top of 115)
+
+Brief [`docs/briefs/active/121_setpoint-profiles.md`](docs/briefs/active/121_setpoint-profiles.md). Linzie 17 Nov 00:31 ("Aren't temperature set points a profile?"); written and built overnight at the coordinator's go (00:42).
+
+- **P1:** `zones[].setpoints.heat_ref` / `cool_ref` name temperature profiles (Brief 115's kind). `heat_c` / `cool_c` stay the in-use setpoints and must be the profile's highest / lowest value, which is checked. Tests in `setpointProfiles.test.ts` (5). 497 tests pass, build clean, Bridgewater digest unchanged.
+- **P2** ([`02_referee.md`](docs/audit/121/02_referee.md)): no new EnergyPlus run. A profile holding Brief 109's hours and setback gives 109's run exactly, so the profile path inherits 109's referee.
+- **P3** ([`03_community_centre.md`](docs/audit/121/03_community_centre.md)): the office on an IES-style profile (an hour's pre-heat): 171 → 85 cold hours in use, for +50 kWh.
+- **Next:** P4 screens (editor thread); P5 close.
+
 ## 🔧 Brief 115 — Simulate v2: natural ventilation, opening windows and air leakage — IN PROGRESS 16 Nov 2026 on `chris/115-air-movement`
 
 Brief [`docs/briefs/active/115_natural-ventilation-and-air-leakage.md`](docs/briefs/active/115_natural-ventilation-and-air-leakage.md) (Linzie approved 16 Nov 15:06). Building (leakage, vents) and Operation (windows, through Controls); nothing in Systems.

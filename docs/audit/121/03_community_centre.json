@@ -1,0 +1,33 @@
+{
+ "source": "scripts/121_community_centre.mts",
+ "weather": {
+  "file": "GBR_London.Gatwick.037760_IWEC.epw",
+  "sha256": "c61a0a1ea127529b04380cce1e4fc88553bb7036d11127f7673d4e1e5b4edffc"
+ },
+ "runs": {
+  "B": {
+   "label": "B",
+   "steps_per_hour": 4,
+   "office_heating_kwh": 2498.9872580860515,
+   "office_peak_heating_w": 8532.12338429664,
+   "office_unmet_heating_hours_in_use": 171,
+   "building_heating_kwh": 22986.316714664383
+  },
+  "B_profile": {
+   "label": "B as a profile",
+   "steps_per_hour": 4,
+   "office_heating_kwh": 2498.9872580860515,
+   "office_peak_heating_w": 8532.12338429664,
+   "office_unmet_heating_hours_in_use": 171,
+   "building_heating_kwh": 22986.316714664383
+  },
+  "early": {
+   "label": "early start, wind-down",
+   "steps_per_hour": 4,
+   "office_heating_kwh": 2549.3507688731083,
+   "office_peak_heating_w": 8519.662538161052,
+   "office_unmet_heating_hours_in_use": 85,
+   "building_heating_kwh": 23015.840454828474
+  }
+ }
+}

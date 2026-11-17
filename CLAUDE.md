@@ -194,7 +194,9 @@ which of these scope items they affect.
 - Heating hours and setbacks per zone (Brief 109): a zone's heating
   setpoint follows its schedule between heat_c and setback_c, and
   cooling runs only in its hours; underfloor heating can put its heat
-  into a floor layer. Simulate v2 only.
+  into a floor layer. Brief 121 (Linzie 17 Nov 00:31): a zone's heating
+  and cooling setpoints may instead follow temperature profiles, with
+  heat_c / cool_c the profile's highest / lowest value. Simulate v2 only.
 - Design heat loss per room (Brief 117): steady transmission and air
   heat loss at a stated design outdoor temperature, after MCS MIS 3005-D
   Issue 3.0 and the MCS calculator's public method (not the text of
