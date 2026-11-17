@@ -30,7 +30,7 @@ export function readMos(bytes: Buffer): Weather {
     const H = w.hours
     H.year[i] = 1990; H.month[i] = m; H.day[i] = d; H.hour[i] = hr
     H.dry_bulb[i] = r[1]; H.dew_point[i] = r[2]; H.relative_humidity[i] = r[3]; H.pressure[i] = r[4]
-    H.global_horizontal[i] = r[8]; H.direct_normal[i] = r[9]; H.diffuse_horizontal[i] = r[10]; H.wind_speed[i] = r[16]
+    H.global_horizontal[i] = r[8]; H.direct_normal[i] = r[9]; H.diffuse_horizontal[i] = r[10]; H.wind_direction[i] = r[15]; H.wind_speed[i] = r[16]
   }
   return w
 }

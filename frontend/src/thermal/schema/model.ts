@@ -733,8 +733,10 @@ export const ModelDocument = z
         ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `glazing "${s.id}" needs frame_fraction and thermal_emissivity` })
       }
       s.openings.forEach((o, j) => {
-        if (o.kind === 'permanent_vent' && (o.cd == null || o.flow_mode == null)) {
-          ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'openings', j], message: `permanent vent on "${s.id}" needs cd and flow_mode` })
+        // Brief 115: flow_mode is today's wind-only vent formula; weather-driven air works the flow out itself (cd and height_m).
+        const today = doc.building.air?.method !== 'weather_driven'
+        if (o.kind === 'permanent_vent' && (o.cd == null || (today && o.flow_mode == null))) {
+          ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'openings', j], message: today ? `permanent vent on "${s.id}" needs cd and flow_mode` : `permanent vent on "${s.id}" needs cd` })
         }
       })
       if (isZoneId(s.zone_b) && !zoneIds.has(s.zone_b)) {

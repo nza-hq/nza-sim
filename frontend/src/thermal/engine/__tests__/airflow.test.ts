@@ -169,6 +169,14 @@ describe('Brief 115: runModel under weather-driven air', () => {
     const d = weatherDriven(); d.controls[0].open_above_c = d.zones[0].setpoints.heat_c
     expect(() => run(d)).toThrow('controls[0].open_above_c')
   })
+  it('a vent under weather-driven air needs cd and height, not today\'s flow_mode', () => {
+    const d = weatherDriven()
+    const v = d.surfaces.find((s: any) => s.openings.some((o: any) => o.kind === 'permanent_vent')).openings[0]
+    delete v.flow_mode
+    expect(() => run(d)).not.toThrow()
+    delete v.cd
+    expect(() => ModelDocument.parse(d)).toThrow('needs cd')
+  })
   it('Rule 8: at fabric and + spaces the windows are removed, not closed', () => {
     const d = ModelDocument.parse(weatherDriven())
     for (const level of ['fabric', 'spaces'] as const) {
