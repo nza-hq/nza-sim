@@ -824,6 +824,12 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   /** Profiles step: the kind shown and the profile chosen (Brief 110b). */
   const [profKind, setProfKind] = useState<ProfileKind>('occupancy')
   const [profSel, setProfSel] = useState<string | null>(null)
+  // Walk-through: Profiles opens on the first of the kind, so the editor shows rather than an empty centre.
+  useEffect(() => {
+    if (mode !== 'profiles' || (profSel && profile(profSel))) return
+    const first = projectProfiles().find((k) => profile(k)?.schedule_type === profKind)
+    if (first) setProfSel(first)
+  }, [mode, profKind, profSel, plan])
   /** Today's library inspector, opened from a fabric type's ⓘ (Brief 110b P2). */
   const [inspect, setInspect] = useState<{ name: string; glazing: boolean } | null>(null)
 
@@ -950,7 +956,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // ─── fabric (step 3) ────────────────────────────────────────────────────────
   const activeOf = (e: FabricElement) => {
     const id = active[e]
-    return id && plan.fabric_types.some((t) => t.id === id) ? id : firstType(plan, e)
+    if (id && plan.fabric_types.some((t) => t.id === id)) return id
+    // Nothing picked yet: the first type in use, so the form opens on what the building has (not an unused default).
+    return plan.fabric_types.find((t) => t.element === e && usage(t).n > 0)?.id ?? firstType(plan, e)
   }
   const newType = (p: Plan, e: FabricElement, from?: FabricType): { plan: Plan; id: string } => {
     const same = p.fabric_types.filter((t) => t.element === e)
@@ -2148,7 +2156,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   }
   const controlsRight = () => {
     const row = ctlMap?.rows.find((r) => r.key === ctlSel)
-    if (!row) return <div className="gl-sec"><p className="gl-say">Choose a system on the left or in the control map to set how it runs.</p></div>
+    if (!row) return <div className="gl-sec ap-ctlright"><p className="gl-say">Choose a system on the left or in the control map to set how it runs.</p></div>
     const x = ctlPlan.systems.find((y) => y.id === row.control.ref)
     const ld = row.service === 'other' ? (ctlPlan.other_loads ?? []).find((y) => y.id === row.control.ref) : undefined
     const c = (ctlPlan.controls ?? []).find((y) => y.kind === row.control.kind && y.ref === row.control.ref)
@@ -2710,7 +2718,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {say && <div className={`gl-pill${say.bad ? ' bad' : ''}`} style={{ left: say.x, top: say.y }}>{say.text}</div>}
 
       {/* ─── left: the steps and the building ─── */}
-      {toPane(slots?.left, onControls ? controlsLeft() : <aside className="gl-panel gl-left">
+      {toPane(slots?.left, onControls ? controlsLeft() : offStep ? (
+        <aside className="gl-panel gl-left"><div className="gl-body"><div className="gl-sec"><p className="gl-say">Nothing to set on this step yet. Heat flow and Monthly show the model as it stands.</p></div></div></aside>
+      ) : <aside className="gl-panel gl-left">
         {!embedded && <div className="gl-head">
           <h2>Building geometry</h2>
           <p>Simulate v2 prototype. Nothing here is saved.</p>
@@ -3012,6 +3022,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {mode === 'profiles' && profilesPanel()}
       {has && mode === 'spaces' && spacesPanel()}
       {has && mode === 'systems' && systemsPanel()}
+      {embedded && railStep === 'shape' && !selWall && !selRooms.length && !(mode === 'outline' && selBlocks.length) && (
+        <div className="gl-sec ap-ctlright"><p className="gl-say">{has ? (mode === 'outline' ? 'Choose a wall on the drawing or on the left to put windows and doors in it, or a block to resize it. When the outline is right, cut it into rooms (Rooms, top left).' : 'Choose a room on the drawing or on the left to name it, or a wall to put windows and doors in it.') : 'Draw the building\'s outline with the tools under the drawing, or start from an example.'}</p></div>
+      )}
       </>, 'right2')}
 
       {/* ─── bottom: tools ─── */}
