@@ -366,6 +366,8 @@
 .gl-root.embedded .gl-key { max-width: calc(100% - 32px); }
 .gl-root.embedded .gl-compass { left: 16px; }
 .gl-root.embedded .gl-3d { inset: 0; }
+/* 17 Nov (Linzie: "the elevation… is kind of locked"): in the workspace the elevation fills the middle, not offset for the standalone card. */
+.gl-root.embedded .gl-elevview { left: 0; }
 .gl-root.embedded .gl-3d-wait { left: 50%; }
 .gl-root.gl-pane { position: relative; inset: auto; height: 100%; background: #fff; overflow: hidden; display: flex; flex-direction: column; }
 .gl-root.gl-pane > * { flex: 1; min-height: 0; }
@@ -520,3 +522,7 @@
 .tp-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 2px; padding: 10px 12px; border: 1px solid var(--gl-line); border-radius: 10px; background: var(--gl-tint); }
 .tp-quick .gl-btn { margin-left: 8px; }
 .tp-axr { text-anchor: end; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.gl-ev-fit { position: absolute; top: 56px; right: 16px; z-index: 2; }
+/* Shape: the rooms under the outline, for context only (17 Nov). */
+.gl-room-ctx { fill: rgba(35, 85, 70, .05); stroke: #9AA5A0; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.gl-zname.gl-ctx { fill: #8A9690; font-weight: 500; pointer-events: none; }

@@ -34,9 +34,11 @@ type Props = {
   /** Wall-type colour bands along the foot of the walls (only when there is more than one type). */
   bands: Band[]
   onPickWall: (i: number, t: number) => void
+  /** Linzie, 17 Nov 10:03: the roof is drawn see-through, so the rooms show beneath; solid when the roof is chosen. */
+  roofOn?: boolean
 }
 
-export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall }: Props) {
+export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false }: Props) {
   const H = plan.storey_height_m
   // The camera starts on the building as it was when 3D opened; edits after that do not move it.
   const [start] = useState(() => {
@@ -102,6 +104,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
+      {plan.blocks.map((b, i) => <Roof key={`r${i}`} ring={b} H={H} on={roofOn} />)}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {runs.map((run) => (
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
@@ -146,6 +149,16 @@ function Slab({ ring }: { ring: XY[] }) {
   return (
     <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, -SLAB, 0]} receiveShadow castShadow>
       <meshStandardMaterial color={C.slab} roughness={0.95} />
+    </mesh>
+  )
+}
+
+/** The flat roof over a block: a slab at the storey height, see-through unless the roof is chosen. */
+function Roof({ ring, H, on }: { ring: XY[]; H: number; on: boolean }) {
+  const g = useMemo(() => new THREE.ExtrudeGeometry(shapeOf(ring), { depth: SLAB, bevelEnabled: false }), [ring])
+  return (
+    <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, H, 0]} castShadow={on} receiveShadow={on} renderOrder={on ? 0 : 2}>
+      <meshStandardMaterial color={on ? C.chosen : C.slab} roughness={0.9} transparent={!on} opacity={on ? 1 : 0.16} depthWrite={on} />
     </mesh>
   )
 }

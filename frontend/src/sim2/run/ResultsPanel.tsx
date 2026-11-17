@@ -179,7 +179,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
         else if ('missing' in r) setInstant({ kind: 'missing', items: plainMissing(r.missing, latestDoc.current) })
         else setInstant({ kind: 'error', message: r.error })
       })
-    } catch { instClient.current = null }
+    } catch (e) { instClient.current = null; setInstant({ kind: 'error', message: `it cannot run in this view (${(e as Error).message || 'the browser blocked the background worker'})` }) }
     // Preview, then apply (Linzie, 16 Nov 00:22): a second worker runs the change being previewed, on the same weather,
     // so the strip can show where the numbers stand now and where they would go. It is not started until asked for.
     return () => { c.dispose(); preview.current?.dispose(); preview.current = null; instClient.current?.dispose(); instClient.current = null }
@@ -414,7 +414,7 @@ function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit:
               heating {unit === 'kwh_per_m2' ? `${perM2(s.building.heating_kwh, s.building.floor_m2)} kWh/m²` : `${mwh(s.building.heating_kwh)} MWh`}{hourlyStale ? ' · out of date' : ''}
             </span>
           : state.kind === 'missing' ? <span className="rp-strip-msg">{state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set</span>
-          : state.kind === 'error' ? <span className="rp-strip-msg rp-error">failed</span> : null}
+          : state.kind === 'error' ? <span className="rp-strip-msg rp-error" title={state.message}>{/cannot run in this view/.test(state.message) ? "can't run in this view" : 'stopped with an error (see Heat flow)'}</span> : null}
         <button type="button" className="rp-btn rp-run" disabled={!weather || state.kind === 'running'} onClick={runHourly}>{s ? 'Run again' : 'Run'}</button>
       </div>
     </div>

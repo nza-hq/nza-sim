@@ -1698,7 +1698,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           return <>
             <h4>Opens</h4>
             <div className="gl-row gl-librow"><span>How it opens</span>
-              <select className="gl-sel" aria-label={`How ${at.name} open`} value={o ? o.style ?? 'unset' : ''} onChange={(e) => e.target.value === '' ? setFT(at.id, { opening: null }) : setO({ style: e.target.value === 'unset' ? null : e.target.value as WindowStyle })}>
+              <select className="gl-sel" aria-label={`How ${at.name} open`} value={o ? o.style ?? 'unset' : ''} onChange={(e) => {
+                if (e.target.value === '') return setFT(at.id, { opening: null })
+                const style = e.target.value === 'unset' ? null : e.target.value as WindowStyle
+                // Linzie, 17 Nov 10:03 ("just put defaults in everything… minimal user input"): choosing a style fills
+                // what is still empty with typical values, shown and editable. Typed values are kept.
+                const ang = WINDOW_STYLES.find((x) => x.key === style)?.angle ?? false
+                setO({ style, openable_fraction: o?.openable_fraction ?? (style ? 1 : null), opening_angle_deg: o?.opening_angle_deg ?? (ang ? 90 : null), cd: o?.cd ?? (style ? computeCd({ type: 'orifice' }) : null) })
+              }}>
                 <option value="">Does not open</option>
                 {o && o.style == null && <option value="unset">Opens (style not set)</option>}
                 {WINDOW_STYLES.map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
@@ -1708,7 +1715,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               {n('Share of the glass that opens', o.openable_fraction, (x) => setO({ openable_fraction: x }), 0.05, undefined, 1)}
               {angled && n('Widest opening angle', o.opening_angle_deg, (x) => setO({ opening_angle_deg: x }), 5, '°', 180)}
               <div className="gl-row gl-typed"><span>Discharge coefficient</span><Num value={o.cd ?? ''} step={0.05} min={0} max={1} onCommit={(x) => setO({ cd: Number.isFinite(x) && x > 0 && x <= 1 ? x : null })} />{o.cd == null && <button type="button" className="ap-link" onClick={() => setO({ cd: computeCd({ type: 'orifice' }) })}>Use 0.61</button>}</div>
-              <p className="gl-hint">{wd ? 'Effective area per EN 16798-7 from the style, the share that opens and the angle. 0.61 is a sharp-edged opening (CIBSE Guide A §4.6). When they open is set per space type on Controls.' : 'Opening windows count only with weather-driven air (Fabric, Air leakage); this model uses the fixed method, so they stay shut.'}</p>
+              <p className="gl-hint">Choosing a style fills in typical values (all of the glass opens{angled ? ', to 90°' : ''}, discharge coefficient 0.61); change any you know. The angle is worked into the open area by EN 16798-7's formula, so the coefficient stays that of a sharp-edged opening, 0.61 (CIBSE Guide A §4.6).</p>
+              <p className="gl-hint">{wd ? 'When they open is set per space type on Controls.' : 'Opening windows count only with weather-driven air (Fabric, Air leakage); this model uses the fixed method, so they stay shut.'}</p>
             </>}
             <h4>Trickle vent</h4>
             <label className="gl-row gl-librow"><span>Each window has one</span><input type="checkbox" aria-label={`${at.name} have trickle vents`} checked={!!v} onChange={(e) => setFT(at.id, { trickle: e.target.checked ? { area_mm2: null, cd: null, flow_mode: null } : null })} /></label>
@@ -2815,7 +2823,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -2853,6 +2861,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {shown.blocks.map((b, i) => <polygon key={`f${i}`} className="gl-floor" points={P(b)} />)}
         {inRooms &&
           shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) && !giving ? ' on' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
+        {/* Linzie, 17 Nov 10:03: on Shape the rooms stay in view under the walls, windows, floor and roof, for context. */}
+        {!inRooms && shown.rooms.map((r) => <polygon key={`cx${r.id}`} className="gl-room-ctx" points={P(r.ring)} />)}
         {liveInner && <line className="gl-wall-hover" x1={toPx(liveInner[0])[0]} y1={toPx(liveInner[0])[1]} x2={toPx(liveInner[1])[0]} y2={toPx(liveInner[1])[1]} />}
         {giving && !drag && shown.rooms.filter((r) => chosen.has(r.id)).map((r) => <polygon key={`pk${r.id}`} className="gl-room-pick" points={P(r.ring)} />)}
         {pending && !pending.same && !drag && (
@@ -2930,6 +2940,11 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   {flash.includes(r.id) && <text className="gl-pvtag done" x={lx} y={ly + 31}>✓ Applied</text>}
                 </g>
               )
+            })
+          : shown.rooms.length > 0 ? shown.rooms.map((r) => {
+              const [lx, ly] = toPx(labelAt(r.ring))
+              const xs = r.ring.map((q) => toPx(q)[0])
+              return Math.max(...xs) - Math.min(...xs) < 34 ? null : <text key={`cl${r.id}`} className="gl-zname gl-ctx" x={lx} y={ly}>{r.name}</text>
             })
           : shown.blocks.map((b, i) => {
               const [lx, ly] = toPx(labelAt(b))
@@ -3021,7 +3036,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   if (t.key === 'rooms') { setLook('plan'); return toMode('rooms') }
                   if (mode !== 'outline') toMode('outline')
                   setShapeTab(t.key)
-                  if (t.key === 'whole' && has) { setTool('select'); setSel({ kind: 'blocks', idx: plan.blocks.map((_, i) => i) }) } else setSel(null)
+                  // Linzie, 17 Nov 10:03 ("even in plan, I want to be able to select a wall and then add windows"): on every
+                  // tab but drawing the outline, a tap chooses a wall rather than starting a new block.
+                  if (has) setTool('select')
+                  if (t.key === 'whole' && has) setSel({ kind: 'blocks', idx: plan.blocks.map((_, i) => i) }); else setSel(null)
                   setLook(t.key === 'floor' || t.key === 'roof' ? '3d' : 'plan')
                 }}>
                 <Icon name={t.icon} size={18} /><span>{t.name}</span>
@@ -3415,7 +3433,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </>, 'right2')}
 
       {/* ─── bottom: tools ─── */}
-      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m). Tap one to nudge it with the arrow keys or make it a door.' : tipLine}</p>
+      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m); tap one to nudge it with the arrow keys. Scroll to zoom, right-drag to pan.' : tipLine}</p>
       {shownLook === 'plan' && <div className="gl-bar" role="toolbar" aria-label={`${STEP[mode]} tools`}>
         <span className="gl-step-tag">{STEP_NO[mode]} {STEP[mode]}</span>
         {TOOLS[mode].map((t, i) => (
