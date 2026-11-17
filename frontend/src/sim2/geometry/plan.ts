@@ -274,6 +274,11 @@ export type SpaceType = {
    * the temperature outside them, °C (null: off outside them). */
   heat_hours?: string | null
   setback_c?: number | null
+  /** Brief 121 (edited on Controls): the heating / cooling setpoint follows this temperature profile (°C each hour)
+   * instead of one figure. heat_c / cool_c are then written as its highest / lowest value; the profile carries any
+   * setback, so setback_c is not used. Null or left out: one figure. */
+  heat_profile?: string | null
+  cool_profile?: string | null
   /** Brief 115 (edited on Controls): when this space type's opening windows open. Null or left out: not stated. */
   windows?: WindowRule | null
   /** How the gains enter the zone (schema 2.3 profile fields), visible and editable on the space type. A new space
@@ -317,10 +322,28 @@ export const noBuildingInputs = (): BuildingInputs => ({ q50: null, tb_multiplie
 /** Brief 118 P5: a project's own profile, made by editing one (Profiles step, today's schedule editor). A library
  * profile is never changed: editing one makes this copy, and the project's space types and systems move to it.
  * Same shape as a library profile's (hourly fractions by day type, monthly multipliers). */
+/** The kinds a profile can be (Linzie, 17 Nov 00:31: setpoints and window opening are profiles too, IES-style).
+ * 'ventilation' is shown as Availability: on/off hours for ventilation, pumps and windows. Setpoints are °C. */
+export const PROFILE_TYPES = ['occupancy', 'lighting', 'equipment', 'dhw', 'heating_setpoint', 'cooling_setpoint', 'window_opening', 'ventilation'] as const
+export type ProfileType = (typeof PROFILE_TYPES)[number]
+export const isTemperature = (t: string | null | undefined) => t === 'heating_setpoint' || t === 'cooling_setpoint'
+/** A temperature profile's in-use and lowest values, °C, over every hour of every day type. */
+export const tempRange = (d: { weekday: number[]; saturday: number[]; sunday: number[] }) => {
+  const all = [...d.weekday, ...d.saturday, ...d.sunday]
+  return { hi: Math.max(...all), lo: Math.min(...all) }
+}
+/** A new profile of the project's own: every hour at one value the person states (a fraction, or °C). */
+export function newOwnProfile(plan: Pick<Plan, 'own_profiles' | 'profiles'>, t: ProfileType, name: string, value: number): { key: string; own: OwnProfile } {
+  const owns = plan.own_profiles ?? []
+  let n = owns.length + 1
+  while (owns.some((x) => x.key === `own_${n}`)) n++
+  const day = () => Array(24).fill(value) as number[]
+  return { key: `own_${n}`, own: { key: `own_${n}`, name, schedule_type: t, from: null, day_types: { weekday: day(), saturday: day(), sunday: day() }, monthly_multipliers: null } }
+}
 export type OwnProfile = {
   key: string
   name: string
-  schedule_type: 'occupancy' | 'lighting' | 'equipment' | 'ventilation'
+  schedule_type: ProfileType
   /** The library profile it was copied from, or null. */
   from: string | null
   day_types: { weekday: number[]; saturday: number[]; sunday: number[] }

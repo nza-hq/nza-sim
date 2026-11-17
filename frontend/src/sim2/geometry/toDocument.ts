@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -281,7 +281,7 @@ export function buildDocument(plan0: Plan): Built {
     if (key === 'always_on') return 'always_on'
     const pr = profile(key)
     if (!pr?.day_types) return null
-    addProfile({ id: key, kind: 'schedule', label: pr.name, day_types: { weekday: pr.day_types.weekday, saturday: pr.day_types.saturday, sunday: pr.day_types.sunday } })
+    addProfile({ id: key, kind: 'schedule', label: pr.name, ...(pr.schedule_type === 'window_opening' ? { purpose: 'window_opening' } : {}), day_types: { weekday: pr.day_types.weekday, saturday: pr.day_types.saturday, sunday: pr.day_types.sunday } })
     return key
   }
   // Systems: a zone takes, per service, the system covering most of its floor (a note says when its rooms differ).
@@ -459,13 +459,25 @@ export function buildDocument(plan0: Plan): Built {
     profile_refs: refsOf(z.id),
     setpoints: (() => {
       const sp = spaceOf.get(z.id)
-      const heat = sp?.heat_c ?? null
-      const cool = sp?.cool_c ?? null
+      // Brief 121: a setpoint may follow a temperature profile. heat_c / cool_c are then its highest / lowest value,
+      // worked out here from the profile itself (one figure, so the two cannot drift), and it carries any setback.
+      const tempRef = (key: string | null | undefined, purpose: 'heating_setpoint' | 'cooling_setpoint') => {
+        const pr = key ? profile(key) : undefined
+        if (!key) return null
+        if (!pr?.day_types || !isTemperature(pr.schedule_type)) { notes.push(`${sp!.name}: its ${purpose === 'heating_setpoint' ? 'heating' : 'cooling'} setpoint profile is missing or is not in °C`); return null }
+        const d = pr.day_types
+        addProfile({ id: key, kind: 'temperature', label: pr.name, purpose, day_types: { weekday: d.weekday, saturday: d.saturday, sunday: d.sunday } })
+        return { id: key, ...tempRange(d) }
+      }
+      const hRef = tempRef(sp?.heat_profile, 'heating_setpoint')
+      const cRef = tempRef(sp?.cool_profile, 'cooling_setpoint')
+      const heat = hRef ? hRef.hi : sp?.heat_c ?? null
+      const cool = cRef ? cRef.lo : sp?.cool_c ?? null
       // Brief 114 (Controls): the heating hours and the setback outside them. A setback without hours means nothing.
       const hours = sp?.heat_hours && sp.heat_hours !== 'always_on' && (heat != null || cool != null) ? hoursRef(sp.heat_hours) : null
-      const setback = hours && heat != null ? sp?.setback_c ?? null : null
+      const setback = hours && heat != null && !hRef ? sp?.setback_c ?? null : null
       if (sp?.setback_c != null && !hours && !setbackNoted.has(sp.id)) { setbackNoted.add(sp.id); notes.push(`${sp.name}: a setback needs heating hours to apply outside (Controls)`) }
-      return { heat_c: heat, cool_c: cool, setback_c: setback, hours_ref: hours, control_strategy: heat != null || cool != null ? 'active_setpoint' : null }
+      return { heat_c: heat, cool_c: cool, setback_c: setback, hours_ref: hours, ...(hRef ? { heat_ref: hRef.id } : {}), ...(cRef ? { cool_ref: cRef.id } : {}), control_strategy: heat != null || cool != null ? 'active_setpoint' : null }
     })(),
     ventilation: ventOf(z.id),
     // A heated room is held at its heating temperature for the design heat loss (said on Systems, Heating).

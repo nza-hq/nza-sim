@@ -474,3 +474,24 @@
 .gl-profnone h3 { font: 600 16px var(--gl-detail, inherit); color: #235546; margin: 0 0 8px; }
 /* Today's editor lays out side by side; below its width the centre scrolls rather than clipping the heatmap. */
 .gl-profedit > .p-4 { min-width: 960px; }
+
+/* Temperature profile editor (Brief 121 P4). */
+.tp-root { padding: 20px 24px; display: grid; gap: 12px; font: 13px var(--gl-detail); color: var(--gl-ink); }
+.tp-head h3 { margin: 0; font: 600 18px var(--gl-display); }
+.tp-head p { margin: 2px 0 0; color: var(--gl-soft); }
+.tp-head .tp-range { color: var(--gl-ink); font-family: var(--gl-figures); }
+.tp-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--gl-line); }
+.tp-tabs button { border: 0; background: none; padding: 6px 12px; border-bottom: 2px solid transparent; color: var(--gl-soft); cursor: pointer; font: 500 13px var(--gl-detail); }
+.tp-tabs button[aria-selected='true'] { color: var(--tp-acc); border-bottom-color: var(--tp-acc); }
+.tp-chart { width: 100%; max-width: 820px; height: auto; touch-action: none; cursor: ns-resize; user-select: none; }
+.tp-grid { stroke: var(--gl-line); stroke-width: 1; }
+.tp-ax { font: 10px var(--gl-figures); fill: var(--gl-soft); }
+.tp-bar { fill: color-mix(in srgb, var(--tp-acc) 70%, #fff); }
+.tp-bar.on { fill: var(--tp-acc); }
+.tp-val { font: 9px var(--gl-figures); fill: var(--gl-ink); text-anchor: middle; }
+.tp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 30px; }
+.tp-row input, .tp-quick input { width: 64px; margin: 0 6px; padding: 4px 6px; border: 1px solid var(--gl-line); border-radius: 6px; font: 13px var(--gl-figures); }
+.tp-hint { color: var(--gl-soft); }
+.tp-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 2px; padding: 10px 12px; border: 1px solid var(--gl-line); border-radius: 10px; background: var(--gl-tint); }
+.tp-quick .gl-btn { margin-left: 8px; }
+.tp-axr { text-anchor: end; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
