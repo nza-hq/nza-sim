@@ -385,7 +385,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const Hve = new Float64Array(H)
     for (let h = 0; h < H; h++) {
       let m = 0
-      for (const v of mech[zi]) m += v.h_w_per_k[h]
+      // Review F3: under weather-driven air an extract fan is in the pressure balance instead (airAt), not here.
+      for (const v of mech[zi]) if (!(weatherAir && v.kind === 'mev')) m += v.h_w_per_k[h]
       Hve[h] = inf.h_w_per_k + ventH[h] + m
     }
     // Σ U·A of the zone's envelope (the legacy α bridging mode only): elements facing outside or the ground.
@@ -409,6 +410,20 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       if (e instanceof AirflowError || e instanceof ScheduleError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
       throw e
     }
+    // Review F3: under weather-driven air an extract fan (MEV) is a fixed flow out of the room, in its pressure
+    // balance; its air arrives through leakage, vents and windows (their lines), so its own conductance is not added
+    // again. A 'natural' entry beside opening windows would count the windows' air twice: refused by name.
+    doc.zones.forEach((z, zi) => {
+      const mevs = mech[zi].filter((v) => v.kind === 'mev')
+      if (mevs.length) {
+        if (!airModels![zi].cracks.length && !airModels![zi].vents.length && !airModels![zi].windows.length) throw new ModelError('an extract fan needs air leakage, vents or windows to draw its air from', `zones[${zi}].ventilation`)
+        const ex = new Float64Array(H)
+        for (const v of mevs) for (let h = 0; h < H; h++) ex[h] += v.flow_m3s * v.running[h]
+        airModels![zi].extract = ex
+      }
+      const nat = z.ventilation.findIndex((v) => v.enabled && v.kind === 'natural')
+      if (nat >= 0 && airModels![zi].windows.length) throw new ModelError('the room\'s opening windows give its natural ventilation under weather-driven air; remove this entry', `zones[${zi}].ventilation[${nat}]`)
+    })
     const wx = airWeather(weather.hours, weather.header.elevation)
     for (let zi = 0; zi < Zn; zi++) { airInflow.push(new Float64Array(H)); airOpen.push(new Float64Array(H)) }
     airAtOf = (zi) => {
@@ -641,7 +656,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       const tot = a.Hve[h]
       if (tot > 0) {
         infW += (v * a.inf.h_w_per_k) / tot; ventW += (v * a.ventH[h]) / tot
-        mech[zi].forEach((m, j) => { mechW[j] += (v * m.h_w_per_k[h]) / tot })
+        mech[zi].forEach((m, j) => { if (!(weatherAir && m.kind === 'mev')) mechW[j] += (v * m.h_w_per_k[h]) / tot })
       }
     }
     if (al) { infW += kwh(al[0]) * 1000; ventW += kwh(al[1]) * 1000 }

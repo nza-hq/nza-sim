@@ -218,6 +218,24 @@ describe('Brief 115: runModel under weather-driven air', () => {
     const low = structuredClone(flat26); low.profiles.at(-1).day_types.sunday[3] = low.zones[0].setpoints.heat_c
     expect(() => run(low)).toThrow('controls[0].open_above_ref')
   })
+  it('review F3: an extract fan is a fixed flow in the room\'s balance, its air through the leakage; natural entries beside windows refused', () => {
+    const base = weatherDriven(); for (const c of base.controls) c.open_fraction = 0
+    const fan = structuredClone(base)
+    fan.zones[0].ventilation = [{ id: 'fan', kind: 'mev', enabled: true, flow_rate: 30, flow_rate_basis: 'constant', sfp_w_per_l_s: 1, recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
+    const runV = (d: any) => runModel(ModelDocument.parse(d), W, LIB, { ...REFEREE_OPTIONS, ventilation: 'document' })
+    const a = runV(base), b = runV(fan)
+    const z = b.zones[0]
+    expect(Math.abs(z.closure.sum_kwh)).toBeLessThan(1e-3)
+    // Every hour at least the fan's 30 l/s comes in (Denver, 1,600 m: room air about 0.92 to 1.05 kg/m³).
+    for (let h = 0; h < 8760; h++) expect(z.air!.inflow_kg_per_h[h]).toBeGreaterThan(0.03 * 0.9 * 3600)
+    // Its own conductance is not added again: the fan's line is 0 and the leakage line carries the air.
+    expect(z.breakdown.find((l) => l.term === 'mechanical_ventilation')!.kwh).toBe(0)
+    expect(readZoneTermKwh(z, 'infiltration')).toBeLessThan(readZoneTermKwh(a.zones[0], 'infiltration'))
+    expect(z.annual.heating_kwh).toBeGreaterThan(a.zones[0].annual.heating_kwh)
+    const nat = weatherDriven()
+    nat.zones[0].ventilation = [{ id: 'nat', kind: 'natural', enabled: true, flow_rate: 1, flow_rate_basis: 'ach', recovery_sensible_pct: null, control_schedule_ref: 'always_on', legacy_v25: null }]
+    expect(() => runV(nat)).toThrow('zones[0].ventilation[0]: the room\'s opening windows give its natural ventilation')
+  })
   it('a vent under weather-driven air needs cd and height, not today\'s flow_mode', () => {
     const d = weatherDriven()
     const v = d.surfaces.find((s: any) => s.openings.some((o: any) => o.kind === 'permanent_vent')).openings[0]

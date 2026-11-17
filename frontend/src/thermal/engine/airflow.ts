@@ -163,6 +163,11 @@ export interface ZoneAirModel {
   cp: Float64Array[]
   /** The site's 10 m wind ÷ the weather file's. */
   wind10: number
+  /**
+   * Review F3: extract fans (MEV) as a fixed flow out of the room each hour, m³/s (of room air); null: none. The air
+   * they draw comes in through the room's leakage, vents and windows, and is counted on those lines.
+   */
+  extract?: Float64Array | null
 }
 
 export interface AirWeather {
@@ -246,6 +251,7 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   const sc = scratchOf(m)
   const d0c = sc.d0c, d0v = sc.d0v, d0w = sc.d0w, ww = sc.ww
   let lo = Infinity, hi = -Infinity
+  const ext = m.extract ? m.extract[h] * rhoZ : 0
   for (let i = 0; i < nc; i++) { const c = m.cracks[i]; const d = cpF[c.facade] * qw * c.wind * c.wind + c.z * dRhoStack; d0c[i] = d; if (d < lo) lo = d; if (d > hi) hi = d }
   for (let i = 0; i < nv; i++) { const v = m.vents[i]; const d = cpF[v.facade] * qw * v.wind * v.wind + v.z * dRhoStack; d0v[i] = d; if (d < lo) lo = d; if (d > hi) hi = d }
   for (let i = 0; i < nw; i++) {
@@ -315,7 +321,7 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
       f += a + b; df += da + db; sa += (a < 0 ? -a : a) + (b < 0 ? -b : b)
       if (rec) { if (a > 0) rec[2] += a; if (b > 0) rec[2] += b }
     }
-    F_ = f; D_ = df; A_ = sa
+    F_ = f - ext; D_ = df; A_ = sa + ext
   }
 
   for (let i = 0; i < 4; i++) out[i] = 0
@@ -325,6 +331,12 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   // derivatives are EnergyPlus's derivative factors, not always the true slope). Settled when the imbalance is below
   // 1e-6 of the flows through the room, or 1e-9 kg/s (0.004 g an hour).
   lo -= 1e-9; hi += 1e-9
+  // An extract fan pulls the room below every path's pressure: widen the bracket down until the paths can supply it.
+  if (ext > 0) {
+    let span = Math.max(1, hi - lo)
+    for (let k = 0; k < 60; k++) { flowAt(lo, null); if (F_ > 0) break; hi = lo; lo -= span; span *= 2 }
+    if (!(F_ > 0)) throw new AirflowError(`the extract fans could not draw their air at hour ${h}`, 'air')
+  }
   // Start from the room's pressure at the step before (it moves little from one step to the next).
   let P = sc.p > lo && sc.p < hi ? sc.p : 0.5 * (lo + hi), it = 0, slow = 0, last = Infinity
   for (; it < 200; it++) {
