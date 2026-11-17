@@ -43,9 +43,12 @@
  * between). 'timetable': open by `open_fraction` × the profile's value. A window's widest opening is its
  * `openable_fraction` × its style's angle factor (`windowEffectiveArea`).
  *
- * Single-sided turbulence (switchable, `building.air.single_sided_turbulence`): when every open window in a room is on
- * one facade, EN 16798-7's single-sided wind term q = ½·A_open·√0.001·U₁₀ (m³/s) is added as its own line (U₁₀ the
- * wind at 10 m on site). Not refereed: EnergyPlus has no exact counterpart (stated).
+ * Single-sided turbulence (switchable, `building.air.single_sided_turbulence`; review F2): when every open window in a
+ * room is on one facade, the turbulent part of the De Gids–Phaff single-sided correlation (as in EN 15242 / EN 16798-7,
+ * U_eff = √(C₁U² + C₂HΔT + C₃), q = ½·A_open·U_eff) is added to the windows' own flow. The wind and stack parts (C₁, C₂)
+ * are already in the pressure balance, so only C₃ = 0.01 m²/s² is added, in quadrature as the correlation has it:
+ * q_total = √(q_windows² + (½·A_open·√C₃)²). The line is the increase over the windows' own flow. Not refereed:
+ * EnergyPlus has no counterpart (stated); hand values in airflow.test.ts.
  */
 
 export class AirflowError extends Error {
@@ -65,6 +68,8 @@ export const AIR = {
   crack_bands: 3,
   /** EN 16798-7's single-sided wind coefficient C_wnd (1/(m/s)), as in EN 15242. */
   c_wnd: 0.001,
+  /** De Gids–Phaff turbulence constant C₃, m²/s² (review F2). */
+  c_turb: 0.01,
   /** EnergyPlus SimpleOpening's default least density difference for two-way flow, kg/m³. */
   min_rho_diff: 1e-4,
 } as const
@@ -346,12 +351,17 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
     if (m.windows.every((o) => o.facade === f0)) {
       let A = 0
       for (const o of m.windows) A += o.width * o.max_factor * factor * o.height
-      mt = rhoO * 0.5 * A * Math.sqrt(AIR.c_wnd) * U * m.wind10
+      // In quadrature with the windows' own inflow (rec[2], kg/s): only the increase is this line.
+      const qt = rhoO * turbulenceFlow(A), qw = rec[2]
+      mt = Math.sqrt(qw * qw + qt * qt) - qw
       out[3] = cp * mt
     }
   }
   return { open_factor: factor, p_z: P, iterations: it, m_in: rec[0] + rec[1] + rec[2] + mt }
 }
+
+/** The turbulent part of the single-sided correlation alone, m³/s, for an open area A (m²): ½·A·√C₃ (review F2). */
+export function turbulenceFlow(A: number): number { return 0.5 * A * Math.sqrt(AIR.c_turb) }
 
 // ─── Building the model from the document ─────────────────────────────────────────────────────────────────────────
 

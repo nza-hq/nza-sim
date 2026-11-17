@@ -49,10 +49,12 @@ const lib2 = { ...lib, ...box.lib }
 
 const four = { ...REFEREE_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' as const } }
 const cases = [
-  { name: 'one_room', budget_ms: 100, doc: box.doc, opts: REFEREE_OPTIONS },
-  { name: 'one_room_4', budget_ms: null, doc: box.doc, opts: four },
-  { name: 'fifty_rooms', budget_ms: 2000, doc: fifty, opts: REFEREE_OPTIONS },
+  { name: 'one_room', budget_ms: null, doc: box.doc, opts: REFEREE_OPTIONS },
+  { name: 'fifty_rooms', budget_ms: null, doc: fifty, opts: REFEREE_OPTIONS },
+  { name: 'one_room_4', budget_ms: 100, doc: box.doc, opts: four },
+  { name: 'fifty_rooms_4', budget_ms: 2000, doc: fifty, opts: four },
   { name: 'fifty_rooms_today', budget_ms: null, doc: today, opts: REFEREE_OPTIONS },
+  { name: 'fifty_rooms_today_4', budget_ms: null, doc: today, opts: four },
 ]
 const median = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)]
 const out = cases.map((c) => {

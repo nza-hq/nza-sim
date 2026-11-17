@@ -48,7 +48,11 @@ export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { s
 export function runOptionsFor(doc: ModelDocument): RunOptions {
   // Brief 120: a zone on a system with a stated capacity is limited too, so it steps in quarter hours the same way.
   const onPlant = (zid: string) => doc.system_groups.some((g) => g.enabled && (g.service === 'heating' || g.service === 'cooling') && g.capacity_kw != null && g.zones.includes(zid))
-  return doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
+  // Brief 115 review F1: windows that open on the weather decide each step from the room's temperature; decided once an
+  // hour they stay open for the whole hour and the room overheats or is overheated (the office referee fails its
+  // gates at 1 step an hour and passes at 4). Such a document runs in quarter hours.
+  const windows = doc.building.air?.method === 'weather_driven' && doc.surfaces.some((s) => s.openings.some((o) => o.kind === 'operable'))
+  return windows || doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
 }
 
 /** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */

@@ -13,7 +13,7 @@
  */
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { AIR, airWeather, buildAirModels, cpAt, cpTable, rhoAir, swamiChandra, windFactor, windowEffectiveArea, zoneAirStep, type AirWeather, type ZoneAirModel } from '../airflow'
+import { AIR, airWeather, buildAirModels, turbulenceFlow, cpAt, cpTable, rhoAir, swamiChandra, windFactor, windowEffectiveArea, zoneAirStep, type AirWeather, type ZoneAirModel } from '../airflow'
 import { REFEREE_OPTIONS, runModel } from '../model'
 import { readZoneTermKwh } from '../results'
 import { ModelDocument } from '../../schema/model'
@@ -89,6 +89,25 @@ describe('Brief 115: one room, one step', () => {
     expect(st.m_in / hand).toBeGreaterThan(0.98)
     expect(st.m_in / hand).toBeLessThan(1.02)
     expect(out[2]).toBeCloseTo(st.m_in * 1004.84, 6)
+  })
+  it('single-sided turbulence (review F2): De Gids–Phaff C₃ in quadrature with the windows\' own flow, hand values', () => {
+    expect(turbulenceFlow(1)).toBeCloseTo(0.05, 12)                 // ½·1·√0.01
+    const Hh = 1.2, Wd = 0.8, cd = 0.6
+    const win = { z_ref: 1, wind: 1, facade: 0, cd, width: Wd, height: Hh, max_factor: 1 }
+    const rule = { rule: 'timetable' as const, open_fraction: 1, open_above_c: null, open_above_h: null, hours: null, modulation: null }
+    // Still and isothermal: the windows carry nothing, so the line is the turbulence alone, ρ·½·A·√C₃.
+    const o0 = new Float64Array(4)
+    const s0 = zoneAirStep(box({ windows: [win], rule, turbulence: true }), wx(20), 0, 20, 20, o0)
+    const rho20 = rhoAir(101325, 20, 0)
+    expect(s0.m_in).toBeCloseTo(rho20 * 0.5 * Wd * Hh * 0.1, 9)
+    // Warm room: √(q_w² + q_t²) − q_w on top of the two-way flow.
+    const off = new Float64Array(4), on = new Float64Array(4)
+    const a = zoneAirStep(box({ windows: [win], rule }), wx(0), 0, 20, 0, off)
+    const b = zoneAirStep(box({ windows: [win], rule, turbulence: true }), wx(0), 0, 20, 0, on)
+    const qt = rhoAir(101325, 0, 1e-5) * 0.5 * Wd * Hh * 0.1
+    expect(b.m_in).toBeCloseTo(Math.sqrt(a.m_in ** 2 + qt ** 2), 9)
+    expect(on[2]).toBeCloseTo(off[2], 9)
+    expect(on[3]).toBeGreaterThan(0)
   })
   it('cross-flow, isothermal: equal windows in series take half the wind pressure each', () => {
     const cd = 0.6, A = 0.5, U = 4
