@@ -20,7 +20,15 @@ export type RoofHip = { style: 'hip'; pitch_deg: number }
 export type RoofRecipe = (RoofFlat | RoofMono | RoofGable | RoofHip) & {
   /** Where the insulation is: at the ceiling with a cold loft above, or in the slope (the room open to the roof). */
   insulation?: 'ceiling' | 'slope'
+  /** Cold roof: the fabric type (a roof type) the loft's slopes are made of; null: not chosen yet. */
+  loft_slope_type?: string | null
+  /** Cold roof: the loft's air changes an hour; null: LOFT_ACH. */
+  loft_ach?: number | null
 }
+
+/** A ventilated loft's air changes an hour: ISO 13789 clause 9.4's conventional rate (the engine thread's P4.2 records
+ * what could and could not be verified about it). Shown and editable on Shape, Roof. */
+export const LOFT_ACH = 3
 export type RoofStyle = RoofRecipe['style']
 export const ROOF_STYLES: ReadonlyArray<{ key: RoofStyle; name: string }> = [
   { key: 'flat', name: 'Flat' },
@@ -47,6 +55,8 @@ export type RoofFace = {
   /** Downhill (slopes) or outward (walls) compass bearing, degrees from north; null for a flat face. */
   azimuth_deg: number | null
   area_m2: number
+  /** A wall: which side of the block's outline it stands on (index into the ring), for its wall type. */
+  edge?: number
 }
 export type BlockRoof = {
   style: RoofStyle
@@ -208,7 +218,7 @@ export type ServedResult = { faces: ServedFace[]; flags: string[]; fell_back_to_
 
 /** The recipe as the service reads it (decodED's field names; flat with no parapet). */
 export function serviceRecipe(r: RoofRecipe): Record<string, unknown> {
-  const { insulation: _i, ...rest } = r
+  const { insulation: _i, loft_slope_type: _t, loft_ach: _a, ...rest } = r
   return r.style === 'flat' ? { style: 'flat', parapet_height_m: 0 } : rest
 }
 
@@ -269,7 +279,7 @@ export function fromServed(ring: readonly XY[], style: RoofStyle, served: Served
     const top = [...up.values()].sort((p, q) => ((q[0] - a[0]) * ux + (q[1] - a[1]) * uy) - ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy))
     const pts: XYZ[] = [[a[0], a[1], 0], [b[0], b[1], 0], ...top]
     const area = faceArea(pts)
-    if (area > 1e-6) walls.push({ kind: 'wall', pts, tilt_deg: 90, azimuth_deg: bearing(uy, -ux), area_m2: area })
+    if (area > 1e-6) walls.push({ kind: 'wall', pts, tilt_deg: 90, azimuth_deg: bearing(uy, -ux), area_m2: area, edge: i })
   })
   // Lines: face edges off the outline (ridges, hips, valleys), each once.
   const seen = new Set<string>()

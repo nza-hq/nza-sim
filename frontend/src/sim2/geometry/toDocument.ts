@@ -25,10 +25,11 @@ import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
 import { ALWAYS, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
-import { crossing, firstType, roomType, typeOfSpan, wallPieces } from './facade'
+import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
 import type { XY } from './ported/zones'
+import { type BlockRoof, LOFT_ACH, blockRoof } from './roof'
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000
 const is21 = (SCHEMA_VERSION as string) !== '2.0'
@@ -45,7 +46,16 @@ export type Built = {
   totals: { zones: number; rooms: number; floor_m2: number; walls: number; wall_net_m2: number; glazing: number; glazing_m2: number; windows: number; doors: number; door_m2: number; partitions: number; systems: number }
 }
 
-export function buildDocument(plan0: Plan): Built {
+/**
+ * Brief 123: a pitched roof. `roofs` are the blocks' roofs as Shape has them (from the roof service, or the browser
+ * for rectangles); absent, rectangles are worked out here and any other outline keeps a flat roof (with a note).
+ * - Insulated at the ceiling: each pitched block gets an unheated loft zone (no setpoint, no system of any kind; its
+ *   own air at the loft's air changes), each room's roof becomes a ceiling to it, and the slopes and gable walls are
+ *   the loft's, to outside.
+ * - Insulated at the slope: the slopes and gable walls go on the rooms beneath, by floor area, and each room's
+ *   height grows by its share of the roof space.
+ */
+export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Built {
   // A plan held from before Brief 112 (one building-wide hot water use) is read as its space types' own.
   const plan = hotWaterOnSpaces(plan0)
   // The project's own profiles first, then the library's (Brief 118 P5).
@@ -250,18 +260,91 @@ export function buildDocument(plan0: Plan): Built {
     byZone.set(s.b, [...(byZone.get(s.b) ?? []), id])
   }
   const floorOf = new Map(used.map((z) => [z.id, plan.rooms.filter((r) => r.zone === z.id).reduce((t, r) => t + ringArea(r.ring), 0)]))
+  // Brief 123: the roof's shape. A block whose roof is pitched (and built) is roofed below; any other stays flat.
+  const rec = plan.roof && plan.roof.style !== 'flat' ? plan.roof : null
+  const roofs = rec ? plan.blocks.map((b, i) => roofsIn?.[i] ?? blockRoof(b, rec)) : []
+  roofs.forEach((r, i) => { if (r.refused) notes.push(`Block ${i + 1} keeps a flat roof: ${r.refused}`) })
+  const pitched = (i: number) => (roofs[i] && roofs[i]!.style !== 'flat' ? roofs[i]! : null)
+  const cold = (rec?.insulation ?? 'ceiling') === 'ceiling'
+  const inside = (p: XY, ring: readonly XY[]) => {
+    let c = false
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]!, [xj, yj] = ring[j]!
+      if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) c = !c
+    }
+    return c
+  }
+  const blockOfRoom = (ring: readonly XY[]) => {
+    const n = ring.length, c: XY = [ring.reduce((t, p) => t + p[0], 0) / n, ring.reduce((t, p) => t + p[1], 0) / n]
+    const i = plan.blocks.findIndex((b) => inside(c, b))
+    return i < 0 ? 0 : i
+  }
+  const loftId = (i: number) => (plan.blocks.length > 1 ? `loft_${i + 1}` : 'loft')
+  /** A gable or raised wall takes the wall type of the outside wall it stands on (at the middle of its foot). */
+  const wallTypeUnder = (f: BlockRoof['faces'][number]) => {
+    const base = f.pts.filter((p) => Math.abs(p[2]) < 1e-6)
+    const m: XY = base.length ? [base.reduce((t, p) => t + p[0], 0) / base.length, base.reduce((t, p) => t + p[1], 0) / base.length] : [f.pts[0]![0], f.pts[0]![1]]
+    let best = { d: Infinity, run: -1, t: 0 }
+    for (const r of runs) {
+      const L = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1]) || 1
+      const t = Math.max(0, Math.min(L, ((m[0] - r.a[0]) * (r.b[0] - r.a[0]) + (m[1] - r.a[1]) * (r.b[1] - r.a[1])) / L))
+      const d = Math.hypot(r.a[0] + ((r.b[0] - r.a[0]) * t) / L - m[0], r.a[1] + ((r.b[1] - r.a[1]) * t) / L - m[1])
+      if (d < best.d) best = { d, run: r.index, t }
+    }
+    return best.run >= 0 ? typeAt(plan, best.run, best.t) : firstType(plan, 'wall')
+  }
+  const slopeRef = rec?.loft_slope_type ? constructionOf(rec.loft_slope_type) : { key: 'unassigned:roof:loft_slopes' }
+  if (rec && cold && roofs.some((_, i) => pitched(i)) && !rec.loft_slope_type) notes.push('The loft\'s roof slopes have no construction yet: choose what they are made of on Shape, Roof')
+  /** Warm roof: the extra height each zone gets from its share of the roof space. */
+  const roofSpace = new Map<string, number>()
+  const roofFace = (zone: string, i: number, share: number, type: string, f: BlockRoof['faces'][number], n: number, onLoft: boolean) => {
+    const wall = f.kind === 'wall'
+    const id = uid(`${zone}_${wall ? 'gable' : 'slope'}_${n + 1}`)
+    add(zone, ext({
+      id, kind: wall ? 'wall' : 'roof', zone_a: zone, zone_b: 'outside', facade: wall ? facade4(f.azimuth_deg ?? 0) : null,
+      area_m2: r3(f.area_m2 * share), azimuth_deg: f.azimuth_deg == null ? null : r3(f.azimuth_deg), tilt_deg: r3(f.tilt_deg),
+      construction_ref: wall ? constructionOf(wallTypeUnder(f)) : onLoft ? slopeRef : constructionOf(type),
+      g_value: null, openings: [],
+    }, wall ? 'wall' : 'roof'))
+    void i
+  }
+
   // Roof and ground floor: one of each per zone, or one per type when the zone's rooms have different types.
   for (const z of used) {
     const rs = plan.rooms.filter((r) => r.zone === z.id)
     for (const e of ['roof', 'floor'] as const) {
-      const byType = new Map<string, number>()
-      for (const r of rs) byType.set(roomType(plan, r.id, e), (byType.get(roomType(plan, r.id, e)) ?? 0) + ringArea(r.ring))
-      for (const [type, a] of byType) {
-        if (e === 'roof') add(z.id, ext({ id: uid(`${z.id}_roof`), kind: 'roof', zone_a: z.id, zone_b: 'outside', facade: null, area_m2: r3(a), azimuth_deg: null, tilt_deg: 0, construction_ref: constructionOf(type), g_value: null, openings: [] }, 'roof'))
+      const byType = new Map<string, { a: number; block: number }>()
+      for (const r of rs) {
+        const block = e === 'roof' && pitched(blockOfRoom(r.ring)) ? blockOfRoom(r.ring) : -1
+        const k = `${block}|${roomType(plan, r.id, e)}`
+        const g = byType.get(k) ?? { a: 0, block }
+        g.a += ringArea(r.ring)
+        byType.set(k, g)
+      }
+      for (const [k, { a, block }] of byType) {
+        const type = k.slice(k.indexOf('|') + 1)
+        const pr = block >= 0 ? pitched(block) : null
+        if (e === 'roof' && pr && cold) {
+          // The room's roof type is now its ceiling, to the loft (layers run loft side first, as a roof's run outside first).
+          const id = uid(`${z.id}_ceiling`)
+          const surf = { ...ext({ id, kind: 'ceiling', zone_a: z.id, zone_b: loftId(block), facade: null, area_m2: r3(a), azimuth_deg: null, tilt_deg: 0, construction_ref: constructionOf(type), g_value: null, openings: [] }, 'other'), ...(is22 ? { inside_solar_absorptance_b: TODAY.inside_solar_absorptance } : {}) }
+          surfaces.push(surf)
+          byZone.set(z.id, [...(byZone.get(z.id) ?? []), id])
+          byZone.set(loftId(block), [...(byZone.get(loftId(block)) ?? []), id])
+        } else if (e === 'roof' && pr) {
+          // Warm roof: the slopes and gable walls over this zone's share of the block, and its share of the roof space.
+          const foot = ringArea(plan.blocks[block]!)
+          const share = foot > 0 ? a / foot : 0
+          pr.faces.forEach((f, n) => roofFace(z.id, block, share, type, f, n, false))
+          roofSpace.set(z.id, (roofSpace.get(z.id) ?? 0) + pr.void_m3 * share)
+        } else if (e === 'roof') add(z.id, ext({ id: uid(`${z.id}_roof`), kind: 'roof', zone_a: z.id, zone_b: 'outside', facade: null, area_m2: r3(a), azimuth_deg: null, tilt_deg: 0, construction_ref: constructionOf(type), g_value: null, openings: [] }, 'roof'))
         else add(z.id, ext({ id: uid(`${z.id}_ground`), kind: 'ground', zone_a: z.id, zone_b: 'ground', facade: null, area_m2: r3(a), azimuth_deg: null, tilt_deg: 180, construction_ref: constructionOf(type), g_value: null, openings: [] }, 'other'))
       }
     }
   }
+  // Cold roof: the loft's own slopes and gable walls, to outside.
+  const lofts = cold ? plan.blocks.map((b, i) => ({ i, b, r: pitched(i) })).filter((x) => x.r && byZone.has(loftId(x.i))) : []
+  for (const { i, r } of lofts) r!.faces.forEach((f, n) => roofFace(loftId(i), i, 1, '', f, n, true))
 
   // Space types: a zone takes the space type covering most of its floor (a note says when its rooms differ).
   const spaceOf = new Map<string, SpaceType | undefined>()
@@ -488,6 +571,27 @@ export function buildDocument(plan0: Plan): Built {
     surfaces: byZone.get(z.id) ?? [],
     ...(is24 ? { emitters: emittersOf(z.id) } : {}),
   }))
+  // Warm roof: a room open to the slope holds the roof space above it too.
+  for (const z of zones) {
+    const v = roofSpace.get(z.id as string)
+    if (v && (z.area_m2 as number) > 0) z.height_m = r3(h + v / (z.area_m2 as number))
+  }
+  // Brief 123 P4 (the engine thread's schema): an unheated loft is an unconditioned zone with no setpoint and no
+  // system of any kind (Rule 8: absent, not muted); its air is its own air changes (ISO 13789, ventilated loft).
+  const loftZones = lofts.map(({ i, b, r }) => {
+    const foot = ringArea(b)
+    return {
+      id: loftId(i), name: plan.blocks.length > 1 ? `Loft ${i + 1}` : 'Loft', floor: 1, storeys: 1,
+      polygon: b.map(([x, y]) => [r3(x), r3(y)]), area_m2: r3(foot), height_m: r3(foot > 0 ? r!.void_m3 / foot : 0),
+      use_type: 'loft', rooms: null, profile_refs: { occupancy: null, lighting: [], equipment: [], auxiliary: [] },
+      setpoints: { heat_c: null, cool_c: null, setback_c: null, hours_ref: null, control_strategy: null },
+      ventilation: [], infiltration_q50: null, infiltration_ach: rec?.loft_ach ?? LOFT_ACH,
+      ...(is21 ? { internal_heat_capacity_j_per_k_m2: 0 } : {}),
+      surfaces: byZone.get(loftId(i)) ?? [],
+      ...(is24 ? { emitters: [] } : {}),
+      conditioning: 'unconditioned', unconditioned_kind: 'ventilated_loft',
+    }
+  })
 
   // Systems: per service, one group per system the user made, serving every zone it is given to, at 100% of that
   // service (one system per service per zone here). A template with no fuel ("No mechanical cooling") is none.
@@ -571,7 +675,7 @@ export function buildDocument(plan0: Plan): Built {
       // Brief 117/120: the design heat loss's conditions, only once an outdoor temperature is chosen.
       ...(bi.design_outdoor != null ? { design: { outdoor: typeof bi.design_outdoor === 'number' ? { stated_c: bi.design_outdoor } : { from_weather: bi.design_outdoor }, warm_up_w_per_m2: bi.warm_up_w_per_m2 ?? null, vent_wind_m_s: bi.vent_wind_m_s ?? null } } : {}),
     },
-    zones,
+    zones: [...zones, ...loftZones],
     surfaces,
     system_groups,
     services: {
