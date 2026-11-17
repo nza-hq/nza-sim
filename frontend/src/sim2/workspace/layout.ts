@@ -9,7 +9,7 @@ export const MODEL_CENTRE_TABS = [
   { id: 'monthly', label: 'Monthly' },
 ] as const
 export type CentreTab = (typeof MODEL_CENTRE_TABS)[number]['id']
-export type Layout = { left: number; right: number; centre: CentreTab }
+export type Layout = { left: number; right: number; centre: CentreTab; rightOpen: boolean }
 
 export const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
@@ -21,10 +21,11 @@ export function loadLayout(): Layout {
         left: clamp(Number(s.left) || LEFT.def, LEFT.min, LEFT.max),
         right: clamp(Number(s.right) || RIGHT.def, RIGHT.min, RIGHT.max),
         centre: MODEL_CENTRE_TABS.some((t) => t.id === s.centre) ? s.centre : 'drawing',
+        rightOpen: s.rightOpen !== false,
       }
     }
   } catch { /* private window or blocked storage: defaults */ }
-  return { left: LEFT.def, right: RIGHT.def, centre: 'drawing' }
+  return { left: LEFT.def, right: RIGHT.def, centre: 'drawing', rightOpen: true }
 }
 export function saveLayout(l: Layout) {
   try { localStorage.setItem(MODEL_LAYOUT_KEY, JSON.stringify(l)) } catch { /* not remembered, still works */ }

@@ -14,7 +14,7 @@ export default function ModelPage() {
   return (
     <ModelWorkspace
       header={<ModelSave api={api} plan={plan} />}
-      render={({ step, slots, centre, setCentre }) => <GeometryLab slots={slots} step={step} onStep={onStep} centreTab={centre} onCentreTab={setCentre} api={api} onPlan={setPlan} />}
+      render={({ step, slots, centre, setCentre, openRight }) => <GeometryLab slots={slots} step={step} onStep={onStep} centreTab={centre} onCentreTab={setCentre} onOpenRight={openRight} api={api} onPlan={setPlan} />}
     />
   )
 }

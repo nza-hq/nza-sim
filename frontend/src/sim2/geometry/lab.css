@@ -2,7 +2,7 @@
  * "re-*", ui/editMode.css): paper and grid, white floor, ink outline, orange = chosen, green = acts. Faces, sizes and
  * colours come from NZA Sim's shared design system (src/design-system/tokens.css, decodED's type system): DM Sans for
  * the UI, Inter for figures, Stolzl for titles. Only the plan's own drawing colours live here. Scoped to .gl-root. */
-.gl-root {
+.gl-root, .ap-bar {
   --gl-orange: var(--color-select, #E28F2C);
   --gl-green: var(--color-act, #235546);
   --gl-ink: var(--color-ink, #2A2A2A);
@@ -17,6 +17,8 @@
   --gl-display: var(--font-display, 'Stolzl', 'DM Sans', system-ui, sans-serif);
   --gl-detail: var(--font-sans, 'DM Sans', system-ui, sans-serif);
   --gl-figures: var(--font-figures, 'Inter', system-ui, sans-serif);
+}
+.gl-root {
   position: fixed; inset: 0; overflow: hidden; background: var(--gl-paper);
   font-family: var(--gl-detail); font-size: 13px; color: var(--gl-ink);
 }
@@ -416,6 +418,12 @@
 .ap-navby button[aria-selected='true'] { background: #F1F6F3; border-color: var(--gl-green); color: var(--gl-green); font-weight: 600; }
 /* The kinds live on the left in the workspace; the right is the passport. */
 .gl-root.gl-pane .ap-give .ap-kinds { display: none; }
+/* Linzie, 17 Nov 00:31: the left lists what is in the model and makes new ones; the right only edits the one chosen. */
+.gl-root.gl-pane .ap-give .ap-items, .gl-root.gl-pane .ap-give .ap-rnew { display: none; }
+.ap-activename { display: none; }
+.gl-root.gl-pane .ap-activename { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font: 500 14px var(--gl-detail); color: var(--gl-ink); }
+.gl-root.gl-pane .ap-activename small { margin-left: auto; color: var(--gl-soft); font-size: 12px; }
+.ap-zone > .gl-row.gl-librow { margin-top: 6px; }
 .ap-navsec { font: 700 10.5px var(--gl-detail); letter-spacing: .06em; text-transform: uppercase; color: var(--gl-soft); margin: 10px 0 4px; }
 .ap-navit .ap-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .ap-navit.active { box-shadow: inset 3px 0 0 var(--gl-green); }
@@ -484,3 +492,10 @@
 .gl-right .ap-detail .gl-title-in { width: 100%; box-sizing: border-box; }
 .gl-right .gl-row > .ap-setc { min-width: 0; text-align: right; white-space: normal; max-width: 70%; }
 .gl-root .ap-goctl { white-space: nowrap; }
+
+/* The Apply bar, in the middle over the drawing (17 Nov). */
+.ap-bar { position: absolute; left: 50%; bottom: 124px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 12px; max-width: calc(100% - 32px); padding: 8px 10px 8px 14px; border: 1px solid var(--gl-line, #E2E8F0); border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(15, 23, 42, .12); font: 500 13px var(--gl-detail, Inter, system-ui, sans-serif); color: var(--gl-ink, #0F172A); }
+.ap-bar-what { display: flex; flex-direction: column; min-width: 0; }
+.ap-bar-what small { color: var(--gl-soft, #64748B); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+.ap-bar .ap-apply { width: auto; margin: 0; white-space: nowrap; }
+.ap-bar .ap-link { white-space: nowrap; }

@@ -40,7 +40,7 @@ import './lab.css'
 import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
 import { ALWAYS, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
-import { ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
+import { ApplyBarTarget, ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
@@ -241,7 +241,7 @@ type Pending = { plan: Plan; who: string; name: string; change: string; ask: str
 /** The give on screen now (its footer), recorded each render so the preview can run it. */
 type Giver = { name: string | null; rooms: boolean; now: string[]; onGive: (all: boolean) => void; colour: string }
 
-export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab, api, onPlan }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void; api?: React.MutableRefObject<EditorApi | null>; onPlan?: (p: Plan) => void } = {}) {
+export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab, onOpenRight, api, onPlan }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void; onOpenRight?: () => void; api?: React.MutableRefObject<EditorApi | null>; onPlan?: (p: Plan) => void } = {}) {
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>(emptyPlan)
@@ -839,6 +839,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   /** Profiles step: the kind shown and the profile chosen (Brief 110b). */
   const [profKind, setProfKind] = useState<ProfileKind>('occupancy')
   const [profSel, setProfSel] = useState<string | null>(null)
+  // Choosing something opens the right again if it was closed: its card is where the chosen thing is set.
+  const openedFor = useRef<unknown[] | null>(null)
+  useEffect(() => {
+    const now = [sel, profSel, activeSpace, activeSet, activeUse, active, activeSys, activeEmit, activeLoad, shapeTab]
+    const was = openedFor.current
+    openedFor.current = now
+    if (was && now.some((x, i) => x !== was[i] && x != null)) onOpenRight?.()
+  }, [sel, profSel, activeSpace, activeSet, activeUse, active, activeSys, activeEmit, activeLoad, shapeTab, onOpenRight])
   // Walk-through: Profiles opens on the first of the kind, so the editor shows rather than an empty centre.
   useEffect(() => {
     if (mode !== 'profiles' || (profSel && profile(profSel))) return
@@ -1414,6 +1422,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           choose: () => undefined,
           active: profSel === key, onPick: () => setProfSel(key),
         })),
+        add: profLibraryAdd(),
       }]
     }
     return []
@@ -1421,6 +1430,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
 
   const chooseList = () => (
     <ChooseList
+      hint={mode === 'profiles' ? 'Choose one to edit it in the middle; the drawing colours the rooms that use it. Double-click a name to rename it.' : !leftRooms ? 'Tap one to edit it on the right and choose its rooms; tap rooms on the drawing too, then Apply in the middle. Ctrl or Shift adds more.' : undefined}
       nav={{ by: leftRooms ? 'rooms' : leftKind, tabs: [...(mode === 'profiles' ? [] : [{ key: 'rooms', name: 'Rooms', icon: 'rooms' as const }]), ...leftKinds()], onBy: onLeftKind, sections: navSections() }}
       onNewZone={() => {
         const z = blankZone(plan.next.zone)
@@ -1569,7 +1579,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <p className="gl-hint">Every value comes from NZA Sim's library. Apply puts these on the rooms chosen, or the whole building; change any room or wall afterwards on its own kind. Doors take the set's door.</p>
               <p className="gl-hint">Sets for existing buildings by age need their constructions added to the library first, for Chris to check.</p>
             </>
-          ) : <p className="gl-hint ap-pnone">Choose a set to see what it puts on each part.</p>}
+          ) : <p className="gl-hint ap-pnone">Choose a set on the left to see what it puts on each part.</p>}
           give={giveFoot({ name: cur?.name ?? null, rooms: true, now: chosenSet.rooms.map((id) => setById(plan.fabric_set)?.name ?? `${typeName(roomType(plan, id, 'roof'))} roof`), onGive: (all) => cur && commit(applySet(plan, cur, all ? allRooms() : chosenSet.rooms)) })}
         />
       )
@@ -1730,10 +1740,23 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   }
   const renameProfile = (key: string, name: string) => commit({ ...plan, own_profiles: (plan.own_profiles ?? []).map((x) => (x.key === key ? { ...x, name } : x)) })
 
+  /** On the left under this project's profiles: add one of the kind from NZA Sim's library. */
+  const profLibraryAdd = () => {
+    const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
+    const mine = projectProfiles()
+    const others = profilesFor(kind.key).filter((p) => !mine.includes(p.key))
+    return (
+      <div className="gl-row gl-librow"><span>+ From the library</span>
+        <select className="gl-sel" aria-label={`Add a ${kind.name.toLowerCase()} profile`} value="" onChange={(e) => { const k = e.target.value; if (k) { commit({ ...plan, profiles: [...(plan.profiles ?? []), k] }); setProfSel(k) } }}>
+          <option value="">{others.length ? 'Choose one…' : 'None left in the library'}</option>
+          {others.map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
+        </select>
+      </div>
+    )
+  }
   const profilesPanel = () => {
     const kind = PROFILE_KINDS.find((k) => k.key === profKind)!
     const mine = projectProfiles().filter((k) => profile(k)!.schedule_type === kind.key)
-    const others = profilesFor(kind.key).filter((p) => !mine.includes(p.key))
     const sel = profSel && mine.includes(profSel) ? profile(profSel)! : null
     const items: Item[] = mine.map((k) => {
       const p = profile(k)!, u = usersOf(k)
@@ -1746,14 +1769,6 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         items={items} active={sel?.key ?? null}
         onActive={setProfSel}
         onRemove={(id) => { commit({ ...plan, profiles: (plan.profiles ?? []).filter((k) => k !== id), own_profiles: (plan.own_profiles ?? []).filter((x) => x.key !== id) }); if (profSel === id) setProfSel(null) }}
-        top={
-          <div className="gl-row gl-librow"><span>Add from the library</span>
-            <select className="gl-sel" aria-label={`Add a ${kind.name.toLowerCase()} profile`} value="" onChange={(e) => { const k = e.target.value; if (k) { commit({ ...plan, profiles: [...(plan.profiles ?? []), k] }); setProfSel(k) } }}>
-              <option value="">{others.length ? 'Choose one…' : 'None left in the library'}</option>
-              {others.map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
-            </select>
-          </div>
-        }
         detail={sel ? (
           <>
             {sel.own
@@ -1766,7 +1781,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               : "From NZA Sim's library. Editing it in the middle makes this project's own copy, and this project's space types and systems move to it; the library stays as it is."}</p>
           </>
         ) : (
-          <p className="gl-hint ap-pnone">{mine.length ? 'Choose one to see its day and what uses it.' : `None in this project yet. Add one from the library; ${kind.where}.`}</p>
+          <p className="gl-hint ap-pnone">{mine.length ? 'Choose one on the left to see its day and what uses it.' : `None in this project yet. Add one from the library on the left; ${kind.where}.`}</p>
         )}
         give={null}
       />
@@ -2043,7 +2058,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {res && <div className="gl-row"><span>In the year</span><span className="ap-setc">{Math.round(res.hours_run).toLocaleString('en-GB')} h, {Math.round(res.kwh).toLocaleString('en-GB')} kWh</span></div>}
             <p className="gl-hint">Power while it runs, in W; when it runs is set on Controls. Its heat warms no room. Empty stays unset.</p>
           </>
-        ) : <p className="gl-hint ap-pnone">Lifts, external lighting and other loads outside the rooms. Add one with "New load".</p>}
+        ) : <p className="gl-hint ap-pnone">Lifts, external lighting and other loads outside the rooms. Add one on the left.</p>}
         give={null}
       />
     )
@@ -3232,7 +3247,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </div>}
     </div>
   )
-  return embedded && slots ? createPortal(root, slots.centre) : root
+  const barTo = embedded && slots && (centreTab ?? 'drawing') === 'drawing' ? slots.centre : null
+  const rooted = <ApplyBarTarget.Provider value={barTo}>{root}</ApplyBarTarget.Provider>
+  return embedded && slots ? createPortal(rooted, slots.centre) : rooted
 }
 
 function Num({ value, unit, auto, step, min = 0, max, onCommit, onChange }: { value: number | string; unit?: string; auto?: boolean; step?: number; min?: number; max?: number; onCommit?: (v: number) => void; onChange?: (s: string) => void }) {
