@@ -137,8 +137,6 @@ describe('Brief 115: one room, one step', () => {
     expect(f(25, 5)).toBeCloseTo(0.8 * 0.2, 12)     // ΔT 20 ≥ 15: least
     m.rule!.hours = new Float64Array([0])
     expect(f(25, 22)).toBe(0)
-    m.rule!.hours = new Float64Array([0.5])          // the opening profile's value scales how far they open
-    expect(f(25, 22)).toBeCloseTo(0.4, 12)
     m.rule!.hours = null
     m.rule!.open_above_h = new Float64Array([26])    // a temperature profile's hour in place of open_above_c
     expect(f(25, 22)).toBe(0)
@@ -217,6 +215,11 @@ describe('Brief 115: runModel under weather-driven air', () => {
     expect(() => ModelDocument.parse(tt)).toThrow('opens by its hours')
     const low = structuredClone(flat26); low.profiles.at(-1).day_types.sunday[3] = low.zones[0].setpoints.heat_c
     expect(() => run(low)).toThrow('controls[0].open_above_ref')
+    // Review F8: under a temperature rule the opening profile is 0 or 1 (when they may open); part values only for timetables.
+    const part = weatherDriven()
+    part.profiles.push({ id: 'half', kind: 'schedule', day_types: { weekday: Array(24).fill(0.5), saturday: Array(24).fill(0.5), sunday: Array(24).fill(0.5) } })
+    part.controls[0].hours_ref = 'half'
+    expect(() => run(part)).toThrow('controls[0].hours_ref: a window that opens by temperature takes its hours as 0 (shut) or 1')
   })
   it('review F3: an extract fan is a fixed flow in the room\'s balance, its air through the leakage; natural entries beside windows refused', () => {
     const base = weatherDriven(); for (const c of base.controls) c.open_fraction = 0

@@ -374,6 +374,18 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   return { open_factor: factor, p_z: P, iterations: it, m_in: rec[0] + rec[1] + rec[2] + mt }
 }
 
+/**
+ * Review F8: under a temperature rule the opening profile says only when the windows may open (0 or 1), as EnergyPlus's
+ * venting availability schedule does; how far is `open_fraction` and the modulation. Part values are for timetables
+ * (EnergyPlus's Constant venting with an opening-factor schedule). Refused by name, not rounded.
+ */
+function openingProfile(f: Float64Array, rule: string, path: string): Float64Array {
+  if (rule === 'temperature') for (let h = 0; h < f.length; h++) if (f[h] !== 0 && f[h] !== 1) {
+    throw new AirflowError(`a window that opens by temperature takes its hours as 0 (shut) or 1 (may open), not ${f[h]} (hour ${h}); say how far with open_fraction, or use a timetable rule`, path)
+  }
+  return f
+}
+
 /** The turbulent part of the single-sided correlation alone, m³/s, for an open area A (m²): ½·A·√C₃ (review F2). */
 export function turbulenceFlow(A: number): number { return 0.5 * A * Math.sqrt(AIR.c_turb) }
 
@@ -383,13 +395,13 @@ interface DocLike {
   building: { air: { method: string; exponent: number | null; single_sided_turbulence: boolean | null }; site: { terrain?: string | null } }
   zones: { id: string; floor: number; storeys: number; height_m: number; infiltration_q50: number | null; infiltration_ach: number | null }[]
   surfaces: { id: string; kind: string; zone_a: string; zone_b: string; area_m2: number; azimuth_deg: number | null; tilt_deg: number; openings: any[] }[]
-  controls: { id: string; target: { kind: string; ref: string }; rule: string | null; open_fraction: number | null; open_above_ref: string | null; open_above_c?: number | null; min_open_h: number | null; min_closed_h: number | null; modulation: { full_open_below_dk: number; min_open_above_dk: number; min_fraction: number } | null }[]
+  controls: { id: string; target: { kind: string; ref: string }; hours_ref?: string | null; rule: string | null; open_fraction: number | null; open_above_ref: string | null; open_above_c?: number | null; min_open_h: number | null; min_closed_h: number | null; modulation: { full_open_below_dk: number; min_open_above_dk: number; min_fraction: number } | null }[]
 }
 
 /**
  * Every zone's air model, from the document. `envelopeArea` is each zone's envelope area as today's method takes it;
- * `hoursOf` turns a schedule profile into hourly fractions; `windows` false leaves windows out (Rule 8: at "Fabric
- * only" and "+ Spaces" there are no windows in the run).
+ * `hoursOf` turns a schedule profile into hourly fractions and `tempOf` a temperature profile into hourly °C. Rule 8
+ * (no windows at "Fabric only" and "+ Spaces") is done before this, in the seam's `levelDocument`.
  */
 export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (ref: string, path: string) => Float64Array,
   tempOf: (ref: string, path: string) => Float64Array = (_r, p) => { throw new AirflowError('temperature profiles need the weather calendar', p) }): ZoneAirModel[] {
@@ -472,13 +484,13 @@ export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (r
       if (c.min_open_h != null || c.min_closed_h != null) throw new AirflowError('least open and closed times are not modelled yet; leave empty', `${cp}.${c.min_open_h != null ? 'min_open_h' : 'min_closed_h'}`)
       if (c.open_above_ref != null && c.open_above_c != null) throw new AirflowError('the windows open above a temperature profile or one temperature: keep one', `${cp}.open_above_c`)
       if (c.rule === 'temperature' && c.open_above_c == null && c.open_above_ref == null) throw new AirflowError('a window that opens by temperature needs the temperature it opens above (one figure, or a temperature profile)', `${cp}.open_above_c`)
-      const hrs = (c as any).hours_ref as string | null
+      const hrs = c.hours_ref ?? null
       const md = c.modulation
       if (md && !(md.min_open_above_dk > md.full_open_below_dk)) throw new AirflowError('the upper difference must be above the lower', `${cp}.modulation`)
       rule = {
         rule: c.rule as 'temperature' | 'timetable', open_fraction: c.open_fraction, open_above_c: c.open_above_c ?? null,
         open_above_h: c.rule === 'temperature' && c.open_above_ref != null ? tempOf(c.open_above_ref, `${cp}.open_above_ref`) : null,
-        hours: hrs != null ? hoursOf(hrs, `${cp}.hours_ref`) : null,
+        hours: hrs != null ? openingProfile(hoursOf(hrs, `${cp}.hours_ref`), c.rule, `${cp}.hours_ref`) : null,
         modulation: md ? { lower_dk: md.full_open_below_dk, upper_dk: md.min_open_above_dk, min_fraction: md.min_fraction } : null,
       }
     }
