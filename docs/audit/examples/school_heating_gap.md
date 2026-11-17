@@ -45,8 +45,22 @@ Both engines put the same sun on the wall. The difference is how fast the outsid
 3. **The sky.** Our engine takes the sky 11 K below the air (ISO 52016-1 Annex B). This weather file's own long-wave data puts it 9.3 K below on average. Setting 9.33 in a local experiment gave 90,008 kWh, which is −1.4 %. The experiment was not kept.
 4. **What is left.** About 6 %, consistent with glazing: EnergyPlus's window has its own films and a frame. Not yet split further.
 
+## A check on the obvious fix
+
+ISO 6946:2017 Annex C gives the outside film as 4 + 4·v. At this file's mean wind that is 10.35 W/m²K. As a local experiment, not kept, our film was set to that constant:
+
+- Plain gap: from +31.6 % to +23.5 %.
+- With TARP inside convection as well: +18.1 %.
+- Walls only: +20.5 %. Windows only: +27.8 %.
+
+So EnergyPlus's effective outside film here is well below what ISO 6946 gives from the weather station's wind. Its DOE-2 model reduces the wind for the wall's height and the suburban terrain, and lowers it again on the leeward side. Matching EnergyPlus would mean taking EnergyPlus's convection model, not ISO's. That is a choice of method to make on purpose, not a number to fit.
+
 ## What it means
 
 - The +38 % is not a missing term (Rule 9 holds: every line closes) and not a bug in either side's geometry or U. It is the outside film on old, leaky fabric at a sheltered site.
 - The engine already has wind-driven outside convection, ISO 6946:2017 Annex C, h = 4 + 4·v, but only for a one-room run. The multi-room run refuses it, because it keeps one matrix factorisation for the year.
-- To close most of the gap, the multi-room run would need the wind-driven film. One exact way is binned wind classes, each with its own factorisation. Inside convection would default to TARP. This changes every result, including the Bridgewater anchor, so it is Linzie's decision and a brief of its own, with every referee re-run. It is not an overnight change.
+- Options, all Linzie's to choose, because each changes every result, including the Bridgewater anchor. Each needs a brief and every referee re-run.
+  - (a) Keep ISO 52016-1's fixed films and label the gap.
+  - (b) ISO 6946's wind-driven film plus TARP inside, which closes a little under half of it here.
+  - (c) EnergyPlus's own DOE-2 outside convection, with height and terrain, which should close most of it. This makes our run follow EnergyPlus's method rather than ISO's.
+  - The engine work is the same for (b) and (c): the outside film becomes an hourly input to the multi-room run, which already re-factorises every step for TARP.
