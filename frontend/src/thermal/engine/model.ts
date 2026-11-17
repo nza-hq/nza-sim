@@ -401,7 +401,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   // Brief 115: weather-driven air, per zone, and what it recorded each hour.
   let airModels: ZoneAirModel[] | null = null
   const airInflow: Float64Array[] = [], airOpen: Float64Array[] = []
-  let airAtOf: (zi: number) => ((h: number, room_c: number, te: number, out: Float64Array, w: number) => void) | null = () => null
+  let airAtOf: (zi: number) => ((h: number, room_c: number, te: number, out: Float64Array, w: number, frac: number) => void) | null = () => null
   if (weatherAir) {
     try {
       airModels = buildAirModels(doc, built.zones.map((Z) => Z.envelopeArea), (ref, p) => scheduleFractions(doc, ref, weather.hours, p))
@@ -413,8 +413,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     for (let zi = 0; zi < Zn; zi++) { airInflow.push(new Float64Array(H)); airOpen.push(new Float64Array(H)) }
     airAtOf = (zi) => {
       const m = airModels![zi]
-      return (h, room, te, out, w) => {
-        const st = zoneAirStep(m, wx, h, room, te, out)
+      return (h, room, te, out, w, frac) => {
+        const st = zoneAirStep(m, wx, h, room, te, out, frac)
         if (w > 0) { airInflow[zi][h] += w * st.m_in * 3600; airOpen[zi][h] += w * st.open_factor }
       }
     }
