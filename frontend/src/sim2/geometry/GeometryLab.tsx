@@ -2823,7 +2823,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -2878,6 +2878,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         )}
         {flash.length > 0 && shown.rooms.filter((r) => flash.includes(r.id)).map((r) => <polygon key={`fl${r.id}`} className="gl-room-flash" points={P(r.ring)} />)}
         {shown.blocks.map((b, i) => <polygon key={`s${i}`} className={`gl-shell${chosenBlocks.has(i) || (drag && drag.kind === 'corner' && drag.block === i) ? ' chosen' : ''}`} points={P(b)} />)}
+        {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Shape turns the whole outline orange (floor lighter, dashed). */}
+        {mode === 'outline' && (shapeTab === 'roof' || shapeTab === 'floor') && shown.blocks.map((b, i) => <polygon key={`hl${i}`} className={`gl-surf-on ${shapeTab}`} points={P(b)} />)}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
           return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />

@@ -524,5 +524,8 @@
 .tp-axr { text-anchor: end; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
 .gl-ev-fit { position: absolute; top: 56px; right: 16px; z-index: 2; }
 /* Shape: the rooms under the outline, for context only (17 Nov). */
+.gl-surf-on { pointer-events: none; stroke-linejoin: round; }
+.gl-surf-on.roof { fill: rgba(226, 143, 44, .32); stroke: var(--gl-orange); stroke-width: 7; }
+.gl-surf-on.floor { fill: rgba(226, 143, 44, .14); stroke: #F0B46A; stroke-width: 7; stroke-dasharray: 12 6; }
 .gl-room-ctx { fill: rgba(35, 85, 70, .05); stroke: #9AA5A0; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .gl-zname.gl-ctx { fill: #8A9690; font-weight: 500; pointer-events: none; }

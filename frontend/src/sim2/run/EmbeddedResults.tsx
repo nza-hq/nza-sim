@@ -80,7 +80,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
                 {estLines ? <HeatBalance lines={estLines} />
                   : <p className="gl-hint">{run.instant.kind === 'missing' ? `No estimate yet. To set: ${run.instant.items.map((m) => m.what).join(' ')}` : run.instant.kind === 'error' ? `The estimate failed: ${run.instant.message}` : 'No estimate yet: choose a weather file (Site).'}</p>}
                 {est && est.notes.length > 0 && <ul className="rp-est-notes">{est.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
-                <h3 className="rp-est-h">The hourly year{run.hourlyStale ? ' (out of date: press Run in the bar above)' : run.state.kind === 'idle' ? ' (press Run in the bar above)' : ''}</h3>
+                <h3 className="rp-est-h">The full year, every 15 minutes{run.hourlyStale ? ' (out of date: press Run in the bar above)' : run.state.kind === 'idle' ? ' (press Run in the bar above)' : ''}</h3>
               </div>
             )}
             {lines && (
