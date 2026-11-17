@@ -128,21 +128,89 @@ Later, if she wants them, from decodED's list:
   - Changing the pitch changes the slope area shown.
 
 ### P4: The loft and sloped roofs in the engine (engine thread)
-- Covers:
-  - The unheated loft zone (no setpoint, no system objects; Rule 8).
-  - Its ventilation, with the rate cited.
-  - The ceiling as an internal surface.
-  - The slopes and gable walls.
-  - The same in the monthly estimate (Brief 122), and in Rule 14's sense for every path that walks the envelope.
-- Every term is a line in the breakdown (Rule 9), including:
-  - Loss through the ceiling to the loft.
-  - Loss from the loft to outside.
-  - Solar on the slopes.
-- The engine thread writes this section in full.
+
+Sloped roofs need nothing new: a roof surface already takes any tilt and azimuth, and sun, sky, films and convection follow the tilt (`model.ts` `buildElements`, `elements.ts`). P4 is the unheated loft, and every path that walks the envelope taking it the same way.
+
+**P4.1 Schema 2.12 (`thermal/schema/model.ts`, upgrade 2.11 → 2.12 fills nothing).**
+- `zones[].conditioning`: `'conditioned'` (default, every zone today) or `'unconditioned'`.
+- An unconditioned zone has no setpoints (`heat_c`, `cool_c`, `setback_c`, `hours_ref`, `heat_ref`, `cool_ref` all null), no emitters, no ventilation entries, no profile references, and is in no system group or control. Each of these is refused by name if present (Rule 8: removed, not muted).
+- `zones[].unconditioned_kind`: `'ventilated_loft'` (the only kind this brief; an unheated stairwell or store can follow), recorded for the screens and the defaults.
+- The loft's air is its own `infiltration_ach`, stated on the zone (P4.2). Its `infiltration_q50` is null.
+- The ceiling between a room and the loft is an interzone `ceiling` surface (`zone_a` the room, `zone_b` the loft), with the ceiling's construction (joists and quilt) and both inside faces, as Brief 104's interzone floors.
+
+**P4.2 The loft's air, cited.**
+- Default 'ventilated loft': **3 air changes an hour**, ISO 13789:2017 Table 7, "not airtight due to some localised open joints or permanent ventilation openings". BS 5250 sets the vent openings (for example a 10 mm continuous gap at each eave, 5 mm at the ridge) but gives no air change rate, so the rate comes from ISO 13789's conventional values. Before P4 builds, the table's wording and values are checked against a published copy or a secondary source that quotes it. If they differ, the published values are used and the change is stated.
+- The editor shows it as "Loft ventilation 3 air changes an hour (ISO 13789, ventilated loft)", editable, never hidden.
+- The rooms' own leakage: under a cold roof, q50 × the rooms' envelope area counts the ceiling to the loft (the air barrier is at the ceiling), so taking the roof off the rooms does not cut their leakage. Under today's method and under weather-driven air both. Stated in the schema note and tested: a gable cold-loft box and the same box flat have the same room leakage.
+
+**P4.3 The hourly run (`model.ts`, `network.ts`).**
+- A document with a loft runs on the network solver (it has an interzone element). The loft floats: no heating or cooling term, its temperature solved each step from the ceiling, slopes, gable walls, solar, sky and its air.
+- Lines (Rule 9), all already terms of the solver:
+  - the room: `interzone` on the ceiling surface ("heat to the loft");
+  - the loft: `interzone` on the ceiling (the same heat, arriving), `conduction`, `opaque_solar_absorbed` and `sky_longwave` per slope and gable wall, `infiltration` (its 3 air changes), `storage`.
+  - The building breakdown leaves interzone out (it cancels), so it shows the loft's losses to outside and the solar on the slopes. Closure is checked per zone, loft included.
+- Results: the loft is a zone in `ZoneResults` with its hourly temperature; `heating_kwh` and `cooling_kwh` 0. It is marked unconditioned in `Summary.zones[]`.
+- Bridging: the roof junctions (eaves, verge, ridge) go to the loft zone, which has the roof; the top rooms keep the wall and window junctions and get no roof junction. Stated; the ceiling-to-wall junction at a cold roof is the ISO 14683 "roof" ψ applied at the eaves, as today (no new ψ values).
+
+**P4.4 Everything that walks the envelope (Rule 14's sense in v2).**
+- `levelDocument`: Fabric only heats every conditioned zone to the temperature and leaves the loft unconditioned (today it sets every zone's `heat_c`). + Spaces and + Systems keep it unconditioned.
+- `preflight`: does not ask the loft for setpoints.
+- Floor area (`readDocFloorM2`, EUI, kWh/m²): conditioned zones only. Tested: adding a loft does not change the floor area or the EUI denominator.
+- Systems, emitters, plant capacity, pumps, heating hours, window rules and hot water skip unconditioned zones, and refuse one named in a system group or control.
+- Design heat loss (Brief 117): a room's ceiling to the loft is a loss to an unheated space at the loft's design temperature. Following the MCS calculator's public method, the loft's design temperature is the outdoor design temperature for a ventilated loft. This is checked against the published method in P4; if it differs, its method is used and stated. The term is its own line ("ceiling to loft").
+- **The monthly estimate (Brief 122)** treats the loft as an adjacent unconditioned space, ISO 13789:2017 clause 6.4: each room's ceiling loss is H_iu·b·(θ_i − θ_e,m) with b = H_ue / (H_iu + H_ue). H_iu is the ceilings' U·A under that loft. H_ue is the loft's slopes and gable walls U·A plus ρc·n·V. Lines:
+  - the room: `interzone` on the ceiling;
+  - the loft, as a zone with no heating: `conduction` per slope and gable wall, `infiltration`, and `interzone` arriving, split in proportion to H_ue's parts so they close.
+  - Solar on the slopes and sky on them are left out of the monthly loft (ISO 13789's b without solar), and the notes say "solar on a cold roof's slopes is not counted in the estimate". The referee reports how much that is.
+- Today's engine (`instantCalc.js`) and the Bridgewater 133.2 anchor are not touched.
+
+**P4.5 Tests.**
+- Schema: an unconditioned zone with any setpoint, emitter, ventilation entry, profile reference, group or control is refused by name; 2.11 documents upgrade with every zone conditioned.
+- A gable cold-loft box: the loft's lines close every hour; the room's ceiling `interzone` equals minus the loft's; the building breakdown has no heating line on the loft; floor area unchanged by the loft.
+- The loft's temperature lies between outside and the room on a winter night, and above outside on a sunny day.
+- The monthly estimate closes per zone, loft included; b is between 0 and 1.
+- Fabric only leaves the loft unconditioned.
+- Bridgewater digest unchanged (no loft in it).
 
 ### P5: Referee (engine thread)
-- Against EnergyPlus: a box with a gable cold loft (the attic as an unconditioned zone) and a warm mono-pitch.
-- The gates are the engine thread's, stated before the run.
+
+Against EnergyPlus 25.2, on Chicago O'Hare TMY3 (committed, as the Brief 115 referees). The spec is committed before the first run as `validation/energyplus/123_roof_spec.json`; the script is `validation/energyplus/123_roof_referee.py`. Convection is iso_conv, on 4 steps an hour, with the EulerMethod zone air algorithm, as Briefs 115 and 120.
+
+**Cases.** All are a 10 × 20 m single-storey box, 3 m to the ceiling, the Brief 104 cooled room's wall, floor and window constructions, and windows on the long sides. No gains in Fabric-like cases.
+
+- **L1 gable cold loft.**
+  - Gable at 35°, ridge on the long axis.
+  - Slopes: tiles on felt, uninsulated. Gable walls: the wall type.
+  - Ceiling: plasterboard with 270 mm mineral wool.
+  - Loft: 3 air changes an hour (EnergyPlus `ZoneInfiltration:DesignFlowRate`, AirChanges/Hour, constant).
+  - Room heated to 21 °C, no cooling.
+- **L2: L1 in summer, cooled.** The same, with the room cooled at 24 °C, to test the solar on the slopes reaching the room through a hot loft.
+- **M1 warm mono-pitch.**
+  - Mono-pitch at 10°, high side north.
+  - Slope insulated: the library's pitched-roof-insulated item, U as stated. Room open to the roof, so its volume includes the void.
+  - Room heated to 21 °C, and cooled at 24 °C as M2.
+- **F0 flat.** The same box with today's flat roof, as the base for each case's own effect.
+
+**Gates (stated here, before any run).**
+
+| Case | Quantity | Gate |
+|---|---|---|
+| L1 | Room's annual heating | ±5 % |
+| L1 | Heat through the ceiling to the loft, year | ±10 % |
+| L1 | Loft's air temperature: annual mean | within 0.5 K |
+| L1 | Loft's air temperature: hourly RMSE | ≤ 1.0 K |
+| L1 | Loft's air temperature: hottest hour | within 1.5 K |
+| L1 | Own effect against F0 (heating) | ±10 % |
+| L2 | Room's annual cooling | ±10 % |
+| L2 | Own effect against F0 (cooling) | ±15 % |
+| M1 | Room's annual heating | ±5 % |
+| M2 | Room's annual cooling | ±10 % |
+| L1, M1 | Monthly estimate's heating against the 15-minute run | ±10 % (Brief 122's gate) |
+| L2 | Slope solar the monthly estimate leaves out | reported, not gated |
+
+- The open room-level gaps of Briefs 103–108 (cooling especially) are reported beside each case's own effect, as Briefs 115 and 119 do. A miss is reported as a miss and never tuned.
+- The report is `docs/audit/123/02_referee.md`, with the engine and EnergyPlus JSON beside it.
+- The EnergyPlus attic is the reference: an unconditioned `Zone` with the slopes and gables as its surfaces and the ceiling as an interzone `Surface` pair. The roof's outside convection is the same fixed coefficient as the walls (iso_conv).
 
 ### P6: Drawing a roof (editor; after P3, and only if Linzie still wants it after using P3)
 - She marks the ridge and hip lines on the plan.
