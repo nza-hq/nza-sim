@@ -109,12 +109,27 @@ export const ScheduleProfile = z
   })
   .strict()
 
+/**
+ * Schema 2.11 (Brief 115): a named temperature for each hour, °C, by day type (weekday / saturday / sunday, index i the
+ * hour from i:00). A window that opens by temperature may open above one (`open_above_ref`) instead of one fixed
+ * `open_above_c`, so the threshold can follow the day (IES-style daily and weekly profiles).
+ */
+export const TemperatureProfile = z
+  .object({
+    id,
+    kind: z.literal('temperature'),
+    label: z.string().optional(),
+    day_types: z.object({ weekday: Day24, saturday: Day24, sunday: Day24 }).strict(),
+  })
+  .strict()
+
 export const Profile = z.discriminatedUnion('kind', [
   OccupancyProfile,
   LightingProfile,
   EquipmentProfile,
   AuxiliaryProfile,
   ScheduleProfile,
+  TemperatureProfile,
 ])
 export type Profile = z.infer<typeof Profile>
 
@@ -661,7 +676,9 @@ export type OtherLoad = z.infer<typeof OtherLoad>
  * trend logs. The figures it controls stay where they live (a zone's setpoints and hours, a system's pumps, a
  * ventilation entry's `runs`): the Controls step edits them there, so each field still has one place.
  * A `window` entry carries the window rule (Brief 115 owns the meanings and the physics; until it lands the rule is
- * recorded, not used). Its `ref` is a zone; `hours_ref` is the allowed opening hours (window entries only).
+ * recorded, not used). Its `ref` is a zone; `hours_ref` is the window's opening profile (window entries only): each hour's value, 0 to 1,
+ * is how far the windows may open that hour (0 shut), × `open_fraction`; a temperature rule opens only when its
+ * conditions hold, above `open_above_c` or the hour's value of the temperature profile `open_above_ref`.
  */
 export const CONTROL_TARGETS = ['system', 'ventilation', 'lighting', 'window'] as const
 export const CONTROLLERS = ['central_bms', 'local', 'time_clock', 'manual', 'photocell'] as const
@@ -910,6 +927,9 @@ export const ModelDocument = z
         for (const f of WINDOW_FIELDS) if (c[f] != null) ctx.addIssue({ code: 'custom', path: [...at, f], message: 'a window rule field; only on a window entry' })
       } else {
         if (c.hours_ref != null && !schedIds.has(c.hours_ref)) ctx.addIssue({ code: 'custom', path: [...at, 'hours_ref'], message: `schedule "${c.hours_ref}" does not exist` })
+        if (c.open_above_ref != null && !doc.profiles.some((p) => p.id === c.open_above_ref && p.kind === 'temperature')) ctx.addIssue({ code: 'custom', path: [...at, 'open_above_ref'], message: `temperature profile "${c.open_above_ref}" does not exist` })
+        if (c.open_above_ref != null && c.open_above_c != null) ctx.addIssue({ code: 'custom', path: [...at, 'open_above_c'], message: 'the windows open above a temperature profile or one temperature: keep one' })
+        if (c.rule === 'timetable' && (c.open_above_ref != null || c.open_above_c != null)) ctx.addIssue({ code: 'custom', path: [...at, c.open_above_ref != null ? 'open_above_ref' : 'open_above_c'], message: 'a window on a timetable opens by its hours, not by temperature; leave empty' })
         if (c.rule === 'adaptive' && c.adaptive_category == null) ctx.addIssue({ code: 'custom', path: [...at, 'adaptive_category'], message: 'an adaptive window rule needs its EN 16798-1 category (I, II or III)' })
       }
     })

@@ -108,7 +108,7 @@ describe('Brief 115: one room, one step', () => {
   it('temperature rule: shut below open-above or when colder than outside; EnergyPlus\'s modulation between', () => {
     const m = box({
       windows: [{ z_ref: 1, wind: 1, facade: 0, cd: 0.6, width: 1, height: 1, max_factor: 1 }],
-      rule: { rule: 'temperature', open_fraction: 0.8, open_above_c: 22, hours: null, modulation: { lower_dk: 5, upper_dk: 15, min_fraction: 0.2 } },
+      rule: { rule: 'temperature', open_fraction: 0.8, open_above_c: 22, open_above_h: null, hours: null, modulation: { lower_dk: 5, upper_dk: 15, min_fraction: 0.2 } },
     })
     const f = (room: number, te: number) => zoneAirStep(m, wx(te), 0, room, te, new Float64Array(4)).open_factor
     expect(f(21, 10)).toBe(0)
@@ -118,6 +118,12 @@ describe('Brief 115: one room, one step', () => {
     expect(f(25, 5)).toBeCloseTo(0.8 * 0.2, 12)     // ΔT 20 ≥ 15: least
     m.rule!.hours = new Float64Array([0])
     expect(f(25, 22)).toBe(0)
+    m.rule!.hours = new Float64Array([0.5])          // the opening profile's value scales how far they open
+    expect(f(25, 22)).toBeCloseTo(0.4, 12)
+    m.rule!.hours = null
+    m.rule!.open_above_h = new Float64Array([26])    // a temperature profile's hour in place of open_above_c
+    expect(f(25, 22)).toBe(0)
+    expect(f(27, 22)).toBeCloseTo(0.8, 12)
   })
 })
 
@@ -168,6 +174,30 @@ describe('Brief 115: runModel under weather-driven air', () => {
     expect(() => run(c)).toThrow('give it a window rule')
     const d = weatherDriven(); d.controls[0].open_above_c = d.zones[0].setpoints.heat_c
     expect(() => run(d)).toThrow('controls[0].open_above_c')
+  })
+  it('window operation as profiles: how far each hour (a schedule) and the temperature it opens above (a temperature profile)', () => {
+    // A timetable at half every hour opens as far as open_fraction 0.5 with no profile.
+    const half = weatherDriven('timetable'); for (const c of half.controls) c.open_fraction = 0.5
+    const prof = weatherDriven('timetable')
+    prof.profiles.push({ id: 'half', kind: 'schedule', day_types: { weekday: Array(24).fill(0.5), saturday: Array(24).fill(0.5), sunday: Array(24).fill(0.5) } })
+    for (const c of prof.controls) c.hours_ref = 'half'
+    const a = run(half), b = run(prof)
+    a.zones.forEach((z, i) => expect(b.zones[i].annual.heating_kwh).toBeCloseTo(z.annual.heating_kwh, 6))
+    // A temperature profile that holds 26 °C every hour gives the same as open_above_c 26.
+    const flat26 = weatherDriven()
+    flat26.profiles.push({ id: 't26', kind: 'temperature', day_types: { weekday: Array(24).fill(26), saturday: Array(24).fill(26), sunday: Array(24).fill(26) } })
+    for (const c of flat26.controls) { c.open_above_c = null; c.open_above_ref = 't26' }
+    const c0 = run(weatherDriven()), c1 = run(flat26)
+    c0.zones.forEach((z, i) => expect(c1.zones[i].air!.hours_windows_open).toBe(z.air!.hours_windows_open))
+    // Refused by name: both thresholds, a missing profile, a timetable with a threshold, a profile not above heating.
+    const both = structuredClone(flat26); both.controls[0].open_above_c = 26
+    expect(() => ModelDocument.parse(both)).toThrow('keep one')
+    const missing = structuredClone(flat26); missing.controls[0].open_above_ref = 'nope'
+    expect(() => ModelDocument.parse(missing)).toThrow(/temperature profile .{0,2}nope.{0,2} does not exist/)
+    const tt = weatherDriven('timetable'); tt.controls[0].open_above_c = 24
+    expect(() => ModelDocument.parse(tt)).toThrow('opens by its hours')
+    const low = structuredClone(flat26); low.profiles.at(-1).day_types.sunday[3] = low.zones[0].setpoints.heat_c
+    expect(() => run(low)).toThrow('controls[0].open_above_ref')
   })
   it('a vent under weather-driven air needs cd and height, not today\'s flow_mode', () => {
     const d = weatherDriven()

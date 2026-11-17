@@ -35,10 +35,12 @@
  * put on the walls, because a roof's pressure coefficient is not in this brief). Windows (glazing) leak nothing when
  * shut. Heights are above the ground: a zone's floor is at its storey × its storey height.
  *
- * Windows open by the zone's window entry on the control map (one per zone). 'temperature': open when the room (last
- * step) is warmer than outside and than `open_above_c`, inside the allowed hours, by `open_fraction` (× the
+ * Windows open by the zone's window entry on the control map (one per zone). Its opening profile (`hours_ref`, a
+ * schedule) gives each hour's value, 0 to 1: how far the windows may open that hour (0 shut; none: 1 every hour).
+ * 'temperature': open when the room (last step) is warmer than outside and than the threshold (`open_above_c`, or the
+ * hour's value of the temperature profile `open_above_ref`), by `open_fraction` × the profile's value (× the
  * modulation, as EnergyPlus's: 1 at or below the lower difference, `min_fraction` at or above the upper, straight
- * between). 'timetable': open by `open_fraction` in every allowed hour. A window's widest opening is its
+ * between). 'timetable': open by `open_fraction` × the profile's value. A window's widest opening is its
  * `openable_fraction` × its style's angle factor (`windowEffectiveArea`).
  *
  * Single-sided turbulence (switchable, `building.air.single_sided_turbulence`): when every open window in a room is on
@@ -138,7 +140,9 @@ export interface WindowRule {
   rule: 'temperature' | 'timetable'
   open_fraction: number
   open_above_c: number | null
-  /** Allowed hours, 0..1 per hour (opens where > 0); null: every hour. */
+  /** The threshold each hour, °C, from a temperature profile (in place of open_above_c); null: open_above_c. */
+  open_above_h: Float64Array | null
+  /** The opening profile, 0..1 per hour (× open_fraction; 0 shut); null: 1 every hour. */
   hours: Float64Array | null
   modulation: { lower_dk: number; upper_dk: number; min_fraction: number } | null
 }
@@ -217,17 +221,17 @@ export function zoneAirStep(m: ZoneAirModel, wx: AirWeather, h: number, room_c: 
   let factor = 0
   const r = m.rule
   if (r && m.windows.length) {
-    const allowed = r.hours ? r.hours[h] > 0 : true
-    if (allowed) {
-      if (r.rule === 'timetable') factor = r.open_fraction
-      else if (room_c > te && room_c > (r.open_above_c as number)) {
+    const prof = r.hours ? r.hours[h] : 1
+    if (prof > 0) {
+      if (r.rule === 'timetable') factor = r.open_fraction * prof
+      else if (room_c > te && room_c > (r.open_above_h ? r.open_above_h[h] : (r.open_above_c as number))) {
         let mult = 1
         const md = r.modulation
         if (md && md.min_fraction !== 1) {
           const dT = room_c - te
           mult = dT <= md.lower_dk ? 1 : dT >= md.upper_dk ? md.min_fraction : md.min_fraction + ((md.upper_dk - dT) / (md.upper_dk - md.lower_dk)) * (1 - md.min_fraction)
         }
-        factor = r.open_fraction * mult
+        factor = r.open_fraction * prof * mult
       }
     }
   }
@@ -363,7 +367,8 @@ interface DocLike {
  * `hoursOf` turns a schedule profile into hourly fractions; `windows` false leaves windows out (Rule 8: at "Fabric
  * only" and "+ Spaces" there are no windows in the run).
  */
-export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (ref: string, path: string) => Float64Array): ZoneAirModel[] {
+export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (ref: string, path: string) => Float64Array,
+  tempOf: (ref: string, path: string) => Float64Array = (_r, p) => { throw new AirflowError('temperature profiles need the weather calendar', p) }): ZoneAirModel[] {
   const air = doc.building.air
   const terrain = doc.building.site.terrain as Terrain | null | undefined
   if (terrain == null || !(terrain in AIR.terrain)) throw new AirflowError('weather-driven air needs the terrain (open, suburban, urban or city)', 'building.site.terrain')
@@ -439,13 +444,14 @@ export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (r
       if (c.rule === 'adaptive') throw new AirflowError('adaptive window rules are not modelled yet (Brief 115 follow-up); use temperature or timetable', `${cp}.rule`)
       if (c.open_fraction == null) throw new AirflowError('how far the windows open, 0 to 1 of their widest', `${cp}.open_fraction`)
       if (c.min_open_h != null || c.min_closed_h != null) throw new AirflowError('least open and closed times are not modelled yet; leave empty', `${cp}.${c.min_open_h != null ? 'min_open_h' : 'min_closed_h'}`)
-      if (c.open_above_ref != null) throw new AirflowError('temperature profiles are not in the document yet; state open_above_c', `${cp}.open_above_ref`)
-      if (c.rule === 'temperature' && c.open_above_c == null) throw new AirflowError('a window that opens by temperature needs the temperature it opens above', `${cp}.open_above_c`)
+      if (c.open_above_ref != null && c.open_above_c != null) throw new AirflowError('the windows open above a temperature profile or one temperature: keep one', `${cp}.open_above_c`)
+      if (c.rule === 'temperature' && c.open_above_c == null && c.open_above_ref == null) throw new AirflowError('a window that opens by temperature needs the temperature it opens above (one figure, or a temperature profile)', `${cp}.open_above_c`)
       const hrs = (c as any).hours_ref as string | null
       const md = c.modulation
       if (md && !(md.min_open_above_dk > md.full_open_below_dk)) throw new AirflowError('the upper difference must be above the lower', `${cp}.modulation`)
       rule = {
         rule: c.rule as 'temperature' | 'timetable', open_fraction: c.open_fraction, open_above_c: c.open_above_c ?? null,
+        open_above_h: c.rule === 'temperature' && c.open_above_ref != null ? tempOf(c.open_above_ref, `${cp}.open_above_ref`) : null,
         hours: hrs != null ? hoursOf(hrs, `${cp}.hours_ref`) : null,
         modulation: md ? { lower_dk: md.full_open_below_dk, upper_dk: md.min_open_above_dk, min_fraction: md.min_fraction } : null,
       }

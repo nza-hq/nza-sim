@@ -9,7 +9,7 @@
  */
 import { infiltration, ventCoefficient, ventConductance, type Vent } from './air'
 import { AIR_LINES, AirflowError, airWeather, buildAirModels, zoneAirStep, type ZoneAirModel } from './airflow'
-import { ScheduleError, scheduleFractions } from './pumps'
+import { ScheduleError, scheduleFractions, temperatureHours } from './pumps'
 import { computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K } from './constants'
 import { ElementError, innerElement, layerFaceNode, opaqueElement, windowElement, type ConstructionBody, type Element } from './elements'
@@ -404,7 +404,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   let airAtOf: (zi: number) => ((h: number, room_c: number, te: number, out: Float64Array, w: number, frac: number) => void) | null = () => null
   if (weatherAir) {
     try {
-      airModels = buildAirModels(doc, built.zones.map((Z) => Z.envelopeArea), (ref, p) => scheduleFractions(doc, ref, weather.hours, p))
+      airModels = buildAirModels(doc, built.zones.map((Z) => Z.envelopeArea), (ref, p) => scheduleFractions(doc, ref, weather.hours, p), (ref, p) => temperatureHours(doc, ref, weather.hours, p))
     } catch (e) {
       if (e instanceof AirflowError || e instanceof ScheduleError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
       throw e
@@ -475,9 +475,10 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     for (let h = 0; h < H; h++) {
       if (r.hours && !(r.hours[h] > 0)) continue
       const hc = sh ? sh[h] : fixed
-      if (hc != null && Number.isFinite(hc) && !((r.open_above_c as number) > hc)) {
+      const above = r.open_above_h ? r.open_above_h[h] : (r.open_above_c as number)
+      if (hc != null && Number.isFinite(hc) && !(above > hc)) {
         const ci = doc.controls.findIndex((c) => c.target.kind === 'window' && c.target.ref === doc.zones[zi].id)
-        throw new ModelError(`the windows open above ${r.open_above_c} °C, not above the room's heating setpoint (${hc} °C at hour ${h}): they would open while it is heated`, `controls[${ci}].open_above_c`)
+        throw new ModelError(`the windows open above ${above} °C, not above the room's heating setpoint (${hc} °C at hour ${h}): they would open while it is heated`, `controls[${ci}].${r.open_above_h ? 'open_above_ref' : 'open_above_c'}`)
       }
     }
   })
