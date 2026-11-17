@@ -408,7 +408,7 @@ function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit:
           : <span className="rp-strip-msg">{instant.kind === 'missing' ? `No estimate yet: ${instant.items.length} ${instant.items.length === 1 ? 'input' : 'inputs'} to set. See them on Heat flow.` : instant.kind === 'error' ? `The estimate failed: ${instant.message}` : !weather ? 'No estimate yet: choose a weather file (Site).' : 'Working it out…'}</span>}
       </div>
       <div className="rp-strip-hourly">
-        <span className="rp-strip-tag">Hourly year</span>
+        <span className="rp-strip-tag">Full year<br />(15 min)</span>
         {state.kind === 'running' ? <span className="rp-strip-msg">Running…</span>
           : s ? <span className={`rp-strip-hv${hourlyStale ? ' rp-stale' : ''}`} title={hourlyStale ? 'Out of date: the model has changed since this run' : undefined}>
               heating {unit === 'kwh_per_m2' ? `${perM2(s.building.heating_kwh, s.building.floor_m2)} kWh/m²` : `${mwh(s.building.heating_kwh)} MWh`}{hourlyStale ? ' · out of date' : ''}

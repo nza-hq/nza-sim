@@ -70,7 +70,7 @@ export function MonthlyEstimate({ estimate, zone }: { estimate: InstantEstimate;
         downLabel="↓"
         unit="kWh"
       />
-      <p className="rp-monthly-foot">The monthly method, worked out as you edit. Run the hourly year (above) for the full calculation.</p>
+      <p className="rp-monthly-foot">The monthly method, worked out as you edit. Run the full year (every 15 minutes, above) for the full calculation.</p>
     </div>
   )
 }
