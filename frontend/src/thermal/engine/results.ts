@@ -20,6 +20,8 @@ export interface BreakdownLine {
     | 'mechanical_ventilation'
     /** Brief 115, weather-driven air: windows opened by the zone's window rule, and EN 16798-7's single-sided term. */
     | 'window_ventilation' | 'single_sided_turbulence'
+    /** Brief 122, the monthly estimate (static) only: gain not used at the heating setpoint, less what cooling removed (monthly.ts). */
+    | 'gains_not_used'
   surface_id: string | null
   /** The profile a gains line comes from. */
   profile_id?: string

@@ -22,6 +22,7 @@
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
+import { runMonthly, type MonthlyOptions, type MonthlyResults } from '../../thermal/engine/monthly'
 import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
 import { CATALOGUES, checkCatalogueRefs, suggestItem } from '../../thermal/catalogue'
 import { DesignError, designHeatLoss, systemRoomsDesignW, type DesignTerm } from '../../thermal/engine/designHeatLoss'
@@ -882,5 +883,55 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
     // Review F8: the kWh is the end-use line's (Rule 11), read through readEntryKwh.
     pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, kwh: readEntryKwh(s, 'pumps', p.id), label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
     other_loads: s.other_loads.map((o) => ({ ...o, kwh: readEntryKwh(s, 'auxiliary', o.id) })),
+  }
+}
+
+/**
+ * Brief 122 P3: the monthly estimate (static), the instant tier on Site, Shape and Fabric. Rule 7: a Static engine,
+ * labelled as such; Rule 11: its own result, never merged with the hourly run's `Summary`. The shapes mirror Summary's
+ * so the workspace can reuse its balance rows and Monthly chart. The caller passes the document as the level it shows
+ * (`levelDocument(doc, 'fabric', heatC)` on Fabric only): nothing is levelled here.
+ */
+export interface InstantEstimate {
+  label: 'Monthly estimate (static)'
+  engine: 'monthly-static'
+  run_ms: number
+  building: { floor_m2: number; heating_kwh: number; cooling_kwh: number }
+  monthly: Monthly
+  /** The building's balance by term, kWh a year, positive into the building; heating, cooling and gains not used included. */
+  breakdown: { term: BreakdownLine['term']; kwh: number }[]
+  zones: { id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; monthly: Monthly; breakdown: { term: BreakdownLine['term']; kwh: number }[] }[]
+  /** What the estimate leaves out, in words (shown with it). */
+  notes: string[]
+}
+export type InstantResult = { ok: true; estimate: InstantEstimate } | { ok: false; missing: Missing[] }
+
+export const MONTHLY_OPTIONS: MonthlyOptions = { solar: RUN_OPTIONS.solar, glazing_solar: RUN_OPTIONS.glazing_solar ?? 'g_value', internal_gains: 'profiles' }
+
+export function instantEstimate(doc: ModelDocument, deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[] }): InstantResult {
+  const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
+  if (pre.missing.length) return { ok: false, missing: pre.missing }
+  let r: MonthlyResults
+  try { r = runMonthly(doc, deps.weather!.weather, pre.library, MONTHLY_OPTIONS) } catch (e) {
+    const m = engineMissing(e, doc)
+    if (m) return { ok: false, missing: [m] }
+    throw e
+  }
+  const byTerm = (zs: MonthlyResults['zones']) => {
+    const m = new Map<BreakdownLine['term'], number>()
+    for (const z of zs) for (const l of z.breakdown) m.set(l.term, (m.get(l.term) ?? 0) + l.kwh)
+    return [...m].map(([term, kwh]) => ({ term, kwh }))
+  }
+  const sum12 = (f: (z: MonthlyResults['zones'][number]) => number[]) => Array.from({ length: 12 }, (_, m) => r.zones.reduce((s, z) => s + f(z)[m], 0))
+  return {
+    ok: true,
+    estimate: {
+      label: 'Monthly estimate (static)', engine: r.engine, run_ms: r.run_ms,
+      building: { floor_m2: doc.zones.reduce((s, z) => s + z.area_m2, 0), heating_kwh: r.zones.reduce((s, z) => s + z.heating_kwh, 0), cooling_kwh: r.zones.reduce((s, z) => s + z.cooling_kwh, 0) },
+      monthly: { heating_kwh: sum12((z) => z.monthly.heating_kwh), cooling_kwh: sum12((z) => z.monthly.cooling_kwh) },
+      breakdown: byTerm(r.zones),
+      zones: r.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: z.floor_m2, heating_kwh: z.heating_kwh, cooling_kwh: z.cooling_kwh, monthly: z.monthly, breakdown: byTerm([z]) })),
+      notes: r.notes,
+    },
   }
 }
