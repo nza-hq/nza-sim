@@ -131,7 +131,7 @@ Later, if she wants them, from decodED's list:
 
 Sloped roofs need nothing new: a roof surface already takes any tilt and azimuth, and sun, sky, films and convection follow the tilt (`model.ts` `buildElements`, `elements.ts`). P4 is the unheated loft, and every path that walks the envelope taking it the same way.
 
-**P4.1 Schema 2.12 (`thermal/schema/model.ts`, upgrade 2.11 → 2.12 fills nothing).**
+**P4.1 Schema (`thermal/schema/model.ts`).** As built: the two fields are added to 2.11 with defaults (`'conditioned'`, null), so every saved plan reads unchanged and no version bump or upgrade step is needed.
 - `zones[].conditioning`: `'conditioned'` (default, every zone today) or `'unconditioned'`.
 - An unconditioned zone has no setpoints (`heat_c`, `cool_c`, `setback_c`, `hours_ref`, `heat_ref`, `cool_ref` all null), no emitters, no ventilation entries, no profile references, and is in no system group or control. Each of these is refused by name if present (Rule 8: removed, not muted).
 - `zones[].unconditioned_kind`: `'ventilated_loft'` (the only kind this brief; an unheated stairwell or store can follow), recorded for the screens and the defaults.
@@ -167,7 +167,7 @@ Sloped roofs need nothing new: a roof surface already takes any tilt and azimuth
 **P4.5 Tests.**
 - Schema: an unconditioned zone with any setpoint, emitter, ventilation entry, profile reference, group or control is refused by name; 2.11 documents upgrade with every zone conditioned.
 - A gable cold-loft box: the loft's lines close every hour; the room's ceiling `interzone` equals minus the loft's; the building breakdown has no heating line on the loft; floor area unchanged by the loft.
-- The loft's temperature lies between outside and the room on a winter night, and above outside on a sunny day.
+- The loft's temperature is far below the room and near outside on a winter night, and above outside on a sunny day. (Written first as "between outside and the room"; on a clear night the bare tiles see the sky and the loft falls a little below outside, in EnergyPlus too, 3,575 hours of the year, so the test says what the physics does.)
 - The monthly estimate closes per zone, loft included; b is between 0 and 1.
 - Fabric only leaves the loft unconditioned.
 - Bridgewater digest unchanged (no loft in it).

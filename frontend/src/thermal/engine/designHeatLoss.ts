@@ -11,6 +11,7 @@
  *   ground       U·A · (θ_int − θ_g)          θ_g the model's ground temperature, the weather file's annual mean
  *                                             (MIS 3005-D Issue 3.0 cl. 5.5.1(c), solid floors)
  *   to_room      U·A · (θ_int − θ_other)      each surface shared with another zone at its design temperature
+ *   to_loft      the same, to an unheated loft (Brief 123): at the outdoor design temperature unless stated
  *   infiltration ρc · n · V · (θ_int − θ_e)   n the model's own (q50 / 20, or a stated ach)
  *   vents        ρc · Σ c · v_d · (θ_int − θ_e)  each permanent vent at the stated design wind speed v_d
  *   mechanical   H_max · (θ_int − θ_e)        each ventilation entry at its largest hourly conductance (its full
@@ -47,7 +48,7 @@ export const MIN_DESIGN_ACH = 0.5
 /** The share of the year's hours colder than each weather-file design temperature (CIBSE Guide A's 99.6 % and 99 %). */
 const COLD_SHARE = { heating_99_6: 0.004, heating_99: 0.01 } as const
 
-export type DesignTerm = 'fabric' | 'bridging' | 'ground' | 'to_room' | 'infiltration' | 'vents' | 'mechanical_ventilation' | 'minimum_air_change' | 'warm_up'
+export type DesignTerm = 'fabric' | 'bridging' | 'ground' | 'to_room' | 'to_loft' | 'infiltration' | 'vents' | 'mechanical_ventilation' | 'minimum_air_change' | 'warm_up'
 
 export interface DesignLine {
   term: DesignTerm
@@ -69,7 +70,7 @@ export interface DesignZone {
   /** A zone with a heating setpoint. An unheated zone's lines are shown, but it is not in the building total. */
   heated: boolean
   internal_c: number
-  internal_source: 'stated' | 'follow_heat_c'
+  internal_source: 'stated' | 'follow_heat_c' | 'outdoor_design'
   /** Air changes an hour from infiltration, vents and ventilation, before the minimum. */
   ach: number
   lines: DesignLine[]
@@ -115,6 +116,9 @@ export function designHeatLoss(doc: ModelDocument, zones: readonly ZoneResults[]
   const internal = doc.zones.map((z, i) => {
     const p = `zones[${i}].design_internal_c`
     const v = z.design_internal_c
+    // Brief 123 P4.4: a ventilated loft not given a temperature sits at the outdoor design temperature, as the MCS
+    // calculator takes a roof (not verified against a published copy here; stated on screen as its source).
+    if (v == null && z.conditioning === 'unconditioned' && z.unconditioned_kind === 'ventilated_loft') return { c: outdoor_c, source: 'outdoor_design' as const }
     if (v == null) throw new DesignError(z.setpoints.heat_c == null ? 'required: the temperature this unheated zone is taken to sit at' : "required: a temperature, or 'follow_heat_c'", p)
     if (v === 'follow_heat_c') {
       if (z.setpoints.heat_c == null) throw new DesignError('this zone has no heating setpoint to follow: state its temperature', p)
@@ -152,7 +156,7 @@ export function designHeatLoss(doc: ModelDocument, zones: readonly ZoneResults[]
         const other = s.zone_a === zone.id ? s.zone_b : s.zone_a
         const oi = zoneIndex.get(other)!
         const dt = ti - internal[oi].c
-        lines.push({ term: 'to_room', surface_id: el.surface_id, other_zone_id: other, h_w_per_k: el.h_w_per_k, delta_t_k: dt, w: el.h_w_per_k * dt })
+        lines.push({ term: doc.zones[oi].conditioning === 'unconditioned' && zone.conditioning !== 'unconditioned' ? 'to_loft' : 'to_room', surface_id: el.surface_id, other_zone_id: other, h_w_per_k: el.h_w_per_k, delta_t_k: dt, w: el.h_w_per_k * dt })
       }
     }
     const tb = c.bridging.total_w_per_k

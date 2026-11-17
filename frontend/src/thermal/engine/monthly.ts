@@ -192,6 +192,7 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
   }
   const Z: ZB[] = doc.zones.map(() => ({ lossLines: [], gainLines: [], cm: 0, envelopeArea: 0, glazingAreas: [], glazingGroups: [], hasRoof: false, hasGround: false, sharedSlabs: 0, vents: 0, inside: [], tr: zeros(), beam: zeros(), paneIn: zeros() }))
   let nullFlowMode = false
+  const ceilings: { room: number; loft: number; surface_id: string; h: number }[] = []
   const seen = new Set<string>()
   doc.zones.forEach((zone, zi) => {
     for (const id of zone.surfaces) {
@@ -211,8 +212,14 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
         Z[zb].cm += faceCapacity(layers, s.area_m2)
         Z[za].inside.push({ area: s.area_m2, alpha: s.inside_solar_absorptance ?? null, window: null, floor: s.tilt_deg > 120 })
         Z[zb].inside.push({ area: s.area_m2, alpha: s.inside_solar_absorptance_b ?? null, window: null, floor: 180 - s.tilt_deg > 120 })
-        if ((s.kind === 'floor' || s.kind === 'ceiling') && zb !== za) { Z[za].sharedSlabs++; Z[zb].sharedSlabs++ }
-        void e
+        // Brief 123 P4: a ceiling to an unconditioned loft carries heat (ISO 13789 6.4, below); its area is in the room's
+        // envelope for leakage, and it is not a slab between storeys (as the hourly run, model.ts buildElements).
+        const ua = doc.zones[za].conditioning === 'unconditioned', ub = doc.zones[zb].conditioning === 'unconditioned'
+        if (ua !== ub) {
+          const room = ua ? zb : za, loft = ua ? za : zb
+          Z[room].envelopeArea += s.area_m2
+          ceilings.push({ room, loft, surface_id: s.id, h: e.u_w_per_m2k * s.area_m2 })
+        } else if ((s.kind === 'floor' || s.kind === 'ceiling') && zb !== za) { Z[za].sharedSlabs++; Z[zb].sharedSlabs++ }
         continue
       }
       const T = Z[za]
@@ -304,7 +311,7 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
   if (options.internal_gains === 'profiles') gains = wrap(() => zoneGains(doc, weather.hours))
 
   const P = MONTHLY_CONSTANTS
-  const zones: MonthlyZone[] = doc.zones.map((zone, zi) => {
+  const pre = doc.zones.map((zone, zi) => {
     const T = Z[zi], path = `zones[${zi}]`
     const volume = zone.area_m2 * zone.height_m
     const inf = wrap(() => infiltration({ q50: zone.infiltration_q50, ach: zone.infiltration_ach, envelope_area_m2: T.envelopeArea, volume_m3: volume, path }))
@@ -318,6 +325,55 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
       glazing_areas_m2: T.glazingAreas, area_ua_w_per_k: areaUA,
       zone_share: { has_roof: T.hasRoof, has_ground: T.hasGround, shared_slabs: T.sharedSlabs, window_perimeter_m: windowPerimeter },
     }))
+    return { volume, inf, areaUA, br }
+  })
+  // Brief 123 P4: an unconditioned loft is an adjacent unconditioned space (ISO 13789:2017 6.4): each room's ceiling loss
+  // is H_iu·b·(θ_i − θ_e) with b = H_ue / (H_iu + H_ue); H_iu all the ceilings under the loft, H_ue the loft's fabric,
+  // bridging and air to outside. Solar and sky on the loft's slopes are not counted (b without solar), and noted.
+  const loftB = new Map<number, { b: number; Hue: number }>()
+  doc.zones.forEach((z, li) => {
+    if (z.conditioning !== 'unconditioned') return
+    const Hiu = ceilings.filter((c) => c.loft === li).reduce((s, c) => s + c.h, 0)
+    const Hue = pre[li].areaUA + pre[li].br.total_w_per_k + pre[li].inf.h_w_per_k
+    loftB.set(li, { b: Hiu + Hue > 0 ? Hue / (Hiu + Hue) : 1, Hue })
+  })
+  for (const c of ceilings) Z[c.room].lossLines.push({ term: 'interzone', surface_id: c.surface_id, h: c.h * loftB.get(c.loft)!.b, ground: false })
+  if (loftB.size) notes.push('An unheated loft is taken by ISO 13789\'s adjustment factor: solar on a cold roof\'s slopes is not counted in this estimate.')
+  const roomTheta = (zi: number) => doc.zones[zi].setpoints.heat_c ?? doc.zones[zi].setpoints.cool_c
+  const zones: MonthlyZone[] = doc.zones.map((zone, zi) => {
+    const T = Z[zi], path = `zones[${zi}]`
+    const { volume, inf, br } = pre[zi]
+    const areaUA = pre[zi].areaUA
+    if (zone.conditioning === 'unconditioned') {
+      // The loft: no heating or cooling; what arrives through the ceilings leaves through its own lines, by conductance.
+      const { Hue } = loftB.get(zi)!
+      const mine = ceilings.filter((c) => c.loft === zi)
+      const lines = new Map<string, BreakdownLine>()
+      const add = (term: BreakdownLine['term'], surface_id: string | null, kwh: number) => {
+        const k = `${term}|${surface_id}`
+        const l = lines.get(k) ?? { term, surface_id, kwh: 0 }
+        l.kwh += kwh; lines.set(k, l)
+      }
+      for (let m = 0; m < 12; m++) {
+        const n = W.hours[m]
+        if (n === 0) continue
+        let qin = 0
+        for (const c of mine) {
+          const th = roomTheta(c.room)
+          if (th == null) continue
+          const q = c.h * loftB.get(zi)!.b * (th - W.theta_e[m]) * n
+          add('interzone', c.surface_id, q / 1000); qin += q
+        }
+        const share = Hue > 0 ? qin / Hue / 1000 : 0
+        for (const l of T.lossLines) add(l.term, l.surface_id, -l.h * share)
+        add('bridging', null, -br.total_w_per_k * share)
+        add('infiltration', null, -inf.h_w_per_k * share)
+      }
+      return {
+        zone_id: zone.id, floor_m2: 0, heating_kwh: 0, cooling_kwh: 0, monthly: { heating_kwh: zeros(), cooling_kwh: zeros() },
+        breakdown: [...lines.values()], h_tr_w_per_k: areaUA + br.total_w_per_k, h_ve_w_per_k: inf.h_w_per_k, c_m_j_per_k: 0, tau_h: 0,
+      }
+    }
     // Air-side lines, with the vents' conductance at each month's mean wind.
     const ventH = W.wind.map((v) => K.rho_c_air * T.vents * v)
     // Interior solar: the hourly run's split (network.ts "Solar inside each zone"), applied to the month's diffuse and
@@ -343,7 +399,8 @@ export function runMonthly(doc: ModelDocument, weather: Weather, library: Record
       T.gainLines.push({ term: `${g.kind}_gains` as BreakdownLine['term'], surface_id: null, profile_id: g.profile_id, wh })
     }
 
-    const Htr = areaUA + br.total_w_per_k
+    // The ceilings to a loft (interzone lines, already × b) are part of H_tr for the time constant.
+    const Htr = areaUA + br.total_w_per_k + T.lossLines.filter((l) => l.term === 'interzone').reduce((s, l) => s + l.h, 0)
     // The hourly run's air node: the air and the zone's stated internal capacity (furniture, partitions not drawn).
     const cm = T.cm + K.rho_c_air * volume + zone.internal_heat_capacity_j_per_k_m2 * zone.area_m2
     const heatC = zone.setpoints.heat_c, coolC = zone.setpoints.cool_c

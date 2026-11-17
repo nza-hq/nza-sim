@@ -393,7 +393,7 @@ export function turbulenceFlow(A: number): number { return 0.5 * A * Math.sqrt(A
 
 interface DocLike {
   building: { air: { method: string; exponent: number | null; single_sided_turbulence: boolean | null }; site: { terrain?: string | null } }
-  zones: { id: string; floor: number; storeys: number; height_m: number; infiltration_q50: number | null; infiltration_ach: number | null }[]
+  zones: { id: string; floor: number; storeys: number; height_m: number; infiltration_q50: number | null; infiltration_ach: number | null; conditioning?: string }[]
   surfaces: { id: string; kind: string; zone_a: string; zone_b: string; area_m2: number; azimuth_deg: number | null; tilt_deg: number; openings: any[] }[]
   controls: { id: string; target: { kind: string; ref: string }; hours_ref?: string | null; rule: string | null; open_fraction: number | null; open_above_ref: string | null; open_above_c?: number | null; min_open_h: number | null; min_closed_h: number | null; modulation: { full_open_below_dk: number; min_open_above_dk: number; min_fraction: number } | null }[]
 }
@@ -438,14 +438,16 @@ export function buildAirModels(doc: DocLike, envelopeArea: number[], hoursOf: (r
     const mine = doc.surfaces.map((s, i) => ({ s, i })).filter(({ s }) => s.zone_a === zone.id)
     const walls = mine.filter(({ s }) => s.kind === 'wall' && isOut(s))
     // Leakage.
-    if (zone.infiltration_q50 == null) throw new AirflowError('weather-driven air works from the room\'s air permeability q50 (m³/h·m² at 50 Pa)', `${zp}.infiltration_q50`)
-    const q50 = zone.infiltration_q50
+    // Brief 123 P4: an unconditioned loft states its air as air changes (its ventilation openings), kept fixed as today.
+    const uncond = zone.conditioning === 'unconditioned'
+    if (!uncond && zone.infiltration_q50 == null) throw new AirflowError('weather-driven air works from the room\'s air permeability q50 (m³/h·m² at 50 Pa)', `${zp}.infiltration_q50`)
+    const q50 = uncond ? 0 : zone.infiltration_q50!
     const kTot = (RHO_REF * q50 * envelopeArea[zi]) / 3600 / Math.pow(50, n)
     const wallArea = walls.reduce((t, { s }) => t + s.area_m2, 0)
     const cracks: Crack[] = []
     // Review F4: a room with leakage but no outside wall (an inner room under a roof) has no facade for the wind to act
     // on, so its leakage is today's q50 ÷ 20 air changes (stated per room: `fixed_leakage`), not refused.
-    const fixedLeakage = kTot > 0 && !(wallArea > 0)
+    const fixedLeakage = uncond || (kTot > 0 && !(wallArea > 0))
     if (kTot > 0 && !fixedLeakage) {
       for (const { s } of walls) for (let b = 0; b < AIR.crack_bands; b++) {
         const z = base + ((b + 0.5) * Hz) / AIR.crack_bands
