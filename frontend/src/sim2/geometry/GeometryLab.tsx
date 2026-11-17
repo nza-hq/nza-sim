@@ -2355,7 +2355,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 {profOptions((w.rule === 'timetable' ? [...profilesFor('window_opening'), ...profilesFor('ventilation')] : [...profilesFor('window_opening'), ...profilesFor('ventilation')].filter(onOff)))}
               </select>
             </div>
-            {(plan.building?.air_method ?? 'today') === 'weather_driven' && w.rule && <p className="gl-hint">The run decides the windows every 15 minutes, from the room's temperature and the hours above.</p>}
+            {(plan.building?.air_method ?? 'today') === 'weather_driven' && w.rule && <p className="gl-hint">The run decides the windows once an hour (every 15 minutes where heating runs to hours), from the room's temperature and the hours above. Hourly keeps it fast but overstates overheating: in a refereed office, 312 hours above 25 °C against EnergyPlus's 199, and the warmest hour about 0.9 °C too warm.</p>}
             {w.rule === 'temperature' && <p className="gl-hint">These hours only say when the windows may open; How far sets how far. A profile that varies hour by hour needs "To a timetable".</p>}
             {w.rule === 'temperature' && w.hours && !onOff({ key: w.hours }) && <p className="gl-hint gl-warn">{profile(w.hours)?.name ?? w.hours} has part values, so the run will refuse it under "When the room is warm". Choose an on/off profile, or use "To a timetable".</p>}
             {(ctlMap?.rows.filter((r) => r.service === 'windows').length ?? 0) > 1 && (
