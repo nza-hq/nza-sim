@@ -13,6 +13,7 @@
  * model document is written, each zone's stretch of the run takes the windows whose middles fall on it.
  */
 import { area, ccw, type XY } from './ported/zones'
+import type { RoofRecipe } from './roof'
 import { type Profile, profile as libProfile, profilesFor as libProfilesFor } from '../library/library'
 
 export type { XY }
@@ -389,6 +390,8 @@ export type Plan = {
   emitter_types?: EmitterType[]
   /** Hot water for the whole building, typed (Systems step). */
   dhw?: DhwInputs
+  /** Brief 123: the roof's shape, applied to each block (absent: flat, as before). */
+  roof?: RoofRecipe
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
