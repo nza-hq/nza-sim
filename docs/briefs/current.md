@@ -1,7 +1,7 @@
 # Current brief
 
 **Brief 115 — Simulate v2: natural ventilation, opening windows and air leakage — IN PROGRESS on `chris/115-air-movement`.**
-Brief [`active/115_natural-ventilation-and-air-leakage.md`](active/115_natural-ventilation-and-air-leakage.md) (Linzie approved 16 Nov 15:06). P0 [`../audit/115/00_reconnaissance.md`](../audit/115/00_reconnaissance.md), P1 [`../audit/115/01_schema.md`](../audit/115/01_schema.md), P2/P3 engine `thermal/engine/airflow.ts`, P4 referees [`../audit/115/02_referee.md`](../audit/115/02_referee.md), P5 speed, and the community centre tests [`../audit/115/04_community_centre.md`](../audit/115/04_community_centre.md) done; window operation as profiles added (17 Nov). Next: independent review. P6/P7 are the editor thread's.
+Brief [`active/115_natural-ventilation-and-air-leakage.md`](active/115_natural-ventilation-and-air-leakage.md) (Linzie approved 16 Nov 15:06). P0 [`../audit/115/00_reconnaissance.md`](../audit/115/00_reconnaissance.md), P1 [`../audit/115/01_schema.md`](../audit/115/01_schema.md), P2/P3 engine `thermal/engine/airflow.ts`, P4 referees [`../audit/115/02_referee.md`](../audit/115/02_referee.md), P5 speed, and the community centre tests [`../audit/115/04_community_centre.md`](../audit/115/04_community_centre.md) done; window operation as profiles added (17 Nov). Independent review answered 17 Nov ([`../audit/115/06_review_response.md`](../audit/115/06_review_response.md)); Linzie's card on quarter hours open. Next: close. P6/P7 are the editor thread's.
 
 Previous:
 
