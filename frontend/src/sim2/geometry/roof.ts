@@ -20,7 +20,15 @@ export type RoofHip = { style: 'hip'; pitch_deg: number }
 export type RoofRecipe = (RoofFlat | RoofMono | RoofGable | RoofHip) & {
   /** Where the insulation is: at the ceiling with a cold loft above, or in the slope (the room open to the roof). */
   insulation?: 'ceiling' | 'slope'
+  /** Cold roof: the fabric type (a roof type) the loft's slopes are made of; null: not chosen yet. */
+  loft_slope_type?: string | null
+  /** Cold roof: the loft's air changes an hour; null: LOFT_ACH. */
+  loft_ach?: number | null
 }
+
+/** A ventilated loft's air changes an hour: ISO 13789 clause 9.4's conventional rate (the engine thread's P4.2 records
+ * what could and could not be verified about it). Shown and editable on Shape, Roof. */
+export const LOFT_ACH = 3
 export type RoofStyle = RoofRecipe['style']
 export const ROOF_STYLES: ReadonlyArray<{ key: RoofStyle; name: string }> = [
   { key: 'flat', name: 'Flat' },
@@ -208,7 +216,7 @@ export type ServedResult = { faces: ServedFace[]; flags: string[]; fell_back_to_
 
 /** The recipe as the service reads it (decodED's field names; flat with no parapet). */
 export function serviceRecipe(r: RoofRecipe): Record<string, unknown> {
-  const { insulation: _i, ...rest } = r
+  const { insulation: _i, loft_slope_type: _t, loft_ach: _a, ...rest } = r
   return r.style === 'flat' ? { style: 'flat', parapet_height_m: 0 } : rest
 }
 

@@ -82,7 +82,7 @@ import { computeCd } from '../../utils/openingCoefficients.js'
 import SchedulePopout from '../../components/shared/SchedulePopout.jsx'
 import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
-import { type BlockRoof, ROOF_STYLES, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, fetchServedRoofs, roofTotals } from './roof'
+import { type BlockRoof, LOFT_ACH, ROOF_STYLES, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, fetchServedRoofs, roofTotals } from './roof'
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
 
@@ -423,7 +423,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     }
   })
   const runs = useMemo(() => wallRuns(plan.blocks), [plan.blocks])
-  const built = useMemo(() => buildDocument(plan), [plan])
+  const built = useMemo(() => buildDocument(plan, roofs), [plan, roofs])
   const placed = useMemo(() => allWindows(plan).windows, [plan])
   const rings = plan.rooms.map((z) => z.ring)
   const has = plan.blocks.length > 0
@@ -1267,7 +1267,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return () => clearTimeout(t)
   }, [note])
   useEffect(() => { setChanges((c) => (c.some((x) => x.depth > past.length) ? c.filter((x) => x.depth <= past.length) : c)) }, [past.length])
-  const previewDoc = useMemo(() => (pending && !pending.same ? buildDocument(pending.plan).doc : ctlDraft ? buildDocument(ctlDraft).doc : null), [pending, ctlDraft])
+  const previewDoc = useMemo(() => (pending && !pending.same ? buildDocument(pending.plan, roofs).doc : ctlDraft ? buildDocument(ctlDraft, roofs).doc : null), [pending, ctlDraft])
 
   // ─── paint ─────────────────────────────────────────────────────────────────
   const P = (r: readonly XY[]) => r.map((p) => toPx(p).map((n) => n.toFixed(1)).join(',')).join(' ')
@@ -1841,6 +1841,23 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 <option value="slope">The slope (room open to the roof)</option>
               </select>
             </div>
+            {(rec.insulation ?? 'ceiling') === 'ceiling' && (
+              <>
+                <div className="gl-row">
+                  <span>Loft slopes made of</span>
+                  <select className="gl-sel" aria-label="Loft slopes made of" value={rec.loft_slope_type ?? ''} onChange={(e) => set({ ...rec, loft_slope_type: e.target.value || null }, `loft slopes → ${e.target.value ? typeName(e.target.value) : 'not set'}`)}>
+                    <option value="">Not set</option>
+                    {plan.fabric_types.filter((t) => t.element === 'roof').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                {!rec.loft_slope_type && <p className="gl-hint">The library has no uninsulated tiled roof yet. Make a roof type for the loft's slopes on Fabric and choose it here; until then the run asks for it.</p>}
+                <div className="gl-row">
+                  <span>Loft air changes</span>
+                  <span className="gl-num"><input className="gl-in" type="number" min={0} max={50} step={0.5} aria-label="Loft air changes an hour" value={rec.loft_ach ?? LOFT_ACH} onChange={(e) => { const v = Number(e.target.value); if (v >= 0) set({ ...rec, loft_ach: v }, `loft air → ${v} an hour`) }} /><small>an hour</small></span>
+                </div>
+                <p className="gl-hint">{rec.loft_ach == null ? `${LOFT_ACH} an hour is ISO 13789's figure for a ventilated loft.` : 'Typed.'} The loft is unheated: nothing heats or cools it.</p>
+              </>
+            )}
             {refused ? <p className="gl-hint gl-warn">{refused}</p> : (
               <dl className="gl-roof-sums">
                 <dt>Roof slopes</dt><dd>{f1(r.slope_m2)} m²</dd>
@@ -1848,7 +1865,6 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                 {(rec.insulation ?? 'ceiling') === 'ceiling' ? <><dt>Ceiling to the loft</dt><dd>{f1(r.ceiling_m2)} m²</dd><dt>Loft</dt><dd>{f1(r.void_m3)} m³, unheated</dd></> : <><dt>Roof space added to the rooms</dt><dd>{f1(r.void_m3)} m³</dd></>}
               </dl>
             )}
-            <p className="gl-hint">The run uses a flat roof until the engine takes the loft (Brief 123 P4). The shape and these areas are saved with the plan.</p>
           </>
         )}
       </div>
