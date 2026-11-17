@@ -105,6 +105,8 @@ export const ScheduleProfile = z
     id,
     kind: z.literal('schedule'),
     label: z.string().optional(),
+    /** Brief 115: what the editor offers it as (recorded for lists; the engine reads a schedule the same way for all). */
+    purpose: z.enum(['window_opening', 'availability']).nullable().default(null),
     day_types: z.object({ weekday: Day24, saturday: Day24, sunday: Day24 }).strict(),
   })
   .strict()
@@ -119,6 +121,8 @@ export const TemperatureProfile = z
     id,
     kind: z.literal('temperature'),
     label: z.string().optional(),
+    /** What the editor offers it as (recorded for lists). Setpoint profiles are named here; zones read them in a follow-up brief. */
+    purpose: z.enum(['heating_setpoint', 'cooling_setpoint', 'window_threshold']).nullable().default(null),
     day_types: z.object({ weekday: Day24, saturday: Day24, sunday: Day24 }).strict(),
   })
   .strict()
