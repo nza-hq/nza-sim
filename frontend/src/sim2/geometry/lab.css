@@ -364,7 +364,10 @@
 .gl-root.embedded { position: absolute; inset: 0; }
 .gl-root.embedded .gl-bar, .gl-root.embedded .gl-tip, .gl-root.embedded .gl-viewswitch, .gl-root.embedded .gl-key,
 .gl-root.embedded.giving .gl-bar, .gl-root.embedded.giving .gl-tip, .gl-root.embedded.giving .gl-viewswitch { left: 50%; }
-.gl-root.embedded .gl-key { max-width: calc(100% - 32px); }
+/* 18 Nov 2026: the key sits in the top-left corner as a short list, not across the middle of the drawing (it covered
+   the building's top edge and its labels). */
+.gl-root.embedded .gl-key { left: 12px; top: 60px; transform: none; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 260px; padding: 8px 10px; box-shadow: 0 1px 3px rgba(17,24,39,.08); }
+.gl-root.embedded .gl-key span { white-space: normal; }
 .gl-root.embedded .gl-compass { left: 16px; }
 .gl-root.embedded .gl-3d { inset: 0; }
 /* 17 Nov (Linzie: "the elevation… is kind of locked"): in the workspace the elevation fills the middle, not offset for the standalone card. */
@@ -540,3 +543,8 @@
 .gl-warn { color: var(--gl-bad); }
 .gl-ridge { stroke: #7C8694; stroke-width: 1.5; stroke-dasharray: 6 4; pointer-events: none; }
 .gl-ridge.on { stroke: #9A5A12; stroke-width: 2.5; stroke-dasharray: none; }
+/* 18 Nov 2026 (left navigation): in a narrower middle, a long type name on the Apply button shortens with "…" (the full
+   name is its tooltip) instead of running over "Nothing chosen yet." */
+.ap-bar-what { flex: 0 1 auto; }
+.ap-bar .ap-apply { flex: 0 1 auto; min-width: 0; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+.ap-bar .ap-apply { text-align: left; }

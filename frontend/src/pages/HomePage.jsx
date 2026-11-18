@@ -26,16 +26,7 @@ function formatDate(ts) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function dimSummary(p) {
-  const L   = p.bc_length     ?? null
-  const W   = p.bc_width      ?? null
-  const fl  = p.bc_num_floors ?? null
-  const gia = (L && W && fl) ? Math.round(L * W * fl).toLocaleString() : null
-  return { L, W, fl, gia }
-}
-
 function ProjectCard({ project, isCurrent, onLoad, onClone, onDelete, busy }) {
-  const { L, W, fl, gia } = dimSummary(project)
   const eui = project.latest_eui != null ? Math.round(project.latest_eui) : null
 
   // Stop-propagation wrappers so hovered action buttons don't trigger card click.
@@ -120,11 +111,8 @@ function ProjectCard({ project, isCurrent, onLoad, onClone, onDelete, busy }) {
         )}
       </div>
 
-      {gia && (
-        <p className="text-xxs text-dark-grey mb-2">
-          {L}m × {W}m × {fl} fl — <span className="font-medium text-navy">{gia} m² GIA</span>
-        </p>
-      )}
+      {/* 18 Nov 2026: the old pages' box dimensions are no longer shown: the model is drawn in the Model workspace now,
+          and a card saying "60m × 15m × 4 fl" for every project read as the building's size. */}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 text-xxs text-mid-grey">
@@ -267,8 +255,8 @@ export default function HomePage() {
       <div className="max-w-3xl mx-auto px-8 py-10">
 
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-navy mb-1">NZA Simulate</h1>
-          <p className="text-xs text-mid-grey">Building energy simulation — select a project or create a new one</p>
+          <h1 className="text-2xl font-semibold text-navy mb-1">Projects</h1>
+          <p className="text-xs text-mid-grey">Open a project to work on its model, or start a new one.</p>
         </div>
 
         {recent.length > 0 && (

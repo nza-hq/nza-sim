@@ -137,3 +137,7 @@ button.rp-strip-msg { cursor: pointer; text-decoration: underline; text-underlin
 .lp-chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid #E5E7EB; background: #fff; color: #374151; cursor: pointer; }
 .lp-chip.on { background: #1E5A4A; border-color: #1E5A4A; color: #fff; }
 .lp-chip:focus-visible { outline: 2px solid #00AEEF; outline-offset: 2px; }
+/* 18 Nov 2026 (left navigation): in a narrower middle, Run and Run in EnergyPlus go onto their own line rather than
+   being cut off at the right. */
+.rp-strip-held { flex-wrap: wrap; }
+.rp-strip-held .rp-strip-hourly { min-height: 44px; }

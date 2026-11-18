@@ -20,3 +20,14 @@ export const SHELF = [
   { to: '/library', name: 'Library', line: 'Constructions, systems, profiles' },
   { to: '/results', name: 'Reports', line: "Today's results pages" },
 ] as const
+
+// @ts-expect-error untyped JS from today's app
+import { MODULE_THEMES } from '../../data/moduleThemes.js'
+/** Brief 110b row 1: each step wears the accent of today's module it stands for. */
+export const STEP_ACCENT: Record<StepId, string> = {
+  site: MODULE_THEMES.weather.accent, shape: MODULE_THEMES.building.accent, fabric: MODULE_THEMES.building.accent,
+  profiles: MODULE_THEMES.profiles.accent, spaces: MODULE_THEMES.gains.accent, systems: MODULE_THEMES.systems.accent, controls: MODULE_THEMES.systems.accent, check: MODULE_THEMES.consumption.accent,
+  interventions: MODULE_THEMES.interventions.accent,
+}
+/** The step the workspace opens on when the address names none. */
+export const DEFAULT_STEP: StepId = 'shape'
