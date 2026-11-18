@@ -179,7 +179,7 @@ export function GivePanel(props: {
       {g && !g.preview && barTo && createPortal(
         <div className="ap-bar" role="region" aria-label="Apply">
           <span className="ap-bar-what">{g.what}{g.now && <small>{g.now}</small>}</span>
-          <button type="button" className="gl-btn ap-apply" disabled={!!g.why} onClick={g.onApply} title={g.why ?? undefined}>{g.label}</button>
+          <button type="button" className="gl-btn ap-apply" disabled={!!g.why} onClick={g.onApply} title={g.why ?? g.label}>{g.label}</button>
           <button type="button" className="ap-link" onClick={g.onAll}>To the whole building</button>
         </div>,
         barTo,

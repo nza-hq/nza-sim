@@ -1,8 +1,8 @@
 /**
  * The Model workspace (Brief 110): Simulate v2's steps inside NZA Sim, laid out the way today's Building page is.
  *
- *   top     the steps as tabs across the top, in build order, with the shelf at the right end (Linzie, 16 Nov 00:22:
- *           "happy for the modules to be across the top if that frees up our space on the left")
+ *   nav     the steps are NZA Sim's left navigation (components/layout/Sidebar.jsx; Linzie, 18 Nov 15:11: "get rid of
+ *           the old stuff and layer this new stuff in the left navigation"). They were tabs across the top before.
  *   left    what you are choosing (whole building, zones, rooms)
  *   centre  what you see: the results strip, then the centre tabs (Drawing, Heat flow). The main window.
  *   right   what you give: kinds, the project's types, the detail, Apply
@@ -15,17 +15,8 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ResizeHandle from './ResizeHandle'
 import { LEFT, MODEL_CENTRE_TABS, RIGHT, clamp, loadLayout, saveLayout, type CentreTab, type Layout } from './layout'
-import { SHELF, STEPS, isStep, type StepId } from './steps'
-// @ts-expect-error untyped JS from today's app
-import { MODULE_THEMES } from '../../data/moduleThemes.js'
+import { DEFAULT_STEP, isStep, type StepId } from './steps'
 import './workspace.css'
-
-/** Brief 110b row 1: each step wears the accent of today's module it stands for. */
-const ACCENT: Record<StepId, string> = {
-  site: MODULE_THEMES.weather.accent, shape: MODULE_THEMES.building.accent, fabric: MODULE_THEMES.building.accent,
-  profiles: MODULE_THEMES.profiles.accent, spaces: MODULE_THEMES.gains.accent, systems: MODULE_THEMES.systems.accent, controls: MODULE_THEMES.systems.accent, check: MODULE_THEMES.consumption.accent,
-  interventions: MODULE_THEMES.interventions.accent,
-}
 
 export type Slots = { left: HTMLElement; centre: HTMLElement; right: HTMLElement; strip: HTMLElement }
 
@@ -35,31 +26,10 @@ const LATER: Partial<Record<StepId, { title: string; text: string; to: string; p
   interventions: { title: 'Interventions', text: 'Stack changes to the model and see what each one saves, in order. It comes in a later brief.', to: '/interventions', page: 'Interventions' },
 }
 
-export function StepRail({ step, onStep }: { step: StepId; onStep: (s: StepId) => void }) {
-  return (
-    <nav className="mw-rail" aria-label="Model steps">
-      <ol>
-        {STEPS.map((s) => (
-          <li key={s.id}>
-            <button type="button" aria-current={s.id === step ? 'step' : undefined} onClick={() => onStep(s.id)} title={s.line} style={{ '--acc': ACCENT[s.id] } as React.CSSProperties}>
-              <span className="mw-n">{s.n}</span>
-              <span className="mw-name">{s.name}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-      <div className="mw-shelf" aria-label="Shelf">
-        {SHELF.map((x) => <Link key={x.to} to={x.to} title={x.line}>{x.name}</Link>)}
-      </div>
-    </nav>
-  )
-}
-
 export default function ModelWorkspace({ render, header }: { header?: React.ReactNode; render?: (a: { step: StepId; slots: Slots; centre: CentreTab; setCentre: (c: CentreTab) => void; openRight: () => void }) => React.ReactNode }) {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const q = params.get('step')
-  const step: StepId = isStep(q) ? q : 'shape'
-  const onStep = (s: StepId) => setParams((p) => { p.set('step', s); return p }, { replace: true })
+  const step: StepId = isStep(q) ? q : DEFAULT_STEP
 
   const [layout, setLayout] = useState<Layout>(loadLayout)
   useEffect(() => saveLayout(layout), [layout])
@@ -75,10 +45,11 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
   const [right, setRightEl] = useState<HTMLElement | null>(null)
   const [strip, setStripEl] = useState<HTMLElement | null>(null)
   const later = LATER[step]
+  // A step that comes later has nothing to give, so its right pane stays shut (18 Nov 2026: it showed an empty column).
+  const rightShown = layout.rightOpen && !later
 
   return (
     <div className="mw-root flex flex-col h-[calc(100vh-3rem)]">
-     <StepRail step={step} onStep={onStep} />
      <div className="flex flex-1 min-h-0 relative">
       <aside className="mw-left flex-shrink-0 bg-white border-r border-light-grey flex flex-col min-h-0" style={{ width: layout.left }}>
         {header}
@@ -108,12 +79,12 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
           )}
         </div>
       </section>
-      {layout.rightOpen && <ResizeHandle onResize={setRight} />}
-      <aside className={`mw-right flex-shrink-0 bg-white border-l border-light-grey min-h-0 overflow-visible relative${layout.rightOpen ? '' : ' mw-shut'}`} style={{ width: layout.rightOpen ? layout.right : 0 }} aria-hidden={!layout.rightOpen}>
+      {rightShown && <ResizeHandle onResize={setRight} />}
+      <aside className={`mw-right flex-shrink-0 bg-white border-l border-light-grey min-h-0 overflow-visible relative${rightShown ? '' : ' mw-shut'}`} style={{ width: rightShown ? layout.right : 0 }} aria-hidden={!rightShown}>
         <button type="button" className="mw-close" aria-label="Close the right panel" title="Close" onClick={() => setRightOpen(false)}>›</button>
         <div className="mw-slot h-full overflow-hidden" ref={setRightEl} />
       </aside>
-      {!layout.rightOpen && <button type="button" className="mw-open" onClick={() => setRightOpen(true)} title="Open the right panel">‹ Details</button>}
+      {!rightShown && !later && <button type="button" className="mw-open" onClick={() => setRightOpen(true)} title="Open the right panel">‹ Details</button>}
       {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: layout.centre, setCentre, openRight: () => setRightOpen(true) })}
      </div>
     </div>

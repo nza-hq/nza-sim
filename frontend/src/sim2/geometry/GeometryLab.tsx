@@ -3126,7 +3126,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               return (
                 <g key={`rl${r.id}`}>
                   <text className={`gl-zname${on && !giving ? ' on' : ''}`} x={lx} y={ly}>{fitName(r.name, wide)}<title>{r.name}</title></text>
-                  {wide > 56 && <text className={`gl-zarea${on && !giving ? ' on' : ''}`} x={lx} y={ly + 15}>{roomSub(r)}</text>}
+                  {wide > 56 && <text className={`gl-zarea${on && !giving ? ' on' : ''}`} x={lx} y={ly + 15}>{fitName(roomSub(r), wide * 1.1)}<title>{roomSub(r)}</title></text>}
                   {pending && !pending.same && pending.rooms.includes(r.id) && <text className="gl-pvtag" x={lx} y={ly + 31}>Preview</text>}
                   {flash.includes(r.id) && <text className="gl-pvtag done" x={lx} y={ly + 31}>✓ Applied</text>}
                 </g>

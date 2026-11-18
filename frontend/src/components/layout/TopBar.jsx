@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Play, Loader2, CheckCircle2, AlertCircle, ChevronDown, ExternalLink, Zap, Activity } from 'lucide-react'
 import { SimulationContext } from '../../context/SimulationContext.jsx'
 import { ProjectContext } from '../../context/ProjectContext.jsx'
@@ -370,6 +371,10 @@ export default function TopBar() {
   const [toast, setToast] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const pendingRunRef = useRef(false)   // true if we're waiting for save to finish
+  // 18 Nov 2026: scenarios and the baseline belong to today's pages (Building, Gains, Results, Interventions …), which
+  // are out of the navigation now; they show only there, not on Projects, Model or Library.
+  const path = useLocation().pathname
+  const onModel = path === '/' || path.startsWith('/model') || path.startsWith('/library')
 
   /* Show toast when simulation completes or errors */
   useEffect(() => {
@@ -454,11 +459,12 @@ export default function TopBar() {
 
         {/* Named input-set scenarios (Model-2 brief Part 0) — save / load /
             list the project's named input sets (Model 1, Model 2, …). */}
-        <ScenarioControl />
+        {/* 18 Nov 2026: only on today's pages (see onModel). */}
+        {!onModel && <ScenarioControl />}
 
         {/* Project baseline control (global) — the pinned inputs interventions
             measure against; Save / Restore / Export-baseline. */}
-        <BaselineControl />
+        {!onModel && <BaselineControl />}
 
         {/* Global engine + unit toggles — Chris UX overhaul (2026-05-17).
             App-wide; replaces per-view toggles in each module's header. */}
