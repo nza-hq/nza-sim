@@ -1,0 +1,1835 @@
+{
+ "source": "scripts/example_three_tiers.mts",
+ "plan": "rwgc_clubhouse.plan.json",
+ "weather": {
+  "file": "GBR_ENG_London.Wea.Ctr-St.James.Park.037700_TMYx.epw",
+  "station": "London.Wea.Ctr-St.James.Park, ENG, GBR (WMO 037700)",
+  "sha256": "8f4879cc5edda3c1e4706074317d0cea8eadff47752fe3c17681d3b168fe7d96"
+ },
+ "document": {
+  "zones": 29,
+  "surfaces": 424,
+  "systems": 8,
+  "notes": [
+   "Men's changing (bay): 1.125 m² of its floor is over no room below, taken as a floor open to outside air",
+   "Showers: 4.375 m² of its floor is over no room below, taken as a floor open to outside air",
+   "Golf simulator (DX): 0.562 m² of its floor is over no room below, taken as a floor open to outside air",
+   "Pro shop lounge: 3.875 m² of its floor is over no room below, taken as a floor open to outside air",
+   "Roof stores: 3.75 m² of its floor is over no room below, taken as a floor open to outside air",
+   "Trophy room: 2.5 m² of its floor is over no room below, taken as a floor open to outside air",
+   "Ground floor: A window on wall 76 crosses into the next room; it is counted in the room its middle is in",
+   "Ground floor: Entrance, cloakroom and stair is in 3 separate parts; the document's outline is its biggest part (the area counts all of them)",
+   "Ground floor: Bar and bar store is in 2 separate parts; the document's outline is its biggest part (the area counts all of them)",
+   "Ground floor: Corridor and lobby (south) is in 2 separate parts; the document's outline is its biggest part (the area counts all of them)",
+   "Ground floor: Ladies' changing and toilets is in 2 separate parts; the document's outline is its biggest part (the area counts all of them)",
+   "Wall: 1960s brick and block, unfilled cavity (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "External door: solid timber, 44 mm (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "Windows: 1990s double glazing, air filled (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "Windows: single glazed, original metal frames (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "Roof: ceiling to a cold loft, 100 mm mineral wool (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "Ground floor: concrete slab, no insulation, no carpet (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "Ground floor: insulated slab, hard floor, no carpet (draft, awaiting Chris): a draft library item, not yet checked by Chris",
+   "First floor: A window on wall 15 crosses into the next room; it is counted in the room its middle is in",
+   "Second floor: Roof stores is in 2 separate parts; the document's outline is its biggest part (the area counts all of them)"
+  ]
+ },
+ "floor_m2": 2084.8,
+ "instant": {
+  "ms": 73,
+  "heating_kwh": 182701,
+  "cooling_kwh": 5008,
+  "monthly_heating_kwh": [
+   34908,
+   27817,
+   23300,
+   12341,
+   6935,
+   2534,
+   1037,
+   1575,
+   4566,
+   12113,
+   24313,
+   31262
+  ],
+  "notes": [
+   "Monthly estimate (static): ISO 52016-1 monthly method. Not the hourly run.",
+   "Each room alone; heat between rooms is not counted.",
+   "Weather-driven air is not in this estimate: leakage is q50 ÷ 20 and permanent vents use today's wind formula.",
+   "Heating hours and setbacks: taken by ISO 13790's monthly intermittent-heating factor (rooms that cool down outside their hours lose less heat); the hourly run follows them hour by hour.",
+   "Surfaces give and lose heat at ISO's fixed rates here, with a sky 11 °C below the air; the full-year run and EnergyPlus work them out from the wind, rain, the sky and each surface's temperature, so old, single-glazed or uninsulated fabric at a sheltered site can read lower there."
+  ]
+ },
+ "run": {
+  "ms": 17882,
+  "steps_per_hour": 4,
+  "heating_kwh": 180179,
+  "cooling_kwh": 3418,
+  "peak_heating_kw": 110.2,
+  "peak_cooling_kw": 7.9,
+  "monthly_heating_kwh": [
+   34798,
+   27222,
+   25984,
+   12713,
+   6420,
+   1666,
+   908,
+   894,
+   4593,
+   11924,
+   21703,
+   31352
+  ],
+  "monthly_cooling_kwh": [
+   0,
+   0,
+   0,
+   7,
+   220,
+   809,
+   1064,
+   1058,
+   259,
+   0,
+   0,
+   0
+  ],
+  "energy": {
+   "eui_kwh_per_m2": 249.8,
+   "total_kwh": 520760,
+   "by_fuel": [
+    {
+     "fuel": "electricity",
+     "kwh": 203652
+    },
+    {
+     "fuel": "gas",
+     "kwh": 317108
+    }
+   ],
+   "end_uses": [
+    {
+     "end_use": "heating",
+     "fuel": "gas",
+     "kwh": 209510
+    },
+    {
+     "end_use": "cooling",
+     "fuel": "electricity",
+     "kwh": 1221
+    },
+    {
+     "end_use": "dhw",
+     "fuel": "gas",
+     "kwh": 107598
+    },
+    {
+     "end_use": "dhw_circulation",
+     "fuel": "electricity",
+     "kwh": 1051
+    },
+    {
+     "end_use": "pumps",
+     "fuel": "electricity",
+     "kwh": 7861
+    },
+    {
+     "end_use": "fans",
+     "fuel": "electricity",
+     "kwh": 11166
+    },
+    {
+     "end_use": "lighting",
+     "fuel": "electricity",
+     "kwh": 17187
+    },
+    {
+     "end_use": "small_power",
+     "fuel": "electricity",
+     "kwh": 101910
+    },
+    {
+     "end_use": "auxiliary",
+     "fuel": "electricity",
+     "kwh": 63257
+    }
+   ],
+   "systems": [
+    {
+     "label": "LTHW boilers: 4 × Ideal Concord Super 200V (≈200 kW), BMS zones",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.85,
+     "served_kwh": 152636,
+     "fuel_kwh": 179572
+    },
+    {
+     "label": "Combi boiler (pro shop, Block 5)",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 23140,
+     "fuel_kwh": 25152
+    },
+    {
+     "label": "DX split units (offices, east dining room, simulator)",
+     "service": "cooling",
+     "fuel": "electricity",
+     "efficiency": 2.8,
+     "served_kwh": 3418,
+     "fuel_kwh": 1221
+    },
+    {
+     "label": "Beaumont 250 gas water heater (146 kW, 768 L, 1992)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.8,
+     "served_kwh": 68960,
+     "fuel_kwh": 86200
+    },
+    {
+     "label": "Combi boiler hot water (pro shop)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 386,
+     "fuel_kwh": 420
+    },
+    {
+     "label": "Fluorescent and LED (part-upgraded)",
+     "service": "lighting",
+     "fuel": "electricity",
+     "efficiency": null,
+     "served_kwh": 17187,
+     "fuel_kwh": 17187
+    },
+    {
+     "label": "Combi boiler (caretaker's flat)",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 4403,
+     "fuel_kwh": 4786
+    },
+    {
+     "label": "Combi boiler hot water (caretaker's flat)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 19300,
+     "fuel_kwh": 20978
+    }
+   ],
+   "pumps": [
+    {
+     "label": "LTHW boilers: 4 × Ideal Concord Super 200V (≈200 kW), BMS zones",
+     "kwh": 7233
+    },
+    {
+     "label": "Combi boiler (pro shop, Block 5)",
+     "kwh": 490
+    },
+    {
+     "label": "Combi boiler (caretaker's flat)",
+     "kwh": 138
+    }
+   ],
+   "other_loads": [
+    {
+     "name": "External lighting (car park, paths, terrace)",
+     "kwh": 6317
+    },
+    {
+     "name": "Golf buggy charging (overnight)",
+     "kwh": 21900
+    },
+    {
+     "name": "Base load not yet traced to a room (to the 2025 meter, pending submetering)",
+     "kwh": 35040
+    }
+   ],
+   "not_modelled": [
+    "\"LTHW boilers: 4 × Ideal Concord Super 200V (≈200 kW), BMS zones\": controller (recorded, not yet used in the calculation)",
+    "\"Beaumont 250 gas water heater (146 kW, 768 L, 1992)\": controller (recorded, not yet used in the calculation)",
+    "\"Combi boiler (pro shop, Block 5)\": controller (recorded, not yet used in the calculation)",
+    "\"DX split units (offices, east dining room, simulator)\": controller (recorded, not yet used in the calculation)",
+    "\"Kitchen extract (untempered make-up air)\": controller (recorded, not yet used in the calculation)",
+    "\"Toilet, shower and changing extract\": controller (recorded, not yet used in the calculation)",
+    "\"Fluorescent and LED (part-upgraded)\": controller (recorded, not yet used in the calculation)",
+    "\"Combi boiler (caretaker's flat)\": controller (recorded, not yet used in the calculation)",
+    "system_groups[].pumps: pump heat into the water (not counted)",
+    "\"Beaumont 250 gas water heater (146 kW, 768 L, 1992)\": store standing loss"
+   ]
+  },
+  "drafts": [
+   "Wall: 1960s brick and block, unfilled cavity (draft, awaiting Chris)",
+   "External door: solid timber, 44 mm (draft, awaiting Chris)",
+   "Windows: 1990s double glazing, air filled (draft, awaiting Chris)",
+   "Windows: single glazed, original metal frames (draft, awaiting Chris)",
+   "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)",
+   "Roof: ceiling to a cold loft, 100 mm mineral wool (draft, awaiting Chris)",
+   "Ground floor: concrete slab, no insulation, no carpet (draft, awaiting Chris)",
+   "Carpet (finish, draft, awaiting Chris)",
+   "Ground floor: insulated slab, hard floor, no carpet (draft, awaiting Chris)",
+   "Suspended ceiling (finish, draft, awaiting Chris)"
+  ],
+  "breakdown": [
+   {
+    "term": "heating",
+    "kwh": 180179
+   },
+   {
+    "term": "cooling",
+    "kwh": -3418
+   },
+   {
+    "term": "conduction",
+    "kwh": -1011111
+   },
+   {
+    "term": "opaque_solar_absorbed",
+    "kwh": 1755503
+   },
+   {
+    "term": "sky_longwave",
+    "kwh": -985407
+   },
+   {
+    "term": "glazing_solar_absorbed",
+    "kwh": 12470
+   },
+   {
+    "term": "bridging",
+    "kwh": -50747
+   },
+   {
+    "term": "infiltration",
+    "kwh": -120199
+   },
+   {
+    "term": "permanent_vents",
+    "kwh": 0
+   },
+   {
+    "term": "solar_transmitted",
+    "kwh": 44339
+   },
+   {
+    "term": "solar_lost_through_glazing",
+    "kwh": -641
+   },
+   {
+    "term": "occupancy_gains",
+    "kwh": 60189
+   },
+   {
+    "term": "lighting_gains",
+    "kwh": 17187
+   },
+   {
+    "term": "equipment_gains",
+    "kwh": 101910
+   },
+   {
+    "term": "storage",
+    "kwh": -254
+   },
+   {
+    "term": "mechanical_ventilation",
+    "kwh": 0
+   }
+  ],
+  "zones": [
+   {
+    "name": "Lounge 1",
+    "floor_m2": 116.6,
+    "heating_kwh": 9603,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 211,
+     "min_in_use_c": 15.999999999999986,
+     "morning_peak": {
+      "w": 2340.5246439498615,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 6773.2215767247635,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 211,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 211
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Lounge 2 (bay)",
+    "floor_m2": 56.3,
+    "heating_kwh": 8676,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 132,
+     "min_in_use_c": 15.999999999999984,
+     "morning_peak": {
+      "w": 2188.266529496533,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 5943.192165652426,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 132,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 132
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Entrance, cloakroom and stair",
+    "floor_m2": 47.3,
+    "heating_kwh": 11260,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 208,
+     "min_in_use_c": 15.99999999999999,
+     "morning_peak": {
+      "w": 2441.1850741517774,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 5201.051224325515,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 208,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 208
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Toilets (west)",
+    "floor_m2": 24.7,
+    "heating_kwh": 8003,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 2159,
+     "min_in_use_c": 14.782637429695942,
+     "morning_peak": {
+      "w": 1770.7597476630294,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 2181.1235803966197,
+      "hour": 295
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 2159,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 2159
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Back of house (west, unheated)",
+    "floor_m2": 95.3,
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Lounge 3 (fan convectors)",
+    "floor_m2": 101.1,
+    "heating_kwh": 6915,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 0,
+     "min_in_use_c": 15.999999999999986,
+     "morning_peak": {
+      "w": 1815.0578085188304,
+      "hour": 96
+     },
+     "later_peak": {
+      "w": 7426.380494396539,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Bar and bar store",
+    "floor_m2": 42.7,
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 0,
+     "min_in_use_c": 21.926473512027762,
+     "morning_peak": {
+      "w": 0,
+      "hour": 0
+     },
+     "later_peak": {
+      "w": 0,
+      "hour": 1
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "q50_over_20",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Main dining room",
+    "floor_m2": 205.3,
+    "heating_kwh": 4632,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 64,
+     "min_in_use_c": 15.999999999999993,
+     "morning_peak": {
+      "w": 124.9615359303652,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 12966.172070871558,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 64,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 64
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Dining room (double height)",
+    "floor_m2": 74.4,
+    "heating_kwh": 4233,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 247,
+     "min_in_use_c": 15.999999999999993,
+     "morning_peak": {
+      "w": 1517.1137856041064,
+      "hour": 336
+     },
+     "later_peak": {
+      "w": 3630.6184422651627,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 247,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 247
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "East dining room (DX)",
+    "floor_m2": 87,
+    "heating_kwh": 3252,
+    "cooling_kwh": 1649,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 120,
+     "min_in_use_c": 15.999999999999993,
+     "morning_peak": {
+      "w": 1036.3472163934478,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 5120.849627099671,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 120,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 120
+     },
+     "cooling": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     }
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Corridor and lobby (south)",
+    "floor_m2": 50.1,
+    "heating_kwh": 3944,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 469,
+     "min_in_use_c": 15.999999999999991,
+     "morning_peak": {
+      "w": 17.388727354167063,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 1956.3879301245975,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 469,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 469
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Kitchen",
+    "floor_m2": 144.8,
+    "heating_kwh": 9436,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 1932,
+     "min_in_use_c": 9.958214392523214,
+     "morning_peak": {
+      "w": 0,
+      "hour": 0
+     },
+     "later_peak": {
+      "w": 4734.741830431682,
+      "hour": 304
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 1932,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 1932
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Ladies' changing and toilets",
+    "floor_m2": 112.3,
+    "heating_kwh": 15768,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 331,
+     "min_in_use_c": 15.999999999999993,
+     "morning_peak": {
+      "w": 2521.630321299576,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 7693.530630515897,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 331,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 331
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Ladies' lounge",
+    "floor_m2": 37.4,
+    "heating_kwh": 1951,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 8,
+     "min_in_use_c": 15.999999999999993,
+     "morning_peak": {
+      "w": 399.6331434437612,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 3436.2548866742513,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 8,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 8
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Plant room and stores (unheated)",
+    "floor_m2": 68.8,
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Staff room and changing",
+    "floor_m2": 34.8,
+    "heating_kwh": 4466,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 46,
+     "min_in_use_c": 15.999999999999993,
+     "morning_peak": {
+      "w": 970.9960524466051,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 3542.553894087314,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 46,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 46
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Equipment store (unheated)",
+    "floor_m2": 176.3,
+    "heating_kwh": 3,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Pro shop",
+    "floor_m2": 104,
+    "heating_kwh": 13540,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 20,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 293,
+     "min_in_use_c": 13.999999999999991,
+     "morning_peak": {
+      "w": 4684.334325776288,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 8167.473790102291,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 293,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 293
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Pro shop office (DX)",
+    "floor_m2": 10.6,
+    "heating_kwh": 1427,
+    "cooling_kwh": 42,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 20,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 95,
+     "min_in_use_c": 13.999999999999995,
+     "morning_peak": {
+      "w": 230.2011106883494,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 1598.4336872727827,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 95,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 95
+     },
+     "cooling": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     }
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Men's changing room",
+    "floor_m2": 106.3,
+    "heating_kwh": 27510,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 1255,
+     "min_in_use_c": 15.471057910126078,
+     "morning_peak": {
+      "w": 7771.401848560087,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 9145.496519589564,
+      "hour": 295
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 1255,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 1255
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Men's changing (bay)",
+    "floor_m2": 57.7,
+    "heating_kwh": 10839,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 2967,
+     "min_in_use_c": 11.322003498050496,
+     "morning_peak": {
+      "w": 2610.649386745943,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 2703.5444092078524,
+      "hour": 297
+     },
+     "limited": true,
+     "recovery": {
+      "mornings": 6,
+      "median_h": null,
+      "not_reached": 6
+     }
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 2967,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 2967
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Showers",
+    "floor_m2": 18.1,
+    "heating_kwh": 5027,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 1289,
+     "min_in_use_c": 14.763880909990592,
+     "morning_peak": {
+      "w": 1674.4594152272266,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 1704.5241026071517,
+      "hour": 295
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 1289,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 1289
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Office (DX)",
+    "floor_m2": 51.3,
+    "heating_kwh": 2615,
+    "cooling_kwh": 578,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 0,
+     "min_in_use_c": 15.999999999999984,
+     "morning_peak": {
+      "w": 2147.2654363973065,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 4711.5668438901475,
+      "hour": 8239
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     },
+     "cooling": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     }
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "First floor corridor",
+    "floor_m2": 34.4,
+    "heating_kwh": 3952,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 2628,
+     "min_in_use_c": 12.927167426408452,
+     "morning_peak": {
+      "w": 1148.7816554702254,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 1169.69374706458,
+      "hour": 297
+     },
+     "limited": true,
+     "recovery": {
+      "mornings": 3,
+      "median_h": 13,
+      "not_reached": 1
+     }
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 2628,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 2628
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Caretaker's flat",
+    "floor_m2": 109,
+    "heating_kwh": 4403,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 391,
+     "min_in_use_c": 15.99999999999999,
+     "morning_peak": {
+      "w": 2570.8070382698156,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 4025.2913710845487,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 391,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 391
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Golf simulator (DX)",
+    "floor_m2": 46.8,
+    "heating_kwh": 4790,
+    "cooling_kwh": 1148,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 20,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 200,
+     "min_in_use_c": 13.999999999999993,
+     "morning_peak": {
+      "w": 2586.639540560026,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 4345.185878923512,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 200,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 200
+     },
+     "cooling": {
+      "unmet_hours": 0,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 0
+     }
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Pro shop lounge",
+    "floor_m2": 18.7,
+    "heating_kwh": 3383,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 20,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 580,
+     "min_in_use_c": 13.999999999999993,
+     "morning_peak": {
+      "w": 1458.5849362327835,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 1728.9046432432424,
+      "hour": 294
+     },
+     "limited": true,
+     "recovery": null
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 580,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 580
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Trophy room",
+    "floor_m2": 22.8,
+    "heating_kwh": 5637,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 2940,
+     "min_in_use_c": 11.266632255222294,
+     "morning_peak": {
+      "w": 1332.925596255888,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 1365.3608301496618,
+      "hour": 297
+     },
+     "limited": true,
+     "recovery": {
+      "mornings": 7,
+      "median_h": null,
+      "not_reached": 7
+     }
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 2940,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 2940
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   },
+   {
+    "name": "Roof stores",
+    "floor_m2": 30.2,
+    "heating_kwh": 4914,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": {
+     "setpoint_c": 21,
+     "setback_c": null,
+     "in_use_hours": 8760,
+     "unmet_in_use_hours": 4967,
+     "min_in_use_c": 6.779458595794578,
+     "morning_peak": {
+      "w": 978.2847479891313,
+      "hour": 288
+     },
+     "later_peak": {
+      "w": 990.9387286833619,
+      "hour": 295
+     },
+     "limited": true,
+     "recovery": {
+      "mornings": 30,
+      "median_h": null,
+      "not_reached": 30
+     }
+    },
+    "short": {
+     "heating": {
+      "unmet_hours": 4967,
+      "system_short_hours": 0,
+      "both_short_hours": 0,
+      "own_short_hours": 4967
+     },
+     "cooling": null
+    },
+    "air": {
+     "leakage": "weather",
+     "hours_windows_open": 0
+    }
+   }
+  ],
+  "plants": [
+   {
+    "id": "heating_y1",
+    "label": "LTHW boilers: 4 × Ideal Concord Super 200V (≈200 kW), BMS zones",
+    "service": "heating",
+    "capacity_kw": 200,
+    "hours_short": 0,
+    "delivered_kwh": 152636.06202438378,
+    "hot_water_first_kwh": 0,
+    "hot_water_short_hours": 0,
+    "hot_water_short_kwh": 0,
+    "min_flow_c": null
+   },
+   {
+    "id": "heating_y3",
+    "label": "Combi boiler (pro shop, Block 5)",
+    "service": "heating",
+    "capacity_kw": 24,
+    "hours_short": 0,
+    "delivered_kwh": 23140.23672250608,
+    "hot_water_first_kwh": 386.0692308000263,
+    "hot_water_short_hours": 0,
+    "hot_water_short_kwh": 0,
+    "min_flow_c": 75
+   },
+   {
+    "id": "cooling_y4",
+    "label": "DX split units (offices, east dining room, simulator)",
+    "service": "cooling",
+    "capacity_kw": 21,
+    "hours_short": 0,
+    "delivered_kwh": 3417.615556132174,
+    "hot_water_first_kwh": 0,
+    "hot_water_short_hours": 0,
+    "hot_water_short_kwh": 0,
+    "min_flow_c": null
+   },
+   {
+    "id": "heating_y2",
+    "label": "Combi boiler (caretaker's flat)",
+    "service": "heating",
+    "capacity_kw": 24,
+    "hours_short": 0,
+    "delivered_kwh": 4402.741897960245,
+    "hot_water_first_kwh": 19300.10500000078,
+    "hot_water_short_hours": 0,
+    "hot_water_short_kwh": 0,
+    "min_flow_c": 75
+   }
+  ]
+ },
+ "energyplus": {
+  "version": "25.2.0",
+  "run_s": 14.7,
+  "wall_s": 15.1,
+  "warnings": 7,
+  "severe": 0,
+  "severe_text": [],
+  "heating_kwh": 164995,
+  "cooling_kwh": 3643,
+  "peak_heating_kw": 102.3,
+  "peak_cooling_kw": 8.2,
+  "monthly_heating_kwh": [
+   32499,
+   25196,
+   23414,
+   11415,
+   5772,
+   1444,
+   620,
+   698,
+   3595,
+   10711,
+   20422,
+   29208
+  ],
+  "energy": {
+   "eui_kwh_per_m2": 241.4,
+   "total_kwh": 503306,
+   "by_fuel": [
+    {
+     "fuel": "electricity",
+     "kwh": 203830
+    },
+    {
+     "fuel": "gas",
+     "kwh": 299476
+    }
+   ],
+   "end_uses": [
+    {
+     "end_use": "heating",
+     "fuel": "gas",
+     "kwh": 191878
+    },
+    {
+     "end_use": "cooling",
+     "fuel": "electricity",
+     "kwh": 1301
+    },
+    {
+     "end_use": "dhw",
+     "fuel": "gas",
+     "kwh": 107598
+    },
+    {
+     "end_use": "dhw_circulation",
+     "fuel": "electricity",
+     "kwh": 1051
+    },
+    {
+     "end_use": "pumps",
+     "fuel": "electricity",
+     "kwh": 7958
+    },
+    {
+     "end_use": "fans",
+     "fuel": "electricity",
+     "kwh": 11166
+    },
+    {
+     "end_use": "lighting",
+     "fuel": "electricity",
+     "kwh": 17187
+    },
+    {
+     "end_use": "small_power",
+     "fuel": "electricity",
+     "kwh": 101910
+    },
+    {
+     "end_use": "auxiliary",
+     "fuel": "electricity",
+     "kwh": 63257
+    }
+   ],
+   "systems": [
+    {
+     "label": "LTHW boilers: 4 × Ideal Concord Super 200V (≈200 kW), BMS zones",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.85,
+     "served_kwh": 140043,
+     "fuel_kwh": 164756
+    },
+    {
+     "label": "Combi boiler (pro shop, Block 5)",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 20846,
+     "fuel_kwh": 22659
+    },
+    {
+     "label": "DX split units (offices, east dining room, simulator)",
+     "service": "cooling",
+     "fuel": "electricity",
+     "efficiency": 2.8,
+     "served_kwh": 3643,
+     "fuel_kwh": 1301
+    },
+    {
+     "label": "Beaumont 250 gas water heater (146 kW, 768 L, 1992)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.8,
+     "served_kwh": 68960,
+     "fuel_kwh": 86200
+    },
+    {
+     "label": "Combi boiler hot water (pro shop)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 386,
+     "fuel_kwh": 420
+    },
+    {
+     "label": "Fluorescent and LED (part-upgraded)",
+     "service": "lighting",
+     "fuel": "electricity",
+     "efficiency": null,
+     "served_kwh": 17187,
+     "fuel_kwh": 17187
+    },
+    {
+     "label": "Combi boiler (caretaker's flat)",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 4106,
+     "fuel_kwh": 4463
+    },
+    {
+     "label": "Combi boiler hot water (caretaker's flat)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 19300,
+     "fuel_kwh": 20978
+    }
+   ],
+   "pumps": [
+    {
+     "label": "LTHW boilers: 4 × Ideal Concord Super 200V (≈200 kW), BMS zones",
+     "kwh": 7308
+    },
+    {
+     "label": "Combi boiler (pro shop, Block 5)",
+     "kwh": 502
+    },
+    {
+     "label": "Combi boiler (caretaker's flat)",
+     "kwh": 148
+    }
+   ],
+   "other_loads": [
+    {
+     "name": "External lighting (car park, paths, terrace)",
+     "kwh": 6317
+    },
+    {
+     "name": "Golf buggy charging (overnight)",
+     "kwh": 21900
+    },
+    {
+     "name": "Base load not yet traced to a room (to the 2025 meter, pending submetering)",
+     "kwh": 35040
+    }
+   ],
+   "not_modelled": [
+    "\"LTHW boilers: 4 × Ideal Concord Super 200V (≈200 kW), BMS zones\": controller (recorded, not yet used in the calculation)",
+    "\"Beaumont 250 gas water heater (146 kW, 768 L, 1992)\": controller (recorded, not yet used in the calculation)",
+    "\"Combi boiler (pro shop, Block 5)\": controller (recorded, not yet used in the calculation)",
+    "\"DX split units (offices, east dining room, simulator)\": controller (recorded, not yet used in the calculation)",
+    "\"Kitchen extract (untempered make-up air)\": controller (recorded, not yet used in the calculation)",
+    "\"Toilet, shower and changing extract\": controller (recorded, not yet used in the calculation)",
+    "\"Fluorescent and LED (part-upgraded)\": controller (recorded, not yet used in the calculation)",
+    "\"Combi boiler (caretaker's flat)\": controller (recorded, not yet used in the calculation)",
+    "system_groups[].pumps: pump heat into the water (not counted)",
+    "\"Beaumont 250 gas water heater (146 kW, 768 L, 1992)\": store standing loss"
+   ]
+  },
+  "notes": [
+   "Thermal bridging: EnergyPlus has no linear bridge, so each room's bridging W/K is carried as outdoor air of exactly that conductance (heat = H × (outdoor − room air), as in the run), shown in EnergyPlus's infiltration.",
+   "Air: the building uses weather-driven air, which EnergyPlus is not given its own way yet (its AirflowNetwork). Each room takes the outdoor air the hourly run worked out for it, hour by hour (leakage, vents, windows opened by their rule, an extract fan's make-up air), so EnergyPlus checks the fabric, sun, mass, gains and setpoints but not the air.",
+   "People: their sensible heat as stated (W per person, radiant share), as the hourly run takes it; their moisture is not modelled in either.",
+   "Radiators and other emitters: EnergyPlus limits each room's heating to its emitters' output at the setpoint, held fixed (LimitCapacity); the hourly run re-rates it each hour at the room's temperature. The heat goes to the air in EnergyPlus.",
+   "System capacity (kW) is not given to EnergyPlus yet: its rooms are limited only by their own emitters and units.",
+   "Energy: EnergyPlus gives each room's heating and cooling; the fuel and electricity come from those through the systems' stated efficiencies, the same conversion the hourly run uses. Lighting, equipment, hot water, pumps and fans are the same inputs in both."
+  ],
+  "zones": [
+   {
+    "name": "Lounge 1",
+    "heating_kwh": 9173,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 247
+   },
+   {
+    "name": "Lounge 2 (bay)",
+    "heating_kwh": 7748,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 218
+   },
+   {
+    "name": "Entrance, cloakroom and stair",
+    "heating_kwh": 10088,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 225
+   },
+   {
+    "name": "Toilets (west)",
+    "heating_kwh": 7371,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 1802
+   },
+   {
+    "name": "Back of house (west, unheated)",
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Lounge 3 (fan convectors)",
+    "heating_kwh": 7264,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 205
+   },
+   {
+    "name": "Bar and bar store",
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Main dining room",
+    "heating_kwh": 4552,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 129
+   },
+   {
+    "name": "Dining room (double height)",
+    "heating_kwh": 3854,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 257
+   },
+   {
+    "name": "East dining room (DX)",
+    "heating_kwh": 3074,
+    "cooling_kwh": 1788,
+    "unmet_heating_hours_in_use": 155
+   },
+   {
+    "name": "Corridor and lobby (south)",
+    "heating_kwh": 3777,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 421
+   },
+   {
+    "name": "Kitchen",
+    "heating_kwh": 8831,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 1928
+   },
+   {
+    "name": "Ladies' changing and toilets",
+    "heating_kwh": 14222,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 248
+   },
+   {
+    "name": "Ladies' lounge",
+    "heating_kwh": 1881,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 128
+   },
+   {
+    "name": "Plant room and stores (unheated)",
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Staff room and changing",
+    "heating_kwh": 4051,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 212
+   },
+   {
+    "name": "Equipment store (unheated)",
+    "heating_kwh": 4,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Pro shop",
+    "heating_kwh": 12169,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 313
+   },
+   {
+    "name": "Pro shop office (DX)",
+    "heating_kwh": 1319,
+    "cooling_kwh": 50,
+    "unmet_heating_hours_in_use": 151
+   },
+   {
+    "name": "Men's changing room",
+    "heating_kwh": 24605,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 955
+   },
+   {
+    "name": "Men's changing (bay)",
+    "heating_kwh": 9634,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 2796
+   },
+   {
+    "name": "Showers",
+    "heating_kwh": 4528,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 997
+   },
+   {
+    "name": "Office (DX)",
+    "heating_kwh": 2436,
+    "cooling_kwh": 617,
+    "unmet_heating_hours_in_use": 74
+   },
+   {
+    "name": "First floor corridor",
+    "heating_kwh": 3611,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 2467
+   },
+   {
+    "name": "Caretaker's flat",
+    "heating_kwh": 4106,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 411
+   },
+   {
+    "name": "Golf simulator (DX)",
+    "heating_kwh": 4326,
+    "cooling_kwh": 1188,
+    "unmet_heating_hours_in_use": 231
+   },
+   {
+    "name": "Pro shop lounge",
+    "heating_kwh": 3033,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 459
+   },
+   {
+    "name": "Trophy room",
+    "heating_kwh": 5069,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 2783
+   },
+   {
+    "name": "Roof stores",
+    "heating_kwh": 4270,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 4720
+   }
+  ]
+ }
+}

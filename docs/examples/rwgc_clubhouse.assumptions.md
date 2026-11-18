@@ -107,13 +107,14 @@ Replace an assumption when better information arrives.
 
 ## Check against the 2025 meters
 
-On Yeovilton weather (London's file was not on this PC; see the thread):
+On London weather (St James's Park TMYx, 2009–2023; the EPW is not committed). The run is
+`scripts/example_three_tiers.mts`, and its results are in `docs/audit/examples/rwgc_clubhouse_three_tiers.json`.
 
 | | Model (15-minute run) | EnergyPlus | 2025 meter |
 |---|---|---|---|
-| Gas | 318 MWh | 296 MWh | 331 MWh |
+| Gas | 317 MWh | 299 MWh | 331 MWh |
 | Electricity | 204 MWh | 204 MWh | 212 MWh |
-| Peak heating | 108 kW | 101 kW | (calcs: 128 kW design, 130 kW in the strategy) |
+| Peak heating | 110 kW | 102 kW | (calcs: 128 kW design, 130 kW in the strategy) |
 
 The base-load figure, the kitchen's equipment and the extract rates were adjusted towards the meters. Nothing else
 was tuned. Several rooms are short of heat for part of the year: the 1880s changing rooms, the first-floor corridor
