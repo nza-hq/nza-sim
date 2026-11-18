@@ -27,6 +27,37 @@ export const ENGINE_CONSTANTS = {
   /** ISO 6946:2017 Annex C, h_c = 4 + 4·v (v the wind speed, m/s): the wind-driven outside convection option. */
   h_ce_wind_a: 4,
   h_ce_wind_b: 4,
+  /**
+   * Brief 125 (Linzie 17 Nov 23:50, "Follow EnergyPlus's method"): EnergyPlus's DOE-2 outside convection (its default
+   * SurfaceConvectionAlgorithm:Outside; EnergyPlus Engineering Reference, "DOE-2 Model"): h = h_n + R_f·(√(h_n² + h_f²) − h_n),
+   * h_f = a·V_z^b with MoWITT's forced terms (windward 3.26, 0.89; leeward 3.55, 0.617), leeward beyond 90° off the
+   * face's azimuth, a face within 0.98 of horizontal always windward; R_f by the outside layer's roughness. Checked
+   * against EnergyPlus 25.2's own coefficients (docs/briefs/active/125_outside-film.md Part 1).
+   */
+  doe2_windward_a: 3.26,
+  doe2_windward_b: 0.89,
+  doe2_leeward_a: 3.55,
+  doe2_leeward_b: 0.617,
+  doe2_leeward_beyond_deg: 90,
+  doe2_horizontal_cos: 0.98,
+  /** Roughness multipliers R_f: MediumRough (every opaque outside layer the EnergyPlus translator writes) and VerySmooth (glazing). */
+  doe2_roughness_opaque: 1.52,
+  doe2_roughness_glazing: 1.0,
+  /** EnergyPlus's low limit on a convection coefficient, W/m²K. */
+  h_ce_min: 0.1,
+  /**
+   * EnergyPlus's wet outside surface: while it rains, a wind-exposed face's convection is 1,000 W/m²K to the outdoor wet
+   * bulb. Raining: the weather code read between hours ≥ 0.5, or the liquid precipitation depth read between hours ≥ 0.8 mm.
+   */
+  h_ce_rain: 1000,
+  /**
+   * Brief 125, speed: the dry outside-film factorisations the network keeps (h_ce, 2·h_ce, 4·h_ce = 20, 40, 80 W/m²K);
+   * a step uses the lowest at or above every face's own film, the difference entering from the step before. A step
+   * above them all is rebuilt exactly. Changes no physics in steady conditions (network.ts).
+   */
+  film_rungs: 3,
+  rain_code_at_least: 0.5,
+  rain_precipitation_mm: 0.8,
   /** Mean difference between outdoor air and apparent sky temperature, K (ISO 13790:2008 11.3.5; ISO 52016-1 Annex B default). */
   delta_theta_sky_k: 11,
   /** Convective share of transmitted solar released to the air node (ISO 52016-1 Annex B default f_sol,c). */

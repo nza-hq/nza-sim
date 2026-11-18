@@ -49,6 +49,12 @@ export interface Weather {
     total_sky_cover: Float64Array
     /** Tenths (field 23). */
     opaque_sky_cover: Float64Array
+    /** Brief 125: present weather observation (field 26; 0 = the codes apply), null when the file does not carry it. */
+    present_weather_observation?: Float64Array | null
+    /** Brief 125: present weather codes (field 27, nine digits), null when absent. */
+    present_weather_codes?: string[] | null
+    /** Brief 125: liquid precipitation depth, mm (field 33; 999 missing), null when absent. */
+    liquid_precipitation_mm?: Float64Array | null
   }
   /** Lower-case hex SHA-256 of the file's bytes, as given to parseEpw. */
   sha256: string

@@ -8,7 +8,8 @@
  * weather and the stated run options; a missing input raises an error naming its path.
  */
 import { infiltration, ventCoefficient, ventConductance, type Vent } from './air'
-import { AIR_LINES, AirflowError, airWeather, buildAirModels, zoneAirStep, type ZoneAirModel } from './airflow'
+import { AIR_LINES, AirflowError, airWeather, buildAirModels, siteTerrain, zoneAirStep, type ZoneAirModel } from './airflow'
+import { outsideFace, outsideFaceZ, rainInputs } from './outsideConvection'
 import { ScheduleError, scheduleFractions, temperatureHours } from './pumps'
 import { computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K } from './constants'
@@ -68,13 +69,16 @@ export interface RunOptions {
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
    * - outside_convection 'wind': h_ce = 4 + 4·v (ISO 6946:2017 Annex C) from the weather's hourly wind speed.
+   * - outside_convection 'doe2' (Brief 125, Linzie 17 Nov 23:50): EnergyPlus's own outside film, DOE-2 from the wind at
+   *   each face's height and the site's terrain, windward or leeward, and the face's temperature; wet faces in rain
+   *   (outsideConvection.ts). Runs on the network solver, one zone included.
    * - inside_convection 'by_heat_flow': ISO 52016-1 Table 25 by the actual direction of heat flow (previous hour).
    * - beam_on_floor: the beam part of transmitted solar lands on the floor-facing inside surfaces, by area.
    * - inside_convection 'tarp' (Brief 105 Part 6): Walton's natural-convection correlations, EnergyPlus's TARP inside
    *   algorithm, from each face's temperature difference with the air at the step before (network.ts). Runs on the
    *   network solver, one zone included.
    */
-  surface_physics?: { outside_convection: 'fixed' | 'wind'; inside_convection: 'by_tilt' | 'by_heat_flow' | 'tarp'; beam_on_floor: boolean }
+  surface_physics?: { outside_convection: 'fixed' | 'wind' | 'doe2'; inside_convection: 'by_tilt' | 'by_heat_flow' | 'tarp'; beam_on_floor: boolean }
   /**
    * Brief 105 Part 6: steps per hour, and the outdoor temperature between the hour's readings ('hold' the hour's, or
    * 'linear' from the hour before's; network.ts). Absent: one step an hour. More than one runs on the network solver,
@@ -155,6 +159,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
   const insideAlpha: (number | null)[] = []    // per element: the zone_a face's inside solar absorptance (null on glazing)
   const insideAlphaB: (number | null)[] = []   // per two-faced element: the zone_b face's
   const absorbed: Float64Array[] = []
+  const surfaceOf: number[] = []  // per element: its surface's index in doc.surfaces (Brief 125)
   const zones: ZoneBuild[] = doc.zones.map(() => ({
     transmittedBySurface: [], solarTransmitted: new Float64Array(H), solarBeam: new Float64Array(H), vents: [], glazingInfo: [],
     glazingAreas: [], glazingGroups: [], envelopeArea: 0, hasRoof: false, hasGround: false, sharedSlabs: 0,
@@ -197,7 +202,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         if (ia == null) throw new ModelError('required', `${path}.inside_solar_absorptance`)
         if (ib == null) throw new ModelError('required', `${path}.inside_solar_absorptance_b`)
         elements.push(innerElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, layers: surfaceLayers(s, library, path), path }))
-        kinds.push(s.kind); zoneA.push(za); zoneB.push(zbZone); insideAlpha.push(ia); insideAlphaB.push(ib)
+        kinds.push(s.kind); surfaceOf.push(i); zoneA.push(za); zoneB.push(zbZone); insideAlpha.push(ia); insideAlphaB.push(ib)
         absorbed.push(new Float64Array(H))
         // Brief 123 P4: a ceiling to an unconditioned loft is not a slab between storeys (its junction is the roof's, at the
         // loft's eaves), and its area is in the room's envelope for leakage: the air barrier is at the ceiling (P4.2).
@@ -236,7 +241,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
           // absorbs its diffuse absorptance; the frame share absorbs all of it.
           optics: ang ? { interior_transmitted: (1 - ff) * ang.t_dif, interior_absorbed: (1 - ff) * ang.a_dif + ff } : null,
         }))
-        kinds.push(s.kind); zoneA.push(za); zoneB.push(null)
+        kinds.push(s.kind); surfaceOf.push(i); zoneA.push(za); zoneB.push(null)
         const a = new Float64Array(H)
         absorbed.push(a)
         const sun = s.tilt_deg > 90 + 1e-9 ? null : sunOn(s.azimuth_deg ?? 0, s.tilt_deg)
@@ -289,7 +294,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         layers: b.layers ?? [], stated_u: stated, emissivity: ground ? null : s.thermal_emissivity, path,
         inside_finish: finishLayers(s.inside_finish, library, `${path}.inside_finish`),
       }))
-      kinds.push(s.kind); zoneA.push(za); zoneB.push(null)
+      kinds.push(s.kind); surfaceOf.push(i); zoneA.push(za); zoneB.push(null)
       const a = new Float64Array(H)
       if (outside) {
         const alpha = s.solar_absorptance
@@ -310,7 +315,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
       })
     }
   })
-  return { elements, kinds, zoneA, zoneB, insideAlpha, insideAlphaB, absorbed, zones }
+  return { elements, kinds, surfaceOf, zoneA, zoneB, insideAlpha, insideAlphaB, absorbed, zones }
 }
 
 /** One zone's run in a common shape, from either solver. */
@@ -375,7 +380,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   // Brief 115: weather-driven air is worked out every step from the room's temperature, on the network solver.
   const weatherAir = doc.building.air.method === 'weather_driven'
   const network = weatherAir || plantGroups.length > 0 || Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
-    || options.surface_physics?.inside_convection === 'tarp' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
+    || options.surface_physics?.inside_convection === 'tarp' || options.surface_physics?.outside_convection === 'doe2' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
 
   // The window junction over several zones: 4√A per facade (all its glazing, every zone), shared out by area. On one
   // zone with one glazing surface per facade this is Engine 1's 4√A per surface; cutting a facade into storeys does
@@ -587,6 +592,20 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     return g ? { w: g.total_w, convective_fraction: g.convective_fraction } : null
   }
 
+  // Brief 125: each face to outside air as EnergyPlus's film needs it: its height (outsideFaceZ, the translator's too),
+  // the site's terrain (siteTerrain, the translator's too), its azimuth and tilt; the weather's wind, humidity, rain.
+  const outsideFilm = () => {
+    const { terrain } = siteTerrain(doc.building.site)
+    const wx = airWeather(weather.hours, weather.header.elevation)
+    return {
+      faces: elements.map((e, k) => {
+        if (e.boundary !== 'outside') return null
+        const s = doc.surfaces[built.surfaceOf[k]]
+        return outsideFace(outsideFaceZ(doc.zones[zoneA[k]], s.tilt_deg), terrain, s.azimuth_deg ?? 0, s.tilt_deg, e.kind === 'window')
+      }),
+      weather: { wind_speed: weather.hours.wind_speed, wind_direction: weather.hours.wind_direction, w: wx.w, pressure: weather.hours.pressure, ...rainInputs(weather.hours) },
+    }
+  }
   const kwhOf = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
   let solved: Solved[]
   let solver: ModelResults['solver']
@@ -644,6 +663,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       warmup_days: options.warmup_days,
       steps_per_hour: options.time_step?.steps_per_hour, theta_e_between: options.time_step?.theta_e_between,
       inside_convection: sp?.inside_convection === 'tarp' ? 'tarp' : 'fixed',
+      outside_convection: sp?.outside_convection === 'doe2' ? outsideFilm() : null,
       plants, plant_free_share: plants.length ? freeShare : null,
     })
     plantRun = run.plants

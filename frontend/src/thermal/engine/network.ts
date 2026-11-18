@@ -28,6 +28,7 @@ import type { Element } from './elements'
 import { luFactor, luFactorInto, luSolve, type LU } from './linalg'
 import { sparseLuFactor, sparseLuSolve, type SparseLU } from './sparse'
 import { checkSetpointHours } from './zone'
+import { doe2Film, filmStep, type FilmStep, type FilmWeather, type OutsideFace } from './outsideConvection'
 
 export interface NetworkZone {
   /** C_int: air ρ·c·V plus the zone's internal heat capacity, J/K. */
@@ -120,6 +121,14 @@ export interface NetworkInputs {
    * every step.
    */
   inside_convection?: 'fixed' | 'tarp'
+  /**
+   * Brief 125: EnergyPlus's outside film (outsideConvection.ts). `faces[k]`: element k's face to outside air (null for
+   * the ground, two-faced elements, and any element keeping its fixed film). Each step, each such face's convection is
+   * DOE-2's from its outside surface temperature at the step before and the step's wind; while it rains, 1,000 W/m²K
+   * to the wet bulb. Its h_re stays the element's. The element's chain is re-factorised and the interface rebuilt every
+   * step. Absent: every element keeps its fixed g_boundary (ISO 52016-1's h_ce + h_re).
+   */
+  outside_convection?: { faces: (OutsideFace | null)[]; weather: FilmWeather } | null
   /**
    * Brief 120: plant (system) capacity. Each step, the zones a plant serves draw at most `cap_w` from it, less
    * `reserved_w` that hour (hot water it heats first), summed over its share of each zone's heating (or cooling). When
@@ -321,6 +330,21 @@ function check(inp: NetworkInputs) {
   if (!(Number.isInteger(N) && N >= 1 && N <= 60)) throw new NetworkError('a whole number from 1 to 60', 'steps_per_hour')
   if (inp.theta_e_between != null && inp.theta_e_between !== 'hold' && inp.theta_e_between !== 'linear') throw new NetworkError("'hold' or 'linear'", 'theta_e_between')
   if (inp.inside_convection != null && inp.inside_convection !== 'fixed' && inp.inside_convection !== 'tarp') throw new NetworkError("'fixed' or 'tarp'", 'inside_convection')
+  const oc = inp.outside_convection
+  if (oc) {
+    if (oc.faces.length !== inp.elements.length) throw new NetworkError('one entry per element', 'outside_convection.faces')
+    oc.faces.forEach((f, k) => {
+      if (f == null) return
+      const p = `outside_convection.faces[${k}]`
+      if (inp.elements[k].element.boundary !== 'outside') throw new NetworkError('only an element facing outside air has an outside film', p)
+      if (!(f.wind_factor >= 0) || !(f.roughness > 0) || !Number.isFinite(f.azimuth_deg) || !(Math.abs(f.cos_tilt) <= 1)) throw new NetworkError('wind factor ≥ 0, roughness > 0, an azimuth and a cosine', p)
+      if (inp.zones.some((z) => z.heating_source?.element === k)) throw new NetworkError('a floor heated from inside cannot also face outside air here', p)
+    })
+    arr(oc.weather.wind_speed, 'outside_convection.weather.wind_speed'); arr(oc.weather.wind_direction, 'outside_convection.weather.wind_direction')
+    arr(oc.weather.w, 'outside_convection.weather.w'); arr(oc.weather.pressure, 'outside_convection.weather.pressure')
+    if (oc.weather.rain_code) arr(oc.weather.rain_code, 'outside_convection.weather.rain_code')
+    if (oc.weather.precipitation_mm) arr(oc.weather.precipitation_mm, 'outside_convection.weather.precipitation_mm')
+  }
 }
 
 /** One element's interior chain: the nodes between its interface nodes, tridiagonal, Thomas-factorised once. */
@@ -338,6 +362,8 @@ interface Chain {
   /** Responses of the interior to a unit face-A and face-B temperature (B⁻¹·c). */
   wA: Float64Array
   wB: Float64Array | null
+  /** The tridiagonal's diagonal (Brief 125: node 0's changes with the outside film). */
+  diag: Float64Array
 }
 
 function thomas(m: number, diag: Float64Array, off: Float64Array, path: string) {
@@ -409,7 +435,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       if (j < m - 1) off[j] = -e.g[i] * A
     }
     const { cp, piv } = thomas(m, diag, off, `elements[${k}]`)
-    const t: Chain = { first, m, cap, off, cp, piv, gA: e.g[L - 2] * A, gB: two[k] ? e.g[0] * A : 0, wA: new Float64Array(m), wB: two[k] ? new Float64Array(m) : null }
+    const t: Chain = { first, m, cap, off, cp, piv, gA: e.g[L - 2] * A, gB: two[k] ? e.g[0] * A : 0, wA: new Float64Array(m), wB: two[k] ? new Float64Array(m) : null, diag }
     if (m > 0) {
       const u = new Float64Array(m); u[m - 1] = -t.gA; solveChain(t, u, t.wA)
       if (t.wB) { const v = new Float64Array(m); v[0] = -t.gB; solveChain(t, v, t.wB) }
@@ -443,13 +469,21 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
     add(z, z, inp.zones[z].bridging_w_per_k)
     for (const f of faces[z]) link(f.node, rad[z], K.h_ri * f.area)      // long-wave through the zone's star node
   }
+  // Brief 125: elements with an outside film that changes each step keep their face-A diagonal out of `base`
+  // (aDiag, added by `assemble`), since it follows their chain's factorisation.
+  const film = inp.outside_convection ?? null
+  const filmK = film ? Int32Array.from(film.faces.flatMap((f, k) => (f ? [k] : []))) : new Int32Array(0)
+  const isFilm = new Uint8Array(E)
+  for (const k of filmK) isFilm[k] = 1
+  const aDiag = new Float64Array(E)
   for (let k = 0; k < E; k++) {
     const e = els[k], t = chains[k], A = e.area_m2, L = e.c.length
     capF[faceA[k]] = e.c[L - 1] * A
     if (two[k]) capF[faceB[k]] = e.c[0] * A
     const a = faceA[k]
     if (t.m === 0) { link(a, faceB[k], e.g[0] * A); continue }  // a two-faced element with no interior node
-    add(a, a, t.gA + t.gA * t.wA[t.m - 1])
+    aDiag[k] = t.gA + t.gA * t.wA[t.m - 1]
+    if (!isFilm[k]) add(a, a, aDiag[k])
     if (two[k]) {
       const b = faceB[k]
       add(b, b, t.gB + t.gB * t.wB![0])
@@ -518,6 +552,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
   const assemble = () => {
     for (let i = 0; i < n; i++) { rows[i].clear(); for (const [j, v] of base[i]) rows[i].set(j, v) }
     for (let q = 0; q < nFaces; q++) link(fZone[q], fNode[q], fHci[q] * fArea[q])  // convection with the zone's air
+    for (const k of filmK) add(faceA[k], faceA[k], aDiag[k])
     lu = sparseLuFactor(n, rows, order)
     const v = new Float64Array(n), x = new Float64Array(n)
     for (let j = 0; j < Z; j++) {
@@ -549,7 +584,6 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       const h = unstable ? (K.tarp_unstable_a * a) / (K.tarp_unstable_b - fCos[q]) : (K.tarp_stable_a * a) / (K.tarp_stable_b + fCos[q])
       fHci[q] = Math.max(K.h_ci_tarp_min, h)
     }
-    assemble()
   }
 
   // ── Solar inside each zone (Part 1b's rule, per zone) ────────────────────────────────────────────────────────
@@ -604,6 +638,84 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       CCP[o + j] = t.cp[j]; CPIV[o + j] = t.piv[j]; CWA[o + j] = t.wA[j]; CWB[o + j] = t.wB ? t.wB[j] : 0
       CZ[o + j] = two[k] && t.first + j <= mid[k] ? elZoneB[k] : elZoneA[k]
     }
+  }
+  // Brief 125: the outside film each step. Node 0 of a boundary chain is its outside surface; its diagonal holds the
+  // film the factorisation was made with (`filmHm`, convection; the element's h_re beside it).
+  // - Rebuilding the factorisation every step costs about 20× the run on 50 rooms (125_perf), so two are made once:
+  //   dry, with every face at ISO 52016-1's fixed h_ce, and wet, every face at the rain film. A dry step's own DOE-2
+  //   film h enters as the fixed film plus (h − h_ce)·(T_conv − T_surface at the step before) (`filmHx`): the balance
+  //   solved and the one recorded are the same, so every step still closes, and in steady conditions it is exact.
+  //   With h below the fixed film this lag only damps (stable); a step where any face's film is above it (strong wind)
+  //   is rebuilt with every face's own film (`exact`). Rain steps use the wet factorisation: exact.
+  // - With TARP inside convection the interface is rebuilt every step anyway, so every step is exact.
+  const filmH = new Float64Array(E), filmHm = new Float64Array(E), filmHx = new Float64Array(E), filmT0 = new Float64Array(E)
+  const elA = Float64Array.from(els, (e) => e.area_m2), elHre = Float64Array.from(els, (e) => e.h_re)
+  const fst: FilmStep = { v: 0, dir: 0, rain: false, wet_bulb: 0 }
+  let tConv = 0
+  /** Element k's chain factorised with outside convection hm (W/m²K), and its face-A entry. */
+  const chainFor = (k: number, hm: number) => {
+    const e = els[k], t = chains[k], o = cO[k], m = t.m, A = elA[k]
+    filmHm[k] = hm
+    t.diag[0] = t.cap[0] / DT + (hm + elHre[k]) * A + e.g[0] * A
+    for (let j = 0; j < m; j++) {
+      const piv = t.diag[j] - (j > 0 ? t.off[j - 1] * CCP[o + j - 1] : 0)
+      if (!(Math.abs(piv) > 0)) throw new NetworkError('an element chain is singular', `elements[${k}]`)
+      CPIV[o + j] = piv
+      CCP[o + j] = j < m - 1 ? t.off[j] / piv : 0
+    }
+    // wA = B⁻¹·(−g_A at the last node), forward then back.
+    CWA[o] = (m === 1 ? -t.gA : 0) / CPIV[o]
+    for (let j = 1; j < m; j++) CWA[o + j] = ((j === m - 1 ? -t.gA : 0) - t.off[j - 1] * CWA[o + j - 1]) / CPIV[o + j]
+    for (let j = m - 2; j >= 0; j--) CWA[o + j] -= CCP[o + j] * CWA[o + j + 1]
+    aDiag[k] = t.gA + t.gA * CWA[o + m - 1]
+  }
+  type FilmState = { ccp: Float64Array; cpiv: Float64Array; cwa: Float64Array; aDiag: Float64Array; diag0: Float64Array; hm: Float64Array; lu: SparseLU; resp: Float64Array[] }
+  const respArrays = [G, Gr, EW, RW, EWc, RWc, Y]
+  const snap = (): FilmState => ({
+    ccp: CCP.slice(), cpiv: CPIV.slice(), cwa: CWA.slice(), aDiag: aDiag.slice(), diag0: Float64Array.from(chains, (t) => t.diag[0] ?? 0), hm: filmHm.slice(),
+    lu, resp: respArrays.map((a) => a.slice()),
+  })
+  const restore = (st: FilmState) => {
+    CCP.set(st.ccp); CPIV.set(st.cpiv); CWA.set(st.cwa); aDiag.set(st.aDiag); filmHm.set(st.hm)
+    chains.forEach((t, k) => { if (t.m > 0) t.diag[0] = st.diag0[k] })
+    lu = st.lu
+    respArrays.forEach((a, i) => a.set(st.resp[i]))
+  }
+  // Dry references: ISO's h_ce, then doubled (K.film_rungs of them): a step takes the lowest at or above every face's film.
+  const rungs: number[] = film && !tarp ? Array.from({ length: K.film_rungs }, (_, i) => K.h_ce * 2 ** i) : []
+  const dryStates: FilmState[] = []
+  let wetState: FilmState | null = null
+  let cur = -1  // the rung in use; rungs.length: wet; −2: exact
+  if (film && !tarp) {
+    for (const k of filmK) chainFor(k, K.h_ce)  // what the first assemble was made with (g_boundary = h_ce + h_re)
+    dryStates.push(snap())
+    for (const r of rungs.slice(1)) { for (const k of filmK) chainFor(k, r); assemble(); dryStates.push(snap()) }
+    for (const k of filmK) chainFor(k, K.h_ce_rain)
+    assemble()
+    wetState = snap()
+    restore(dryStates[0]); cur = 0
+  }
+  let filmExactSteps = 0  // steps rebuilt with every face's own film (a count, for the speed record)
+  const filmUpdate = (h: number, te: number, frac: number) => {
+    filmStep(film!.weather, h, frac, te, fst)
+    tConv = fst.wet_bulb
+    let hMax = 0
+    for (const k of filmK) {
+      const o = cO[k]
+      filmT0[k] = CX[o]
+      const hc = fst.rain ? K.h_ce_rain : doe2Film(film!.faces[k]!, CX[o] - te, fst.v, fst.dir)
+      filmH[k] = hc
+      if (hc > hMax) hMax = hc
+    }
+    const want = fst.rain ? rungs.length : rungs.findIndex((r) => r >= hMax)
+    if (tarp || want < 0) {
+      for (const k of filmK) { chainFor(k, filmH[k]); filmHx[k] = 0 }
+      cur = -2
+      if (!tarp) { assemble(); filmExactSteps++ }
+      return
+    }
+    if (cur !== want) { restore(want === rungs.length ? wetState! : dryStates[want]); cur = want }
+    for (const k of filmK) filmHx[k] = filmH[k] - filmHm[k]
   }
   const heatC = Float64Array.from(inp.zones, (z) => z.setpoints.heat_c ?? NaN)
   const coolC = Float64Array.from(inp.zones, (z) => z.setpoints.cool_c ?? NaN)
@@ -963,7 +1075,8 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
 
   /** One step of hour h at outdoor temperature te; recorded outputs add w (1 / steps per hour) of their value. */
   const sub = (h: number, te: number, record: boolean, w: number, frac = 1) => {
-    if (tarp) tarpCoefficients()
+    if (film) filmUpdate(h, te, frac)
+    if (tarp) { tarpCoefficients(); assemble() }
     if (anyCapAt) for (let z = 0; z < Z; z++) { const f = capAt[z]; if (f) { capW[z] = f(ctlPrev[z]); if (record) capRec[z]![h] += w * capW[z] } }
     if (anySpH) for (let z = 0; z < Z; z++) {
       const sp = spH[z]
@@ -996,7 +1109,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       if (o1 === o) continue
       // solveChain with the right-hand side (stored heat, then the outside sources) formed as it goes.
       let s0 = 0, sA = 0, jA = -1
-      if (!two[k]) { s0 = gBnd[k] * (ground[k] ? inp.theta_ground : te) + sky[k]; sA = absP[h * E + k] + solDiffuse[elZoneA[k]] * difPane[k]; jA = o + absAt[k] }
+      if (!two[k]) { s0 = (isFilm[k] ? elA[k] * (filmHm[k] * tConv + elHre[k] * te + filmHx[k] * (tConv - filmT0[k])) : gBnd[k] * (ground[k] ? inp.theta_ground : te)) + sky[k]; sA = absP[h * E + k] + solDiffuse[elZoneA[k]] * difPane[k]; jA = o + absAt[k] }
       let bj = CD[o] * CX[o]
       if (jA >= 0) { bj += s0; if (jA === o) bj += sA }
       CY[o] = bj / CPIV[o]
@@ -1071,7 +1184,7 @@ export function runNetwork(inp: NetworkInputs): NetworkRun {
       if (!two[k]) {
         const node0 = cO[k + 1] > cO[k] ? CX[cO[k]] : xF[faceA[k]]
         const tb = ground[k] ? inp.theta_ground : te
-        const qb = gBnd[k] * (tb - node0), qs = absP[h * E + k]
+        const qb = isFilm[k] ? elA[k] * (filmHm[k] * (tConv - node0) + elHre[k] * (te - node0) + filmHx[k] * (tConv - filmT0[k])) : gBnd[k] * (tb - node0), qs = absP[h * E + k]
         sum[za] += qb; elB[k] += w * qb
         sum[za] += qs; elS[k] += w * qs
         sum[za] += sky[k]; elK[k] += w * sky[k]

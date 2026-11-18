@@ -28,6 +28,8 @@ import type { ModelDocument, Surface } from '../schema/model'
 import { readZoneConductances, type ModelResults } from '../engine/results'
 import type { ConstructionBody, Layer } from '../engine/elements'
 import type { Weather } from '../engine/types'
+import { siteTerrain } from '../engine/airflow'
+import { outsideFaceZ } from '../engine/outsideConvection'
 import { iso6946Films } from '../engine/elements'
 import { ENGINE_CONSTANTS as K } from '../engine/constants'
 import { groundTemperature, ModelError, surfaceLayers, zoneSetpointHours } from '../engine/model'
@@ -185,10 +187,9 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
     run_simulation_for_sizing_periods: 'No', run_simulation_for_weather_file_run_periods: 'Yes',
   })
   // Terrain sets how EnergyPlus scales the weather file's wind to each surface's height.
-  const TERRAIN: Record<string, string> = { open: 'Country', suburban: 'Suburbs', urban: 'City', city: 'City', sheltered: 'City', normal: 'Suburbs', exposed: 'Country' }
-  const terrainFrom = doc.building.site.terrain ?? doc.building.site.exposure
-  const terrain = (terrainFrom && TERRAIN[terrainFrom]) || 'Suburbs'
-  if (!terrainFrom || !TERRAIN[terrainFrom]) note('Wind: the site states no terrain or exposure, so EnergyPlus scales the wind to each surface\'s height as for suburbs (its own default).')
+  // Brief 125: one read of the site's terrain, shared with the run's outside film (airflow.ts siteTerrain).
+  const { terrain, stated: terrainStated } = siteTerrain(doc.building.site)
+  if (!terrainStated) note('Wind: the site states no terrain or exposure, so EnergyPlus scales the wind to each surface\'s height as for suburbs (its own default).')
   put('Building', epName(doc.building.name || 'Building'), {
     north_axis: 0, terrain, solar_distribution: 'FullExterior', maximum_number_of_warmup_days: 25, minimum_number_of_warmup_days: 6,
     loads_convergence_tolerance_value: 0.04, temperature_convergence_tolerance_value: 0.4,
@@ -394,7 +395,9 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
       const vertical = s.tilt_deg > 45 && s.tilt_deg < 135
       const h = vertical ? Math.max(1, Math.min(height, gross / 2)) : Math.sqrt(gross)
       const w = gross / h
-      const o = place(ground ? z0 : vertical ? z0 : s.tilt_deg <= 45 ? z0 + height : z0)
+      // Brief 125: the surface's centroid at outsideFaceZ, the height the run's outside film takes its wind at (one
+      // read). Its windows fill the middle of it, so they share the height. Ground floors stay at the zone's floor.
+      const o = place(ground ? z0 : outsideFaceZ(zone, s.tilt_deg) - (h / 2) * f.up[2])
       const type = s.kind === 'wall' ? 'Wall' : s.kind === 'roof' ? 'Roof' : 'Floor'
       const sname = epName(s.id)
       put('BuildingSurface:Detailed', sname, {
