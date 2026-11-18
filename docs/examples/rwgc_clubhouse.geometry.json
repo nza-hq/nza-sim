@@ -165,24 +165,32 @@
 25.75
 ],
 [
--0.25,
-25.25
+-0.111,
+25.579
 ],
 [
--1.25,
-24.5
+-0.841,
+25.091
 ],
 [
--1.25,
-22.5
+-1.329,
+24.361
 ],
 [
--1.0,
-22.5
+-1.5,
+23.5
 ],
 [
--0.25,
-21.5
+-1.329,
+22.639
+],
+[
+-0.841,
+21.909
+],
+[
+-0.111,
+21.421
 ],
 [
 0.75,
@@ -1433,42 +1441,6 @@
 "ring": [
 [
 5.25,
-19.5
-],
-[
-5.25,
-21.0
-],
-[
-5.5,
-21.0
-],
-[
-5.5,
-22.75
-],
-[
-5.25,
-22.75
-],
-[
-5.25,
-26.5
-],
-[
-5.5,
-26.5
-],
-[
-5.5,
-28.75
-],
-[
-5.25,
-28.75
-],
-[
-5.25,
 30.25
 ],
 [
@@ -1480,24 +1452,32 @@
 25.75
 ],
 [
--0.25,
-25.25
+-0.111,
+25.579
 ],
 [
--1.25,
-24.5
+-0.841,
+25.091
 ],
 [
--1.25,
-22.5
+-1.329,
+24.361
 ],
 [
--1.0,
-22.5
+-1.5,
+23.5
 ],
 [
--0.25,
-21.5
+-1.329,
+22.639
+],
+[
+-0.841,
+21.909
+],
+[
+-0.111,
+21.421
 ],
 [
 0.75,
@@ -1506,9 +1486,45 @@
 [
 0.75,
 19.5
+],
+[
+5.25,
+19.5
+],
+[
+5.25,
+21.0
+],
+[
+5.5,
+21.0
+],
+[
+5.5,
+22.75
+],
+[
+5.25,
+22.75
+],
+[
+5.25,
+26.5
+],
+[
+5.5,
+26.5
+],
+[
+5.5,
+28.75
+],
+[
+5.25,
+28.75
 ]
 ],
-"area": 56.25,
+"area": 57.12,
 "revit_area": 50.579315,
 "height_m": 3.14,
 "recovered": false
@@ -2820,7 +2836,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.06 x 0.03",
 "block": 0,
-"side": 48,
+"side": 50,
 "t_m": 1.46,
 "width_m": 0.433,
 "sill_m": 0.519,
@@ -2832,7 +2848,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.06 x 0.03",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 2.624,
 "width_m": 0.626,
 "sill_m": 0.519,
@@ -2844,7 +2860,7 @@
 "cat": "Windows",
 "type": "1.4 x 2.2 m",
 "block": 0,
-"side": 45,
+"side": 47,
 "t_m": 0.642,
 "width_m": 1.499,
 "sill_m": 0.383,
@@ -2856,7 +2872,7 @@
 "cat": "Windows",
 "type": "1.4 x 2.2 m",
 "block": 0,
-"side": 46,
+"side": 48,
 "t_m": 0.22,
 "width_m": 1.5,
 "sill_m": 0.448,
@@ -3926,41 +3942,41 @@
 "block": 0,
 "side": 38,
 "t_m": 0.0,
-"width_m": 0.837,
+"width_m": 0.878,
 "sill_m": 0.0,
 "height_m": 2.595,
-"dist": 0.28
+"dist": 0.07
 },
 {
 "eid": "3409647",
 "cat": "Windows",
 "type": "1.20 X 2.76",
 "block": 0,
-"side": 39,
-"t_m": 0.438,
-"width_m": 1.2,
+"side": 41,
+"t_m": 0.0,
+"width_m": 0.635,
 "sill_m": 0.0,
 "height_m": 2.595,
-"dist": 0.23
+"dist": 0.01
 },
 {
 "eid": "3409662",
 "cat": "Windows",
 "type": "1.20 X 2.76",
 "block": 0,
-"side": 41,
-"t_m": 0.34,
-"width_m": 0.91,
+"side": 43,
+"t_m": 0.0,
+"width_m": 0.878,
 "sill_m": 0.0,
 "height_m": 2.595,
-"dist": 0.16
+"dist": 0.06
 },
 {
 "eid": "3412526",
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 44,
+"side": 46,
 "t_m": 2.853,
 "width_m": 0.578,
 "sill_m": 0.0,
@@ -3972,7 +3988,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 44,
+"side": 46,
 "t_m": 0.921,
 "width_m": 0.605,
 "sill_m": 0.0,
@@ -3984,7 +4000,7 @@
 "cat": "Doors",
 "type": "M_Door-Curtain-Wall-Double-Storefront",
 "block": 0,
-"side": 44,
+"side": 46,
 "t_m": 1.576,
 "width_m": 1.227,
 "sill_m": 0.0,
@@ -3996,7 +4012,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 0.151,
 "width_m": 0.522,
 "sill_m": 0.0,
@@ -4008,7 +4024,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning_0.06",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 0.123,
 "width_m": 0.557,
 "sill_m": 1.89,
@@ -4032,7 +4048,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 2.624,
 "width_m": 0.626,
 "sill_m": 1.907,
@@ -4044,7 +4060,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.06 x 0.03",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 0.196,
 "width_m": 0.746,
 "sill_m": 0.519,
@@ -4056,7 +4072,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 0.196,
 "width_m": 0.746,
 "sill_m": 1.907,
@@ -4068,7 +4084,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.06 x 0.03",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 1.02,
 "width_m": 0.719,
 "sill_m": 0.519,
@@ -4080,7 +4096,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 1.02,
 "width_m": 0.719,
 "sill_m": 1.907,
@@ -4092,7 +4108,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.06 x 0.03",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 1.817,
 "width_m": 0.729,
 "sill_m": 0.519,
@@ -4104,7 +4120,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 47,
+"side": 49,
 "t_m": 1.817,
 "width_m": 0.729,
 "sill_m": 1.907,
@@ -4116,7 +4132,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.06 x 0.03",
 "block": 0,
-"side": 48,
+"side": 50,
 "t_m": 0.0,
 "width_m": 0.383,
 "sill_m": 0.519,
@@ -4128,7 +4144,7 @@
 "cat": "Doors",
 "type": "R21_Curtain_Single Door with Glass (1)",
 "block": 0,
-"side": 48,
+"side": 50,
 "t_m": 0.424,
 "width_m": 0.961,
 "sill_m": 0.0,
@@ -4140,7 +4156,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 48,
+"side": 50,
 "t_m": 1.46,
 "width_m": 0.433,
 "sill_m": 1.907,
@@ -4152,7 +4168,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 48,
+"side": 50,
 "t_m": 0.461,
 "width_m": 0.921,
 "sill_m": 1.907,
@@ -4164,7 +4180,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning",
 "block": 0,
-"side": 48,
+"side": 50,
 "t_m": 0.0,
 "width_m": 0.383,
 "sill_m": 1.907,
@@ -4200,7 +4216,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning_0.15 x 0.04",
 "block": 0,
-"side": 49,
+"side": 51,
 "t_m": 2.655,
 "width_m": 0.515,
 "sill_m": 0.0,
@@ -4212,7 +4228,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.04 x 0.03",
 "block": 0,
-"side": 49,
+"side": 51,
 "t_m": 2.655,
 "width_m": 0.515,
 "sill_m": 2.229,
@@ -4224,7 +4240,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning_0.06 x 0.12",
 "block": 0,
-"side": 51,
+"side": 53,
 "t_m": 0.186,
 "width_m": 0.666,
 "sill_m": 0.0,
@@ -4236,7 +4252,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.045",
 "block": 0,
-"side": 51,
+"side": 53,
 "t_m": 0.191,
 "width_m": 0.342,
 "sill_m": 2.229,
@@ -4248,7 +4264,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning _0.045",
 "block": 0,
-"side": 51,
+"side": 53,
 "t_m": 0.528,
 "width_m": 0.647,
 "sill_m": 2.229,
@@ -4272,7 +4288,7 @@
 "cat": "Windows",
 "type": "M_Curtain Wall-Awning_0.06 x 0.12",
 "block": 0,
-"side": 51,
+"side": 53,
 "t_m": 0.844,
 "width_m": 0.406,
 "sill_m": 0.0,
@@ -4284,7 +4300,7 @@
 "cat": "Curtain Panels",
 "type": "Glass 10mm",
 "block": 0,
-"side": 49,
+"side": 51,
 "t_m": 0.335,
 "width_m": 1.802,
 "sill_m": 0.0,
@@ -4501,28 +4517,32 @@
 25.75
 ],
 [
-0.0,
-25.5
+-0.111,
+25.579
 ],
 [
--1.25,
-24.75
+-0.841,
+25.091
+],
+[
+-1.329,
+24.361
 ],
 [
 -1.5,
-24.25
+23.5
 ],
 [
--1.5,
-22.75
+-1.329,
+22.639
 ],
 [
--1.25,
-22.75
+-0.841,
+21.909
 ],
 [
--0.5,
-21.5
+-0.111,
+21.421
 ],
 [
 0.75,
@@ -5198,34 +5218,6 @@
 "name": "Mens Changing Rooms",
 "ring": [
 [
-5.5,
-19.5
-],
-[
-5.5,
-21.25
-],
-[
-5.25,
-21.25
-],
-[
-5.25,
-24.0
-],
-[
-5.5,
-24.0
-],
-[
-5.5,
-27.5
-],
-[
-5.25,
-27.5
-],
-[
 5.25,
 30.25
 ],
@@ -5238,28 +5230,32 @@
 25.75
 ],
 [
-0.0,
-25.5
+-0.111,
+25.579
 ],
 [
--1.25,
-24.75
+-0.841,
+25.091
+],
+[
+-1.329,
+24.361
 ],
 [
 -1.5,
-24.25
+23.5
 ],
 [
--1.5,
-22.75
+-1.329,
+22.639
 ],
 [
--1.25,
-22.75
+-0.841,
+21.909
 ],
 [
--0.5,
-21.5
+-0.111,
+21.421
 ],
 [
 0.75,
@@ -5268,6 +5264,34 @@
 [
 0.75,
 19.5
+],
+[
+5.5,
+19.5
+],
+[
+5.5,
+21.25
+],
+[
+5.25,
+21.25
+],
+[
+5.25,
+24.0
+],
+[
+5.5,
+24.0
+],
+[
+5.5,
+27.5
+],
+[
+5.25,
+27.5
 ]
 ],
 "area": 57.44,
@@ -5582,7 +5606,7 @@
 "cat": "Doors",
 "type": "1.78 x 2.05",
 "block": 0,
-"side": 41,
+"side": 42,
 "t_m": 0.515,
 "width_m": 1.62,
 "sill_m": 0.0,
@@ -5594,7 +5618,7 @@
 "cat": "Windows",
 "type": "2019 - Sash Window Type 3",
 "block": 0,
-"side": 38,
+"side": 39,
 "t_m": 1.537,
 "width_m": 1.38,
 "sill_m": 0.2,
@@ -5606,7 +5630,7 @@
 "cat": "Windows",
 "type": "2019 - Sash Window Type 2",
 "block": 0,
-"side": 38,
+"side": 39,
 "t_m": 7.063,
 "width_m": 1.0,
 "sill_m": 0.175,
@@ -5894,7 +5918,7 @@
 "cat": "Windows",
 "type": "1.9 x 1.3 m",
 "block": 0,
-"side": 52,
+"side": 53,
 "t_m": 2.978,
 "width_m": 1.921,
 "sill_m": 0.735,
@@ -5918,12 +5942,12 @@
 "cat": "Windows",
 "type": "2019 - Sash Window",
 "block": 0,
-"side": 33,
-"t_m": 0.832,
-"width_m": 0.626,
+"side": 34,
+"t_m": 0.0,
+"width_m": 0.878,
 "sill_m": 0.69,
 "height_m": 1.64,
-"dist": 0.02
+"dist": 0.11
 },
 {
 "eid": "3461230",
@@ -5954,7 +5978,7 @@
 "cat": "Windows",
 "type": "2019 - Sash Window Type 3",
 "block": 0,
-"side": 36,
+"side": 37,
 "t_m": 1.47,
 "width_m": 1.38,
 "sill_m": 0.814,
@@ -5966,7 +5990,7 @@
 "cat": "Windows",
 "type": "60x68",
 "block": 0,
-"side": 42,
+"side": 43,
 "t_m": 1.649,
 "width_m": 0.625,
 "sill_m": 4.691,
@@ -5990,7 +6014,7 @@
 "cat": "Windows",
 "type": "1.62 x 1.32",
 "block": 0,
-"side": 48,
+"side": 49,
 "t_m": 0.028,
 "width_m": 1.641,
 "sill_m": 1.025,
@@ -6002,7 +6026,7 @@
 "cat": "Doors",
 "type": "0.70 x 1.92",
 "block": 0,
-"side": 46,
+"side": 47,
 "t_m": 3.15,
 "width_m": 0.7,
 "sill_m": 0.0,
@@ -6050,7 +6074,7 @@
 "cat": "Doors",
 "type": "R21_Curtain_Single Door with Glass (1)",
 "block": 0,
-"side": 46,
+"side": 47,
 "t_m": 2.657,
 "width_m": 0.213,
 "sill_m": 0.0,

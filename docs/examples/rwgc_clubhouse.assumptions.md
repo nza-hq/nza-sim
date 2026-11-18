@@ -25,8 +25,9 @@ Replace an assumption when better information arrives.
 - The Revit rooms are traced onto a 0.25 m grid so that they tile each floor wall to wall, as NZA Sim needs. Walls and
   small gaps go to the nearest room, and the outline sits 0.15 m outside the rooms' inside faces. The rooms are then
   straightened together: any step under 0.35 m becomes a straight or diagonal wall, and the two curved bays become a
-  few flat facets. This keeps the false corners out of the thermal bridging. The two bays are drawn as curves in 3D,
-  which is drawing only: the model keeps their facets. Floor areas run about 5–8 % above
+  few flat facets. This keeps the false corners out of the thermal bridging. The two bays (Lounge 2 and the men's
+  changing bay above it) are a true half-circle of 2.25 m radius to the outline, modelled as eight flat facets and
+  drawn as a smooth curve in 3D (drawing only). Floor areas run about 5–8 % above
   Revit's room areas, which are measured to the inside faces.
 - Rooms under 2 m² (WC cubicles, risers, ducts) are folded into the rooms next to them. The Bar (402) and one Toilet
   (381) have no floor faces in the export, so they are recovered from the gaps they leave.
@@ -41,7 +42,7 @@ Replace an assumption when better information arrives.
   against 229 m² of windows and doors in CA-1000.
 - **Roofs** come from the survey's 40 Revit roofs (`rwgc_clubhouse.roofs.json`). 26 are kept: 14 over the ground
   floor, 11 over the first floor and 1 over the second.
-  - Each kept roof is a rectangle (the smallest that encloses it). Its style (gable, hip or mono-pitch), its pitch
+  - Each kept roof is a rectangle, lined up with its own slopes. Its style (gable, hip or mono-pitch), its pitch
     (8°–46°) and its ridge direction come from its slopes.
   - It sits on the floor whose top its eaves are at: eaves below 56.9 m AOD go on the ground floor, below 59.4 m on
     the first floor, and above that on the second.
@@ -127,7 +128,7 @@ On London weather (St James's Park TMYx, 2009–2023; the EPW is not committed).
 
 | | Model (15-minute run) | EnergyPlus | 2025 meter |
 |---|---|---|---|
-| Gas | 337 MWh | 319 MWh | 331 MWh |
+| Gas | 334 MWh | 316 MWh | 331 MWh |
 | Electricity | 204 MWh | 204 MWh | 212 MWh |
 | Peak heating | 116 kW | 104 kW | (calcs: 128 kW design, 130 kW in the strategy) |
 

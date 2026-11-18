@@ -86,6 +86,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
   const curves = plan.curves ?? []
   const cw = useMemo(() => curvedWalls(plan.blocks, runs, placed, curves), [plan.blocks, runs, placed, curves])
   const smooth = (ring: XY[], block: number) => (curves.length ? displayRing(ring, curves.filter((c) => c.block === block)) : ring)
+  const joins = useMemo(() => wallJoins(ordered(runs, cw)), [runs, cw])
 
   return (
     <Canvas shadows camera={{ position: cam, fov: 40, near: 0.1, far: 2000 }} gl={{ antialias: true }} style={{ position: 'absolute', inset: 0, background: '#E4EEF2' }}>
@@ -129,9 +130,9 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
       })}
       {roofPieces(plan).map((p, i, all) => { const br = roofs?.[i] ?? blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, floors[act + 1])} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
-      {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={crossers} bands={[]} onPick={() => {}} />)}
+      {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={crossers} bands={[]} onPick={() => {}} join={joins.get(g.run.index)} />)}
       {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => (
-        <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
+        <Wall key={run.index} join={joins.get(run.index)} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
       ))}
       </group>
 
@@ -250,17 +251,36 @@ function OtherFloor({ plan, floor, above, y, H, solid }: { plan: Plan; floor: Pl
   const curves: WallCurve[] = floor.curves ?? []
   const cw = useMemo(() => curvedWalls(sub.blocks, runs, placed, curves), [sub, runs, placed, curves])
   const smooth = (ring: XY[], block: number) => (curves.length ? displayRing(ring, curves.filter((c) => c.block === block)) : ring)
+  const joins = useMemo(() => wallJoins(ordered(runs, cw)), [runs, cw])
   return (
     <group position={[0, y, 0]}>
       {sub.blocks.map((b, i) => <Slab key={`s${i}`} ring={smooth(b, i)} />)}
       {sub.rooms.map((r) => <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, sub.blocks, curves) : r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />)}
       {roofPieces(sub, true).map((p, i, all) => { const br = blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, above)} H={H} on={false} solid={solid} hide={false} /> : <Pitched key={`r${i}`} roof={br} H={H} on={false} solid={solid} hide={false} /> })}
-      {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
-      {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
+      {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} join={joins.get(g.run.index)} />)}
+      {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => <Wall key={run.index} join={joins.get(run.index)} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
     </group>
   )
 }
 const NONE = new Set<string>()
+/** A floor's walls in order round each block, a curve's segments in place of its facets. */
+function ordered(runs: readonly WallRun[], cw: { replaced: Set<number>; segments: Array<{ run: WallRun }> }): Array<{ run: WallRun }> {
+  const out: Array<{ run: WallRun }> = []
+  let s = 0
+  for (const run of runs) {
+    if (!cw.replaced.has(run.index)) { out.push({ run }); continue }
+    // The first facet of a curve brings in its segments (in order), the rest of its facets nothing.
+    const first = !cw.replaced.has(run.index - 1) || runs.find((r) => r.index === run.index - 1)?.block !== run.block
+    if (!first) continue
+    while (s < cw.segments.length && cw.segments[s]!.run.block === run.block) {
+      out.push(cw.segments[s]!)
+      s++
+      const g = cw.segments[s - 1]!.run, next = cw.segments[s]?.run
+      if (!next || Math.hypot(next.a[0] - g.b[0], next.a[1] - g.b[1]) > 1e-6) break
+    }
+  }
+  return out
+}
 /** What a flat roof piece leaves out: the floor above, and (for a floor's flat rest) its pitched parts. */
 const restCut = (p: RoofPiece, all: readonly RoofPiece[], above?: PlanFloor): XY[][] => [...(above?.blocks ?? []), ...(p.rest ? all.filter((q) => q.block === p.block && !q.rest).map((q) => q.ring) : [])]
 
@@ -291,6 +311,51 @@ function Partition({ a, b, H }: { a: XY; b: XY; H: number }) {
   )
 }
 
+/** Where a wall's inside face starts and ends against its neighbours: e = T·tan(turn / 2), positive at an outside
+ * corner (the inside face is shorter), negative at an inside one. */
+type Join = { e0: number; e1: number }
+const NO_JOIN: Join = { e0: 0, e1: 0 }
+/** The joins of a floor's walls, each block's walls in order round it (a curve's segments in its facets' place). */
+export function wallJoins(walls: ReadonlyArray<{ run: WallRun }>): Map<number, Join> {
+  const out = new Map<number, Join>()
+  const byBlock = new Map<number, WallRun[]>()
+  for (const { run } of walls) byBlock.set(run.block, [...(byBlock.get(run.block) ?? []), run])
+  for (const list of byBlock.values()) {
+    const n = list.length
+    const dir = list.map((r) => Math.atan2(r.b[1] - r.a[1], r.b[0] - r.a[0]))
+    const e = list.map((r, i) => {
+      // Only where this wall's end meets the next one's start.
+      const nx = list[(i + 1) % n]!
+      if (Math.hypot(nx.a[0] - r.b[0], nx.a[1] - r.b[1]) > 1e-3) return 0
+      const turn = ((dir[(i + 1) % n]! - dir[i]! + 3 * Math.PI) % (2 * Math.PI)) - Math.PI
+      return Math.abs(turn) > 3 ? 0 : WALL_T * Math.tan(turn / 2)
+    })
+    list.forEach((r, i) => out.set(r.index, { e0: e[(i + n - 1) % n]!, e1: e[i]! }))
+  }
+  return out
+}
+
+/** A wall piece whose inside face runs from xi0 to xi1 (its outside face from x0 to x1): a mitred end. */
+function Mitred({ x0, x1, xi0, xi1, y0, y1, z0, z1, colour, rough = 0.9 }: { x0: number; x1: number; xi0: number; xi1: number; y0: number; y1: number; z0: number; z1: number; colour: string; rough?: number }) {
+  const g = useMemo(() => {
+    // Outside face at z1, inside at z0; eight corners, six faces.
+    const P = [[x0, y0, z1], [x1, y0, z1], [xi1, y0, z0], [xi0, y0, z0], [x0, y1, z1], [x1, y1, z1], [xi1, y1, z0], [xi0, y1, z0]]
+    const F = [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [4, 5, 6, 7], [3, 2, 1, 0]]
+    const pos: number[] = []
+    for (const [a, b, c, d] of F) pos.push(...P[a]!, ...P[b]!, ...P[c]!, ...P[a]!, ...P[c]!, ...P[d]!)
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    geo.computeVertexNormals()
+    return geo
+  }, [x0, x1, xi0, xi1, y0, y1, z0, z1])
+  if (y1 - y0 < 1e-4) return null
+  return (
+    <mesh geometry={g} castShadow receiveShadow>
+      <meshStandardMaterial color={colour} roughness={rough} side={THREE.DoubleSide} />
+    </mesh>
+  )
+}
+
 /** Box in a wall group's frame: x from x0 to x1 along, y from y0 to y1 up, z from z0 to z1 (out is +). */
 function Box({ x0, x1, y0, y1, z0, z1, colour, rough = 0.9, op = 1 }: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; colour: string; rough?: number; op?: number }) {
   if (x1 - x0 < 1e-4 || y1 - y0 < 1e-4) return null
@@ -302,7 +367,7 @@ function Box({ x0, x1, y0, y1, z0, z1, colour, rough = 0.9, op = 1 }: { x0: numb
   )
 }
 
-function Wall({ run, H, windows, chosen, crossers, bands, onPick }: { run: WallRun; H: number; windows: PlacedWindow[]; chosen: Span | null; crossers: Set<string>; bands: Band[]; onPick: (t: number) => void }) {
+function Wall({ run, H, windows, chosen, crossers, bands, onPick, join = NO_JOIN }: { run: WallRun; H: number; windows: PlacedWindow[]; chosen: Span | null; crossers: Set<string>; bands: Band[]; onPick: (t: number) => void; join?: Join }) {
   const { L, pos, rot } = along(run.a, run.b)
   const ws = [...windows].sort((p, q) => p.offset_m - q.offset_m)
   const colour = C.wall
@@ -329,6 +394,14 @@ function Wall({ run, H, windows, chosen, crossers, bands, onPick }: { run: WallR
     x = x1
   })
   pieces.push(<Box key="pier-end" x0={x} x1={L} y0={0} y1={H} {...wall} />)
+  // 18 Nov 2026 (Linzie: walls of one thickness that follow round the corners): a piece at either end of the wall is
+  // mitred, its inside face cut back (an outside corner) or carried on (an inside corner) to meet the next wall's.
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i]!.props as { x0: number; x1: number }
+    if (!p || (Math.abs(p.x0) > 1e-6 && Math.abs(p.x1 - L) > 1e-6)) continue
+    const e0 = Math.abs(p.x0) <= 1e-6 ? join.e0 : 0, e1 = Math.abs(p.x1 - L) <= 1e-6 ? join.e1 : 0
+    if (e0 || e1) pieces[i] = <Mitred key={`m${i}`} {...(pieces[i]!.props as Parameters<typeof Mitred>[0])} xi0={p.x0 + e0} xi1={p.x1 - e1} />
+  }
 
   return (
     <group position={pos} rotation={rot} onClick={click} onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }} onPointerOut={() => { document.body.style.cursor = '' }}>
