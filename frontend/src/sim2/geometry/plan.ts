@@ -13,7 +13,7 @@
  * model document is written, each zone's stretch of the run takes the windows whose middles fall on it.
  */
 import { area, ccw, type XY } from './ported/zones'
-import type { RoofRecipe } from './roof'
+import type { RoofPart, RoofRecipe } from './roof'
 import { type Profile, profile as libProfile, profilesFor as libProfilesFor } from '../library/library'
 
 export type { XY }
@@ -416,6 +416,9 @@ export type Plan = {
   dhw?: DhwInputs
   /** Brief 123: the roof's shape, applied to each block (absent: flat, as before). */
   roof?: RoofRecipe
+  /** 17 Nov 2026: parts of a block's roof, each a rectangle with its own shape (a wing's own roof); a block with parts
+   * takes its roof from them, any other block from `roof` (roof.ts, roofPieces). */
+  roof_parts?: RoofPart[]
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }

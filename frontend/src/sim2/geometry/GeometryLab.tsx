@@ -84,7 +84,7 @@ import { computeCd } from '../../utils/openingCoefficients.js'
 import SchedulePopout from '../../components/shared/SchedulePopout.jsx'
 import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, changeWindow, crossing, firstType, removeWindow, roomType, setOpeningsIn, pieceAt, piecesOfRooms, setTypeOn, setTypeOnRooms, setWindowsIn, spaceByRoom, typeAt, typeColour, typeOfSpan, wallPieces, wholeWall, windowsIn } from './facade'
 
-import { type BlockRoof, LOFT_ACH, ROOF_STYLES, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, fetchServedRoofs, roofTotals } from './roof'
+import { type BlockRoof, LOFT_ACH, ROOF_STYLES, type RoofPart, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, fetchServedRoofs, pieceRoofs, roofPieces, roofTotals, splitAtCorner } from './roof'
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
 
@@ -251,6 +251,18 @@ type Pending = { plan: Plan; who: string; name: string; change: string; ask: str
 /** The give on screen now (its footer), recorded each render so the preview can run it. */
 type Giver = { name: string | null; rooms: boolean; now: string[]; onGive: (all: boolean) => void; colour: string }
 
+/** 17 Nov 2026 (example school): a room's name shortened to fit its width on the plan (about 6.6 px a character at
+ * 12 px), so the names of narrow rooms side by side no longer run into each other. The full name is in the tooltip. */
+function fitName(name: string, widePx: number): string {
+  const room = Math.floor((widePx - 8) / 6.6)
+  if (name.length <= room) return name
+  if (room <= 2) return ''
+  // Keep a short last word (a number or letter: "Classroom 4" → "Clas… 4"), which is what tells such rooms apart.
+  const tail = /\s(\S{1,3})$/.exec(name)?.[1]
+  if (tail && room >= tail.length + 3) return `${name.slice(0, room - tail.length - 2).trimEnd()}… ${tail}`
+  return `${name.slice(0, room - 1).trimEnd()}…`
+}
+
 export default function GeometryLab({ slots, step: railStep, onStep, centreTab, onCentreTab, onOpenRight, api, onPlan }: { slots?: Slots; step?: StepId; onStep?: (s: StepId) => void; centreTab?: CentreTab; onCentreTab?: (c: CentreTab) => void; onOpenRight?: () => void; api?: React.MutableRefObject<EditorApi | null>; onPlan?: (p: Plan) => void } = {}) {
   const embedded = !!slots
   // ─── the plan, with Undo ───────────────────────────────────────────────────
@@ -282,6 +294,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return local.map((r) => (r.refused ? { ...r, refused: mine ? `This shape needs the roof service for any block that is not a rectangle, and ${mine.reason}, so this block keeps a flat roof for now.` : 'Working out this roof…' } : r))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roofKey, served])
+  // Roof parts (17 Nov 2026): the roof's pieces (each block, or each of its parts) and each piece's roof.
+  const roofPcs = useMemo(() => roofPieces(plan), [plan.blocks, plan.roof, plan.roof_parts])
+  const pRoofs = useMemo(() => pieceRoofs(roofPcs, roofs), [roofPcs, roofs])
+  const [roofPart, setRoofPart] = useState<string | null>(null)
   const [past, setPast] = useState<Plan[]>([])
   const [future, setFuture] = useState<Plan[]>([])
   /** While a preview is worked out, a give writes here instead of to the plan (preview, then apply). */
@@ -1810,17 +1826,63 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
 
   // ─── Brief 123: the roof's shape (Shape, roof tab) ─────────────────────────────────────────────────────────────
   const roofShapePanel = () => {
-    const rec: RoofRecipe = plan.roof ?? { style: 'flat' }
-    const r = roofTotals(roofs)
+    // Roof parts: with parts, the chosen part's recipe is edited; without, the plan's one roof.
+    const parts = plan.roof_parts ?? []
+    const part = parts.find((p) => p.id === roofPart) ?? parts[0]
+    const rec: RoofRecipe = part ? part.recipe : plan.roof ?? { style: 'flat' }
+    const mineIdx = part ? roofPcs.filter((pc) => pc.part === part.id).map((pc) => pc.index) : roofPcs.filter((pc) => !pc.part).map((pc) => pc.index)
+    const r = roofTotals(mineIdx.map((i) => pRoofs[i]!).filter(Boolean))
     const refused = r.blocks.find((b) => b.refused)?.refused
+    const log = (text: string) => setChanges((cs) => [{ text, effect: null, depth: past.length + 1 }, ...cs].slice(0, 30))
     const set = (next: RoofRecipe, text: string) => {
-      commit({ ...plan, roof: next })
-      setChanges((cs) => [{ text, effect: null, depth: past.length + 1 }, ...cs].slice(0, 30))
+      if (part) commit({ ...plan, roof_parts: parts.map((p) => (p.id === part.id ? { ...p, recipe: next } : p)) })
+      else commit({ ...plan, roof: next })
+      log(part ? `${part.name}: ${text}` : text)
     }
     const pitched = rec.style !== 'flat'
+    // An L-shaped block can be roofed as two wings, cut at its inner corner one way or the other.
+    const splits = plan.blocks.map((b, bi) => ({ bi, ways: ([0, 1] as const).map((w) => splitAtCorner(b, w)) })).filter((x) => x.ways.some(Boolean) && !roofPcs.some((pc) => pc.block === x.bi && pc.part))
+    const split = (bi: number, rings: [XY[], XY[]]) => {
+      const base: RoofRecipe = plan.roof ?? { style: 'flat' }
+      const n0 = parts.length
+      const made: RoofPart[] = rings.map((ring, k) => ({ id: `rp${n0 + k + 1}`, name: `Wing ${n0 + k + 1}`, ring, recipe: { ...base } }))
+      commit({ ...plan, roof_parts: [...parts, ...made] })
+      setRoofPart(made[0]!.id)
+      log(`block ${bi + 1}'s roof → two wings, each with its own roof`)
+    }
     return (
       <div className="gl-sec">
-        <h3>Shape</h3>
+        {(parts.length > 0 || splits.length > 0) && (
+          <>
+            <h3>Roofs</h3>
+            {parts.length > 0 ? (
+              <>
+                <div className="gl-chips" role="group" aria-label="Roof part">
+                  {parts.map((p) => <button key={p.id} type="button" aria-pressed={p.id === part?.id} onClick={() => setRoofPart(p.id)}>{p.name}</button>)}
+                </div>
+                {part && (
+                  <div className="gl-row">
+                    <span>Name</span>
+                    <input className="gl-in" aria-label="Roof part name" value={part.name} onChange={(e) => commit({ ...plan, roof_parts: parts.map((p) => (p.id === part.id ? { ...p, name: e.target.value } : p)) })} />
+                  </div>
+                )}
+                {roofPcs.some((pc) => pc.part) ? <p className="gl-hint">Each wing has its own roof. Choose a wing, then its shape below.</p>
+                  : <p className="gl-hint gl-warn">The building's outline has changed, so these wings no longer fit it and the whole building takes one roof. Go back to one roof, then split it again.</p>}
+                <button type="button" className="gl-btn quiet" onClick={() => { commit({ ...plan, roof_parts: [] }); setRoofPart(null); log('one roof for the whole building') }}>One roof for the whole building</button>
+              </>
+            ) : (
+              <>
+                <p className="gl-hint">This building has wings. Give each wing its own roof (a pitched original and a flatter extension, say):</p>
+                {splits.map(({ bi, ways }) => ways.map((rings, w) => rings && (
+                  <button key={`${bi}-${w}`} type="button" className="gl-btn quiet" onClick={() => split(bi, rings)}>
+                    {`Split at the inner corner ${w === 0 ? 'across' : 'along'} (${rings.map((q) => `${f1(Math.hypot(q[1]![0] - q[0]![0], q[1]![1] - q[0]![1]))} × ${f1(Math.hypot(q[2]![0] - q[1]![0], q[2]![1] - q[1]![1]))} m`).join(' and ')})`}
+                  </button>
+                )))}
+              </>
+            )}
+          </>
+        )}
+        <h3>{part ? `Shape of ${part.name}` : 'Shape'}</h3>
         <div className="gl-chips gl-roof-styles" role="group" aria-label="Roof shape">
           {ROOF_STYLES.map((s) => (
             <button key={s.key} type="button" aria-pressed={rec.style === s.key} onClick={() => rec.style !== s.key && set(defaultRoof(s.key), `the roof → ${s.name.toLowerCase()}`)}>
@@ -1867,7 +1929,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                     {plan.fabric_types.filter((t) => t.element === 'roof').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
-                {!rec.loft_slope_type && <p className="gl-hint">The library has no uninsulated tiled roof yet. Make a roof type for the loft's slopes on Fabric and choose it here; until then the run asks for it.</p>}
+                {!rec.loft_slope_type && <p className="gl-hint">Make a roof type for the loft's slopes on Fabric (the library has "tiles and felt, no insulation", a draft awaiting Chris) and choose it here; until then the run asks for it.</p>}
                 <div className="gl-row">
                   <span>Loft air changes</span>
                   <span className="gl-num"><input className="gl-in" type="number" min={0} max={50} step={0.5} aria-label="Loft air changes an hour" value={rec.loft_ach ?? LOFT_ACH} onChange={(e) => { const v = Number(e.target.value); if (v >= 0) set({ ...rec, loft_ach: v }, `loft air → ${v} an hour`) }} /><small>an hour</small></span>
@@ -2943,11 +3005,11 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </SchedulePopout>
         )
       })()}
-      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} showMonthly={centreTab === 'monthly'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} showMonthly={centreTab === 'monthly'} showProfiles={centreTab === 'profiles'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D roofs={roofs} roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D roofs={pRoofs} roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -3005,7 +3067,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Shape turns the whole outline orange (floor lighter, dashed). */}
         {mode === 'outline' && (shapeTab === 'roof' || shapeTab === 'floor') && shown.blocks.map((b, i) => <polygon key={`hl${i}`} className={`gl-surf-on ${shapeTab}`} points={P(b)} />)}
         {/* Brief 123: the ridge and hip lines of a pitched roof, on Shape. */}
-        {mode === 'outline' && plan.roof && plan.roof.style !== 'flat' && roofs.map((br, i) => br.lines.map(([a, c], j) => <line key={`rg${i}-${j}`} className={`gl-ridge${shapeTab === 'roof' ? ' on' : ''}`} x1={toPx([a[0], a[1]])[0]} y1={toPx([a[0], a[1]])[1]} x2={toPx([c[0], c[1]])[0]} y2={toPx([c[0], c[1]])[1]} />))}
+        {mode === 'outline' && pRoofs.some((br) => br.style !== 'flat') && pRoofs.map((br, i) => br.lines.map(([a, c], j) => <line key={`rg${i}-${j}`} className={`gl-ridge${shapeTab === 'roof' ? ' on' : ''}`} x1={toPx([a[0], a[1]])[0]} y1={toPx([a[0], a[1]])[1]} x2={toPx([c[0], c[1]])[0]} y2={toPx([c[0], c[1]])[1]} />))}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
           return <line className="gl-wall-hover" x1={toPx(r.a)[0]} y1={toPx(r.a)[1]} x2={toPx(r.b)[0]} y2={toPx(r.b)[1]} />
@@ -3062,7 +3124,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               if (wide < 34) return null
               return (
                 <g key={`rl${r.id}`}>
-                  <text className={`gl-zname${on && !giving ? ' on' : ''}`} x={lx} y={ly}>{r.name}</text>
+                  <text className={`gl-zname${on && !giving ? ' on' : ''}`} x={lx} y={ly}>{fitName(r.name, wide)}<title>{r.name}</title></text>
                   {wide > 56 && <text className={`gl-zarea${on && !giving ? ' on' : ''}`} x={lx} y={ly + 15}>{roomSub(r)}</text>}
                   {pending && !pending.same && pending.rooms.includes(r.id) && <text className="gl-pvtag" x={lx} y={ly + 31}>Preview</text>}
                   {flash.includes(r.id) && <text className="gl-pvtag done" x={lx} y={ly + 31}>✓ Applied</text>}
@@ -3072,7 +3134,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           : shown.rooms.length > 0 ? shown.rooms.map((r) => {
               const [lx, ly] = toPx(labelAt(r.ring))
               const xs = r.ring.map((q) => toPx(q)[0])
-              return Math.max(...xs) - Math.min(...xs) < 34 ? null : <text key={`cl${r.id}`} className="gl-zname gl-ctx" x={lx} y={ly}>{r.name}</text>
+              return Math.max(...xs) - Math.min(...xs) < 34 ? null : <text key={`cl${r.id}`} className="gl-zname gl-ctx" x={lx} y={ly}>{fitName(r.name, Math.max(...xs) - Math.min(...xs))}</text>
             })
           : shown.blocks.map((b, i) => {
               const [lx, ly] = toPx(labelAt(b))

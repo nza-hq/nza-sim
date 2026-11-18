@@ -13,7 +13,7 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { type Plan, type PlacedWindow, type Span, type WallRun, type XY, edgesOf } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
-import { type BlockRoof, blockRoof } from './roof'
+import { type BlockRoof, blockRoof, roofPieces } from './roof'
 
 // Colours from BuildingViewer3D, so the two read as one tool.
 const C = { floorOn: '#F2B872', wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
@@ -39,7 +39,7 @@ type Props = {
   roofOn?: boolean
   /** Linzie, 17 Nov 10:29: the ground floor tinted a lighter orange when it is chosen. */
   floorOn?: boolean
-  /** Brief 123: each block's roof (from the roof service or the browser); absent, worked out here. */
+  /** Brief 123: one roof per roof piece (roofPieces: each block, or each of its roof parts), from the roof service or the browser; absent, worked out here. */
   roofs?: BlockRoof[]
 }
 
@@ -110,7 +110,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
-      {plan.blocks.map((b, i) => { const br = roofs?.[i] ?? blockRoof(b, plan.roof); return br.style === 'flat' ? <Roof key={`r${i}`} ring={b} H={H} on={roofOn} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} hide={floorOn && !roofOn} /> })}
+      {roofPieces(plan).map((pc, i) => { const br = roofs?.[i] ?? blockRoof(pc.ring, pc.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={pc.ring} H={H} on={roofOn} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {runs.map((run) => (
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />

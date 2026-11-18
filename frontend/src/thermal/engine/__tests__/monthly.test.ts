@@ -95,4 +95,18 @@ describe('monthly estimate (Brief 122 P1)', () => {
     expect(z.monthly.cooling_kwh.every((x) => x >= 0)).toBe(true)
     expect(closes(z)).toBeLessThan(1e-6)
   })
+  it('heating hours with a setback (ISO 13790 13.2.2): less heating than all day, the difference its own line, still closing', () => {
+    const { doc, lib } = box({ glazing: true, dark: false })
+    const cont = runMonthly(doc, W, lib, OPTS)
+    const d: any = structuredClone(doc)
+    d.profiles.push({ id: 'day', kind: 'schedule', day_types: { weekday: Array.from({ length: 24 }, (_, h) => (h >= 7 && h < 17 ? 1 : 0)), saturday: Array(24).fill(0), sunday: Array(24).fill(0) } })
+    for (const z of d.zones) z.setpoints = { ...z.setpoints, setback_c: 12, hours_ref: 'day' }
+    const int = runMonthly(d, W, lib, OPTS)
+    const h = (r: typeof cont) => r.zones.reduce((t, z) => t + z.heating_kwh, 0)
+    expect(h(int)).toBeLessThan(h(cont))
+    const saved = int.zones.flatMap((z) => z.breakdown).filter((l) => l.term === 'intermittent_heating').reduce((t, l) => t + l.kwh, 0)
+    expect(saved).toBeGreaterThan(0)
+    expect(cont.zones.flatMap((z) => z.breakdown).some((l) => l.term === 'intermittent_heating')).toBe(false)
+    for (const z of int.zones) expect(closes(z)).toBeLessThan(1e-6)
+  })
 })

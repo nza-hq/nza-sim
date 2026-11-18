@@ -21,6 +21,8 @@
  * cooling, per zone and for the building, the building's breakdown (Rule 9: every term, summed over the zones;
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
+import { siteTerrain } from '../../thermal/engine/airflow'
+import { rainInputs, skyInfrared } from '../../thermal/engine/outsideConvection'
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
 import { runMonthly, type MonthlyOptions, type MonthlyResults } from '../../thermal/engine/monthly'
 import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
@@ -35,6 +37,7 @@ type SurfaceKind = Surface['kind']
 import { upgradeDocument } from '../../thermal/schema/upgrade'
 import { CONSTRUCTIONS, resolveConstructions, type LibraryItem, type Missing } from './library'
 import type { WeatherChoice } from './weather'
+import type { Weather } from '../../thermal/engine/types'
 
 export type { Missing } from './library'
 
@@ -45,7 +48,17 @@ export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'pr
  * below in use are undercounted (cooled room, mild: −54 h of EnergyPlus's 248 at 1 step, −31 h at 4; the gate is
  * ±50 h). Every other document keeps one step an hour, Brief 104's speed budget.
  */
-export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }
+// Brief 125 (Linzie 17 Nov 23:50, "Follow EnergyPlus's method"): the run's outside film is EnergyPlus's own (DOE-2
+// from the wind at each face's height, wet faces in rain), so old fabric at a sheltered site reads as EnergyPlus does.
+// RUN_OPTIONS keeps ISO 52016-1's fixed film for the Brief 103/104 referees.
+export const QUARTER_HOUR_OPTIONS: RunOptions = {
+  ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' },
+  // Brief 125 (Linzie 17 Nov 23:50) and Brief 126 (Linzie 18 Nov 10:57, "Please fix"): the surfaces and the air as
+  // EnergyPlus works them out: DOE-2 outside film, its outside long-wave and sky, TARP inside (ISO 15099 on windows),
+  // its Simple Window Model's glass, and outdoor air's own heat capacity.
+  surface_physics: { ...RUN_OPTIONS.surface_physics!, outside_convection: 'doe2', inside_convection: 'tarp', outside_longwave: 'energyplus', window: 'energyplus' },
+  air_heat_capacity: 'outdoor',
+}
 export function runOptionsFor(doc: ModelDocument): RunOptions {
   // Linzie 17 Nov 10:27, "Instant, 15 minutes, then Energy+": the monthly estimate is the instant tier (Brief 122), so
   // the run is the accurate tier and every document runs in quarter hours: windows decide every 15 minutes (Brief 115
@@ -121,6 +134,11 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
   // Brief 115 Rule 8: opening windows are Operation; they arrive with their controls at + Systems. Removed, not closed.
   for (const s of d.surfaces) s.openings = s.openings.filter((o) => o.kind !== 'operable')
   d.controls = d.controls.filter((c) => c.target.kind !== 'window')
+  // 17 Nov 2026 (example school): the control map names systems; at these levels the systems are gone, so their entries
+  // go too (they are recorded only and change no number). Without this, any plan with a control map failed the instant
+  // estimate on Site, Shape and Fabric ("no heating, cooling, hot water or other system").
+  const kept = new Set(d.zones.flatMap((z) => z.ventilation.map((v) => v.id)))
+  d.controls = d.controls.filter((c) => c.target.kind === 'window' || (c.target.kind === 'ventilation' && kept.has(c.target.ref)))
   if (level === 'fabric') {
     if (heatC == null || !Number.isFinite(heatC)) throw new Error('fabric level needs the heating setpoint')
     d.profiles = d.profiles.filter((p) => p.kind === 'schedule')
@@ -139,6 +157,8 @@ export interface Summary {
   /** Steps the year was run in per hour: 4 from the product (runOptionsFor, Linzie 17 Nov 10:27); a caller's own options may differ. */
   steps_per_hour: number
   weather: { file_name: string; station: string; sha256: string }
+  /** Brief 125: how the run treated what is not in the model's inputs, in words (shown under its balance). */
+  method_notes: string[]
   building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number; monthly: Monthly }
   /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
   zones: {
@@ -198,6 +218,12 @@ export interface Summary {
         pumps: (PumpResult & { label: string; kwh: number })[]
         /** Brief 114: lifts, external lighting and other loads outside the rooms. */
         other_loads: (OtherLoadResult & { kwh: number })[]
+        /**
+         * 17 Nov 2026 (load profiles, Linzie's end goal): each end use's energy by fuel hour by hour, W (8,760 values),
+         * regrouped from the systems engine's own hourly draws in the same way as `end_uses` (each line sums to its
+         * `end_uses` kWh; Rule 9, Rule 11). Not a second calculation.
+         */
+        hourly: { end_use: EndUse; fuel: Fuel; w: Float64Array }[]
       }
     | { ok: false; missing: Missing[] }
     /** Brief 111: no systems at this level, so no energy. */
@@ -397,7 +423,9 @@ function controlOwner(d: ModelDocument, i: number): string {
   if (!c) return `controls[${i}]`
   const zi = d.zones.findIndex((z) => z.id === c.target.ref)
   if (c.target.kind === 'window' && zi >= 0) return `the windows in ${zoneName(d, String(zi))}`
-  if (c.target.kind === 'system') { const g = d.system_groups.find((x) => x.id === c.target.ref); if (g) return `"${g.label || g.id}"` }
+  if (c.target.kind === 'system' || c.target.kind === 'lighting') { const g = d.system_groups.find((x) => x.id === c.target.ref); if (g) return `"${g.label || g.id}"` }
+  // A ventilation system's control names its zone entries (`${id}_vent`, toDocument), which carry its label.
+  if (c.target.kind === 'ventilation') { const v = d.zones.flatMap((z) => z.ventilation).find((x) => x.id === c.target.ref); if (v) return `"${v.label || v.id}"` }
   return `the control of "${c.target.ref}"`
 }
 const profileLabel = (d: ModelDocument | null, i: string) => d?.profiles[Number(i)]?.label || d?.profiles[Number(i)]?.id || `profile ${i}`
@@ -504,6 +532,26 @@ export function readRunDocument(input: unknown): { ok: true; doc: ModelDocument 
   return { ok: true, doc }
 }
 
+/** Brief 125: the run's outside film in words: how it was worked out, the terrain it took, and whether rain was known. */
+function methodNotes(doc: ModelDocument, w: Weather, options: RunOptions): string[] {
+  if (options.surface_physics?.outside_convection !== 'doe2') return []
+  const { terrain, stated } = siteTerrain(doc.building.site)
+  const words = { Country: 'open country', Suburbs: 'suburbs', City: 'a city centre' }[terrain]
+  const rain = rainInputs(w.hours)
+  const notes = [
+    `Outside surfaces lose heat to the air as EnergyPlus works it out (its DOE-2 method): from the wind at each surface's height${stated ? `, for ${words}` : `, for ${words} (the site states no terrain; set it on Site)`}, and whether the wind is on that face.`
+      + (rain.rain_code || rain.precipitation_mm ? ' Surfaces are wet while it rains, from the weather file.' : ' This weather file has no rain information, so surfaces are never wet.'),
+  ]
+  if (options.surface_physics?.outside_longwave === 'energyplus') {
+    const est = skyInfrared(w.hours).estimated
+    notes.push(`Outside surfaces see the sky, the ground and the air as EnergyPlus works it out, with the sky's temperature from the weather file's own sky radiation${est ? ` (${est.toLocaleString('en-GB')} hours missing it are estimated from cloud and humidity, as EnergyPlus does)` : ''}.`)
+  }
+  if (options.surface_physics?.inside_convection === 'tarp') notes.push("Inside surfaces give heat to the room's air as EnergyPlus works it out (its TARP method, and ISO 15099 for windows), from each surface's temperature.")
+  if (options.surface_physics?.window === 'energyplus') notes.push("Windows are modelled as EnergyPlus's simple glazing: the glass's own resistance from the stated U, and a glass emissivity of 0.84.")
+  if (options.air_heat_capacity === 'outdoor') notes.push('Outdoor air coming in carries heat by its own density and humidity each quarter hour, as EnergyPlus does.')
+  return notes
+}
+
 export function simulate(
   input: unknown,
   deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean },
@@ -570,6 +618,7 @@ export function simulate(
   const summary: Summary = {
     engine: results.engine, run_ms: results.run_ms, steps_per_hour: options.time_step?.steps_per_hour ?? 1,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
+    method_notes: methodNotes(doc, weather.weather, options),
     building: {
       floor_m2: readDocFloorM2(doc),
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
@@ -898,7 +947,19 @@ export function energyOf(doc: ModelDocument, results: ModelResults, weather: Wea
     // Review F8: the kWh is the end-use line's (Rule 11), read through readEntryKwh.
     pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, kwh: readEntryKwh(s, 'pumps', p.id), label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
     other_loads: s.other_loads.map((o) => ({ ...o, kwh: readEntryKwh(s, 'auxiliary', o.id) })),
+    hourly: hourlyLines(s),
   }
+}
+
+/** The systems engine's hourly draws grouped as its end-use lines are (systems.ts, Totals): groups by service and fuel, the rest as electricity. */
+function hourlyLines(s: Extract<ReturnType<typeof runSystems>, { ok: true }>['systems']): { end_use: EndUse; fuel: Fuel; w: Float64Array }[] {
+  const H = s.electricity_w.length
+  const m = new Map<string, { end_use: EndUse; fuel: Fuel; w: Float64Array }>()
+  const at = (end_use: EndUse, fuel: Fuel) => { const k = `${end_use}|${fuel}`; let l = m.get(k); if (!l) { l = { end_use, fuel, w: new Float64Array(H) }; m.set(k, l) } return l.w }
+  for (const g of s.groups) { const w = at(g.service, g.fuel); for (let h = 0; h < H; h++) w[h] += g.fuel_w[h] }
+  for (const u of s.ungrouped) { const w = at(u.end_use, 'electricity'); for (let h = 0; h < H; h++) w[h] += u.w[h] }
+  const order = s.end_uses.map((l) => `${l.end_use}|${l.fuel}`)
+  return [...m.entries()].filter(([k, l]) => order.includes(k) && l.w.some((v) => v > 0)).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0])).map(([, l]) => l)
 }
 
 /**
@@ -946,7 +1007,8 @@ export function instantEstimate(doc: ModelDocument, deps: { weather: WeatherChoi
       monthly: { heating_kwh: sum12((z) => z.monthly.heating_kwh), cooling_kwh: sum12((z) => z.monthly.cooling_kwh) },
       breakdown: byTerm(r.zones),
       zones: r.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: z.floor_m2, heating_kwh: z.heating_kwh, cooling_kwh: z.cooling_kwh, monthly: z.monthly, breakdown: byTerm([z]) })),
-      notes: r.notes,
+      // Brief 125: the full-year run takes the outside film from the wind and rain; this estimate keeps ISO's fixed one.
+      notes: [...r.notes, 'Surfaces give and lose heat at ISO\'s fixed rates here, with a sky 11 °C below the air; the full-year run and EnergyPlus work them out from the wind, rain, the sky and each surface\'s temperature, so old, single-glazed or uninsulated fabric at a sheltered site can read lower there.'],
     },
   }
 }

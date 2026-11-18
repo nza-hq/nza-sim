@@ -27,6 +27,13 @@ export const BORROWS: Borrow[] = [
   { key: 'hotel_reception', name: 'Hotel reception', use: 'public', type: 'hotel', occupancy: 'hotel_reception_occupancy', lighting: null, equipment: null, light: null, equip: null },
   { key: 'office', name: 'Office, open plan', use: 'office', type: 'office', occupancy: 'office_occupancy', lighting: 'office_lighting', equipment: null, light: 'office_workstation_lighting', equip: 'office_workstation_equipment' },
   { key: 'retail', name: 'Shop floor', use: 'retail', type: 'retail', occupancy: 'retail_occupancy', lighting: null, equipment: null, light: 'retail_sales_floor', equip: 'retail_sales_equipment' },
+  // School (17 Nov 2026, example school): the profiles are drafts awaiting Chris (library_additions.json); the W/m² are
+  // today's school Internal Gains templates.
+  { key: 'school_classroom', name: 'Classroom', use: 'public', type: 'school', occupancy: 'school_classroom_occupancy', lighting: 'school_lighting', equipment: null, light: 'school_classroom_lighting', equip: 'school_classroom_equipment' },
+  { key: 'school_hall', name: 'School hall', use: 'public', type: 'school', occupancy: 'school_hall_occupancy', lighting: 'school_lighting', equipment: null, light: 'school_sports_hall', equip: null },
+  { key: 'school_kitchen', name: 'School kitchen', use: 'other', type: 'school', occupancy: 'school_kitchen_occupancy', lighting: 'school_lighting', equipment: null, light: 'school_catering', equip: 'school_kitchen' },
+  { key: 'school_office', name: 'School office and staff room', use: 'office', type: 'school', occupancy: 'school_office_occupancy', lighting: 'school_lighting', equipment: null, light: 'school_classroom_lighting', equip: 'school_classroom_equipment' },
+  { key: 'school_corridor', name: 'School corridor', use: 'public', type: 'school', occupancy: 'school_corridor_occupancy', lighting: 'school_lighting', equipment: null, light: 'school_corridor_lighting', equip: null },
 ].filter((b) => b.occupancy == null || LIBRARY.profiles.some((p) => p.key === b.occupancy))
 
 /** The occupied value of a setpoint profile: the highest heating or lowest cooling hour on a weekday. */

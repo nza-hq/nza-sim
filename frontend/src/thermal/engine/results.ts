@@ -22,6 +22,9 @@ export interface BreakdownLine {
     | 'window_ventilation' | 'single_sided_turbulence'
     /** Brief 122, the monthly estimate (static) only: gain not used at the heating setpoint, less what cooling removed (monthly.ts). */
     | 'gains_not_used'
+    /** The monthly estimate (static) only (17 Nov 2026): losses not had while heating is off or set back (ISO 13790:2008
+     * 13.2.2, intermittent heating), so the month's need at its heating hours closes against the continuous losses. */
+    | 'intermittent_heating'
   surface_id: string | null
   /** The profile a gains line comes from. */
   profile_id?: string

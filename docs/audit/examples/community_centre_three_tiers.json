@@ -1,0 +1,577 @@
+{
+ "source": "scripts/example_three_tiers.mts",
+ "plan": "community_centre.plan.json",
+ "weather": {
+  "file": "london.epw",
+  "station": "London Wea Ctr St James Park, ENG, GBR (WMO 037700)",
+  "sha256": "0f082af32d57132475c5ed2f05245aa6608d3420ddad098ada73dddb7760776f"
+ },
+ "document": {
+  "zones": 9,
+  "surfaces": 60,
+  "systems": 7,
+  "notes": [
+   "Hot water use is stated, but Store has no hot water system: the run will refuse until one is given, or the daily use is cleared (Systems, Hot water)",
+   "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris): a draft library item, not yet checked by Chris"
+  ]
+ },
+ "floor_m2": 684,
+ "instant": {
+  "ms": 95,
+  "heating_kwh": 9925,
+  "cooling_kwh": 18217,
+  "monthly_heating_kwh": [
+   2206,
+   1796,
+   1138,
+   514,
+   159,
+   30,
+   6,
+   15,
+   78,
+   501,
+   1319,
+   2162
+  ],
+  "notes": [
+   "Monthly estimate (static): ISO 52016-1 monthly method. Not the hourly run.",
+   "Each room alone; heat between rooms is not counted.",
+   "Outside surfaces lose heat to the air at ISO's fixed rate here; the full-year run and EnergyPlus take it from the wind and rain, so old, single-glazed or uninsulated fabric at a sheltered site can read lower there."
+  ]
+ },
+ "run": {
+  "ms": 5248,
+  "steps_per_hour": 4,
+  "heating_kwh": 16281,
+  "cooling_kwh": 16362,
+  "peak_heating_kw": 13.7,
+  "peak_cooling_kw": 6.5,
+  "monthly_heating_kwh": [
+   3837,
+   3286,
+   2062,
+   818,
+   45,
+   0,
+   0,
+   0,
+   4,
+   531,
+   2096,
+   3602
+  ],
+  "monthly_cooling_kwh": [
+   944,
+   884,
+   1130,
+   1192,
+   1609,
+   1773,
+   2051,
+   1914,
+   1643,
+   1287,
+   999,
+   936
+  ],
+  "energy": {
+   "eui_kwh_per_m2": 101.1,
+   "total_kwh": 69162,
+   "by_fuel": [
+    {
+     "fuel": "electricity",
+     "kwh": 51206
+    },
+    {
+     "fuel": "gas",
+     "kwh": 17956
+    }
+   ],
+   "end_uses": [
+    {
+     "end_use": "heating",
+     "fuel": "electricity",
+     "kwh": 1152
+    },
+    {
+     "end_use": "heating",
+     "fuel": "gas",
+     "kwh": 13614
+    },
+    {
+     "end_use": "cooling",
+     "fuel": "electricity",
+     "kwh": 5237
+    },
+    {
+     "end_use": "dhw",
+     "fuel": "gas",
+     "kwh": 4342
+    },
+    {
+     "end_use": "dhw_circulation",
+     "fuel": "electricity",
+     "kwh": 526
+    },
+    {
+     "end_use": "fans",
+     "fuel": "electricity",
+     "kwh": 5367
+    },
+    {
+     "end_use": "lighting",
+     "fuel": "electricity",
+     "kwh": 6699
+    },
+    {
+     "end_use": "small_power",
+     "fuel": "electricity",
+     "kwh": 32226
+    }
+   ],
+   "systems": [
+    {
+     "label": "Gas boiler 1",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 12525,
+     "fuel_kwh": 13614
+    },
+    {
+     "label": "Air source heat pump",
+     "service": "heating",
+     "fuel": "electricity",
+     "efficiency": 3.2,
+     "served_kwh": 2934,
+     "fuel_kwh": 917
+    },
+    {
+     "label": "VRF (meeting room)",
+     "service": "heating",
+     "fuel": "electricity",
+     "efficiency": 3.5,
+     "served_kwh": 821,
+     "fuel_kwh": 235
+    },
+    {
+     "label": "Split cooling (office)",
+     "service": "cooling",
+     "fuel": "electricity",
+     "efficiency": 2.8,
+     "served_kwh": 2777,
+     "fuel_kwh": 992
+    },
+    {
+     "label": "VRF cooling",
+     "service": "cooling",
+     "fuel": "electricity",
+     "efficiency": 3.2,
+     "served_kwh": 13585,
+     "fuel_kwh": 4245
+    },
+    {
+     "label": "Gas boiler 1 (hot water)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 3994,
+     "fuel_kwh": 4342
+    }
+   ],
+   "pumps": [],
+   "other_loads": [],
+   "not_modelled": []
+  },
+  "drafts": [
+   "Internal wall: plaster, 100mm block, plaster (draft, awaiting Chris)",
+   "Suspended ceiling (finish, draft, awaiting Chris)"
+  ],
+  "breakdown": [
+   {
+    "term": "heating",
+    "kwh": 16281
+   },
+   {
+    "term": "cooling",
+    "kwh": -16362
+   },
+   {
+    "term": "conduction",
+    "kwh": -510583
+   },
+   {
+    "term": "opaque_solar_absorbed",
+    "kwh": 790603
+   },
+   {
+    "term": "sky_longwave",
+    "kwh": -315911
+   },
+   {
+    "term": "glazing_solar_absorbed",
+    "kwh": 12171
+   },
+   {
+    "term": "bridging",
+    "kwh": -7473
+   },
+   {
+    "term": "infiltration",
+    "kwh": -14430
+   },
+   {
+    "term": "permanent_vents",
+    "kwh": 0
+   },
+   {
+    "term": "solar_transmitted",
+    "kwh": 12876
+   },
+   {
+    "term": "solar_lost_through_glazing",
+    "kwh": -132
+   },
+   {
+    "term": "occupancy_gains",
+    "kwh": 12973
+   },
+   {
+    "term": "lighting_gains",
+    "kwh": 6699
+   },
+   {
+    "term": "equipment_gains",
+    "kwh": 32226
+   },
+   {
+    "term": "storage",
+    "kwh": 10
+   },
+   {
+    "term": "mechanical_ventilation",
+    "kwh": -18949
+   }
+  ],
+  "zones": [
+   {
+    "name": "Café",
+    "floor_m2": 112,
+    "heating_kwh": 1059,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "Kitchen",
+    "floor_m2": 56,
+    "heating_kwh": 4857,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "Reception",
+    "floor_m2": 72,
+    "heating_kwh": 549,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "Open-plan office",
+    "floor_m2": 132,
+    "heating_kwh": 2385,
+    "cooling_kwh": 2777,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "Meeting room",
+    "floor_m2": 45,
+    "heating_kwh": 821,
+    "cooling_kwh": 1211,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "Comms room",
+    "floor_m2": 15,
+    "heating_kwh": 0,
+    "cooling_kwh": 12374,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "Store",
+    "floor_m2": 28,
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "WCs",
+    "floor_m2": 28,
+    "heating_kwh": 2509,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   },
+   {
+    "name": "Main hall",
+    "floor_m2": 196,
+    "heating_kwh": 4100,
+    "cooling_kwh": 0,
+    "unconditioned": false,
+    "hours": null,
+    "short": {
+     "heating": null,
+     "cooling": null
+    },
+    "air": null
+   }
+  ],
+  "plants": []
+ },
+ "energyplus": {
+  "version": "25.2.0",
+  "run_s": 4.2,
+  "wall_s": 4.5,
+  "warnings": 3,
+  "severe": 0,
+  "severe_text": [],
+  "heating_kwh": 15138,
+  "cooling_kwh": 16728,
+  "peak_heating_kw": 12.9,
+  "peak_cooling_kw": 6.8,
+  "monthly_heating_kwh": [
+   3649,
+   3090,
+   1879,
+   696,
+   32,
+   0,
+   0,
+   0,
+   2,
+   456,
+   1922,
+   3411
+  ],
+  "energy": {
+   "eui_kwh_per_m2": 99.9,
+   "total_kwh": 68364,
+   "by_fuel": [
+    {
+     "fuel": "electricity",
+     "kwh": 51207
+    },
+    {
+     "fuel": "gas",
+     "kwh": 17157
+    }
+   ],
+   "end_uses": [
+    {
+     "end_use": "heating",
+     "fuel": "electricity",
+     "kwh": 1025
+    },
+    {
+     "end_use": "heating",
+     "fuel": "gas",
+     "kwh": 12815
+    },
+    {
+     "end_use": "cooling",
+     "fuel": "electricity",
+     "kwh": 5364
+    },
+    {
+     "end_use": "dhw",
+     "fuel": "gas",
+     "kwh": 4342
+    },
+    {
+     "end_use": "dhw_circulation",
+     "fuel": "electricity",
+     "kwh": 526
+    },
+    {
+     "end_use": "fans",
+     "fuel": "electricity",
+     "kwh": 5367
+    },
+    {
+     "end_use": "lighting",
+     "fuel": "electricity",
+     "kwh": 6699
+    },
+    {
+     "end_use": "small_power",
+     "fuel": "electricity",
+     "kwh": 32226
+    }
+   ],
+   "systems": [
+    {
+     "label": "Gas boiler 1",
+     "service": "heating",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 11790,
+     "fuel_kwh": 12815
+    },
+    {
+     "label": "Air source heat pump",
+     "service": "heating",
+     "fuel": "electricity",
+     "efficiency": 3.2,
+     "served_kwh": 2553,
+     "fuel_kwh": 798
+    },
+    {
+     "label": "VRF (meeting room)",
+     "service": "heating",
+     "fuel": "electricity",
+     "efficiency": 3.5,
+     "served_kwh": 795,
+     "fuel_kwh": 227
+    },
+    {
+     "label": "Split cooling (office)",
+     "service": "cooling",
+     "fuel": "electricity",
+     "efficiency": 2.8,
+     "served_kwh": 3070,
+     "fuel_kwh": 1096
+    },
+    {
+     "label": "VRF cooling",
+     "service": "cooling",
+     "fuel": "electricity",
+     "efficiency": 3.2,
+     "served_kwh": 13658,
+     "fuel_kwh": 4268
+    },
+    {
+     "label": "Gas boiler 1 (hot water)",
+     "service": "dhw",
+     "fuel": "gas",
+     "efficiency": 0.92,
+     "served_kwh": 3994,
+     "fuel_kwh": 4342
+    }
+   ],
+   "pumps": [],
+   "other_loads": [],
+   "not_modelled": []
+  },
+  "notes": [
+   "Overhangs and fins are not carried (EnergyPlus needs each window's real size and position, which the model does not hold yet), so 3 windows have more sun in EnergyPlus than in NZA Sim: z1_glazing_1, z4_glazing_1, z5_glazing_1.",
+   "Thermal bridging: EnergyPlus has no linear bridge, so each room's bridging W/K is carried as outdoor air of exactly that conductance (heat = H × (outdoor − room air), as in the run), shown in EnergyPlus's infiltration.",
+   "People: their sensible heat as stated (W per person, radiant share), as the hourly run takes it; their moisture is not modelled in either.",
+   "Radiators and other emitters: EnergyPlus limits each room's heating to its emitters' output at the setpoint, held fixed (LimitCapacity); the hourly run re-rates it each hour at the room's temperature. The heat goes to the air in EnergyPlus.",
+   "MVHR: outdoor air through the room's ideal loads at its flow × (1 − heat recovery), the same heat as the stated recovery all year (the model states no summer bypass); its heat is in the room's heating and cooling. Fan electricity is from the stated SFP, as in the hourly run.",
+   "Energy: EnergyPlus gives each room's heating and cooling; the fuel and electricity come from those through the systems' stated efficiencies, the same conversion the hourly run uses. Lighting, equipment, hot water, pumps and fans are the same inputs in both."
+  ],
+  "zones": [
+   {
+    "name": "Café",
+    "heating_kwh": 1043,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Kitchen",
+    "heating_kwh": 4485,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 16
+   },
+   {
+    "name": "Reception",
+    "heating_kwh": 551,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Open-plan office",
+    "heating_kwh": 2002,
+    "cooling_kwh": 3070,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Meeting room",
+    "heating_kwh": 795,
+    "cooling_kwh": 1327,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Comms room",
+    "heating_kwh": 0,
+    "cooling_kwh": 12331,
+    "unmet_heating_hours_in_use": null
+   },
+   {
+    "name": "Store",
+    "heating_kwh": 0,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "WCs",
+    "heating_kwh": 2287,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   },
+   {
+    "name": "Main hall",
+    "heating_kwh": 3975,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 0
+   }
+  ]
+ }
+}
