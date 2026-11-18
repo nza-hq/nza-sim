@@ -11444,6 +11444,13 @@
        "ridge_axis": "shortest"
       }
      }
+    ],
+    "curves": [
+     {
+      "block": 0,
+      "from": 37,
+      "to": 39
+     }
     ]
    },
    {
@@ -14442,6 +14449,13 @@
        "high_side": 180
       }
      }
+    ],
+    "curves": [
+     {
+      "block": 0,
+      "from": 28,
+      "to": 31
+     }
     ]
    },
    {
@@ -16884,6 +16898,13 @@
      "insulation": "slope",
      "ridge_axis": "shortest"
     }
+   }
+  ],
+  "curves": [
+   {
+    "block": 0,
+    "from": 37,
+    "to": 39
    }
   ],
   "emitter_types": [

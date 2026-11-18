@@ -24,6 +24,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { chainAt } from '../frontend/src/sim2/geometry/curves'
 import { setTypeOnRooms } from '../frontend/src/sim2/geometry/facade'
 import { type EmitterType, type FabricType, type OwnProfile, type Plan, type PlanControl, type PlanRoom, type PlanSystem, type PlanZone, type SpaceType, type Win, FLOOR_NAMES, floorsOf, newPlan, onFloor, upgradePlan } from '../frontend/src/sim2/geometry/plan'
 import type { RoofRecipe } from '../frontend/src/sim2/geometry/roof'
@@ -163,7 +164,13 @@ geo.floors.forEach((f, k) => {
   // Its roof: the survey's roofs over it, insulated in the slope (the calcs' roof U-values are for the sloped areas),
   // and the rest flat.
   const roof_parts = (roofsByFloor[String(k)] ?? []).map((p) => ({ id: p.id, name: p.name, ring: p.ring, recipe: p.recipe }))
-  plan = { ...plan, blocks: f.blocks, rooms, windows, wall_spans: [], roof: { style: 'flat' }, roof_parts }
+  // The two bays (Lounge 2 on the ground floor, the men's changing bay above it) are curved: drawn as curves in 3D,
+  // modelled as their flat facets (Linzie 18 Nov 23:34).
+  const BAY: XY = [-1.2, 23.5]
+  const near = f.blocks[0]!.map((a, i) => { const b = f.blocks[0]![(i + 1) % f.blocks[0]!.length]!; return { i, d: Math.hypot((a[0] + b[0]) / 2 - BAY[0], (a[1] + b[1]) / 2 - BAY[1]) } }).sort((p, q) => p.d - q.d)[0]!
+  const bay = near.d < 2 ? chainAt(f.blocks[0]!, near.i) : null
+  plan = { ...plan, blocks: f.blocks, rooms, windows, wall_spans: [], roof: { style: 'flat' }, roof_parts, ...(bay ? { curves: [{ ...bay, block: 0 }] } : {}) }
+  if (bay) console.log(`${f.name}: bay drawn as a curve, sides ${bay.from}–${bay.to}`)
   plan = { ...plan, floors: plan.floors!.map((x, i) => (i === k ? { ...x, name: FLOOR_NAMES[k]! } : x)) }
   for (let b = 1; b <= 5; b++) {
     const ids = rooms.filter((r) => blockOfRoom.get(r.id) === b).map((r) => r.id)

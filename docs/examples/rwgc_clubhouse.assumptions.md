@@ -25,7 +25,8 @@ Replace an assumption when better information arrives.
 - The Revit rooms are traced onto a 0.25 m grid so that they tile each floor wall to wall, as NZA Sim needs. Walls and
   small gaps go to the nearest room, and the outline sits 0.15 m outside the rooms' inside faces. The rooms are then
   straightened together: any step under 0.35 m becomes a straight or diagonal wall, and the two curved bays become a
-  few flat facets. This keeps the false corners out of the thermal bridging. Floor areas run about 5–8 % above
+  few flat facets. This keeps the false corners out of the thermal bridging. The two bays are drawn as curves in 3D,
+  which is drawing only: the model keeps their facets. Floor areas run about 5–8 % above
   Revit's room areas, which are measured to the inside faces.
 - Rooms under 2 m² (WC cubicles, risers, ducts) are folded into the rooms next to them. The Bar (402) and one Toilet
   (381) have no floor faces in the export, so they are recovered from the gaps they leave.

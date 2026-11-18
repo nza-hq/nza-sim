@@ -15,6 +15,7 @@ import pc from 'polygon-clipping'
 import { type Plan, type PlacedWindow, type PlanFloor, type Span, type WallRun, type XY, allWindows, edgesOf, floorsOf, wallRuns } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
 import { type BlockRoof, type RoofPiece, blockRoof, roofPieces } from './roof'
+import { type WallCurve, curvedWalls, displayRing, displayRoomRing } from './curves'
 
 // Colours from BuildingViewer3D, so the two read as one tool.
 const C = { tiles: '#9C5B4A', flatRoof: '#8E979B', floorOn: '#F2B872', wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
@@ -81,6 +82,10 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
   }, [plan.blocks, plan.rooms])
 
   const zoneIndex = (zid: string) => Math.max(0, plan.zones.findIndex((z) => z.id === zid))
+  // Curved walls (drawing only): the facets they replace, the smooth wall's segments, and outlines to match.
+  const curves = plan.curves ?? []
+  const cw = useMemo(() => curvedWalls(plan.blocks, runs, placed, curves), [plan.blocks, runs, placed, curves])
+  const smooth = (ring: XY[], block: number) => (curves.length ? displayRing(ring, curves.filter((c) => c.block === block)) : ring)
 
   return (
     <Canvas shadows camera={{ position: cam, fov: 40, near: 0.1, far: 2000 }} gl={{ antialias: true }} style={{ position: 'absolute', inset: 0, background: '#E4EEF2' }}>
@@ -109,11 +114,11 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
 
       {floors.map((f, i) => (i === act ? null : <OtherFloor key={`f${i}`} plan={plan} floor={f} above={floors[i + 1]} y={i * H} H={H} solid={solidRoofs} />))}
       <group position={[0, act * H, 0]}>
-      {plan.blocks.map((b, i) => <Slab key={`s${i}`} ring={b} on={floorOn} />)}
+      {plan.blocks.map((b, i) => <Slab key={`s${i}`} ring={smooth(b, i)} on={floorOn} />)}
       {plan.rooms.map((r) => (
-        <RoomFloor key={r.id} ring={r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />
+        <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, plan.blocks, curves) : r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />
       ))}
-      {floorOn && plan.blocks.map((b, i) => <FloorGlow key={`fg${i}`} ring={b} />)}
+      {floorOn && plan.blocks.map((b, i) => <FloorGlow key={`fg${i}`} ring={smooth(b, i)} />)}
       {labels && plan.rooms.map((r) => {
         const at = labelAt(r.ring)
         return (
@@ -122,9 +127,10 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
-      {roofPieces(plan).map((p, i, all) => { const br = roofs?.[i] ?? blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.ring} cut={restCut(p, all, floors[act + 1])} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> })}
+      {roofPieces(plan).map((p, i, all) => { const br = roofs?.[i] ?? blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, floors[act + 1])} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
-      {runs.map((run) => (
+      {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={crossers} bands={[]} onPick={() => {}} />)}
+      {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => (
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
       ))}
       </group>
@@ -241,12 +247,16 @@ function OtherFloor({ plan, floor, above, y, H, solid }: { plan: Plan; floor: Pl
   const runs = useMemo(() => wallRuns(sub.blocks), [sub])
   const placed = useMemo(() => allWindows(sub).windows, [sub])
   const zoneIndex = (zid: string) => Math.max(0, plan.zones.findIndex((z) => z.id === zid))
+  const curves: WallCurve[] = floor.curves ?? []
+  const cw = useMemo(() => curvedWalls(sub.blocks, runs, placed, curves), [sub, runs, placed, curves])
+  const smooth = (ring: XY[], block: number) => (curves.length ? displayRing(ring, curves.filter((c) => c.block === block)) : ring)
   return (
     <group position={[0, y, 0]}>
-      {sub.blocks.map((b, i) => <Slab key={`s${i}`} ring={b} />)}
-      {sub.rooms.map((r) => <RoomFloor key={r.id} ring={r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />)}
-      {roofPieces(sub, true).map((p, i, all) => { const br = blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.ring} cut={restCut(p, all, above)} H={H} on={false} solid={solid} hide={false} /> : <Pitched key={`r${i}`} roof={br} H={H} on={false} solid={solid} hide={false} /> })}
-      {runs.map((run) => <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
+      {sub.blocks.map((b, i) => <Slab key={`s${i}`} ring={smooth(b, i)} />)}
+      {sub.rooms.map((r) => <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, sub.blocks, curves) : r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />)}
+      {roofPieces(sub, true).map((p, i, all) => { const br = blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, above)} H={H} on={false} solid={solid} hide={false} /> : <Pitched key={`r${i}`} roof={br} H={H} on={false} solid={solid} hide={false} /> })}
+      {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
+      {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
     </group>
   )
 }

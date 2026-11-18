@@ -14,6 +14,7 @@
  */
 import { area, ccw, type XY } from './ported/zones'
 import type { RoofPart, RoofRecipe } from './roof'
+import type { WallCurve } from './curves'
 import { type Profile, profile as libProfile, profilesFor as libProfilesFor } from '../library/library'
 
 export type { XY }
@@ -420,6 +421,9 @@ export type Plan = {
   /** 17 Nov 2026: parts of a block's roof, each a rectangle with its own shape (a wing's own roof); a block with parts
    * takes its roof from them, any other block from `roof` (roof.ts, roofPieces). */
   roof_parts?: RoofPart[]
+  /** 18 Nov 2026: runs of a block's sides the 3D view draws as one smooth curved wall (drawing only; the model keeps
+   * the facets). See curves.ts. */
+  curves?: WallCurve[]
   /** 18 Nov 2026 (RWGC clubhouse, Linzie: "add stacked floors"): every floor of a building with more than one, ground
    * first, each its own outline, rooms and windows (stacked one storey height apart). The floor being edited is the
    * one in `blocks`, `rooms`, `windows` and `wall_spans` above (its entry here is stale until the next switch), so
@@ -433,11 +437,11 @@ export type Plan = {
 
 /** One floor of a building with more than one (Plan.floors). Rooms, zones and windows keep ids unique over the whole
  * building; a zone's rooms are all on one floor. */
-export type PlanFloor = { name: string; blocks: XY[][]; rooms: PlanRoom[]; windows: Win[]; wall_spans: TypeSpan[]; roof?: RoofRecipe; roof_parts?: RoofPart[] }
+export type PlanFloor = { name: string; blocks: XY[][]; rooms: PlanRoom[]; windows: Win[]; wall_spans: TypeSpan[]; roof?: RoofRecipe; roof_parts?: RoofPart[]; curves?: WallCurve[] }
 
 /** Every floor, ground first, the one being edited as it is now. A plan with no `floors` is one floor. */
 export function floorsOf(plan: Plan): PlanFloor[] {
-  const here: PlanFloor = { name: plan.floors?.[plan.active_floor ?? 0]?.name ?? 'Ground floor', blocks: plan.blocks, rooms: plan.rooms, windows: plan.windows, wall_spans: plan.wall_spans, ...(plan.roof ? { roof: plan.roof } : {}), ...(plan.roof_parts ? { roof_parts: plan.roof_parts } : {}) }
+  const here: PlanFloor = { name: plan.floors?.[plan.active_floor ?? 0]?.name ?? 'Ground floor', blocks: plan.blocks, rooms: plan.rooms, windows: plan.windows, wall_spans: plan.wall_spans, ...(plan.roof ? { roof: plan.roof } : {}), ...(plan.roof_parts ? { roof_parts: plan.roof_parts } : {}), ...(plan.curves ? { curves: plan.curves } : {}) }
   if (!plan.floors?.length) return [here]
   return plan.floors.map((f, i) => (i === (plan.active_floor ?? 0) ? here : f))
 }
@@ -448,8 +452,8 @@ export function onFloor(plan: Plan, i: number): Plan {
   const fs = floorsOf(plan)
   while (fs.length <= i) fs.push({ name: FLOOR_NAMES[fs.length] ?? `Floor ${fs.length}`, blocks: [], rooms: [], windows: [], wall_spans: [] })
   const f = fs[i]!
-  const { roof_parts: _rp, roof: _r, ...rest } = plan
-  return { ...rest, floors: fs, active_floor: i, blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}) }
+  const { roof_parts: _rp, roof: _r, curves: _c, ...rest } = plan
+  return { ...rest, floors: fs, active_floor: i, blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}), ...(f.curves ? { curves: f.curves } : {}) }
 }
 export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor', 'Fourth floor', 'Fifth floor']
 

@@ -66,6 +66,7 @@ import { CATALOGUES, catalogueItem } from '../../thermal/catalogue'
 import { PUMP_CURVE } from '../../thermal/engine/pumps'
 import { controlMap, hoursOnMonday } from './controls'
 import { buildDocument } from './toDocument'
+import { chainAt } from './curves'
 import { previewItems } from '../run/ResultsPanel'
 import type { Summary } from '../run/seam'
 // @ts-expect-error untyped JS from today's app
@@ -3457,6 +3458,24 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <button type="button" className="gl-x" aria-label="Close" onClick={() => setSel(null)}>×</button>
             </div>
             <div className="gl-body">
+              {(() => {
+                // 18 Nov 2026 (Linzie): a curved wall drawn as one in 3D. The model keeps the flat walls.
+                const ring = plan.blocks[selWall.block]
+                const on = (plan.curves ?? []).find((c) => c.block === selWall.block && selWall.side >= c.from && selWall.side <= c.to)
+                const chain = ring ? chainAt(ring, selWall.side) : null
+                if (!on && !chain) return null
+                return (
+                  <div className="gl-sec">
+                    <h3>Curve <small>3D only</small></h3>
+                    {on ? (
+                      <button type="button" className="gl-btn quiet" onClick={() => commit({ ...plan, curves: (plan.curves ?? []).filter((c) => c !== on) })}>Draw these {on.to - on.from + 1} walls straight</button>
+                    ) : (
+                      <button type="button" className="gl-btn quiet" onClick={() => commit({ ...plan, curves: [...(plan.curves ?? []).filter((c) => c.block !== selWall.block || c.to < chain!.from || c.from > chain!.to), { ...chain!, block: selWall.block }] })}>Draw as a curve ({chain!.to - chain!.from + 1} walls)</button>
+                    )}
+                    <p className="gl-hint">Shows this wall and the walls either side that bend with it as one curved wall in 3D. The model keeps the flat walls, so nothing in the results changes.</p>
+                  </div>
+                )
+              })()}
               {runPieces.length > 1 && (
                 <div className="gl-chips" role="group" aria-label="Which part">
                   {runPieces.map((p, i) => (
