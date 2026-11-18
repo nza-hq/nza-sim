@@ -591,3 +591,19 @@ describe('Brief 120 P3: system capacity in the summary', () => {
     expect(r.summary.zones.every((z) => z.short.heating === null && z.short.cooling === null)).toBe(true)
   })
 })
+
+describe('Brief 125: the outside film in the run', () => {
+  it("the product's run takes EnergyPlus's film and says so; the referee options keep ISO's fixed film and say nothing", async () => {
+    expect(QUARTER_HOUR_OPTIONS.surface_physics?.outside_convection).toBe('doe2')
+    expect(RUN_OPTIONS.surface_physics?.outside_convection).toBe('fixed')
+    const r = simulate(await doc(), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.method_notes).toHaveLength(1)
+    expect(r.summary.method_notes[0]).toMatch(/^Outside surfaces lose heat to the air as EnergyPlus works it out \(its DOE-2 method\)/)
+    // This weather (Denver, from a .mos file) carries no present weather or precipitation.
+    expect(r.summary.method_notes[0]).toMatch(/no rain information/)
+    const f = simulate(await doc(), { weather: WEATHER, options: RUN_OPTIONS })
+    if (!f.ok) throw new Error('ran')
+    expect(f.summary.method_notes).toEqual([])
+  }, 60000)
+})

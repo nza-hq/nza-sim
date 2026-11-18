@@ -72,4 +72,3 @@ const out = cases.map((c) => {
 })
 const file = process.argv[2]
 if (file) writeFileSync(file, JSON.stringify({ source: 'scripts/125_perf.mts', node: process.version, cases: out }, null, 1) + '\n')
-if (process.env.PROF) console.log('LU ms', Math.round((globalThis as any).__tLU), 'responses ms', Math.round((globalThis as any).__tResp))

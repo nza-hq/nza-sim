@@ -95,6 +95,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
               <div className="rp-hb">
                 <p className="rp-hb-for">{zone ? `${zone.name || zone.id}, heat from the other zones included` : 'Whole building'} <i>estimate</i></p>
                 <HeatBalance lines={lines} />
+                {s && s.method_notes.length > 0 && <ul className="rp-est-notes">{s.method_notes.map((n) => <li key={n}>{n}</li>)}</ul>}
               </div>
             )}
             {flow && !zone && (

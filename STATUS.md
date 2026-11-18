@@ -2,14 +2,15 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
-## 🔧 Brief 125: the outside surface film as EnergyPlus works it out — IN PROGRESS 18 Nov 2026 on `sim2/125-outside-film` (off `sim2/example-school`)
+## 🔧 Brief 125: the outside surface film as EnergyPlus works it out — IN REVIEW 18 Nov 2026 on `sim2/125-outside-film` (off `sim2/example-school`)
 
 Linzie 17 Nov 23:50 chose "Follow EnergyPlus's method" for the outside film (cause of the school's +38 % heating against EnergyPlus, `docs/audit/examples/school_heating_gap.md`). Brief: `docs/briefs/active/125_outside-film.md`.
 
 - **P1 (measured):** EnergyPlus 25.2's own coefficients, wind at the face and rain status on the school reproduced: DOE-2 to 0.00 ± 0.09 W/m²K (wall) and ± 0.06 (glass), leeward beyond 90°; rain 35,038 of 35,040 steps.
 - **P2:** one read of the site's terrain (`airflow.ts siteTerrain`, moved from the translator) and of each outside face's height (`outsideFaceZ`); the translator places surfaces at that height.
 - **P3:** `engine/outsideConvection.ts` (DOE-2, rain from the EPW's present weather and precipitation, wet bulb) and `network.ts` `outside_convection`. Speed: two fixed dry/wet factorisation sets (dry at 20, 40, 80 W/m²K), the film's difference entering from the step before (closes every step; exact in steady conditions); 50 rooms 9.3 s against 8.5 s fixed (`scripts/125_perf.mts`; rebuilding every step took 174 s). Against the exact rebuild: school plain heating 82,114 vs 82,180 kWh, 50 rooms 179,424 vs 179,446.
-- **Next (P4):** the 15-minute run takes it (`QUARTER_HOUR_OPTIONS`), then school, community centre, Bridgewater and the EnergyPlus referees re-run.
+- **P4:** the 15-minute run takes it (`QUARTER_HOUR_OPTIONS`); the run says so under its balance (`Summary.method_notes`), and the instant estimate says it keeps ISO's fixed film. Re-run (London TMYx, EnergyPlus 25.2): school plain heating gap +31.6 % → +18.4 %; school as built heating +38.4 % → +29.5 %, cooling −10.0 % → −3.8 % (`docs/audit/examples/extended_school_three_tiers.json`); community centre heating +8.8 % → +10.8 %, cooling −7.7 % → −3.4 %; 50-room Bridgewater grid (Chicago) −0.6 % heating, −0.8 % cooling (insulated: barely moves). Today's app (Bridgewater anchor 133.2) is untouched. The Brief 103/104/115/123/124 referees keep their own options (fixed film) and all pass. Write-up: `docs/audit/examples/school_heating_gap.md` (After Brief 125).
+- **Open:** inside convection (TARP), the sky temperature and the window model make up the school's remaining +18 %; each is a separate choice for Linzie. The air model's 'urban' terrain (0.22/370) differs from what the translator sends EnergyPlus (City): recorded, not changed.
 
 ## 🔧 Worked example 2: the extended school, plus fixes found building it — IN REVIEW 17 Nov 2026 on `sim2/example-school` (off `chris/121-setpoint-profiles`)
 

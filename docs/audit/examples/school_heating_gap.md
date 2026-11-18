@@ -64,3 +64,29 @@ So EnergyPlus's effective outside film here is well below what ISO 6946 gives fr
   - (b) ISO 6946's wind-driven film plus TARP inside, which closes a little under half of it here.
   - (c) EnergyPlus's own DOE-2 outside convection, with height and terrain, which should close most of it. This makes our run follow EnergyPlus's method rather than ISO's.
   - The engine work is the same for (b) and (c): the outside film becomes an hourly input to the multi-room run, which already re-factorises every step for TARP.
+
+## After Brief 125 (18 Nov 2026): the run takes EnergyPlus's outside film
+
+Linzie chose (c) on 17 Nov at 23:50. The 15-minute run now works each outside face's film out as EnergyPlus does: DOE-2 from the wind at the face's height and the site's terrain, windward or leeward, plus wet faces in rain. This was checked against EnergyPlus's own coefficients face by face (`docs/briefs/active/125_outside-film.md`). Nothing was tuned.
+
+| Case | Run before | Run after | EnergyPlus | Gap before | Gap after |
+|---|---|---|---|---|---|
+| Plain (no gains, 20 °C, no systems) | 91,265 | 82,114 | 69,370 | +31.6 % | +18.4 % |
+| As built, heating | 38,571 | 36,271 | 28,011 | +38.4 % | +29.5 % |
+| As built, cooling | 17,022 | 18,101 | 18,813 | −10.0 % | −3.8 % |
+| Community centre, heating | 15,476 | 15,762 | 14,222 | +8.8 % | +10.8 % |
+| Community centre, cooling | 15,926 | 16,681 | 17,262 | −7.7 % | −3.4 % |
+
+EnergyPlus columns are after Brief 125 P2. It now places each surface at the height the run uses, so they move a little from the table above (69,344 → 69,370; 27,871 → 28,011).
+
+Face by face, our film now matches EnergyPlus's. On z3_wall_1 in dry steps it averages 4.46 W/m²K against EnergyPlus's 4.51. Rain falls on 1,355 steps against EnergyPlus's 1,353.
+
+What is left on the school (+18 % plain) is the other part of this note's list:
+
+- inside convection: TARP, about −5 % at the fixed film;
+- the sky: about −1 %;
+- the window model: EnergyPlus's glass outer surface runs about 0.9 K warmer than ours on z3_glazing_1.
+
+Each is a separate choice, not made here.
+
+The community centre's heating moved slightly the other way, away from EnergyPlus. Its cooling moved towards it. It is insulated, so the film matters less than the other terms there.

@@ -21,6 +21,8 @@
  * cooling, per zone and for the building, the building's breakdown (Rule 9: every term, summed over the zones;
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
+import { siteTerrain } from '../../thermal/engine/airflow'
+import { rainInputs } from '../../thermal/engine/outsideConvection'
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
 import { runMonthly, type MonthlyOptions, type MonthlyResults } from '../../thermal/engine/monthly'
 import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
@@ -35,6 +37,7 @@ type SurfaceKind = Surface['kind']
 import { upgradeDocument } from '../../thermal/schema/upgrade'
 import { CONSTRUCTIONS, resolveConstructions, type LibraryItem, type Missing } from './library'
 import type { WeatherChoice } from './weather'
+import type { Weather } from '../../thermal/engine/types'
 
 export type { Missing } from './library'
 
@@ -45,7 +48,13 @@ export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'pr
  * below in use are undercounted (cooled room, mild: −54 h of EnergyPlus's 248 at 1 step, −31 h at 4; the gate is
  * ±50 h). Every other document keeps one step an hour, Brief 104's speed budget.
  */
-export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }
+// Brief 125 (Linzie 17 Nov 23:50, "Follow EnergyPlus's method"): the run's outside film is EnergyPlus's own (DOE-2
+// from the wind at each face's height, wet faces in rain), so old fabric at a sheltered site reads as EnergyPlus does.
+// RUN_OPTIONS keeps ISO 52016-1's fixed film for the Brief 103/104 referees.
+export const QUARTER_HOUR_OPTIONS: RunOptions = {
+  ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' },
+  surface_physics: { ...RUN_OPTIONS.surface_physics!, outside_convection: 'doe2' },
+}
 export function runOptionsFor(doc: ModelDocument): RunOptions {
   // Linzie 17 Nov 10:27, "Instant, 15 minutes, then Energy+": the monthly estimate is the instant tier (Brief 122), so
   // the run is the accurate tier and every document runs in quarter hours: windows decide every 15 minutes (Brief 115
@@ -144,6 +153,8 @@ export interface Summary {
   /** Steps the year was run in per hour: 4 from the product (runOptionsFor, Linzie 17 Nov 10:27); a caller's own options may differ. */
   steps_per_hour: number
   weather: { file_name: string; station: string; sha256: string }
+  /** Brief 125: how the run treated what is not in the model's inputs, in words (shown under its balance). */
+  method_notes: string[]
   building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number; monthly: Monthly }
   /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
   zones: {
@@ -517,6 +528,18 @@ export function readRunDocument(input: unknown): { ok: true; doc: ModelDocument 
   return { ok: true, doc }
 }
 
+/** Brief 125: the run's outside film in words: how it was worked out, the terrain it took, and whether rain was known. */
+function methodNotes(doc: ModelDocument, w: Weather, options: RunOptions): string[] {
+  if (options.surface_physics?.outside_convection !== 'doe2') return []
+  const { terrain, stated } = siteTerrain(doc.building.site)
+  const words = { Country: 'open country', Suburbs: 'suburbs', City: 'a city centre' }[terrain]
+  const rain = rainInputs(w.hours)
+  return [
+    `Outside surfaces lose heat to the air as EnergyPlus works it out (its DOE-2 method): from the wind at each surface's height${stated ? `, for ${words}` : `, for ${words} (the site states no terrain; set it on Site)`}, and whether the wind is on that face.`
+      + (rain.rain_code || rain.precipitation_mm ? ' Surfaces are wet while it rains, from the weather file.' : ' This weather file has no rain information, so surfaces are never wet.'),
+  ]
+}
+
 export function simulate(
   input: unknown,
   deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean },
@@ -583,6 +606,7 @@ export function simulate(
   const summary: Summary = {
     engine: results.engine, run_ms: results.run_ms, steps_per_hour: options.time_step?.steps_per_hour ?? 1,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
+    method_notes: methodNotes(doc, weather.weather, options),
     building: {
       floor_m2: readDocFloorM2(doc),
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
@@ -971,7 +995,8 @@ export function instantEstimate(doc: ModelDocument, deps: { weather: WeatherChoi
       monthly: { heating_kwh: sum12((z) => z.monthly.heating_kwh), cooling_kwh: sum12((z) => z.monthly.cooling_kwh) },
       breakdown: byTerm(r.zones),
       zones: r.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: z.floor_m2, heating_kwh: z.heating_kwh, cooling_kwh: z.cooling_kwh, monthly: z.monthly, breakdown: byTerm([z]) })),
-      notes: r.notes,
+      // Brief 125: the full-year run takes the outside film from the wind and rain; this estimate keeps ISO's fixed one.
+      notes: [...r.notes, 'Outside surfaces lose heat to the air at ISO\'s fixed rate here; the full-year run and EnergyPlus take it from the wind and rain, so old, single-glazed or uninsulated fabric at a sheltered site can read lower there.'],
     },
   }
 }
