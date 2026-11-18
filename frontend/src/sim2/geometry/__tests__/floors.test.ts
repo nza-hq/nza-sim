@@ -63,6 +63,22 @@ describe('stacked floors (18 Nov 2026, RWGC clubhouse)', () => {
     expect(b.notes.some((n) => /over no room below/.test(n))).toBe(true)
   })
 
+  it('a floor\'s roof part is a pitched roof over the rooms under it; the rest of the block stays flat', () => {
+    let p = twoFloors()
+    // A 30° gable over the east end of the ground floor (x 16–20), where nothing stands above.
+    p = { ...p, roof: { style: 'flat' }, roof_parts: [{ id: 'g1', name: 'East wing', ring: rect(16, 0, 20, 10), recipe: { style: 'gable', pitch_deg: 30, ridge_axis: 'longest', insulation: 'slope' } }] }
+    const b = buildDocument(p)
+    expect(b.issues).toEqual([])
+    const doc = b.doc as any
+    const roofs = (zone: string, slope: boolean) => doc.surfaces.filter((x: any) => x.zone_a === zone && x.kind === 'roof' && (x.tilt_deg > 0) === slope).reduce((t: number, x: any) => t + x.area_m2, 0)
+    // The gable's slopes are 4 × 10 m on plan, over the east zone only: 40 / cos 30°.
+    expect(roofs('z2', true)).toBeCloseTo(40 / Math.cos(Math.PI / 6), 3)
+    // The east zone's flat roof: 10 × 10 less the 60 m² upstairs stands on, less the 40 m² under the gable.
+    expect(roofs('z2', false)).toBeCloseTo(0, 3)
+    expect(roofs('z1', false)).toBeCloseTo(40, 3)
+    expect(roofs('z1', true)).toBeCloseTo(0, 3)
+  })
+
   it('a one-floor plan builds as before (no floors field, nothing stacked)', () => {
     const one: Plan = { ...newPlan(), building: { ...newPlan().building!, terrain: 'suburban' }, storey_height_m: 3, zones: [{ id: 'z1', name: 'Zone 1', use: null, heating: null, cooling: null }], blocks: [rect(0, 0, 10, 10)], rooms: [{ id: 'r1', name: 'Room', ring: rect(0, 0, 10, 10), zone: 'z1' }] }
     const doc = buildDocument(one).doc as any

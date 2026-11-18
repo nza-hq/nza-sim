@@ -81,18 +81,21 @@ function buildStacked(plan0: Plan, floors: PlanFloor[]): Built {
     if (was != null && was !== k) notes.push(`${plan0.zones.find((z) => z.id === r.zone)?.name ?? r.zone} has rooms on more than one floor; a zone is on one floor, so its rooms on ${floors[k]!.name.toLowerCase()} are left out`)
     else zoneFloor.set(r.zone, k)
   }))
-  const pitched = (plan0.roof && plan0.roof.style !== 'flat') || floors.some((f) => f.roof_parts?.some((p) => p.recipe.style !== 'flat'))
-  if (pitched) notes.push('Pitched roofs are not stacked yet: with more than one floor every roof is flat (its type as chosen on Fabric)')
   const subs = floors.map((f, k) => {
     const mine = f.rooms.filter((r) => zoneFloor.get(r.zone) === k)
     // Every room of the building, so space types, systems and emitters see the whole building; the floor's own rooms
     // for its geometry (buildFloor reads geometry from blocks, windows and the rooms of its zones).
-    const sub: Plan = { ...plan0, floors: undefined, active_floor: undefined, blocks: f.blocks, rooms: mine, windows: f.windows, wall_spans: f.wall_spans, roof: { style: 'flat' } as Plan['roof'], roof_parts: undefined }
-    return buildFloor(sub)
+    // Its roof: the floor's own parts, each over the rooms under it, and the rest flat (roofPieces, partial). A whole
+    // block's pitched roof (no parts) is drawn only on the top floor's blocks; below one it would stand on the floor above.
+    const top = k === floors.length - 1
+    const roof = f.roof && f.roof.style !== 'flat' && !top && !f.roof_parts?.length ? { style: 'flat' as const } : f.roof ?? { style: 'flat' as const }
+    if (roof !== f.roof && f.roof) notes.push(`${f.name}: its pitched roof covers whole blocks, which the floor above stands on; give it roof parts instead (each a rectangle), so it is flat for now`)
+    const sub: Plan = { ...plan0, floors: undefined, active_floor: undefined, blocks: f.blocks, rooms: mine, windows: f.windows, wall_spans: f.wall_spans, roof, roof_parts: f.roof_parts }
+    return buildFloor(sub, undefined, { loftPrefix: `f${k}_`, partialRoof: true })
   })
   // Gather: zones (on their floor), surfaces, system groups (their zones joined), profiles, controls, library refs.
   const docs = subs.map((s) => s.doc as Record<string, unknown> & { zones: Array<Record<string, unknown>>; surfaces: Array<Record<string, unknown>>; system_groups: Array<Record<string, unknown>>; profiles: Array<Record<string, unknown>>; controls?: Array<Record<string, unknown>>; library_refs: Array<Record<string, unknown>>; other_loads?: unknown[] })
-  const zones = docs.flatMap((d, k) => d.zones.map((z) => ({ ...z, floor: k })))
+  const zones = docs.flatMap((d, k) => d.zones.map((z) => ({ ...z, floor: z.use_type === 'loft' ? k + 1 : k })))
   const surfaces = docs.flatMap((d) => d.surfaces.map((s) => ({ ...s })))
   const groups = new Map<string, Record<string, unknown>>()
   for (const d of docs) for (const g of d.system_groups) {
@@ -119,10 +122,15 @@ function buildStacked(plan0: Plan, floors: PlanFloor[]): Built {
   if (!it?.construction) notes.push('The floors between storeys have no construction yet (Fabric, Floor between storeys)')
   const take = (zid: string, kind: 'roof' | 'ground', a: number) => {
     // Take a m² off the zone's roofs (or ground floors), in proportion to their areas.
-    const own = surfaces.filter((s) => s.zone_a === zid && s.kind === kind)
-    const tot = own.reduce((t, s) => t + (s.area_m2 as number), 0)
-    if (tot <= 0) return
-    for (const s of own) s.area_m2 = r3(Math.max(0, (s.area_m2 as number) * (1 - Math.min(1, a / tot))))
+    // The flat roofs first (the floor above stands on them); a pitched roof's slopes only if they are not enough.
+    const own = surfaces.filter((s) => s.zone_a === zid && s.kind === kind).sort((p, q) => (p.tilt_deg as number) - (q.tilt_deg as number))
+    let left = a
+    for (const s of own) {
+      if (left <= 0) break
+      const cut = Math.min(left, s.area_m2 as number)
+      s.area_m2 = r3((s.area_m2 as number) - cut)
+      left -= cut
+    }
   }
   const added: Array<{ zone: string; id: string }> = []
   const zoneFoot = new Map([...zoneFloor.keys()].map((z) => [z, foot(z)]))
@@ -178,7 +186,7 @@ function buildStacked(plan0: Plan, floors: PlanFloor[]): Built {
   }
 }
 
-function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[]): Built {
+function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPrefix?: string; partialRoof?: boolean } = {}): Built {
   // A plan held from before Brief 112 (one building-wide hot water use) is read as its space types' own.
   const plan = hotWaterOnSpaces(plan0)
   // The project's own profiles first, then the library's (Brief 118 P5).
@@ -386,7 +394,7 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[]): Built {
   // Brief 123: the roof's shape. A block whose roof is pitched (and built) is roofed below; any other stays flat.
   // Roof parts (17 Nov 2026): a block may have parts, each a rectangle with its own recipe; `pieces` are the parts and
   // the blocks without parts (whose recipe is plan.roof). With no parts, piece i is block i, as before.
-  const pieces = roofPieces(plan)
+  const pieces = roofPieces(plan, opts.partialRoof)
   const recOf = (i: number) => { const r = pieces[i]?.recipe; return r && r.style !== 'flat' ? r : null }
   const roofs = pieces.map((p, i) => (recOf(i) ? (p.part ? blockRoof(p.ring, p.recipe) : roofsIn?.[p.block] ?? blockRoof(p.ring, p.recipe)) : null))
   roofs.forEach((r, i) => { if (r?.refused) notes.push(`${pieces[i]!.part ? `The ${pieces[i]!.name.toLowerCase()} roof` : `Block ${pieces[i]!.block + 1}`} keeps a flat roof: ${r.refused}`) })
@@ -410,9 +418,18 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[]): Built {
     const b = blockOfRoom(ring)
     const mine = pieces.filter((p) => p.block === b)
     if (mine.length === 1) return [{ piece: mine[0]!.index, a: ringArea(ring) }]
-    return mine.map((p) => ({ piece: p.index, a: areaInside(ring, p.ring) })).filter((x) => x.a > 1e-6)
+    const parts = mine.filter((p) => !p.rest).map((p) => ({ piece: p.index, a: areaInside(ring, p.ring) }))
+    // Stacked floors: what no part covers is under the block's flat rest.
+    const rest = mine.find((p) => p.rest)
+    if (rest) {
+      // Parts that overlap share the room's floor between them (never more roof than floor).
+      const room = ringArea(ring), under = parts.reduce((t, x) => t + x.a, 0)
+      if (under > room) for (const x of parts) x.a *= room / under
+      parts.push({ piece: rest.index, a: Math.max(0, room - Math.min(room, under)) })
+    }
+    return parts.filter((x) => x.a > 1e-6)
   }
-  const loftId = (i: number) => (pieces.length > 1 ? `loft_${i + 1}` : 'loft')
+  const loftId = (i: number) => `${opts.loftPrefix ?? ''}${pieces.length > 1 ? `loft_${i + 1}` : 'loft'}`
   /** A gable or raised wall takes the wall type of the outside wall it stands on (at the middle of its foot). */
   /** Roof parts: the length of a run lying along the part's own outline (a part's walls are those of its own rooms). */
   const alongPart = (r: (typeof runs)[number], ring: readonly XY[]) => ring.reduce((t, a, k) => {

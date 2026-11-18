@@ -26,6 +26,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { setTypeOnRooms } from '../frontend/src/sim2/geometry/facade'
 import { type EmitterType, type FabricType, type OwnProfile, type Plan, type PlanControl, type PlanRoom, type PlanSystem, type PlanZone, type SpaceType, type Win, FLOOR_NAMES, floorsOf, newPlan, onFloor, upgradePlan } from '../frontend/src/sim2/geometry/plan'
+import type { RoofRecipe } from '../frontend/src/sim2/geometry/roof'
 import { buildDocument } from '../frontend/src/sim2/geometry/toDocument'
 import { defaultPumps } from '../frontend/src/thermal/catalogue/auxiliaryDefaults'
 import { TODAY } from '../frontend/src/thermal/schema/upgrade'
@@ -36,6 +37,12 @@ type GRoom = { number: string; name: string; ring: XY[]; area: number }
 type GWin = { cat: 'Windows' | 'Doors' | 'Curtain Panels'; block: number; side: number; t_m: number; width_m: number; sill_m: number; height_m: number; dist: number }
 type GFloor = { key: string; name: string; blocks: XY[][]; rooms: GRoom[]; windows: GWin[] }
 const geo = JSON.parse(readFileSync(path.join(root, 'docs/examples/rwgc_clubhouse.geometry.json'), 'utf8')) as { floors: GFloor[] }
+// The survey's roofs (Linzie 18 Nov 22:59: "see the whole building in 3D with all the roof shapes"): each Revit roof as
+// a rectangle (its smallest enclosing one) with its style, pitch and ridge read from its slopes, on the floor whose top
+// its eaves sit at (eaves below 56.9 m AOD the ground floor's, below 59.4 m the first floor's, above the second's).
+// Dormers, flat bits and roofs drawn twice are left out. Made from the GLB by the same extraction as the rooms.
+type GRoofPart = { id: string; name: string; ring: XY[]; recipe: RoofRecipe }
+const roofsByFloor = JSON.parse(readFileSync(path.join(root, 'docs/examples/rwgc_clubhouse.roofs.json'), 'utf8')) as Record<string, GRoofPart[]>
 
 const H = 3.0 // one storey height for every floor (floors are stacked this far apart)
 
@@ -153,7 +160,10 @@ geo.floors.forEach((f, k) => {
   const windows: Win[] = ws.sort((a, b) => first[a.block]! + a.side - (first[b.block]! + b.side) || a.t_m - b.t_m).map((w) => ({
     id: `w${++nWin}`, wall: first[w.block]! + w.side, t_m: w.t_m, width_m: w.width_m, height_m: w.height_m, sill_m: w.sill_m, shading_m: 0, ...(w.door ? { door: true } : {}),
   }))
-  plan = { ...plan, blocks: f.blocks, rooms, windows, wall_spans: [] }
+  // Its roof: the survey's roofs over it, insulated in the slope (the calcs' roof U-values are for the sloped areas),
+  // and the rest flat.
+  const roof_parts = (roofsByFloor[String(k)] ?? []).map((p) => ({ id: p.id, name: p.name, ring: p.ring, recipe: p.recipe }))
+  plan = { ...plan, blocks: f.blocks, rooms, windows, wall_spans: [], roof: { style: 'flat' }, roof_parts }
   plan = { ...plan, floors: plan.floors!.map((x, i) => (i === k ? { ...x, name: FLOOR_NAMES[k]! } : x)) }
   for (let b = 1; b <= 5; b++) {
     const ids = rooms.filter((r) => blockOfRoom.get(r.id) === b).map((r) => r.id)

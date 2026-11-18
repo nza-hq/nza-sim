@@ -433,11 +433,11 @@ export type Plan = {
 
 /** One floor of a building with more than one (Plan.floors). Rooms, zones and windows keep ids unique over the whole
  * building; a zone's rooms are all on one floor. */
-export type PlanFloor = { name: string; blocks: XY[][]; rooms: PlanRoom[]; windows: Win[]; wall_spans: TypeSpan[]; roof_parts?: RoofPart[] }
+export type PlanFloor = { name: string; blocks: XY[][]; rooms: PlanRoom[]; windows: Win[]; wall_spans: TypeSpan[]; roof?: RoofRecipe; roof_parts?: RoofPart[] }
 
 /** Every floor, ground first, the one being edited as it is now. A plan with no `floors` is one floor. */
 export function floorsOf(plan: Plan): PlanFloor[] {
-  const here: PlanFloor = { name: plan.floors?.[plan.active_floor ?? 0]?.name ?? 'Ground floor', blocks: plan.blocks, rooms: plan.rooms, windows: plan.windows, wall_spans: plan.wall_spans, ...(plan.roof_parts ? { roof_parts: plan.roof_parts } : {}) }
+  const here: PlanFloor = { name: plan.floors?.[plan.active_floor ?? 0]?.name ?? 'Ground floor', blocks: plan.blocks, rooms: plan.rooms, windows: plan.windows, wall_spans: plan.wall_spans, ...(plan.roof ? { roof: plan.roof } : {}), ...(plan.roof_parts ? { roof_parts: plan.roof_parts } : {}) }
   if (!plan.floors?.length) return [here]
   return plan.floors.map((f, i) => (i === (plan.active_floor ?? 0) ? here : f))
 }
@@ -448,8 +448,8 @@ export function onFloor(plan: Plan, i: number): Plan {
   const fs = floorsOf(plan)
   while (fs.length <= i) fs.push({ name: FLOOR_NAMES[fs.length] ?? `Floor ${fs.length}`, blocks: [], rooms: [], windows: [], wall_spans: [] })
   const f = fs[i]!
-  const { roof_parts: _rp, ...rest } = plan
-  return { ...rest, floors: fs, active_floor: i, blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}) }
+  const { roof_parts: _rp, roof: _r, ...rest } = plan
+  return { ...rest, floors: fs, active_floor: i, blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}) }
 }
 export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor', 'Fourth floor', 'Fifth floor']
 

@@ -343,7 +343,7 @@ export async function fetchServedRoofs(blocks: readonly (readonly XY[])[], recip
 /** One part of a block's roof: a rectangle inside the block, with its own shape. */
 export type RoofPart = { id: string; name: string; ring: XY[]; recipe: RoofRecipe }
 /** A piece of the whole roof: a block with no parts (its recipe is the plan's), or one part. */
-export type RoofPiece = { index: number; block: number; name: string; ring: XY[]; recipe: RoofRecipe | null; part: string | null }
+export type RoofPiece = { index: number; block: number; name: string; ring: XY[]; recipe: RoofRecipe | null; part: string | null; /** Stacked floors: the block's floor outside every part, roofed flat. */ rest?: boolean }
 
 const centroid = (ring: readonly XY[]): XY => [ring.reduce((t, p) => t + p[0], 0) / ring.length, ring.reduce((t, p) => t + p[1], 0) / ring.length]
 export function insideRing(p: XY, ring: readonly XY[]): boolean {
@@ -358,11 +358,19 @@ export function insideRing(p: XY, ring: readonly XY[]): boolean {
 export const blockOfPart = (blocks: readonly (readonly XY[])[], part: Pick<RoofPart, 'ring'>) => blocks.findIndex((b) => insideRing(centroid(part.ring), b))
 
 /** The roof's pieces, in block order: each block's parts, or the block itself. */
-export function roofPieces(plan: { blocks: readonly (readonly XY[])[]; roof?: RoofRecipe | null; roof_parts?: readonly RoofPart[] | null }): RoofPiece[] {
+export function roofPieces(plan: { blocks: readonly (readonly XY[])[]; roof?: RoofRecipe | null; roof_parts?: readonly RoofPart[] | null; floors?: readonly unknown[] }, partial = (plan.floors?.length ?? 0) > 1): RoofPiece[] {
   const out: RoofPiece[] = []
   const parts = plan.roof_parts ?? []
+  // Stacked floors (18 Nov 2026, RWGC clubhouse): a floor's roof is pieces over parts of it, between and beside the floors
+  // above, so its parts need not fill the block. Each part is its own roof over the rooms under it; the rest of the
+  // block is roofed flat.
   plan.blocks.forEach((b, bi) => {
     const mine = parts.filter((p) => blockOfPart(plan.blocks, p) === bi)
+    if (partial && mine.length && mine.every((p) => asRectangle(p.ring) != null)) {
+      for (const p of mine) out.push({ index: out.length, block: bi, name: p.name, ring: p.ring, recipe: p.recipe, part: p.id })
+      out.push({ index: out.length, block: bi, name: `${plan.blocks.length > 1 ? `Block ${bi + 1}` : 'The building'}, the rest`, ring: b as XY[], recipe: { style: 'flat' }, part: null, rest: true })
+      return
+    }
     // Parts count only while they still fill the block exactly (a block reshaped since keeps the plan's one roof).
     if (mine.length && partsFit(b, mine)) for (const p of mine) out.push({ index: out.length, block: bi, name: p.name, ring: p.ring, recipe: p.recipe, part: p.id })
     else out.push({ index: out.length, block: bi, name: plan.blocks.length > 1 ? `Block ${bi + 1}` : 'The building', ring: b as XY[], recipe: plan.roof ?? null, part: null })

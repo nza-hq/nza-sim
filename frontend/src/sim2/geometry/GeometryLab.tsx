@@ -450,6 +450,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const has = plan.blocks.length > 0
   // Stacked floors (18 Nov 2026): every floor, and the zones whose rooms are on another floor (kept out of this floor's lists).
   const floors = useMemo(() => floorsOf(plan), [plan])
+  // 3D room names: on for one floor, off for a stacked building until asked for (they hide the building).
+  const [names3dSet, setNames3d] = useState<boolean | null>(null)
+  const names3d = names3dSet ?? floors.length < 2
+  const [solidRoofs, setSolidRoofs] = useState(false)
   const zonesElsewhere = useMemo(() => new Set(floors.flatMap((f, i) => (i === (plan.active_floor ?? 0) ? [] : f.rooms.map((r) => r.zone)))), [floors, plan.active_floor])
   const inRooms = mode !== 'outline'
   const selBlocks = sel?.kind === 'blocks' ? sel.idx.filter((i) => i < plan.blocks.length) : []
@@ -3015,7 +3019,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D roofs={pRoofs} roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D labels={names3d} solidRoofs={solidRoofs} roofs={pRoofs} roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -3033,6 +3037,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           ))}
           <button type="button" title="Add a floor above the top one" onClick={() => { commit(onFloor(plan, floors.length)); setSel(null); toMode('outline'); setTool('rect') }}>+ Floor</button>
         </>}
+        {in3d && <><span className="gl-viewsep" aria-hidden /><button type="button" aria-pressed={names3d} title="Show the rooms' names in 3D" onClick={() => setNames3d(!names3d)}>Names</button><button type="button" aria-pressed={solidRoofs} title="Draw the roofs solid, to see their shapes" onClick={() => setSolidRoofs(!solidRoofs)}>Roofs</button></>}
       </div>
       {shownLook === 'elev' && selWall && selSpan && (
         <FacadeView

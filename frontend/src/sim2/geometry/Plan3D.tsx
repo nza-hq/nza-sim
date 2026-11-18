@@ -11,12 +11,13 @@ import { Html, OrbitControls } from '@react-three/drei'
 import { Canvas, type ThreeEvent, useThree } from '@react-three/fiber'
 import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
-import { type Plan, type PlacedWindow, type Span, type WallRun, type XY, edgesOf } from './plan'
+import pc from 'polygon-clipping'
+import { type Plan, type PlacedWindow, type PlanFloor, type Span, type WallRun, type XY, allWindows, edgesOf, floorsOf, wallRuns } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
-import { type BlockRoof, blockRoof, roofPieces } from './roof'
+import { type BlockRoof, type RoofPiece, blockRoof, roofPieces } from './roof'
 
 // Colours from BuildingViewer3D, so the two read as one tool.
-const C = { floorOn: '#F2B872', wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
+const C = { tiles: '#9C5B4A', flatRoof: '#8E979B', floorOn: '#F2B872', wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
 const WALL_T = 0.25 // outside wall thickness, inward from the outside face
 const PART_T = 0.1
 const FD = 0.08 // reveal frame depth, out from the wall face (as today)
@@ -41,20 +42,29 @@ type Props = {
   floorOn?: boolean
   /** Brief 123: one roof per roof piece (roofPieces: each block, or each of its roof parts), from the roof service or the browser; absent, worked out here. */
   roofs?: BlockRoof[]
+  /** The rooms' names on the floor (off for a busy building, so the building itself can be seen). */
+  labels?: boolean
+  /** 18 Nov 2026 (Linzie: "see the whole building in 3D with all the roof shapes"): every roof drawn solid, in a
+   * roof colour, rather than see-through. */
+  solidRoofs?: boolean
 }
 
-export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs }: Props) {
+export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs, labels = true, solidRoofs = false }: Props) {
   const H = plan.storey_height_m
+  // Stacked floors (18 Nov 2026, Linzie: "see the whole building in 3D"): every floor at its height, the one being
+  // edited as before (walls to choose, labels), the others drawn with their walls, windows and roofs.
+  const floors = useMemo(() => floorsOf(plan), [plan])
+  const act = plan.active_floor ?? 0
   // The camera starts on the building as it was when 3D opened; edits after that do not move it.
   const [start] = useState(() => {
-    const pts = plan.blocks.flat()
+    const pts = floorsOf(plan).flatMap((f) => f.blocks.flat())
     if (!pts.length) return { c: [0, 0] as XY, r: 20 }
     const xs = pts.map((p) => p[0])
     const ys = pts.map((p) => p[1])
     const c: XY = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
     return { c, r: Math.max(10, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) }
   })
-  const target: [number, number, number] = [start.c[0], H / 3, -start.c[1]]
+  const target: [number, number, number] = [start.c[0], (H * floors.length) / 3, -start.c[1]]
   const cam: [number, number, number] = [start.c[0] + start.r * 0.55, start.r * 0.95, -start.c[1] + start.r * 0.95]
 
   const partitions = useMemo(() => {
@@ -97,12 +107,14 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
         <meshStandardMaterial color={C.ground} roughness={0.95} />
       </mesh>
 
+      {floors.map((f, i) => (i === act ? null : <OtherFloor key={`f${i}`} plan={plan} floor={f} above={floors[i + 1]} y={i * H} H={H} solid={solidRoofs} />))}
+      <group position={[0, act * H, 0]}>
       {plan.blocks.map((b, i) => <Slab key={`s${i}`} ring={b} on={floorOn} />)}
       {plan.rooms.map((r) => (
         <RoomFloor key={r.id} ring={r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />
       ))}
       {floorOn && plan.blocks.map((b, i) => <FloorGlow key={`fg${i}`} ring={b} />)}
-      {plan.rooms.map((r) => {
+      {labels && plan.rooms.map((r) => {
         const at = labelAt(r.ring)
         return (
           <Html key={`l${r.id}`} position={[at[0], 0.05, -at[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: 'none' }}>
@@ -110,11 +122,12 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
-      {roofPieces(plan).map((pc, i) => { const br = roofs?.[i] ?? blockRoof(pc.ring, pc.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={pc.ring} H={H} on={roofOn} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} hide={floorOn && !roofOn} /> })}
+      {roofPieces(plan).map((p, i, all) => { const br = roofs?.[i] ?? blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.ring} cut={restCut(p, all, floors[act + 1])} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {runs.map((run) => (
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
       ))}
+      </group>
 
       <FitToPane target={target} radius={start.r * 0.72} />
       <OrbitControls target={target} enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI / 2 - 0.05} minDistance={3} maxDistance={start.r * 6} makeDefault />
@@ -169,20 +182,33 @@ function FloorGlow({ ring }: { ring: XY[] }) {
   )
 }
 
-/** The flat roof over a block: a slab at the storey height, see-through unless the roof is chosen. */
-function Roof({ ring, H, on, hide }: { ring: XY[]; H: number; on: boolean; hide: boolean }) {
-  const g = useMemo(() => new THREE.ExtrudeGeometry(shapeOf(ring), { depth: SLAB, bevelEnabled: false }), [ring])
+/** The part of a ring no floor above stands on (stacked floors), as shapes with their holes. */
+function uncovered(ring: readonly XY[], cut: readonly (readonly XY[])[] | undefined): THREE.Shape[] {
+  const close = (r: readonly XY[]) => [...r.map((p) => [p[0], p[1]] as [number, number]), [r[0]![0], r[0]![1]] as [number, number]]
+  if (!cut?.length) return [shapeOf(ring)]
+  const left = pc.difference([close(ring)], ...cut.map((c) => [close(c)] as pc.Polygon))
+  return left.map((poly) => {
+    const sh = shapeOf(poly[0]!.slice(0, -1) as XY[])
+    for (const hole of poly.slice(1)) { const h = new THREE.Path(); hole.slice(0, -1).forEach((p, i) => (i ? h.lineTo(p[0], p[1]) : h.moveTo(p[0], p[1]))); sh.holes.push(h) }
+    return sh
+  })
+}
+
+/** The flat roof over a block: a slab at the storey height, see-through unless the roof is chosen. With floors stacked,
+ * only where no floor above stands on it. */
+function Roof({ ring, cut, H, on, hide, solid = false }: { ring: XY[]; cut?: XY[][]; H: number; on: boolean; hide: boolean; solid?: boolean }) {
+  const g = useMemo(() => new THREE.ExtrudeGeometry(uncovered(ring, cut), { depth: SLAB, bevelEnabled: false }), [ring, cut])
   // With the ground floor chosen the roof is left off, so the floor can be seen.
   if (hide) return null
   return (
-    <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, H, 0]} castShadow={on} receiveShadow={on} renderOrder={on ? 0 : 2}>
-      <meshStandardMaterial color={on ? C.select : C.slab} roughness={0.8} transparent={!on} opacity={on ? 1 : 0.16} depthWrite={on} />
+    <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, H, 0]} castShadow={on || solid} receiveShadow={on || solid} renderOrder={on || solid ? 0 : 2}>
+      <meshStandardMaterial color={on ? C.select : solid ? C.flatRoof : C.slab} roughness={0.8} transparent={!on && !solid} opacity={on || solid ? 1 : 0.16} depthWrite={on || solid} />
     </mesh>
   )
 }
 
 /** Brief 123: a pitched roof's faces (slopes and gable walls) from roof.ts; see-through unless the roof is chosen. */
-function Pitched({ roof, H, on, hide }: { roof: BlockRoof; H: number; on: boolean; hide: boolean }) {
+function Pitched({ roof, H, on, hide, solid = false }: { roof: BlockRoof; H: number; on: boolean; hide: boolean; solid?: boolean }) {
   const g = useMemo(() => {
     const pos: number[] = []
     for (const f of roof.faces) {
@@ -197,9 +223,9 @@ function Pitched({ roof, H, on, hide }: { roof: BlockRoof; H: number; on: boolea
   const edges = useMemo(() => new THREE.EdgesGeometry(g, 1), [g])
   if (hide) return null
   return (
-    <group renderOrder={on ? 0 : 2}>
-      <mesh geometry={g} castShadow={on} receiveShadow={on}>
-        <meshStandardMaterial color={on ? C.select : C.slab} roughness={0.8} side={THREE.DoubleSide} transparent={!on} opacity={on ? 1 : 0.22} depthWrite={on} />
+    <group renderOrder={on || solid ? 0 : 2}>
+      <mesh geometry={g} castShadow={on || solid} receiveShadow={on || solid}>
+        <meshStandardMaterial color={on ? C.select : solid ? C.tiles : C.slab} roughness={0.8} side={THREE.DoubleSide} transparent={!on && !solid} opacity={on || solid ? 1 : 0.22} depthWrite={on || solid} />
       </mesh>
       <lineSegments geometry={edges}>
         <lineBasicMaterial color={on ? '#9A5A12' : '#7C8694'} transparent opacity={on ? 1 : 0.6} />
@@ -207,6 +233,26 @@ function Pitched({ roof, H, on, hide }: { roof: BlockRoof; H: number; on: boolea
     </group>
   )
 }
+
+/** A floor other than the one being edited: slab, room colours, walls with their windows and its roof, drawn at its
+ * height and not chosen from here (switch floors to edit it). */
+function OtherFloor({ plan, floor, above, y, H, solid }: { plan: Plan; floor: PlanFloor; above?: PlanFloor; y: number; H: number; solid: boolean }) {
+  const sub = useMemo(() => ({ ...plan, blocks: floor.blocks, rooms: floor.rooms, windows: floor.windows, wall_spans: floor.wall_spans, roof_parts: floor.roof_parts, roof: floor.roof ?? plan.roof }), [plan, floor])
+  const runs = useMemo(() => wallRuns(sub.blocks), [sub])
+  const placed = useMemo(() => allWindows(sub).windows, [sub])
+  const zoneIndex = (zid: string) => Math.max(0, plan.zones.findIndex((z) => z.id === zid))
+  return (
+    <group position={[0, y, 0]}>
+      {sub.blocks.map((b, i) => <Slab key={`s${i}`} ring={b} />)}
+      {sub.rooms.map((r) => <RoomFloor key={r.id} ring={r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />)}
+      {roofPieces(sub, true).map((p, i, all) => { const br = blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.ring} cut={restCut(p, all, above)} H={H} on={false} solid={solid} hide={false} /> : <Pitched key={`r${i}`} roof={br} H={H} on={false} solid={solid} hide={false} /> })}
+      {runs.map((run) => <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
+    </group>
+  )
+}
+const NONE = new Set<string>()
+/** What a flat roof piece leaves out: the floor above, and (for a floor's flat rest) its pitched parts. */
+const restCut = (p: RoofPiece, all: readonly RoofPiece[], above?: PlanFloor): XY[][] => [...(above?.blocks ?? []), ...(p.rest ? all.filter((q) => q.block === p.block && !q.rest).map((q) => q.ring) : [])]
 
 function RoomFloor({ ring, colour }: { ring: XY[]; colour: string }) {
   const g = useMemo(() => new THREE.ShapeGeometry(shapeOf(ring)), [ring])

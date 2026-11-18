@@ -36,8 +36,20 @@ Replace an assumption when better information arrives.
   Inside doors are dropped. Where two openings overlap on a wall, the larger is kept (32 dropped). No wall is more than
   80 % glass, so that EnergyPlus has some wall around its windows. The result is 119 m² of glazing and 68 m² of doors,
   against 229 m² of windows and doors in CA-1000.
-- **Assumption:** every roof is flat. Pitched roofs are not stacked yet. The roof U-values from the calcs already
-  include the lofts.
+- **Roofs** come from the survey's 40 Revit roofs (`rwgc_clubhouse.roofs.json`). 26 are kept: 14 over the ground
+  floor, 11 over the first floor and 1 over the second.
+  - Each kept roof is a rectangle (the smallest that encloses it). Its style (gable, hip or mono-pitch), its pitch
+    (8°–46°) and its ridge direction come from its slopes.
+  - It sits on the floor whose top its eaves are at: eaves below 56.9 m AOD go on the ground floor, below 59.4 m on
+    the first floor, and above that on the second.
+  - Dormers, flat pieces and roofs drawn twice in the survey are left out. Wherever no pitched roof covers a room, its
+    roof is flat.
+- **Assumption:** the roofs are insulated in the slope, so the rooms are open to the roof space with no separate loft.
+  CA-1000's roof areas are sloped areas: 1,983 m² in the calcs against 1,867 m² in the model (1,699 m² sloped and
+  168 m² flat).
+- **Assumption:** a roof's rectangle can be bigger than the rooms under it (an L-shaped roof, or the eaves). Only the
+  part over rooms counts, so the overhang adds no area. Where two roofs overlap, the room's floor is shared between
+  them.
 - Six small patches of upper floor (0.6–4.4 m² each) sit over no room below. These are taken as floors open to
   outside air.
 
@@ -112,9 +124,9 @@ On London weather (St James's Park TMYx, 2009–2023; the EPW is not committed).
 
 | | Model (15-minute run) | EnergyPlus | 2025 meter |
 |---|---|---|---|
-| Gas | 317 MWh | 299 MWh | 331 MWh |
+| Gas | 344 MWh | 325 MWh | 331 MWh |
 | Electricity | 204 MWh | 204 MWh | 212 MWh |
-| Peak heating | 110 kW | 102 kW | (calcs: 128 kW design, 130 kW in the strategy) |
+| Peak heating | 116 kW | 106 kW | (calcs: 128 kW design, 130 kW in the strategy) |
 
 The base-load figure, the kitchen's equipment and the extract rates were adjusted towards the meters. Nothing else
 was tuned. Several rooms are short of heat for part of the year: the 1880s changing rooms, the first-floor corridor
