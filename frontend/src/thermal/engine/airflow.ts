@@ -83,6 +83,31 @@ export function windFactor(z: number, terrain: Terrain): number {
   return Math.pow(AIR.met.boundary_m / AIR.met.height_m, AIR.met.exponent) * Math.pow(z / t.boundary_m, t.exponent)
 }
 
+/**
+ * Brief 125: EnergyPlus's Site terrain classes (Building terrain), and the document's site read as one of them: the
+ * terrain the EnergyPlus translator sends and the run's outside film uses (one read, Rule 11). `terrain` first, else
+ * the older `exposure`; neither: Suburbs, EnergyPlus's own default (`stated` false). Weather-driven air keeps its own
+ * classes (AIR.terrain), where 'urban' is 0.22/370: recorded in Brief 125, not changed here.
+ */
+export const EP_TERRAIN = {
+  Country: { exponent: 0.14, boundary_m: 270 },
+  Suburbs: { exponent: 0.22, boundary_m: 370 },
+  City: { exponent: 0.33, boundary_m: 460 },
+} as const
+export type EpTerrain = keyof typeof EP_TERRAIN
+const SITE_TO_EP: Record<string, EpTerrain> = { open: 'Country', suburban: 'Suburbs', urban: 'City', city: 'City', sheltered: 'City', normal: 'Suburbs', exposed: 'Country' }
+export function siteTerrain(site: { terrain?: string | null; exposure?: string | null }): { terrain: EpTerrain; stated: boolean } {
+  const from = site.terrain ?? site.exposure
+  const t = from ? SITE_TO_EP[from] : undefined
+  return t ? { terrain: t, stated: true } : { terrain: 'Suburbs', stated: false }
+}
+/** The wind at height z ÷ the weather file's, for an EnergyPlus terrain (DataEnvironment::WindSpeedAt). */
+export function windFactorAt(z: number, terrain: EpTerrain): number {
+  if (!(z > 0)) return 0
+  const t = EP_TERRAIN[terrain]
+  return Math.pow(AIR.met.boundary_m / AIR.met.height_m, AIR.met.exponent) * Math.pow(z / t.boundary_m, t.exponent)
+}
+
 export const rhoAir = (p: number, t: number, w: number) => p / (287.0 * (t + 273.15) * (1 + 1.6077687 * Math.max(w, 1e-5)))
 export const cpAir = (w: number) => 1.00484e3 + 1.85895e3 * w
 export const muAir = (t: number) => 1.71432e-5 + 4.828e-8 * t
@@ -92,6 +117,19 @@ export const stdPressure = (elevation_m: number) => 101325 * Math.pow(1 - 2.2557
 export function humidityRatio(dewPoint: number, p: number): number {
   const pv = 610.94 * Math.exp((17.625 * dewPoint) / (dewPoint + 243.04))
   return Math.max(0, (0.621945 * pv) / (p - pv))
+}
+/**
+ * Brief 125: the wet-bulb temperature, °C, from the dry bulb, humidity ratio and pressure: the psychrometric balance
+ * w = ((2501 − 2.326·t*)·w_s(t*) − 1.006·(t − t*)) / (2501 + 1.86·t − 4.186·t*) (ASHRAE Fundamentals, over water),
+ * solved by bisection, with w_s from the same saturation pressure as humidityRatio.
+ */
+export function wetBulb(t: number, w: number, p: number): number {
+  const ws = (x: number) => humidityRatio(x, p)
+  const f = (x: number) => ((2501 - 2.326 * x) * ws(x) - 1.006 * (t - x)) / (2501 + 1.86 * t - 4.186 * x) - w
+  let lo = t - 40, hi = t
+  if (f(hi) <= 0) return t
+  for (let i = 0; i < 60; i++) { const m = 0.5 * (lo + hi); if (f(m) > 0) hi = m; else lo = m }
+  return 0.5 * (lo + hi)
 }
 const RHO_REF = rhoAir(AIR.ref.p_pa, AIR.ref.t_c, AIR.ref.w)
 const MU_REF = muAir(AIR.ref.t_c)

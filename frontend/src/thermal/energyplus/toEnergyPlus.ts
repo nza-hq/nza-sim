@@ -28,6 +28,8 @@ import type { ModelDocument, Surface } from '../schema/model'
 import { readZoneConductances, type ModelResults } from '../engine/results'
 import type { ConstructionBody, Layer } from '../engine/elements'
 import type { Weather } from '../engine/types'
+import { siteTerrain } from '../engine/airflow'
+import { hostRectHeight, outsideFaceZ, windowLayout, windowMargin } from '../engine/outsideConvection'
 import { iso6946Films } from '../engine/elements'
 import { ENGINE_CONSTANTS as K } from '../engine/constants'
 import { groundTemperature, ModelError, surfaceLayers, zoneSetpointHours } from '../engine/model'
@@ -168,6 +170,9 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
   // the run gave today's leakage (no outside wall, review F4) keeps it, as under today's method.
   const weatherAir = doc.building.air.method === 'weather_driven'
   const airWx = weatherAir ? airWeather(weather.hours, weather.header.elevation) : null
+  // Brief 126: the outdoor humidity ratio each hour (airWeather, the run's one read) and EnergyPlus's standard density.
+  const wOut = (airWx ?? airWeather(weather.hours, weather.header.elevation)).w
+  const RHO_STD = 101325 / (287.0 * (20 + 273.15))
   const airOf = (zi: number) => (weatherAir && ours.zones[zi].air?.leakage === 'weather' ? ours.zones[zi].air! : null)
   if (weatherAir && ours.zones.some((z) => !z.air)) throw new EnergyPlusInputError('the hourly run has no weather-driven air for every room (run it again)', 'building.air.method')
   const shaded: string[] = []
@@ -175,6 +180,7 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
   const put = (type: string, name: string, o: Obj) => { (ep[type] ??= {})[name] = o }
   const cols = new Columns(H)
   const surfById = new Map(doc.surfaces.map((s, i) => [s.id, { s, i }]))
+  const surfLite = new Map(doc.surfaces.map((s) => [s.id, s]))
   const zoneIndex = new Map(doc.zones.map((z, i) => [z.id, i]))
   const Z = doc.zones.map((_, i) => `Z${i + 1}`)
 
@@ -185,10 +191,9 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
     run_simulation_for_sizing_periods: 'No', run_simulation_for_weather_file_run_periods: 'Yes',
   })
   // Terrain sets how EnergyPlus scales the weather file's wind to each surface's height.
-  const TERRAIN: Record<string, string> = { open: 'Country', suburban: 'Suburbs', urban: 'City', city: 'City', sheltered: 'City', normal: 'Suburbs', exposed: 'Country' }
-  const terrainFrom = doc.building.site.terrain ?? doc.building.site.exposure
-  const terrain = (terrainFrom && TERRAIN[terrainFrom]) || 'Suburbs'
-  if (!terrainFrom || !TERRAIN[terrainFrom]) note('Wind: the site states no terrain or exposure, so EnergyPlus scales the wind to each surface\'s height as for suburbs (its own default).')
+  // Brief 125: one read of the site's terrain, shared with the run's outside film (airflow.ts siteTerrain).
+  const { terrain, stated: terrainStated } = siteTerrain(doc.building.site)
+  if (!terrainStated) note('Wind: the site states no terrain or exposure, so EnergyPlus scales the wind to each surface\'s height as for suburbs (its own default).')
   put('Building', epName(doc.building.name || 'Building'), {
     north_axis: 0, terrain, solar_distribution: 'FullExterior', maximum_number_of_warmup_days: 25, minimum_number_of_warmup_days: 6,
     loads_convergence_tolerance_value: 0.04, temperature_convergence_tolerance_value: 0.4,
@@ -324,23 +329,22 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
       put('ZoneCapacitanceMultiplier:ResearchSpecial', `${zn} capacity`, { zone_or_zonelist_name: zn, temperature_capacity_multiplier: r6(m), humidity_capacity_multiplier: 1, carbon_dioxide_capacity_multiplier: 1, generic_contaminant_capacity_multiplier: 1 })
     }
 
-    // Thermal bridging: the run's W/K for this zone, onto its outside walls (else roofs, else ground floors) by area,
-    // as the referees fold it (Brief 104 tb_by_zone).
     const own = zone.surfaces.map((sid) => surfById.get(sid)!).filter(({ s }) => s.zone_a === zone.id)
-    const opaque = (k: string, b: string) => own.filter(({ s }) => s.kind === k && s.zone_b === b && s.area_m2 > 0)
+    // Thermal bridging: the run's W/K for this zone, as it is in the run, H·(θ_e − θ_air) (ISO 52016-1). EnergyPlus has
+    // no linear bridge; Brief 126 carries it as outdoor air of exactly that conductance (below), not folded into the
+    // walls' U as before, where it took the walls' sun and outside film and lost less than the run's (school: about
+    // 7 MWh a year of the plain case's gap, docs/briefs/active/126_inside-sky-window.md Part 1).
     const tbH = readZoneConductances(r).bridging.total_w_per_k
-    const tbOn = tbH > 0 ? [opaque('wall', 'outside'), opaque('roof', 'outside'), opaque('ground', 'ground')].find((l) => l.length > 0) ?? null : null
-    if (tbH > 0 && !tbOn) throw new EnergyPlusInputError('the zone has thermal bridging but no outside wall, roof or ground floor to carry it', `${zp}`)
-    const tbArea = tbOn ? tbOn.reduce((s, x) => s + x.s.area_m2, 0) : 0
-    const tbSet = new Set(tbOn?.map((x) => x.s.id))
 
     // Windows by host: a wall (or roof) of this zone facing the same way.
     const glass = own.filter(({ s }) => s.kind === 'glazing' && s.area_m2 > 0)
+    // Brief 126: one layout for the translator and the run's window heights (windowLayout).
+    const layout = windowLayout(zone, surfLite)
     const hostOf = new Map<string, string>()
     for (const { s, i } of glass) {
-      const cands = own.filter(({ s: w }) => (w.kind === 'wall' || w.kind === 'roof') && w.zone_b === 'outside' && w.area_m2 > 0 && Math.abs(w.tilt_deg - s.tilt_deg) < 1e-6 && Math.abs((w.azimuth_deg ?? 0) - (s.azimuth_deg ?? 0)) < 1e-6)
-      if (cands.length === 0) throw new EnergyPlusInputError(`window "${s.id}" has no wall or roof of its zone facing the same way to sit in`, `surfaces[${i}]`)
-      hostOf.set(s.id, cands.reduce((a, b) => (b.s.area_m2 > a.s.area_m2 ? b : a)).s.id)
+      const l = layout.get(s.id)
+      if (!l) throw new EnergyPlusInputError(`window "${s.id}" has no wall or roof of its zone facing the same way to sit in`, `surfaces[${i}]`)
+      hostOf.set(s.id, l.host)
     }
 
     for (const sid of zone.surfaces) {
@@ -381,7 +385,6 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
       const boundary = ground ? 'ground' : 'outside'
       let u = uRan.get(s.id)
       if (u == null) throw new EnergyPlusInputError('the hourly run has no U for this surface (run it again)', p)
-      if (tbSet.has(s.id)) u += tbH / tbArea
       layers = layersForU(layers, s.tilt_deg, boundary, u, p)
       const outsideOptics = outside ? { solar: s.solar_absorptance!, thermal: s.thermal_emissivity! } : null
       const cons = construction(layers, outsideOptics, s.inside_solar_absorptance!, p, b.name ?? s.construction_ref.key)
@@ -391,10 +394,11 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
       const hosted = glass.filter(({ s: g }) => hostOf.get(g.id) === s.id)
       const winArea = hosted.reduce((t, x) => t + x.s.area_m2, 0)
       const gross = s.area_m2 + winArea
-      const vertical = s.tilt_deg > 45 && s.tilt_deg < 135
-      const h = vertical ? Math.max(1, Math.min(height, gross / 2)) : Math.sqrt(gross)
+      const h = hostRectHeight(s.tilt_deg, gross, height)
       const w = gross / h
-      const o = place(ground ? z0 : vertical ? z0 : s.tilt_deg <= 45 ? z0 + height : z0)
+      // Brief 125: the surface's centroid at outsideFaceZ, the height the run's outside film takes its wind at (one
+      // read). Its windows fill the middle of it, so they share the height. Ground floors stay at the zone's floor.
+      const o = place(ground ? z0 : outsideFaceZ(zone, s.tilt_deg) - (h / 2) * f.up[2])
       const type = s.kind === 'wall' ? 'Wall' : s.kind === 'roof' ? 'Roof' : 'Floor'
       const sname = epName(s.id)
       put('BuildingSurface:Detailed', sname, {
@@ -403,7 +407,7 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
       })
       if (hosted.length) {
         // A row of windows with small gaps; each split into glass and frame (Brief 104 Part 1b).
-        const m = Math.min(0.02, h / 20)
+        const m = windowMargin(h)
         const hw = h - 2 * m
         const widths = hosted.map((x) => x.s.area_m2 / hw)
         const gap = (w - widths.reduce((a, c) => a + c, 0)) / (hosted.length + 1)
@@ -442,6 +446,21 @@ export function toEnergyPlus(doc: ModelDocument, weather: Weather, library: Reco
         })
         note('Permanent vents: the flow per unit of wind the model states for each vent (as the hourly run takes it), with EnergyPlus\'s wind at the zone\'s height and terrain.')
       })
+    }
+
+    // ── Thermal bridging (Brief 126): H W/K as air at standard density, V = H / (ρ_std·c_p(w)) each hour, so EnergyPlus's
+    // ρ_std·c_p·V·(θ_e − θ_air) is the run's H·(θ_e − θ_air). c_p follows the hour's outdoor humidity, as EnergyPlus's.
+    if (tbH > 0) {
+      const v = new Float64Array(H)
+      let peak = 0
+      for (let h = 0; h < H; h++) { v[h] = tbH / (RHO_STD * (1004.84 + 1858.95 * wOut[h])); if (v[h] > peak) peak = v[h] }
+      const bn = epName(`${zn}_bridging`)
+      put('Schedule:File', bn, cols.add(bn, Float64Array.from(v, (x) => x / peak)))
+      put('ZoneInfiltration:DesignFlowRate', `${zn} thermal bridging`, {
+        zone_or_zonelist_or_space_or_spacelist_name: zn, schedule_name: bn, design_flow_rate_calculation_method: 'Flow/Zone', design_flow_rate: r6(peak),
+        constant_term_coefficient: 1, temperature_term_coefficient: 0, velocity_term_coefficient: 0, velocity_squared_term_coefficient: 0, density_basis: 'Standard',
+      })
+      note('Thermal bridging: EnergyPlus has no linear bridge, so each room\'s bridging W/K is carried as outdoor air of exactly that conductance (heat = H × (outdoor − room air), as in the run), shown in EnergyPlus\'s infiltration.')
     }
 
     // ── Air leakage: the run's air change rate from q50, constant (today's method) ──────────────────────────────

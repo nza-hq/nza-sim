@@ -96,6 +96,26 @@ describe('EnergyPlus input (Brief 123)', () => {
     for (const s of Object.values(ep['Schedule:File'] ?? {}) as any[]) expect(s.column_number).toBeLessThanOrEqual(cols)
   })
 
+  it("thermal bridging (Brief 126): each room's W/K as air at standard density, the wall's U the run's own, labelled", () => {
+    const ours = simulate(doc, { weather: WEATHER })
+    if (!ours.ok) throw new Error('ran')
+    const inf = ep['ZoneInfiltration:DesignFlowRate'] as Record<string, any>
+    const rho = 101325 / (287 * 293.15)
+    let n = 0
+    ours.results.zones.forEach((z: any, zi: number) => {
+      const H = z.conductances.bridging.total_w_per_k
+      const o = Object.entries(inf).find(([k]) => k === `${prep.input.zones[zi].ep_name} thermal bridging`)?.[1]
+      if (!(H > 0)) { expect(o).toBeUndefined(); return }
+      n++
+      expect(o.density_basis).toBe('Standard')
+      // The peak flow is the hour with the driest air: ρ_std·c_p·V = H to within c_p's humidity term (under 1 %).
+      expect(rho * 1004.84 * o.design_flow_rate).toBeGreaterThan(H * 0.99)
+      expect(rho * 1004.84 * o.design_flow_rate).toBeLessThanOrEqual(H * (1 + 1e-6))
+    })
+    expect(n).toBeGreaterThan(0)
+    expect(prep.input.notes.some((t: string) => /Thermal bridging: EnergyPlus has no linear bridge/.test(t))).toBe(true)
+  })
+
   it('weather-driven air: each room takes the run\'s own hourly air (17 Nov 2026), labelled; no vents or fixed ach of its own', () => {
     const d = structuredClone(prep.doc) as any
     d.building.air = { ...d.building.air, method: 'weather_driven', exponent: 0.67, single_sided_turbulence: false }

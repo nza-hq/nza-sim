@@ -25,7 +25,7 @@
  },
  "floor_m2": 1360,
  "instant": {
-  "ms": 125,
+  "ms": 105,
   "heating_kwh": 47974,
   "cooling_kwh": 22994,
   "monthly_heating_kwh": [
@@ -47,72 +47,73 @@
    "Each room alone; heat between rooms is not counted.",
    "Weather-driven air is not in this estimate: leakage is q50 ÷ 20 and permanent vents use today's wind formula.",
    "Heating hours and setbacks: taken by ISO 13790's monthly intermittent-heating factor (rooms that cool down outside their hours lose less heat); the hourly run follows them hour by hour.",
-   "An unheated loft is taken by ISO 13789's adjustment factor: solar on a cold roof's slopes is not counted in this estimate."
+   "An unheated loft is taken by ISO 13789's adjustment factor: solar on a cold roof's slopes is not counted in this estimate.",
+   "Outside surfaces lose heat to the air at ISO's fixed rate here; the full-year run and EnergyPlus take it from the wind and rain, so old, single-glazed or uninsulated fabric at a sheltered site can read lower there."
   ]
  },
  "run": {
-  "ms": 10266,
+  "ms": 11132,
   "steps_per_hour": 4,
-  "heating_kwh": 38571,
-  "cooling_kwh": 17022,
-  "peak_heating_kw": 109.7,
-  "peak_cooling_kw": 7.2,
+  "heating_kwh": 32148,
+  "cooling_kwh": 17960,
+  "peak_heating_kw": 104.1,
+  "peak_cooling_kw": 7.5,
   "monthly_heating_kwh": [
-   7727,
-   7218,
-   4746,
-   2981,
-   524,
-   44,
-   11,
-   48,
-   152,
-   2013,
-   4894,
-   8211
+   6611,
+   6121,
+   3637,
+   2706,
+   229,
+   14,
+   3,
+   39,
+   57,
+   1423,
+   4143,
+   7166
   ],
   "monthly_cooling_kwh": [
-   1128,
-   990,
-   1202,
-   1223,
-   1614,
-   1930,
-   2069,
-   1597,
-   1589,
-   1387,
-   1173,
-   1118
+   1146,
+   1015,
+   1240,
+   1241,
+   1806,
+   2103,
+   2277,
+   1647,
+   1734,
+   1420,
+   1197,
+   1134
   ],
   "energy": {
-   "eui_kwh_per_m2": 95.6,
-   "total_kwh": 130038,
+   "eui_kwh_per_m2": 90.7,
+   "total_kwh": 123403,
    "by_fuel": [
     {
      "fuel": "electricity",
-     "kwh": 73538
+     "kwh": 73584
     },
     {
      "fuel": "gas",
-     "kwh": 56500
+     "kwh": 49819
     }
    ],
    "end_uses": [
     {
      "end_use": "heating",
      "fuel": "electricity",
-     "kwh": 499
+     "kwh": 420
     },
     {
      "end_use": "heating",
      "fuel": "gas",
-     "kwh": 40027
+     "kwh": 33346
     },
     {
      "end_use": "cooling",
      "fuel": "electricity",
-     "kwh": 5319
+     "kwh": 5612
     },
     {
      "end_use": "dhw",
@@ -127,7 +128,7 @@
     {
      "end_use": "pumps",
      "fuel": "electricity",
-     "kwh": 1615
+     "kwh": 1446
     },
     {
      "end_use": "fans",
@@ -156,32 +157,32 @@
      "service": "heating",
      "fuel": "gas",
      "efficiency": 0.92,
-     "served_kwh": 22899,
-     "fuel_kwh": 24891
+     "served_kwh": 17886,
+     "fuel_kwh": 19441
     },
     {
      "label": "Gas boiler 2 (extension, 2012)",
      "service": "heating",
      "fuel": "gas",
      "efficiency": 0.92,
-     "served_kwh": 13925,
-     "fuel_kwh": 15136
+     "served_kwh": 12793,
+     "fuel_kwh": 13905
     },
     {
      "label": "VRF heating (ICT suite and classroom 6)",
      "service": "heating",
      "fuel": "electricity",
      "efficiency": 3.5,
-     "served_kwh": 1746,
-     "fuel_kwh": 499
+     "served_kwh": 1470,
+     "fuel_kwh": 420
     },
     {
      "label": "VRF cooling (ICT suite, classroom 6, server room)",
      "service": "cooling",
      "fuel": "electricity",
      "efficiency": 3.2,
-     "served_kwh": 17022,
-     "fuel_kwh": 5319
+     "served_kwh": 17960,
+     "fuel_kwh": 5612
     },
     {
      "label": "Hot water cylinder (boiler 1)",
@@ -219,11 +220,11 @@
    "pumps": [
     {
      "label": "Gas boiler 1 (original wing, 1998)",
-     "kwh": 924
+     "kwh": 779
     },
     {
      "label": "Gas boiler 2 (extension, 2012)",
-     "kwh": 691
+     "kwh": 667
     }
    ],
    "other_loads": [
@@ -273,15 +274,15 @@
   "breakdown": [
    {
     "term": "heating",
-    "kwh": 38571
+    "kwh": 32148
    },
    {
     "term": "cooling",
-    "kwh": -17022
+    "kwh": -17960
    },
    {
     "term": "conduction",
-    "kwh": -1006622
+    "kwh": -1072148
    },
    {
     "term": "opaque_solar_absorbed",
@@ -289,7 +290,7 @@
    },
    {
     "term": "sky_longwave",
-    "kwh": -723982
+    "kwh": -634383
    },
    {
     "term": "glazing_solar_absorbed",
@@ -297,23 +298,23 @@
    },
    {
     "term": "bridging",
-    "kwh": -15249
+    "kwh": -16501
    },
    {
     "term": "infiltration",
-    "kwh": -39530
+    "kwh": -51397
    },
    {
     "term": "permanent_vents",
-    "kwh": -1070
+    "kwh": -1091
    },
    {
     "term": "window_ventilation",
-    "kwh": -5087
+    "kwh": -8103
    },
    {
     "term": "single_sided_turbulence",
-    "kwh": -314
+    "kwh": -408
    },
    {
     "term": "solar_transmitted",
@@ -337,92 +338,92 @@
    },
    {
     "term": "storage",
-    "kwh": 226
+    "kwh": 276
    },
    {
     "term": "mechanical_ventilation",
-    "kwh": -4327
+    "kwh": -4838
    }
   ],
   "zones": [
    {
     "name": "Entrance and reception",
     "floor_m2": 60,
-    "heating_kwh": 3610,
+    "heating_kwh": 2814,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
-     "unmet_in_use_hours": 25,
+     "unmet_in_use_hours": 16,
      "min_in_use_c": 11.999999999999995,
      "morning_peak": {
-      "w": 1057.4196364920833,
-      "hour": 480
+      "w": 703.3146568845176,
+      "hour": 8400
      },
      "later_peak": {
-      "w": 8145.074901735492,
-      "hour": 1014
+      "w": 7991.362975861545,
+      "hour": 8406
      },
      "limited": true,
      "recovery": null
     },
     "short": {
      "heating": {
-      "unmet_hours": 25,
+      "unmet_hours": 16,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 25
+      "own_short_hours": 16
      },
      "cooling": null
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 429
+     "hours_windows_open": 847
     }
    },
    {
     "name": "School office and head",
     "floor_m2": 60,
-    "heating_kwh": 1852,
+    "heating_kwh": 1368,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
-     "unmet_in_use_hours": 38,
-     "min_in_use_c": 11.999999999999995,
+     "unmet_in_use_hours": 31,
+     "min_in_use_c": 11.999999999999996,
      "morning_peak": {
-      "w": 459.02839591652116,
-      "hour": 480
+      "w": 203.45765054441375,
+      "hour": 8400
      },
      "later_peak": {
-      "w": 6692.55959038357,
-      "hour": 1014
+      "w": 6389.430401762465,
+      "hour": 8406
      },
      "limited": true,
      "recovery": null
     },
     "short": {
      "heating": {
-      "unmet_hours": 38,
+      "unmet_hours": 31,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 38
+      "own_short_hours": 31
      },
      "cooling": null
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 762
+     "hours_windows_open": 1075
     }
    },
    {
     "name": "Classroom 1",
     "floor_m2": 60,
-    "heating_kwh": 910,
+    "heating_kwh": 640,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
@@ -430,13 +431,13 @@
      "setback_c": null,
      "in_use_hours": 8760,
      "unmet_in_use_hours": 0,
-     "min_in_use_c": 11.999999999999996,
+     "min_in_use_c": 12.00890597716369,
      "morning_peak": {
-      "w": 137.40644523072143,
-      "hour": 8400
+      "w": 0,
+      "hour": 0
      },
      "later_peak": {
-      "w": 6781.856804646898,
+      "w": 6319.833162877536,
       "hour": 8406
      },
      "limited": true,
@@ -453,13 +454,13 @@
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 1421
+     "hours_windows_open": 1658
     }
    },
    {
     "name": "Classroom 2",
     "floor_m2": 60,
-    "heating_kwh": 854,
+    "heating_kwh": 594,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
@@ -467,13 +468,13 @@
      "setback_c": null,
      "in_use_hours": 8760,
      "unmet_in_use_hours": 0,
-     "min_in_use_c": 11.999999999999996,
+     "min_in_use_c": 12.168199188298383,
      "morning_peak": {
-      "w": 74.42643471890788,
-      "hour": 8400
+      "w": 0,
+      "hour": 0
      },
      "later_peak": {
-      "w": 6751.043445984164,
+      "w": 6200.323929800584,
       "hour": 8406
      },
      "limited": true,
@@ -490,13 +491,13 @@
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 1480
+     "hours_windows_open": 1692
     }
    },
    {
     "name": "Classroom 3",
     "floor_m2": 60,
-    "heating_kwh": 846,
+    "heating_kwh": 587,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
@@ -504,13 +505,13 @@
      "setback_c": null,
      "in_use_hours": 8760,
      "unmet_in_use_hours": 0,
-     "min_in_use_c": 11.999999999999996,
+     "min_in_use_c": 12.20257509856063,
      "morning_peak": {
-      "w": 54.07497865088453,
-      "hour": 8400
+      "w": 0,
+      "hour": 0
      },
      "later_peak": {
-      "w": 6745.290399448262,
+      "w": 6173.949672374671,
       "hour": 8406
      },
      "limited": true,
@@ -527,13 +528,13 @@
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 1480
+     "hours_windows_open": 1701
     }
    },
    {
     "name": "Classroom 4",
     "floor_m2": 60,
-    "heating_kwh": 850,
+    "heating_kwh": 590,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
@@ -541,13 +542,13 @@
      "setback_c": null,
      "in_use_hours": 8760,
      "unmet_in_use_hours": 0,
-     "min_in_use_c": 11.999999999999996,
+     "min_in_use_c": 12.194760767812426,
      "morning_peak": {
-      "w": 58.04106328847054,
-      "hour": 8400
+      "w": 0,
+      "hour": 0
      },
      "later_peak": {
-      "w": 6746.277812410955,
+      "w": 6179.8140229883775,
       "hour": 8406
      },
      "limited": true,
@@ -564,13 +565,13 @@
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 1483
+     "hours_windows_open": 1695
     }
    },
    {
     "name": "Classroom 5",
     "floor_m2": 60,
-    "heating_kwh": 876,
+    "heating_kwh": 612,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
@@ -578,13 +579,13 @@
      "setback_c": null,
      "in_use_hours": 8760,
      "unmet_in_use_hours": 0,
-     "min_in_use_c": 11.999999999999996,
+     "min_in_use_c": 12.128660349064326,
      "morning_peak": {
-      "w": 86.18449283961904,
-      "hour": 8400
+      "w": 0,
+      "hour": 0
      },
      "later_peak": {
-      "w": 6756.265766106253,
+      "w": 6228.939883562961,
       "hour": 8406
      },
      "limited": true,
@@ -601,27 +602,27 @@
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 1438
+     "hours_windows_open": 1681
     }
    },
    {
     "name": "Staff room",
     "floor_m2": 45,
-    "heating_kwh": 1126,
+    "heating_kwh": 795,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
-     "unmet_in_use_hours": 9,
-     "min_in_use_c": 11.999999999999996,
+     "unmet_in_use_hours": 4,
+     "min_in_use_c": 11.999999999999998,
      "morning_peak": {
-      "w": 111.85664663241482,
-      "hour": 8400
+      "w": 0,
+      "hour": 0
      },
      "later_peak": {
-      "w": 5316.836362743563,
+      "w": 4972.516086382616,
       "hour": 8406
      },
      "limited": true,
@@ -629,77 +630,77 @@
     },
     "short": {
      "heating": {
-      "unmet_hours": 9,
+      "unmet_hours": 4,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 9
+      "own_short_hours": 4
      },
      "cooling": null
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 833
+     "hours_windows_open": 1181
     }
    },
    {
     "name": "Pupil WCs",
     "floor_m2": 45,
-    "heating_kwh": 4231,
+    "heating_kwh": 3744,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 18,
      "setback_c": 12,
      "in_use_hours": 2610,
-     "unmet_in_use_hours": 28,
-     "min_in_use_c": 16.538730496661884,
+     "unmet_in_use_hours": 23,
+     "min_in_use_c": 16.80568335849528,
      "morning_peak": {
-      "w": 7598.166369783732,
+      "w": 7503.154373440864,
       "hour": 1015
      },
      "later_peak": {
-      "w": 6447.969530685248,
+      "w": 6220.0048351789355,
       "hour": 8408
      },
      "limited": true,
      "recovery": {
-      "mornings": 39,
-      "median_h": 1,
+      "mornings": 34,
+      "median_h": 0.5,
       "not_reached": 0
      }
     },
     "short": {
      "heating": {
-      "unmet_hours": 28,
+      "unmet_hours": 23,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 28
+      "own_short_hours": 23
      },
      "cooling": null
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 48
+     "hours_windows_open": 186
     }
    },
    {
     "name": "Corridor (original)",
     "floor_m2": 130,
-    "heating_kwh": 7743,
+    "heating_kwh": 6142,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
-     "unmet_in_use_hours": 53,
-     "min_in_use_c": 11.999999999999993,
+     "unmet_in_use_hours": 44,
+     "min_in_use_c": 11.99999999999999,
      "morning_peak": {
-      "w": 1295.4987719851654,
+      "w": 1010.323433790822,
       "hour": 840
      },
      "later_peak": {
-      "w": 15015.315320751246,
+      "w": 14926.72494124715,
       "hour": 1014
      },
      "limited": true,
@@ -707,10 +708,10 @@
     },
     "short": {
      "heating": {
-      "unmet_hours": 53,
+      "unmet_hours": 44,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 53
+      "own_short_hours": 44
      },
      "cooling": null
     },
@@ -722,21 +723,21 @@
    {
     "name": "Kitchen",
     "floor_m2": 80,
-    "heating_kwh": 7246,
+    "heating_kwh": 6942,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
-     "unmet_in_use_hours": 315,
-     "min_in_use_c": 13.494819126897148,
+     "unmet_in_use_hours": 284,
+     "min_in_use_c": 13.000686974303903,
      "morning_peak": {
       "w": 0,
       "hour": 0
      },
      "later_peak": {
-      "w": 7531.836106688071,
+      "w": 7485.346346522817,
       "hour": 1016
      },
      "limited": true,
@@ -744,16 +745,16 @@
     },
     "short": {
      "heating": {
-      "unmet_hours": 315,
+      "unmet_hours": 284,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 315
+      "own_short_hours": 284
      },
      "cooling": null
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 85
+     "hours_windows_open": 182
     }
    },
    {
@@ -780,21 +781,21 @@
    {
     "name": "Link corridor",
     "floor_m2": 42,
-    "heating_kwh": 1200,
+    "heating_kwh": 1023,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
-     "unmet_in_use_hours": 8,
-     "min_in_use_c": 14.76904323771666,
+     "unmet_in_use_hours": 18,
+     "min_in_use_c": 14.334627837844206,
      "morning_peak": {
       "w": 0,
       "hour": 0
      },
      "later_peak": {
-      "w": 3636.633074259905,
+      "w": 3535.936889327739,
       "hour": 846
      },
      "limited": true,
@@ -802,10 +803,10 @@
     },
     "short": {
      "heating": {
-      "unmet_hours": 8,
+      "unmet_hours": 18,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 8
+      "own_short_hours": 18
      },
      "cooling": null
     },
@@ -817,21 +818,21 @@
    {
     "name": "ICT suite",
     "floor_m2": 91,
-    "heating_kwh": 971,
-    "cooling_kwh": 369,
+    "heating_kwh": 796,
+    "cooling_kwh": 736,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
      "unmet_in_use_hours": 0,
-     "min_in_use_c": 14.792022171236688,
+     "min_in_use_c": 14.54633707007146,
      "morning_peak": {
       "w": 0,
       "hour": 0
      },
      "later_peak": {
-      "w": 6181.781187920516,
+      "w": 5544.071252036354,
       "hour": 846
      },
      "limited": true,
@@ -860,7 +861,7 @@
     "name": "Server room",
     "floor_m2": 28,
     "heating_kwh": 0,
-    "cooling_kwh": 16386,
+    "cooling_kwh": 16739,
     "unconditioned": false,
     "hours": null,
     "short": {
@@ -880,21 +881,21 @@
    {
     "name": "Classroom 6",
     "floor_m2": 63,
-    "heating_kwh": 775,
-    "cooling_kwh": 266,
+    "heating_kwh": 674,
+    "cooling_kwh": 484,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 20,
      "setback_c": null,
      "in_use_hours": 8760,
      "unmet_in_use_hours": 0,
-     "min_in_use_c": 14.865143290595473,
+     "min_in_use_c": 14.316502013263618,
      "morning_peak": {
       "w": 0,
       "hour": 0
      },
      "later_peak": {
-      "w": 4384.0435117752595,
+      "w": 4098.56253868958,
       "hour": 846
      },
      "limited": true,
@@ -922,38 +923,38 @@
    {
     "name": "Hall",
     "floor_m2": 384,
-    "heating_kwh": 5479,
+    "heating_kwh": 4828,
     "cooling_kwh": 0,
     "unconditioned": false,
     "hours": {
      "setpoint_c": 18,
      "setback_c": null,
      "in_use_hours": 8760,
-     "unmet_in_use_hours": 19,
-     "min_in_use_c": 13.061342202136053,
+     "unmet_in_use_hours": 44,
+     "min_in_use_c": 12.298744547009605,
      "morning_peak": {
       "w": 0,
       "hour": 0
      },
      "later_peak": {
-      "w": 19542.7026708448,
-      "hour": 846
+      "w": 19763.356710714936,
+      "hour": 1014
      },
      "limited": true,
      "recovery": null
     },
     "short": {
      "heating": {
-      "unmet_hours": 19,
+      "unmet_hours": 44,
       "system_short_hours": 0,
       "both_short_hours": 0,
-      "own_short_hours": 19
+      "own_short_hours": 44
      },
      "cooling": null
     },
     "air": {
      "leakage": "weather",
-     "hours_windows_open": 594
+     "hours_windows_open": 774
     }
    },
    {
@@ -980,7 +981,7 @@
     "service": "heating",
     "capacity_kw": 120,
     "hours_short": 0,
-    "delivered_kwh": 22899.37839419944,
+    "delivered_kwh": 17885.73344058859,
     "hot_water_first_kwh": 5207.881593749989,
     "hot_water_short_hours": 0,
     "hot_water_short_kwh": 0,
@@ -992,7 +993,7 @@
     "service": "heating",
     "capacity_kw": 90,
     "hours_short": 0,
-    "delivered_kwh": 13925.312098513876,
+    "delivered_kwh": 12792.552874623529,
     "hot_water_first_kwh": 9947.508375520692,
     "hot_water_short_hours": 0,
     "hot_water_short_kwh": 0,
@@ -1016,7 +1017,7 @@
     "service": "heating",
     "capacity_kw": 28,
     "hours_short": 0,
-    "delivered_kwh": 1746.1244193013695,
+    "delivered_kwh": 1469.9538858467447,
     "hot_water_first_kwh": 0,
     "hot_water_short_hours": 0,
     "hot_water_short_kwh": 0,
@@ -1028,7 +1029,7 @@
     "service": "cooling",
     "capacity_kw": 28,
     "hours_short": 0,
-    "delivered_kwh": 17022.086266028684,
+    "delivered_kwh": 17959.963451712756,
     "hot_water_first_kwh": 0,
     "hot_water_short_hours": 0,
     "hot_water_short_kwh": 0,
@@ -1039,56 +1040,56 @@
  "energyplus": {
   "version": "25.2.0",
   "run_s": 10.3,
-  "wall_s": 10.7,
+  "wall_s": 10.6,
   "warnings": 5,
   "severe": 0,
   "severe_text": [],
-  "heating_kwh": 27871,
-  "cooling_kwh": 18913,
-  "peak_heating_kw": 95.9,
-  "peak_cooling_kw": 7.9,
+  "heating_kwh": 30101,
+  "cooling_kwh": 17805,
+  "peak_heating_kw": 98.3,
+  "peak_cooling_kw": 7.6,
   "monthly_heating_kwh": [
-   5908,
-   5397,
-   2969,
-   2269,
-   120,
-   3,
-   0,
-   19,
-   29,
-   1119,
-   3576,
-   6462
+   6267,
+   5763,
+   3372,
+   2457,
+   194,
+   12,
+   2,
+   33,
+   51,
+   1343,
+   3846,
+   6760
   ],
   "energy": {
-   "eui_kwh_per_m2": 87.6,
-   "total_kwh": 119153,
+   "eui_kwh_per_m2": 89.1,
+   "total_kwh": 121147,
    "by_fuel": [
     {
      "fuel": "electricity",
-     "kwh": 73844
+     "kwh": 73624
     },
     {
      "fuel": "gas",
-     "kwh": 45308
+     "kwh": 47523
     }
    ],
    "end_uses": [
     {
      "end_use": "heating",
      "fuel": "electricity",
-     "kwh": 384
+     "kwh": 439
     },
     {
      "end_use": "heating",
      "fuel": "gas",
-     "kwh": 28835
+     "kwh": 31050
     },
     {
      "end_use": "cooling",
      "fuel": "electricity",
-     "kwh": 5910
+     "kwh": 5564
     },
     {
      "end_use": "dhw",
@@ -1103,7 +1104,7 @@
     {
      "end_use": "pumps",
      "fuel": "electricity",
-     "kwh": 1446
+     "kwh": 1516
     },
     {
      "end_use": "fans",
@@ -1132,32 +1133,32 @@
      "service": "heating",
      "fuel": "gas",
      "efficiency": 0.92,
-     "served_kwh": 15403,
-     "fuel_kwh": 16743
+     "served_kwh": 16835,
+     "fuel_kwh": 18298
     },
     {
      "label": "Gas boiler 2 (extension, 2012)",
      "service": "heating",
      "fuel": "gas",
      "efficiency": 0.92,
-     "served_kwh": 11125,
-     "fuel_kwh": 12092
+     "served_kwh": 11731,
+     "fuel_kwh": 12751
     },
     {
      "label": "VRF heating (ICT suite and classroom 6)",
      "service": "heating",
      "fuel": "electricity",
      "efficiency": 3.5,
-     "served_kwh": 1343,
-     "fuel_kwh": 384
+     "served_kwh": 1535,
+     "fuel_kwh": 439
     },
     {
      "label": "VRF cooling (ICT suite, classroom 6, server room)",
      "service": "cooling",
      "fuel": "electricity",
      "efficiency": 3.2,
-     "served_kwh": 18913,
-     "fuel_kwh": 5910
+     "served_kwh": 17805,
+     "fuel_kwh": 5564
     },
     {
      "label": "Hot water cylinder (boiler 1)",
@@ -1195,11 +1196,11 @@
    "pumps": [
     {
      "label": "Gas boiler 1 (original wing, 1998)",
-     "kwh": 791
+     "kwh": 832
     },
     {
      "label": "Gas boiler 2 (extension, 2012)",
-     "kwh": 654
+     "kwh": 684
     }
    ],
    "other_loads": [
@@ -1235,6 +1236,7 @@
   },
   "notes": [
    "Overhangs and fins are not carried (EnergyPlus needs each window's real size and position, which the model does not hold yet), so 2 windows have more sun in EnergyPlus than in NZA Sim: z14_glazing_2, z16_glazing_2.",
+   "Thermal bridging: EnergyPlus has no linear bridge, so each room's bridging W/K is carried as outdoor air of exactly that conductance (heat = H × (outdoor − room air), as in the run), shown in EnergyPlus's infiltration.",
    "Air: the building uses weather-driven air, which EnergyPlus is not given its own way yet (its AirflowNetwork). Each room takes the outdoor air the hourly run worked out for it, hour by hour (leakage, vents, windows opened by their rule, an extract fan's make-up air), so EnergyPlus checks the fabric, sun, mass, gains and setpoints but not the air.",
    "People: their sensible heat as stated (W per person, radiant share), as the hourly run takes it; their moisture is not modelled in either.",
    "Radiators and other emitters: EnergyPlus limits each room's heating to its emitters' output at the setpoint, held fixed (LimitCapacity); the hourly run re-rates it each hour at the room's temperature. The heat goes to the air in EnergyPlus.",
@@ -1245,69 +1247,69 @@
   "zones": [
    {
     "name": "Entrance and reception",
-    "heating_kwh": 2419,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 73
-   },
-   {
-    "name": "School office and head",
-    "heating_kwh": 1199,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 75
-   },
-   {
-    "name": "Classroom 1",
-    "heating_kwh": 592,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 29
-   },
-   {
-    "name": "Classroom 2",
-    "heating_kwh": 544,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 28
-   },
-   {
-    "name": "Classroom 3",
-    "heating_kwh": 536,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 27
-   },
-   {
-    "name": "Classroom 4",
-    "heating_kwh": 540,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 28
-   },
-   {
-    "name": "Classroom 5",
-    "heating_kwh": 568,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 28
-   },
-   {
-    "name": "Staff room",
-    "heating_kwh": 704,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 36
-   },
-   {
-    "name": "Pupil WCs",
-    "heating_kwh": 3099,
-    "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 40
-   },
-   {
-    "name": "Corridor (original)",
-    "heating_kwh": 5202,
+    "heating_kwh": 2548,
     "cooling_kwh": 0,
     "unmet_heating_hours_in_use": 78
    },
    {
-    "name": "Kitchen",
-    "heating_kwh": 5917,
+    "name": "School office and head",
+    "heating_kwh": 1314,
     "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 166
+    "unmet_heating_hours_in_use": 83
+   },
+   {
+    "name": "Classroom 1",
+    "heating_kwh": 685,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 34
+   },
+   {
+    "name": "Classroom 2",
+    "heating_kwh": 638,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 30
+   },
+   {
+    "name": "Classroom 3",
+    "heating_kwh": 631,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 30
+   },
+   {
+    "name": "Classroom 4",
+    "heating_kwh": 635,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 30
+   },
+   {
+    "name": "Classroom 5",
+    "heating_kwh": 663,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 34
+   },
+   {
+    "name": "Staff room",
+    "heating_kwh": 802,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 47
+   },
+   {
+    "name": "Pupil WCs",
+    "heating_kwh": 3233,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 44
+   },
+   {
+    "name": "Corridor (original)",
+    "heating_kwh": 5685,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 86
+   },
+   {
+    "name": "Kitchen",
+    "heating_kwh": 6175,
+    "cooling_kwh": 0,
+    "unmet_heating_hours_in_use": 193
    },
    {
     "name": "Store and plant",
@@ -1317,33 +1319,33 @@
    },
    {
     "name": "Link corridor",
-    "heating_kwh": 844,
+    "heating_kwh": 992,
     "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 30
+    "unmet_heating_hours_in_use": 38
    },
    {
     "name": "ICT suite",
-    "heating_kwh": 745,
-    "cooling_kwh": 967,
-    "unmet_heating_hours_in_use": 2
+    "heating_kwh": 859,
+    "cooling_kwh": 742,
+    "unmet_heating_hours_in_use": 5
    },
    {
     "name": "Server room",
     "heating_kwh": 0,
-    "cooling_kwh": 17297,
+    "cooling_kwh": 16560,
     "unmet_heating_hours_in_use": null
    },
    {
     "name": "Classroom 6",
-    "heating_kwh": 598,
-    "cooling_kwh": 649,
+    "heating_kwh": 676,
+    "cooling_kwh": 504,
     "unmet_heating_hours_in_use": 0
    },
    {
     "name": "Hall",
-    "heating_kwh": 4364,
+    "heating_kwh": 4565,
     "cooling_kwh": 0,
-    "unmet_heating_hours_in_use": 64
+    "unmet_heating_hours_in_use": 72
    },
    {
     "name": "Loft (Original wing)",
