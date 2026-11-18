@@ -12,6 +12,7 @@
  * the ISO 6946 U of the stack equals the stated U, and the masses stay as layered.
  */
 import { ENGINE_CONSTANTS as K, heatFlowDirection } from './constants'
+import { simpleGlazingLayerR } from './outsideConvection'
 
 export interface Layer {
   name?: string
@@ -225,14 +226,21 @@ export function opaqueElement(args: {
 export function windowElement(args: {
   id: string; area_m2: number; tilt_deg: number; u: number; emissivity: number | null; path: string
   optics?: { interior_transmitted: number; interior_absorbed: number } | null
+  /**
+   * Brief 126: 'energyplus', the glass as EnergyPlus's Simple Window Model takes it: its layer resistance is the U
+   * less EnergyPlus's own rating films (simpleGlazingLayerR), its emissivity 0.84 (the stated one is not used).
+   * Absent or 'iso': the U less ISO 6946's films, the stated emissivity.
+   */
+  glass?: 'iso' | 'energyplus'
 }): Element {
   const { id, area_m2, tilt_deg, u, path } = args
   if (!(area_m2 > 0)) throw new ElementError('area must be > 0', `${path}.area_m2`)
   if (!(u > 0)) throw new ElementError('window U must be > 0', `${path}.u`)
   const { R_si, R_se } = iso6946Films(tilt_deg, 'outside')
-  const r = 1 / u - R_se - R_si
-  if (!(r > 0)) throw new ElementError(`window U ${u} is above the films alone (${(1 / (R_se + R_si)).toFixed(2)})`, `${path}.u`)
-  const h_re = K.h_re_per_emissivity * need(args.emissivity, `${path}.thermal_emissivity`)
+  const ep = args.glass === 'energyplus'
+  const r = ep ? simpleGlazingLayerR(u) : 1 / u - R_se - R_si
+  if (!(r > 0)) throw new ElementError(ep ? `window U ${u} leaves no glass layer after EnergyPlus's rating films` : `window U ${u} is above the films alone (${(1 / (R_se + R_si)).toFixed(2)})`, `${path}.u`)
+  const h_re = K.h_re_per_emissivity * (ep ? K.simple_glazing_emissivity : need(args.emissivity, `${path}.thermal_emissivity`))
   const dir = heatFlowDirection(tilt_deg)
   return {
     id, kind: 'window', area_m2, tilt_deg, boundary: 'outside', u_w_per_m2k: u,

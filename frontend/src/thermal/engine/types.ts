@@ -55,6 +55,8 @@ export interface Weather {
     present_weather_codes?: string[] | null
     /** Brief 125: liquid precipitation depth, mm (field 33; 999 missing), null when absent. */
     liquid_precipitation_mm?: Float64Array | null
+    /** Brief 126: horizontal infrared radiation from the sky, W/m² (field 13; NaN where missing). Optional for weather built elsewhere. */
+    horizontal_infrared?: Float64Array | null
   }
   /** Lower-case hex SHA-256 of the file's bytes, as given to parseEpw. */
   sha256: string

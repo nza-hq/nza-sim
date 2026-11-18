@@ -143,7 +143,8 @@ describe('simulate', () => {
     if (!s.ok) throw new Error(JSON.stringify(s.missing))
     c.summary.emitters!.zones.forEach((z, i) => {
       expect(z.peak_w).toBe(s.summary.emitters!.zones[i].peak_w)
-      expect(z.peak_w).toBeLessThan(r.summary.zones[i].hours!.morning_peak!.w / 2)
+      // Brief 126 (TARP inside, EnergyPlus's sky): the steady peak is about 0.51 of the Monday-morning peak (0.45 before).
+      expect(z.peak_w).toBeLessThan(r.summary.zones[i].hours!.morning_peak!.w * 0.6)
       expect(z.in_use).toBe(true); expect(s.summary.emitters!.zones[i].in_use).toBe(false)
       expect(z.unmet_hours).toBe(c.results.zones[i].annual.unmet_heating_hours_in_use)
       expect(z.min_c).toBe(c.results.zones[i].annual.min_control_in_use_c)
@@ -355,7 +356,7 @@ describe('simulate', () => {
     const r2 = simulate(await withRads((zi) => need[zi]), { weather: WEATHER })
     if (!r2.ok) throw new Error(JSON.stringify(r2.missing))
     for (const z of r2.summary.emitters!.zones) { expect(z.unmet_hours).toBe(0); expect(z.shortfall_w).toBe(0) }
-  })
+  }, 30000)
   it('a what-if that cannot run says why, and the run itself still shows', async () => {
     const d = await doc()
     const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
@@ -596,12 +597,18 @@ describe('Brief 125: the outside film in the run', () => {
   it("the product's run takes EnergyPlus's film and says so; the referee options keep ISO's fixed film and say nothing", async () => {
     expect(QUARTER_HOUR_OPTIONS.surface_physics?.outside_convection).toBe('doe2')
     expect(RUN_OPTIONS.surface_physics?.outside_convection).toBe('fixed')
+    // Brief 126: the inside film, the sky, the window and the outdoor air, EnergyPlus's way too.
+    expect(QUARTER_HOUR_OPTIONS.surface_physics).toMatchObject({ inside_convection: 'tarp', outside_longwave: 'energyplus', window: 'energyplus' })
+    expect(QUARTER_HOUR_OPTIONS.air_heat_capacity).toBe('outdoor')
+    expect(RUN_OPTIONS.surface_physics).toMatchObject({ inside_convection: 'by_tilt' })
     const r = simulate(await doc(), { weather: WEATHER })
     if (!r.ok) throw new Error(JSON.stringify(r.missing))
-    expect(r.summary.method_notes).toHaveLength(1)
+    expect(r.summary.method_notes).toHaveLength(5)
     expect(r.summary.method_notes[0]).toMatch(/^Outside surfaces lose heat to the air as EnergyPlus works it out \(its DOE-2 method\)/)
     // This weather (Denver, from a .mos file) carries no present weather or precipitation.
     expect(r.summary.method_notes[0]).toMatch(/no rain information/)
+    expect(r.summary.method_notes[1]).toMatch(/sky's temperature from the weather file's own sky radiation/)
+    expect(r.summary.method_notes.slice(2).join(' ')).toMatch(/TARP.*ISO 15099.*simple glazing.*0\.84.*density and humidity/)
     const f = simulate(await doc(), { weather: WEATHER, options: RUN_OPTIONS })
     if (!f.ok) throw new Error('ran')
     expect(f.summary.method_notes).toEqual([])

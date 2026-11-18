@@ -9,7 +9,7 @@
  */
 import { infiltration, ventCoefficient, ventConductance, type Vent } from './air'
 import { AIR_LINES, AirflowError, airWeather, buildAirModels, siteTerrain, zoneAirStep, type ZoneAirModel } from './airflow'
-import { outsideFace, outsideFaceZ, rainInputs } from './outsideConvection'
+import { outsideFace, outsideFaceZ, rainInputs, skyInfrared, windowLayout } from './outsideConvection'
 import { ScheduleError, scheduleFractions, temperatureHours } from './pumps'
 import { computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K } from './constants'
@@ -76,9 +76,18 @@ export interface RunOptions {
    * - beam_on_floor: the beam part of transmitted solar lands on the floor-facing inside surfaces, by area.
    * - inside_convection 'tarp' (Brief 105 Part 6): Walton's natural-convection correlations, EnergyPlus's TARP inside
    *   algorithm, from each face's temperature difference with the air at the step before (network.ts). Runs on the
-   *   network solver, one zone included.
+   *   network solver, one zone included. Brief 126: a window's inside face takes ISO 15099, as EnergyPlus's TARP does.
+   * - outside_longwave 'energyplus' (Brief 126, Linzie 18 Nov 10:57): each outside face's long-wave as EnergyPlus,
+   *   ground, sky and air by view, the sky from the weather file's infrared (outsideConvection.ts). Needs 'doe2'.
+   *   Absent or 'iso': ISO 52016-1's h_re to the air and a sky 11 K below it.
+   * - window 'energyplus' (Brief 126): a window as EnergyPlus's Simple Window Model takes it: the glass layer's
+   *   resistance from the stated U less EnergyPlus's rating films, and emissivity 0.84 on the glass. Absent or 'iso':
+   *   the stated U less ISO 6946's films, and the surface's stated emissivity.
    */
-  surface_physics?: { outside_convection: 'fixed' | 'wind' | 'doe2'; inside_convection: 'by_tilt' | 'by_heat_flow' | 'tarp'; beam_on_floor: boolean }
+  surface_physics?: {
+    outside_convection: 'fixed' | 'wind' | 'doe2'; inside_convection: 'by_tilt' | 'by_heat_flow' | 'tarp'; beam_on_floor: boolean
+    outside_longwave?: 'iso' | 'energyplus'; window?: 'iso' | 'energyplus'
+  }
   /**
    * Brief 105 Part 6: steps per hour, and the outdoor temperature between the hour's readings ('hold' the hour's, or
    * 'linear' from the hour before's; network.ts). Absent: one step an hour. More than one runs on the network solver,
@@ -100,6 +109,12 @@ export interface RunOptions {
    * the inside surfaces, which pass it on by convection and radiation.
    */
   solar_convective_fraction?: number
+  /**
+   * Brief 126: the heat outdoor air carries in. Absent or 'fixed': ENGINE_CONSTANTS.rho_c_air (0.33 Wh/m³K) all year.
+   * 'outdoor': ρ·c_p of the outdoor air each step, as EnergyPlus takes it for infiltration and ventilation (network.ts
+   * outdoor_air). Runs on the network solver.
+   */
+  air_heat_capacity?: 'fixed' | 'outdoor'
 }
 
 /**
@@ -236,7 +251,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         const fw = K.glazing_angle_factor
         insideAlpha.push(null); insideAlphaB.push(null)
         elements.push(windowElement({
-          id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, u, emissivity: s.thermal_emissivity, path,
+          id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, u, emissivity: s.thermal_emissivity, path, glass: sp?.window === 'energyplus' ? 'energyplus' : 'iso',
           // Solar falling on the window from inside is diffuse: it leaves at the diffuse transmittance and the glass
           // absorbs its diffuse absorptance; the frame share absorbs all of it.
           optics: ang ? { interior_transmitted: (1 - ff) * ang.t_dif, interior_absorbed: (1 - ff) * ang.a_dif + ff } : null,
@@ -380,7 +395,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   // Brief 115: weather-driven air is worked out every step from the room's temperature, on the network solver.
   const weatherAir = doc.building.air.method === 'weather_driven'
   const network = weatherAir || plantGroups.length > 0 || Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
-    || options.surface_physics?.inside_convection === 'tarp' || options.surface_physics?.outside_convection === 'doe2' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
+    || options.surface_physics?.inside_convection === 'tarp' || options.surface_physics?.outside_convection === 'doe2' || options.air_heat_capacity === 'outdoor' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
 
   // The window junction over several zones: 4√A per facade (all its glazing, every zone), shared out by area. On one
   // zone with one glazing surface per facade this is Engine 1's 4√A per surface; cutting a facade into storeys does
@@ -601,10 +616,25 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       faces: elements.map((e, k) => {
         if (e.boundary !== 'outside') return null
         const s = doc.surfaces[built.surfaceOf[k]]
-        return outsideFace(outsideFaceZ(doc.zones[zoneA[k]], s.tilt_deg), terrain, s.azimuth_deg ?? 0, s.tilt_deg, e.kind === 'window')
+        // Brief 126: the emissivity the element was built with (a window under EnergyPlus's model: its 0.84).
+        return outsideFace(outsideFaceZ(doc.zones[zoneA[k]], s.tilt_deg), terrain, s.azimuth_deg ?? 0, s.tilt_deg, e.kind === 'window', e.h_re / K.h_re_per_emissivity)
       }),
-      weather: { wind_speed: weather.hours.wind_speed, wind_direction: weather.hours.wind_direction, w: wx.w, pressure: weather.hours.pressure, ...rainInputs(weather.hours) },
+      weather: {
+        wind_speed: weather.hours.wind_speed, wind_direction: weather.hours.wind_direction, w: wx.w, pressure: weather.hours.pressure, ...rainInputs(weather.hours),
+        sky_ir: sp?.outside_longwave === 'energyplus' ? skyInfrared(weather.hours).ir : null,
+      },
     }
+  }
+  // Brief 126: each window's glass height as the translator draws it (windowLayout, one read), for ISO 15099 inside.
+  const surfLite = new Map(doc.surfaces.map((s) => [s.id, s]))
+  const layouts = new Map<number, Map<string, { host: string; height_m: number }>>()
+  const windowHeightOf = (k: number) => {
+    const zi = zoneA[k], s = doc.surfaces[built.surfaceOf[k]]
+    let l = layouts.get(zi)
+    if (!l) { l = windowLayout(doc.zones[zi], surfLite); layouts.set(zi, l) }
+    const got = l.get(s.id)
+    if (!got) throw new ModelError('a window needs a wall or roof of its zone facing the same way to sit in', `surfaces[${built.surfaceOf[k]}]`)
+    return got.height_m
   }
   const kwhOf = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
   let solved: Solved[]
@@ -642,6 +672,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     // factorisation per run in the network); refused rather than ignored.
     if (sp?.outside_convection === 'wind') throw new ModelError("wind-driven outside convection runs on one zone only", 'options.surface_physics.outside_convection')
     if (sp?.inside_convection === 'by_heat_flow') throw new ModelError("inside convection by heat flow runs on one zone only", 'options.surface_physics.inside_convection')
+    if (sp?.outside_longwave === 'energyplus' && sp.outside_convection !== 'doe2') throw new ModelError("EnergyPlus's outside long-wave goes with its outside film ('doe2')", 'options.surface_physics.outside_longwave')
     if (options.other_gains && Zn > 1) throw new ModelError('other gains are a one-zone reference-case input', 'options.other_gains')
     const run = runNetwork({
       zones: doc.zones.map((zone, zi) => ({
@@ -657,12 +688,15 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       elements: elements.map((element, k) => ({
         element, zone_a: zoneA[k], zone_b: zoneB[k], solar_absorbed_w_per_m2: absorbed[k],
         inside_solar_absorptance: insideAlpha[k], inside_solar_absorptance_b: insideAlphaB[k],
+        window_height_m: element.kind === 'window' ? windowHeightOf(k) : null,
       })),
       hours: H, theta_e: weather.hours.dry_bulb, theta_ground: tg, control: options.control,
       hc_convective_fraction: options.hc_convective_fraction, solar_convective_fraction: options.solar_convective_fraction,
       warmup_days: options.warmup_days,
       steps_per_hour: options.time_step?.steps_per_hour, theta_e_between: options.time_step?.theta_e_between,
       inside_convection: sp?.inside_convection === 'tarp' ? 'tarp' : 'fixed',
+      inside_air: sp?.inside_convection === 'tarp' ? { pressure: weather.hours.pressure, w: airWeather(weather.hours, weather.header.elevation).w } : null,
+      outdoor_air: options.air_heat_capacity === 'outdoor' ? { pressure: weather.hours.pressure, w: airWeather(weather.hours, weather.header.elevation).w } : null,
       outside_convection: sp?.outside_convection === 'doe2' ? outsideFilm() : null,
       plants, plant_free_share: plants.length ? freeShare : null,
     })

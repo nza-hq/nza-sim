@@ -67,7 +67,7 @@ for (const [label, f] of Object.entries(cases)) {
   if (only && !only.split(',').includes(label)) continue
   const doc = f(structuredClone(base))
   if (!doc) continue
-  const opts: any = { ...runOptionsFor(doc) }; if (process.env.INSIDE) opts.surface_physics = { outside_convection: 'fixed', inside_convection: process.env.INSIDE, beam_on_floor: true }
+  const opts: any = { ...runOptionsFor(doc) }; if (process.env.INSIDE) opts.surface_physics = { ...opts.surface_physics, inside_convection: process.env.INSIDE }; if (process.env.SP) opts.surface_physics = { ...opts.surface_physics, ...JSON.parse(process.env.SP) }; if (process.env.AIRC) opts.air_heat_capacity = process.env.AIRC
   const run = simulate(doc, { weather, options: opts })
   if (!run.ok) { console.log(label, JSON.stringify(run.missing).slice(0, 400)); continue }
   const prep = energyPlusInput(doc, run.results, { weather })
@@ -77,7 +77,8 @@ for (const [label, f] of Object.entries(cases)) {
   const s = run.summary
   const a = s.building.heating_kwh, b = ep.building.heating_kwh
   const bd = s.breakdown.filter((l) => Math.abs(l.kwh) > 50).map((l) => `${l.term}:${Math.round(l.kwh)}`).join(' ')
-  if (process.env.DUMPZ) { const zr: any = (run.results as any).zones.find((z: any) => (z.zone_id ?? z.id) === process.env.DUMPZ) ?? (run.results as any).zones[2]; const m: any = {}; for (const l of zr.breakdown) { const k = l.term + ' ' + (l.surface_id ?? ''); m[k] = (m[k] ?? 0) + l.kwh } for (const [k, v] of Object.entries(m)) if (Math.abs(v as number) > 5) console.log('    ', k, Math.round(v as number)) }
+  if (process.env.DUMPALL) { const { writeFileSync } = await import('node:fs'); writeFileSync(process.env.DUMPALL, JSON.stringify((run.results as any).zones.map((z: any, i: number) => ({ id: doc.zones[i].id, name: doc.zones[i].name, lines: z.breakdown })))) }
+  if (process.env.DUMPZ) { const zi0 = doc.zones.findIndex((z: any) => z.id === process.env.DUMPZ || z.name === process.env.DUMPZ); const zr: any = (run.results as any).zones[zi0] ?? (run.results as any).zones[2]; const m: any = {}; for (const l of zr.breakdown) { const k = l.term + ' ' + (l.surface_id ?? ''); m[k] = (m[k] ?? 0) + l.kwh } for (const [k, v] of Object.entries(m)) if (Math.abs(v as number) > 5) console.log('    ', k, Math.round(v as number)) }
   if (process.env.ZONES) s.zones.forEach((z, i) => { const wa = doc.surfaces.filter((x: any) => x.zone_a === z.id && x.kind === 'wall' && x.solar_absorptance != null && x.construction_ref.key === 'cavity_wall_unfilled_1960s').reduce((t: number, x: any) => t + x.area_m2, 0); const ga = doc.surfaces.filter((x: any) => x.zone_a === z.id && x.kind === 'glazing').reduce((t: number, x: any) => t + x.area_m2, 0); console.log('  ', (z.name ?? '').padEnd(24), 'run', Math.round(z.heating_kwh), 'ep', Math.round(ep.zones[i].heating_kwh), 'oldwall m2', Math.round(wa), 'glaz', Math.round(ga), 'floor', Math.round(z.floor_m2)) })
   console.log(label.padEnd(18), 'run', Math.round(a), 'ep', Math.round(b), `${((a / b - 1) * 100).toFixed(1)}%`, 'severe', ep.severe, '|', bd)
 }
