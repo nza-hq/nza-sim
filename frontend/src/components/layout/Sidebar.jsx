@@ -32,15 +32,20 @@ import { accentForPath } from '../../data/moduleThemes.js'
 //
 // "Overview" is a label rename of the existing /information route — the URL
 // stays /information for backward compatibility.
+// 18 Nov 2026 (Linzie, "Start the swap"): the Model workspace IS NZA Sim now. It sits straight under Home; today's
+// input pages stay reachable (nothing is retired yet) in their own group below it, named as the earlier pages.
 const INPUT_ITEMS = [
   { to: '/',            icon: Home,            label: 'Home' },
-  { to: '/information', icon: ClipboardList,   label: 'Overview' },
-  { to: '/weather',     icon: Cloud,           label: 'Weather' },
-  { to: '/building',    icon: Building2,       label: 'Building' },
-  { to: '/gains',       icon: Flame,           label: 'Internal Gains' },
-  { to: '/operation',   icon: Wind,            label: 'Operation' },
-  { to: '/systems',     icon: Thermometer,     label: 'Systems' },
-  { to: '/model',       icon: Boxes,           label: 'Model (new)' },
+  { to: '/model',       icon: Boxes,           label: 'Model' },
+]
+
+const EARLIER_ITEMS = [
+  { to: '/information', icon: ClipboardList,   label: 'Overview (earlier pages)' },
+  { to: '/weather',     icon: Cloud,           label: 'Weather (earlier pages)' },
+  { to: '/building',    icon: Building2,       label: 'Building (earlier pages)' },
+  { to: '/gains',       icon: Flame,           label: 'Internal Gains (earlier pages)' },
+  { to: '/operation',   icon: Wind,            label: 'Operation (earlier pages)' },
+  { to: '/systems',     icon: Thermometer,     label: 'Systems (earlier pages)' },
   { to: '/consumption', icon: FileSpreadsheet, label: 'Consumption' },
 ]
 
@@ -121,6 +126,14 @@ export default function Sidebar() {
       {/* Input modules (top) */}
       <div className="flex flex-col pt-1">
         {INPUT_ITEMS.map(item => (
+          <NavItem key={item.to} {...item} />
+        ))}
+      </div>
+
+      {/* Earlier pages: today's inputs, kept while the Model workspace takes over */}
+      <div className="my-2 mx-3 border-t border-white/12" />
+      <div className="flex flex-col">
+        {EARLIER_ITEMS.map(item => (
           <NavItem key={item.to} {...item} />
         ))}
       </div>

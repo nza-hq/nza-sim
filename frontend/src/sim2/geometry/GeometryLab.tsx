@@ -78,6 +78,7 @@ import { GAIN_COLOURS } from '../../components/modules/gains/gainColours.js'
 import TempProfileEditor from './TempProfileEditor'
 // @ts-expect-error untyped JS from today's app
 import GlazingInspector from '../../components/library/GlazingInspector.jsx'
+import { inspectorDetail } from '../run/library'
 // @ts-expect-error untyped JS from today's app (Brief 115: today's discharge coefficients, read)
 import { computeCd } from '../../utils/openingCoefficients.js'
 // @ts-expect-error untyped JS from today's app (the schedule pop-out, reused)
@@ -2970,8 +2971,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const root = (
     <div className={`gl-root${giving ? ' giving' : ''}${embedded ? ' embedded' : ''}`} ref={host}>
       {!embedded && <ResultsPanel doc={built.doc} right={giving ? 384 : cardOpen ? 358 : 16} />}
-      {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} onClose={() => setInspect(null)} />}
-      {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} onClose={() => setInspect(null)} />}
+      {inspect && !inspect.glazing && <ConstructionInspector open constructionName={inspect.name} detail={inspectorDetail(inspect.name)} onClose={() => setInspect(null)} />}
+      {inspect && inspect.glazing && <GlazingInspector open glazingName={inspect.name} detail={inspectorDetail(inspect.name)} onClose={() => setInspect(null)} />}
       {mode === 'profiles' && (centreTab ?? 'drawing') === 'drawing' && (() => {
         // Brief 118 P5: Profiles gets the full centre, with today's schedule editor (no drawing).
         const sel = profSel ? profile(profSel) : null

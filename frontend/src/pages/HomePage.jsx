@@ -172,12 +172,12 @@ export default function HomePage() {
 
   const handleLoad = useCallback(async (id) => {
     if (id !== currentProjectId) await loadProject(id)
-    navigate('/information')
+    navigate('/model')  // 18 Nov 2026: the Model workspace is NZA Sim now (was /information)
   }, [currentProjectId, loadProject, navigate])
 
   const handleCreate = useCallback(async () => {
     await createProject()
-    navigate('/building')
+    navigate('/model')  // 18 Nov 2026: the Model workspace is NZA Sim now (was /building)
   }, [createProject, navigate])
 
   const handleClone = useCallback(async (project) => {

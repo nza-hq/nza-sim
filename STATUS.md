@@ -2,6 +2,16 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## ✅ Swap-in: the Model workspace is NZA Sim — 18 Nov 2026
+
+Linzie 18 Nov 12:34, "Start the swap ... Do the end-to-end test." PR #71 merged `chris/121-setpoint-profiles` (Briefs 115, 121–126, the school example, editor work; 80 commits, 0 behind) into main. On the merge: build clean, 604 tests pass, Bridgewater anchor 133.2 (fixture, Yeovilton EPW c6571102…cf2).
+
+- **Front door:** the sidebar puts Model straight under Home; today's input pages stay, grouped below it and named "(earlier pages)" (nothing retired). Opening or creating a project goes to `/model`.
+- **End-to-end (container, 1440×900, Yeovilton TMYx):** school and community centre open from "Open an example"; all nine steps load with no page errors; the full year runs at Fabric only / + Spaces / + Systems (school + Systems 8.5 s, community centre 1.7 s); Heat flow (HeatBalance, Sankey), Monthly, Load profiles, Per m² / Total, Pop Out (`/model/popout`) and the profile editor work; Run in EnergyPlus 25.2 on the school in 25 s (heating NZA Sim 49.3 vs EnergyPlus 44.2 MWh, +12 % on this weather; cooling +0 %; EUI 104 vs 100). The drawn door runs (fixed 17 Nov, tested).
+- **Fixed:** (1) the ⓘ inspector on Fabric said "HTTP 404": Simulate v2's constructions (incl. Chris's pending drafts) are not rows in the backend library. The inspectors take an optional `detail` (read-only, no fetch, no Edit) and the workspace hands it from `sim2/run/constructions.json` (`inspectorDetail`); today's pages unchanged. (2) After a step change, a level switch or an edit, the strip and Heat flow kept the last figures for up to ~6 s without marking them out of date ("+ Spaces" showed + Systems' energy used). A run in flight now dims them (`busy` in `useRun`), as a running state already did.
+- **Not checked here:** save / version and sign-in need a signed-in session (magic link); checked on IT15 separately.
+- **Still open:** Check (meters) and Interventions steps are placeholders (Interventions links to today's page); Site has no weather charts; Chris owes the uncarpeted ground floor and the carpet / ceiling tile figures.
+
 ## 🔧 Brief 126: the inside film, the sky and the window as EnergyPlus works them out — IN REVIEW 18 Nov 2026 on `sim2/126-inside-sky-window` (off `sim2/125-outside-film`)
 
 Linzie 18 Nov 10:57, "Please fix" (the school's remaining gap after Brief 125). Brief: `docs/briefs/active/126_inside-sky-window.md`.

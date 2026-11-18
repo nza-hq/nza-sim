@@ -122,6 +122,7 @@ export default function ConstructionInspector({
   constructionName,    // string — required
   initialMode = 'view', // 'view' | 'edit'
   onSaved,             // callback(name) when a save lands so consumers can refresh
+  detail: givenDetail = null, // optional: the detail itself ({ name, definition, summary }), read-only, no fetch (Simulate v2's own library)
 }) {
   const [mode, setMode]       = useState(initialMode)
   const [data, setData]       = useState(null)
@@ -152,7 +153,7 @@ export default function ConstructionInspector({
   useEffect(() => {
     if (!open || !constructionName) return
     setLoading(true); setError(null); setSaveMsg(null)
-    Promise.all([
+    Promise.all(givenDetail ? [givenDetail, []] : [
       fetch(`/api/library/constructions/${encodeURIComponent(constructionName)}`).then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))),
       fetch(`/api/library?type=construction`).then(r => r.ok ? r.json() : []),
     ])
@@ -161,7 +162,7 @@ export default function ConstructionInspector({
         const extracted = extractLayers(detail.definition)
         setLayers(extracted)
         const item = (list || []).find(it => it.name === constructionName)
-        setIsDefault(!!item?.is_default)
+        setIsDefault(givenDetail ? true : !!item?.is_default)
         setItemId(item?.id ?? null)
         setDisplayName(item?.display_name || detail?.summary?.description || constructionName)
         // If the saved config has a y_factor, use it; otherwise default 1.15
@@ -172,7 +173,7 @@ export default function ConstructionInspector({
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [open, constructionName])
+  }, [open, constructionName, givenDetail])
 
   const calc = useMemo(() => computeUValue(layers, yFactor), [layers, yFactor])
 
@@ -323,7 +324,7 @@ export default function ConstructionInspector({
                 <Lock size={10} /> built-in
               </span>
             )}
-            {mode === 'view' ? (
+            {givenDetail ? null : mode === 'view' ? (
               <button
                 onClick={() => setMode('edit')}
                 className="text-xxs px-2.5 py-1 rounded text-white"
