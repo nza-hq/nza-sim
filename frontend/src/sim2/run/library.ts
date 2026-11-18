@@ -126,3 +126,31 @@ export function resolveConstructions(doc: ModelDocument, items: readonly Library
   })
   return { library, missing, drafts }
 }
+
+/** Today's library inspectors (ConstructionInspector / GlazingInspector) read `{ name, definition, summary }` from the
+ * backend; Simulate v2's constructions are this committed library, so the inspector is handed the same shape from here,
+ * read-only (18 Nov 2026: the backend has no row for the drafts, so the ⓘ showed "HTTP 404"). One object per key, so
+ * the inspector's effect does not re-run on every render. */
+const INSPECTOR_DETAIL = new Map<string, Obj>()
+export function inspectorDetail(key: string): Obj | null {
+  if (INSPECTOR_DETAIL.has(key)) return INSPECTOR_DETAIL.get(key)!
+  const item = CONSTRUCTIONS.find((c) => c.key === key)
+  if (!item) return null
+  const b = item.body
+  const d = {
+    name: b.name ?? key,
+    definition: b.epjson ?? b,
+    summary: {
+      type: b.type ?? null,
+      u_value_W_per_m2K: b.u_value_W_per_m2K ?? null,
+      u_value_effective_W_per_m2K: b.u_value_effective_W_per_m2K ?? null,
+      y_factor: b.y_factor ?? null,
+      g_value: b.g_value ?? null,
+      thermal_mass: b.thermal_mass ?? null,
+      frame_fraction: b.frame_fraction ?? null,
+      description: item.draft ? `${b.description ?? item.draft} (draft, awaiting Chris's library)` : (b.description ?? ''),
+    },
+  }
+  INSPECTOR_DETAIL.set(key, d)
+  return d
+}

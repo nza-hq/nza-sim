@@ -30,6 +30,7 @@ export default function GlazingInspector({
   glazingName,
   initialMode = 'view',
   onSaved,
+  detail: givenDetail = null, // optional: the detail itself ({ name, definition, summary }), read-only, no fetch (Simulate v2's own library)
 }) {
   const [mode, setMode]   = useState(initialMode)
   const [data, setData]   = useState(null)
@@ -57,7 +58,7 @@ export default function GlazingInspector({
   useEffect(() => {
     if (!open || !glazingName) return
     setLoading(true); setError(null); setSaveMsg(null)
-    Promise.all([
+    Promise.all(givenDetail ? [givenDetail, []] : [
       fetch(`/api/library/constructions/${encodeURIComponent(glazingName)}`).then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))),
       fetch(`/api/library?type=construction`).then(r => r.ok ? r.json() : []),
     ])
@@ -72,13 +73,13 @@ export default function GlazingInspector({
         setVt(Number(wmObj.visible_transmittance ?? 0.7))
         setFrameFrac(Number(detail.summary?.frame_fraction ?? 0.20))
         const item = (list || []).find(it => it.name === glazingName)
-        setIsDefault(!!item?.is_default)
+        setIsDefault(givenDetail ? true : !!item?.is_default)
         setItemId(item?.id ?? null)
         setDisplayName(item?.display_name || detail?.summary?.description || glazingName)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [open, glazingName])
+  }, [open, glazingName, givenDetail])
 
   async function save({ asCopy = false } = {}) {
     setSaveBusy(true); setSaveMsg(null)
@@ -183,7 +184,7 @@ export default function GlazingInspector({
                 <Lock size={10} /> built-in
               </span>
             )}
-            {mode === 'view' ? (
+            {givenDetail ? null : mode === 'view' ? (
               <button onClick={() => setMode('edit')} className="text-xxs px-2.5 py-1 rounded text-white" style={{ backgroundColor: '#A1887F' }}>
                 Edit
               </button>

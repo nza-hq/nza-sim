@@ -137,6 +137,10 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
   // Brief 111 P4: what the results include. Fabric only heats every room to a temperature the person states (shown and
   // editable beside the switch, never hidden); + Spaces and + Systems run the document's own setpoints.
   const [level, setLevel] = useState<Level>('systems')
+  // 18 Nov 2026 (end-to-end test): a run asked for after an edit, a level switch or a step change keeps the last
+  // figures on screen until its answer comes (no flicker), but they are no longer the answer to what is on screen, so
+  // they are shown as out of date (dimmed) until it arrives. Without this, "+ Spaces" showed + Systems' energy used.
+  const [busy, setBusy] = useState(false)
   const [fabricC, setFabricC] = useState<number>(21)
   const opts = () => ({ level: latestLevel.current.level, fabric_heat_c: latestLevel.current.level === 'fabric' ? latestLevel.current.c : null, what_if: latestWhatIf.current })
   const latestLevel = useRef({ level, c: fabricC })
@@ -156,6 +160,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
         if (r.ok) setState({ kind: 'done', summary: r.summary, ms: a.ms })
         else if ('missing' in r) setState({ kind: 'missing', items: plainMissing(r.missing, latestDoc.current) })
         else setState({ kind: 'error', message: r.error })
+        setBusy(false)
         setRanFor(ranDoc.current)
       },
       (w: WeatherAnswer) => {
@@ -232,6 +237,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
     if (!client.current) return
     if (hold) { askInstant(); return }
     setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
+    setBusy(true)
     ranDoc.current = doc
     client.current.run(doc, 250, opts())
   }, [doc, whatIf, level, fabricC, hold])
@@ -286,7 +292,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
     const l = latestLevel.current
     return { doc: latestDoc.current, level: l.level, fabric_heat_c: l.level === 'fabric' ? l.c : null, weather: weatherBytes.current }
   })
-  return { auth, doc, energyPlus, state, previewState, instant, hold, hourlyStale, runHourly, level, setLevel, fabricC, setFabricC, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+  return { auth, doc, energyPlus, state, busy, previewState, instant, hold, hourlyStale, runHourly, level, setLevel, fabricC, setFabricC, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
 }
 export type Run = ReturnType<typeof useRun>
 
@@ -450,7 +456,7 @@ export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void })
     )
   }
   return (
-    <div className={`rp-strip${state.kind === 'running' ? ' rp-stale' : ''}`} role="status" aria-label="Results">
+    <div className={`rp-strip${state.kind === 'running' || run.busy ? ' rp-stale' : ''}`} role="status" aria-label="Results" aria-busy={state.kind === 'running' || run.busy} title={run.busy && s ? 'Working out the change: these figures are from before it' : undefined}>
       {shown ? (
         // Brief 110b P1: today's LiveResultsStrip, four figures, in the top bar's Per m² / Total.
         <div className="rp-strip-live" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen?.() }} title="Open the heat flow">
@@ -493,7 +499,7 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
       <EnergyPlusCompare ep={run.energyPlus} current={run.doc} disabled={!run.weather} />
 
       {s && (
-        <div className={state.kind === 'running' ? 'rp-stale' : undefined}>
+        <div className={state.kind === 'running' || run.busy ? 'rp-stale' : undefined}>
           <div className="rp-totals">
             <div>
               <span className="rp-label">Heating <i>estimate</i></span>

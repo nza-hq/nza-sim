@@ -112,7 +112,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
       )}
       {showMonthly && createPortal(
         <div className="rp-flow" role="tabpanel" aria-label="Monthly">
-          <div className="rp-flow-in">
+          <div className={`rp-flow-in${!run.hold && run.busy ? ' rp-stale' : ''}`}>
             <h2>Monthly heating and cooling{zone ? `, ${zone.name || zone.id}` : ', whole building'}</h2>
             {run.hold && est ? <MonthlyEstimate estimate={est} zone={estZone} /> : s ? <MonthlyDemand summary={s} zone={zone} /> : <p className="gl-hint">{run.state.kind === 'missing' ? 'The months need a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The months need a run: choose a weather file on Site.'}</p>}
           </div>
@@ -121,7 +121,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
       )}
       {showProfiles && createPortal(
         <div className="rp-flow" role="tabpanel" aria-label="Load profiles">
-          <div className="rp-flow-in">
+          <div className={`rp-flow-in${!run.hold && run.busy ? ' rp-stale' : ''}`}>
             <h2>Load profiles, whole building</h2>
             {s?.energy?.ok ? <LoadProfiles energy={s.energy} />
               : <p className="gl-hint">{s && s.energy && !s.energy.ok ? 'Load profiles need the energy: some system inputs are still unset (see Heat flow).' : s ? 'Load profiles are energy, so they need the systems: choose "+ Systems" above the results.' : run.state.kind === 'running' ? 'Working it out…' : 'Load profiles need a full-year run: press Run in the bar above.'}</p>}
