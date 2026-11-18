@@ -90,3 +90,37 @@ What is left on the school (+18 % plain) is the other part of this note's list:
 Each is a separate choice, not made here.
 
 The community centre's heating moved slightly the other way, away from EnergyPlus. Its cooling moved towards it. It is insulated, so the film matters less than the other terms there.
+
+## After Brief 126 (18 Nov 2026): the inside film, the sky, the window, and how bridging reaches EnergyPlus
+
+Linzie answered "Please fix" on 18 Nov at 10:57. The 15-minute run now follows EnergyPlus for five things:
+
+- **Inside film.** TARP, with ISO 15099 on windows.
+- **Outside long-wave and sky.** From the weather file's own infrared.
+- **Window glass.** EnergyPlus's simple glazing: emissivity 0.84, and a glass layer from EnergyPlus's own rating films.
+- **Outdoor air.** It carries heat at its own density.
+
+Each was checked against EnergyPlus's own outputs before it was written (`docs/briefs/active/126_inside-sky-window.md`). Nothing was tuned.
+
+Tracing what was left showed a fourth cause. The translator had folded thermal bridging into the walls' U, so in EnergyPlus the bridging took the walls' sun and outside film. In the run, bridging is H·(θ_e − θ_air). The translator now carries it as exactly that conductance, which raises EnergyPlus's heating.
+
+| Case | After 125 | After 126 | EnergyPlus |
+|---|---|---|---|
+| Plain, heating | 82,114 (+18.4 %) | 75,093 (−0.6 %) | 75,512 |
+| As built, heating | 36,271 (+29.5 %) | 32,148 (+6.8 %) | 30,101 |
+| As built, cooling | 18,101 (−3.8 %) | 17,960 (+0.9 %) | 17,805 |
+| Community centre, heating | 15,762 (+10.8 %) | 16,281 (+7.6 %) | 15,138 |
+| Community centre, cooling | 16,681 (−3.4 %) | 16,362 (−2.2 %) | 16,728 |
+
+On the plain school, one kind at a time, every kind is now 3 % to 12 % below EnergyPlus:
+
+| Element kind | Gap |
+|---|---|
+| Walls | −2.7 % |
+| Glazing | −4.7 % |
+| Ground | −10.5 % |
+| Roof and loft | −12.4 % |
+| Air | −6.1 % |
+| Bridging | −8.4 % |
+
+The ground, the loft and weather-driven air are the next to look at. The as-built school's remaining +6.8 % has not yet been split.

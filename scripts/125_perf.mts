@@ -54,10 +54,12 @@ const lib2 = { ...lib, ...box.lib }
 
 const four = { ...REFEREE_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' as const } }
 const film = { ...four, surface_physics: { ...REFEREE_OPTIONS.surface_physics!, outside_convection: 'doe2' as const } }
+// Brief 126: everything EnergyPlus's way, as the run takes it (QUARTER_HOUR_OPTIONS' surfaces and air on these options).
+const ep = { ...four, surface_physics: { ...REFEREE_OPTIONS.surface_physics!, outside_convection: 'doe2' as const, inside_convection: 'tarp' as const, outside_longwave: 'energyplus' as const, window: 'energyplus' as const }, air_heat_capacity: 'outdoor' as const }
 const cases0 = [
-  { name: 'one_room_4', doc: box.doc, opts: four }, { name: 'one_room_4_film', doc: box.doc, opts: film },
-  { name: 'fifty_rooms_today_4', doc: today, opts: four }, { name: 'fifty_rooms_today_4_film', doc: today, opts: film },
-  { name: 'fifty_rooms_4', doc: fifty, opts: four }, { name: 'fifty_rooms_4_film', doc: fifty, opts: film },
+  { name: 'one_room_4', doc: box.doc, opts: four }, { name: 'one_room_4_film', doc: box.doc, opts: film }, { name: 'one_room_4_ep', doc: box.doc, opts: ep },
+  { name: 'fifty_rooms_today_4', doc: today, opts: four }, { name: 'fifty_rooms_today_4_film', doc: today, opts: film }, { name: 'fifty_rooms_today_4_ep', doc: today, opts: ep },
+  { name: 'fifty_rooms_4', doc: fifty, opts: four }, { name: 'fifty_rooms_4_film', doc: fifty, opts: film }, { name: 'fifty_rooms_4_ep', doc: fifty, opts: ep },
 ]
 const cases = cases0.filter((c) => !process.env.ONLY || c.name === process.env.ONLY)
 const N = Number(process.env.REPEAT ?? 3)

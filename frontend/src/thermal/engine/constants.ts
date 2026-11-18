@@ -58,6 +58,47 @@ export const ENGINE_CONSTANTS = {
   film_rungs: 3,
   rain_code_at_least: 0.5,
   rain_precipitation_mm: 0.8,
+  /**
+   * Brief 126 (Linzie 18 Nov 10:57, "Please fix": the inside film, the sky and the window, as EnergyPlus). EnergyPlus's
+   * outside long-wave (Engineering Reference, "Exterior Longwave Radiation"): a face exchanges with the ground (view
+   * (1 − cos Σ)/2, at the outdoor air), the sky (view (1 + cos Σ)/2 × β, β = √((1 + cos Σ)/2)) and the air (the rest of
+   * the sky view), each by h = ε·σ·(T_s² + T_x²)(T_s + T_x) at the face's temperature the step before. The sky
+   * temperature is (IR/σ)^¼ from the weather file's horizontal infrared, read between hours; where that is missing,
+   * Clark and Allen's sky emissivity from the dew point and opaque cover, as EnergyPlus. Checked against EnergyPlus
+   * 25.2's own coefficients to 0.0001 W/m²K (docs/briefs/active/126_inside-sky-window.md Part 1).
+   */
+  sigma: 5.6697e-8,
+  clark_allen_a: 0.787,
+  clark_allen_b: 0.764,
+  clark_allen_n1: 0.0224,
+  clark_allen_n2: -0.0035,
+  clark_allen_n3: 0.00028,
+  /**
+   * EnergyPlus's Simple Window Model (WindowMaterial:SimpleGlazingSystem, the glazing the translator writes): the glass
+   * takes emissivity 0.84 on both faces, and its layer resistance is the stated U less EnergyPlus's own rating films,
+   * R_i = 1/(0.359073·ln U + 6.949915) for U ≤ 5.85, 1/(1.788041·U − 2.886625) above, and R_o = 1/(0.025342·U + 29.163853).
+   */
+  simple_glazing_emissivity: 0.84,
+  simple_glazing_ri_ln_a: 0.359073,
+  simple_glazing_ri_ln_b: 6.949915,
+  simple_glazing_ri_u_split: 5.85,
+  simple_glazing_ri_lin_a: 1.788041,
+  simple_glazing_ri_lin_b: 2.886625,
+  simple_glazing_ro_a: 0.025342,
+  simple_glazing_ro_b: 29.163853,
+  /**
+   * A window's inside convection in EnergyPlus's TARP: ISO 15099 (EnergyPlus CalcISO15099WindowIntConvCoeff), from the
+   * glass's height and its difference with the room air, air properties at the film temperature T_a + ¼(T_s − T_a):
+   * λ = 2.873e-3 + 7.76e-5·T, μ = 3.723e-6 + 4.94e-8·T, c_p = 1002.737 + 1.2324e-2·T (T in K); Nusselt by tilt
+   * (eq. 135 to 139), Ra_cv = 2.5e5·e^(0.72·θ)/sin θ. Checked against EnergyPlus's own window coefficients to 0.01 W/m²K.
+   */
+  iso15099_lambda_a: 2.873e-3,
+  iso15099_lambda_b: 7.76e-5,
+  iso15099_mu_a: 3.723e-6,
+  iso15099_mu_b: 4.94e-8,
+  iso15099_cp_a: 1002.737,
+  iso15099_cp_b: 1.2324e-2,
+  gravity: 9.81,
   /** Mean difference between outdoor air and apparent sky temperature, K (ISO 13790:2008 11.3.5; ISO 52016-1 Annex B default). */
   delta_theta_sky_k: 11,
   /** Convective share of transmitted solar released to the air node (ISO 52016-1 Annex B default f_sol,c). */
