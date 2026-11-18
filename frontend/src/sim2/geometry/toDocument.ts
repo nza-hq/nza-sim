@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, FINISH_KEY, finishesOf, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, FINISH_KEY, finishesOf, floorsOf, type PlanFloor, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -59,6 +59,126 @@ export type Built = {
  *   height grows by its share of the roof space.
  */
 export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Built {
+  const floors = floorsOf(plan0)
+  return floors.length > 1 ? buildStacked(plan0, floors) : buildFloor(plan0, roofsIn)
+}
+
+/**
+ * 18 Nov 2026 (RWGC clubhouse, Linzie: "add stacked floors"): a building of more than one floor. Each floor is built
+ * as one floor is (walls, windows, partitions, a roof and a ground floor for every zone), its zones put on their floor,
+ * and then the floors are joined where they stand on each other: where a zone's rooms lie over another zone's on the
+ * floor below, that much of the lower zone's roof and the upper zone's ground floor become one floor between them
+ * (ceiling from below, the 'intermediate' fabric type); an upper zone's floor over no room below is an exposed floor
+ * to outside air. Floors are one storey height apart. A pitched roof is not stacked yet: every floor's roof is flat
+ * (a note says so when one was chosen). Systems, profiles and controls are the building's, gathered from the floors.
+ */
+function buildStacked(plan0: Plan, floors: PlanFloor[]): Built {
+  const notes: string[] = []
+  const rooms = floors.flatMap((f) => f.rooms)
+  const zoneFloor = new Map<string, number>()
+  floors.forEach((f, k) => f.rooms.forEach((r) => {
+    const was = zoneFloor.get(r.zone)
+    if (was != null && was !== k) notes.push(`${plan0.zones.find((z) => z.id === r.zone)?.name ?? r.zone} has rooms on more than one floor; a zone is on one floor, so its rooms on ${floors[k]!.name.toLowerCase()} are left out`)
+    else zoneFloor.set(r.zone, k)
+  }))
+  const pitched = (plan0.roof && plan0.roof.style !== 'flat') || floors.some((f) => f.roof_parts?.some((p) => p.recipe.style !== 'flat'))
+  if (pitched) notes.push('Pitched roofs are not stacked yet: with more than one floor every roof is flat (its type as chosen on Fabric)')
+  const subs = floors.map((f, k) => {
+    const mine = f.rooms.filter((r) => zoneFloor.get(r.zone) === k)
+    // Every room of the building, so space types, systems and emitters see the whole building; the floor's own rooms
+    // for its geometry (buildFloor reads geometry from blocks, windows and the rooms of its zones).
+    const sub: Plan = { ...plan0, floors: undefined, active_floor: undefined, blocks: f.blocks, rooms: mine, windows: f.windows, wall_spans: f.wall_spans, roof: { style: 'flat' } as Plan['roof'], roof_parts: undefined }
+    return buildFloor(sub)
+  })
+  // Gather: zones (on their floor), surfaces, system groups (their zones joined), profiles, controls, library refs.
+  const docs = subs.map((s) => s.doc as Record<string, unknown> & { zones: Array<Record<string, unknown>>; surfaces: Array<Record<string, unknown>>; system_groups: Array<Record<string, unknown>>; profiles: Array<Record<string, unknown>>; controls?: Array<Record<string, unknown>>; library_refs: Array<Record<string, unknown>>; other_loads?: unknown[] })
+  const zones = docs.flatMap((d, k) => d.zones.map((z) => ({ ...z, floor: k })))
+  const surfaces = docs.flatMap((d) => d.surfaces.map((s) => ({ ...s })))
+  const groups = new Map<string, Record<string, unknown>>()
+  for (const d of docs) for (const g of d.system_groups) {
+    const was = groups.get(g.id as string)
+    groups.set(g.id as string, was ? { ...g, ...was, zones: [...(was.zones as string[]), ...(g.zones as string[])] } : { ...g })
+  }
+  const byId = <T extends Record<string, unknown>>(xs: T[], key: (x: T) => string) => [...new Map(xs.map((x) => [key(x), x])).values()]
+  const profiles = byId(docs.flatMap((d) => d.profiles), (p) => p.id as string)
+  const controls = byId(docs.flatMap((d) => d.controls ?? []), (c) => c.id as string)
+  // The floors between storeys' construction is pinned too (the floors' own documents never had it).
+  const mid = construction(plan0.fabric_types.find((t) => t.element === 'intermediate')?.construction)
+  const midPin = mid?.body_hash ? [{ kind: 'construction', key: mid.key, version: null, body_hash: mid.body_hash }] : []
+  const library_refs = byId([...docs.flatMap((d) => d.library_refs), ...midPin], (r) => `${r.kind}:${r.key}`).sort((a, b) => (`${a.kind}${a.key}` < `${b.kind}${b.key}` ? -1 : 1))
+
+  // Join the floors. Footprints: each zone's rooms, as polygon-clipping multipolygons.
+  const foot = (zid: string): pc.MultiPolygon => {
+    const rs = rooms.filter((r) => r.zone === zid).map((r) => [[...r.ring.map((p) => [p[0], p[1]] as [number, number]), [r.ring[0]![0], r.ring[0]![1]] as [number, number]]] as pc.Polygon)
+    return rs.length ? pc.union(...(rs as [pc.Polygon, ...pc.Polygon[]])) : []
+  }
+  const mpArea = (mp: pc.MultiPolygon) => mp.reduce((t, poly) => t + poly.reduce((u, ring, i) => u + (i === 0 ? 1 : -1) * Math.abs(ringArea(ring.slice(0, -1) as XY[])), 0), 0)
+  const zonesOn = (k: number) => [...zoneFloor.entries()].filter(([, f]) => f === k).map(([z]) => z)
+  const it = plan0.fabric_types.find((t) => t.element === 'intermediate')
+  const midRef = it ? (it.u != null ? { key: it.construction ?? 'unassigned:interior_floor', u_value_override: it.u } : { key: it.construction ?? 'unassigned:interior_floor' }) : { key: 'unassigned:interior_floor' }
+  if (!it?.construction) notes.push('The floors between storeys have no construction yet (Fabric, Floor between storeys)')
+  const take = (zid: string, kind: 'roof' | 'ground', a: number) => {
+    // Take a m² off the zone's roofs (or ground floors), in proportion to their areas.
+    const own = surfaces.filter((s) => s.zone_a === zid && s.kind === kind)
+    const tot = own.reduce((t, s) => t + (s.area_m2 as number), 0)
+    if (tot <= 0) return
+    for (const s of own) s.area_m2 = r3(Math.max(0, (s.area_m2 as number) * (1 - Math.min(1, a / tot))))
+  }
+  const added: Array<{ zone: string; id: string }> = []
+  const zoneFoot = new Map([...zoneFloor.keys()].map((z) => [z, foot(z)]))
+  for (let k = 1; k < floors.length; k++) {
+    for (const up of zonesOn(k)) {
+      let over = 0
+      for (const lo of zonesOn(k - 1)) {
+        const a = r3(mpArea(pc.intersection(zoneFoot.get(up)!, zoneFoot.get(lo)!)))
+        if (a < 0.01) continue
+        over += a
+        take(lo, 'roof', a)
+        const id = `${lo}_ceiling_${up}`
+        surfaces.push({
+          id, kind: 'ceiling', zone_a: lo, zone_b: up, facade: null, area_m2: a, azimuth_deg: null, tilt_deg: 0, construction_ref: midRef, g_value: null, openings: [],
+          ...(is21 ? { solar_absorptance: null, thermal_emissivity: null, frame_fraction: null } : {}),
+          ...(is22 ? { inside_solar_absorptance: TODAY.inside_solar_absorptance, inside_solar_absorptance_b: TODAY.inside_solar_absorptance, faces_up: null } : {}),
+        })
+        added.push({ zone: lo, id }, { zone: up, id })
+      }
+      // The upper zone's ground floor: over a room below it is the floor just made; the rest is open to outside air.
+      const own = surfaces.filter((s) => s.zone_a === up && s.kind === 'ground')
+      const tot = own.reduce((t, s) => t + (s.area_m2 as number), 0)
+      const open = r3(Math.max(0, tot - over))
+      for (const s of own) {
+        s.area_m2 = r3(tot > 0 ? ((s.area_m2 as number) / tot) * open : 0)
+        Object.assign(s, { kind: 'floor', zone_b: 'outside', ...(is21 ? { solar_absorptance: TODAY.roof_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity } : {}), inside_finish: s.inside_finish ?? null })
+      }
+      if (open > 0.5) notes.push(`${plan0.zones.find((z) => z.id === up)?.name ?? up}: ${r3(open)} m² of its floor is over no room below, taken as a floor open to outside air`)
+    }
+  }
+  // Drop what was taken to nothing, and give each zone its new surfaces.
+  const gone = new Set(surfaces.filter((s) => (s.area_m2 as number) < 0.01 && (s.kind === 'roof' || s.kind === 'floor')).map((s) => s.id as string))
+  const kept = surfaces.filter((s) => !gone.has(s.id as string))
+  for (const z of zones) {
+    z.surfaces = [...(z.surfaces as string[]).filter((sid) => !gone.has(sid)), ...added.filter((x) => x.zone === z.id).map((x) => x.id)]
+  }
+  const d0 = docs[0]!
+  const doc = { ...d0, zones, surfaces: kept, system_groups: [...groups.values()], profiles, ...(controls.length ? { controls } : {}), library_refs }
+  const res = ModelDocument.safeParse(doc)
+  const sum = (k: string) => kept.filter((s) => s.kind === k)
+  const t = subs.map((s) => s.totals)
+  const add = (key: keyof Built['totals']) => t.reduce((s, x) => s + x[key], 0)
+  return {
+    doc,
+    ok: res.success,
+    issues: res.success ? [] : res.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+    notes: [...new Set([...notes, ...subs.flatMap((s, k) => s.notes.map((n) => (/^(A window|\d+ window)|separate parts|m of side/.test(n) ? `${floors[k]!.name}: ${n}` : n)))])],
+    totals: {
+      zones: zones.filter((z) => z.use_type !== 'loft').length, rooms: rooms.length, floor_m2: r3(add('floor_m2')),
+      walls: add('walls'), wall_net_m2: r3(add('wall_net_m2')), glazing: add('glazing'), glazing_m2: r3(add('glazing_m2')), windows: add('windows'),
+      doors: add('doors'), door_m2: r3(add('door_m2')), partitions: sum('partition').length, systems: groups.size,
+    },
+  }
+}
+
+function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[]): Built {
   // A plan held from before Brief 112 (one building-wide hot water use) is read as its space types' own.
   const plan = hotWaterOnSpaces(plan0)
   // The project's own profiles first, then the library's (Brief 118 P5).
@@ -91,7 +211,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
   // A fabric type's construction: its library key, or `unassigned:<element>` while none is chosen (a type other than
   // the element's first adds its id, so the types stay apart); a U-value the user typed rides on it as an override.
   const typeOf = new Map(plan.fabric_types.map((t) => [t.id, t]))
-  const UNSET: Record<FabricElement, string> = { wall: 'external_wall', glazing: 'glazing', door: 'external_door', roof: 'roof', floor: 'ground_floor', partition: 'internal_wall' }
+  const UNSET: Record<FabricElement, string> = { wall: 'external_wall', glazing: 'glazing', door: 'external_door', roof: 'roof', floor: 'ground_floor', partition: 'internal_wall', intermediate: 'interior_floor' }
   const constructionOf = (type: string) => {
     const t = typeOf.get(type)
     if (!t) return { key: 'unassigned:external_wall' }

@@ -41,7 +41,7 @@ import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
 import { FinishInfo, FinishRows } from './Finishes'
 import { carpetIn } from './toDocument'
-import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, floorsOf, onFloor, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ApplyBarTarget, ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
@@ -183,6 +183,8 @@ const TOOLS: Record<Mode, Array<{ key: Tool; name: string; glyph: string; line: 
 }
 const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'pick', profiles: 'pick', spaces: 'pick', systems: 'pick' }
 const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', profiles: 'Profiles', spaces: 'Spaces', systems: 'Systems' }
+/** Stacked floors: the floor switcher's short names (Plan.floors keeps the full ones). */
+const FLOOR_SHORT = ['Ground', 'First', 'Second', 'Third', 'Fourth', 'Fifth']
 const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, profiles: 4, spaces: 5, systems: 6 }
 const MODES: Mode[] = ['outline', 'rooms', 'fabric', 'profiles', 'spaces', 'systems']
 const STEP_ICON: Record<Mode, IconName> = { outline: 'building', rooms: 'rooms', fabric: 'wall', profiles: 'profile', spaces: 'person', systems: 'heating' }
@@ -446,6 +448,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const placed = useMemo(() => allWindows(plan).windows, [plan])
   const rings = plan.rooms.map((z) => z.ring)
   const has = plan.blocks.length > 0
+  // Stacked floors (18 Nov 2026): every floor, and the zones whose rooms are on another floor (kept out of this floor's lists).
+  const floors = useMemo(() => floorsOf(plan), [plan])
+  const zonesElsewhere = useMemo(() => new Set(floors.flatMap((f, i) => (i === (plan.active_floor ?? 0) ? [] : f.rooms.map((r) => r.zone)))), [floors, plan.active_floor])
   const inRooms = mode !== 'outline'
   const selBlocks = sel?.kind === 'blocks' ? sel.idx.filter((i) => i < plan.blocks.length) : []
 
@@ -3020,6 +3025,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         <button type="button" aria-pressed={shownLook === 'plan'} onClick={() => setLook('plan')}>Plan</button>
         <button type="button" aria-pressed={in3d} onClick={() => setLook('3d')} disabled={!plan.blocks.length}>3D</button>
         <button type="button" aria-pressed={shownLook === 'elev'} onClick={() => setLook('elev')} disabled={!selWall} title={selWall ? undefined : 'Choose a wall first'}>Elevation</button>
+        {/* 18 Nov 2026 (RWGC clubhouse, Linzie): stacked floors. Each step works on the floor chosen here. */}
+        {(has || floors.length > 1) && <>
+          <span className="gl-viewsep" aria-hidden />
+          {floors.map((f, i) => (
+            <button key={i} type="button" aria-pressed={(plan.active_floor ?? 0) === i} title={f.name} onClick={() => { if ((plan.active_floor ?? 0) !== i) { commit(onFloor(plan, i)); setSel(null) } }}>{FLOOR_SHORT[i] ?? f.name}</button>
+          ))}
+          <button type="button" title="Add a floor above the top one" onClick={() => { commit(onFloor(plan, floors.length)); setSel(null); toMode('outline'); setTool('rect') }}>+ Floor</button>
+        </>}
       </div>
       {shownLook === 'elev' && selWall && selSpan && (
         <FacadeView
@@ -3346,9 +3359,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               )}
               {mode === 'rooms' && (
                 <div className="gl-sec">
-                  <h3>Zones <small>{plan.zones.length}</small></h3>
+                  <h3>Zones <small>{plan.zones.filter((z) => !zonesElsewhere.has(z.id)).length}</small></h3>
                   <div className="gl-zones">
                     {plan.zones.map((z, i) => {
+                      if (zonesElsewhere.has(z.id)) return null
                       const rs = roomsIn(z.id)
                       const allOn = rs.length > 0 && rs.every((r) => chosen.has(r.id))
                       return (

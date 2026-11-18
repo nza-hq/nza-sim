@@ -1,9 +1,9 @@
 {
  "_note": "Made by scripts/sim2_library_snapshot.mjs from docs/audit/102/library_export.json. Do not edit by hand.",
  "source": "docs/audit/102/library_export.json",
- "source_sha256": "c3891d6632c605671a54843cc4cc0e50b66f0ec2ecfc544b8b9c7f9d96d6b9f0",
+ "source_sha256": "d1b9b09d52bebe6e8c07b210bdf6db51bd4a6e5c4dedbed02d7658fd3c1cfaea",
  "exported_at": "2026-11-14T19:36:56+00:00",
- "additions_sha256": "deec116aad324c9f00700fbea8b8622ca48322f3c4395b96d90871fbfeb5c7f5",
+ "additions_sha256": "2ccbb0d796af978d8e9d32361987e1cb5ffb40d8ba70154c589d404443668247",
  "constructions": [
   {
    "key": "bridgwater_ext_wall",
@@ -493,6 +493,36 @@
    "seer": 3.2,
    "efficiency": 3.5,
    "efficiency_type": "scop",
+   "sfp": null,
+   "heat_recovery": null
+  },
+  {
+   "key": "gas_boiler_noncondensing_heating",
+   "body_hash": "dfd9bd44e2988629de88c63aeb39bb088c1678eabac7cf06d32e56cf446bd5bb",
+   "name": "Gas Boiler — Non-condensing (Heating), 85 %",
+   "type": "gas_boiler",
+   "category": "heating",
+   "serves": "heating",
+   "fuel": "gas",
+   "scop": null,
+   "seer": null,
+   "efficiency": 0.85,
+   "efficiency_type": "thermal_efficiency",
+   "sfp": null,
+   "heat_recovery": null
+  },
+  {
+   "key": "gas_water_heater_direct_dhw",
+   "body_hash": "356b40bf33076924ef4d93c2aa9502b7b245e52be47691b8ea7d08859f5ff343",
+   "name": "Gas-fired water heater — direct, storage (DHW), 80 %",
+   "type": "gas_boiler_dhw",
+   "category": "dhw",
+   "serves": "dhw",
+   "fuel": "gas",
+   "scop": null,
+   "seer": null,
+   "efficiency": 0.8,
+   "efficiency_type": "thermal_efficiency",
    "sfp": null,
    "heat_recovery": null
   }
