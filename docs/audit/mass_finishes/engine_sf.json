@@ -1,0 +1,196 @@
+{
+ "epw": "USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw",
+ "epw_sha256": "b69e012e7ff8a5d3e610a19acc1ceb84926feae1f4347192b9388459423bf29c",
+ "cases": {
+  "exposed": {
+   "fabric_only": {
+    "hourly": {
+     "heat_kwh": 0,
+     "cool_kwh": 4029.5434144084143,
+     "peak_cool_w": 2353.6846471514627
+    },
+    "monthly": {
+     "heat_kwh": 0.15002051669183125,
+     "cool_kwh": 4166.738125762639,
+     "c_m_mj_per_k": 16.015122,
+     "tau_h": 119.71506509398952
+    },
+    "free": {
+     "max_c": 28.60651013395743,
+     "hours_over_26": 183,
+     "hours_over_28": 15
+    }
+   },
+   "app_default_250k": {
+    "hourly": {
+     "heat_kwh": 0,
+     "cool_kwh": 3995.60685962706,
+     "peak_cool_w": 2354.2001963581424
+    },
+    "monthly": {
+     "heat_kwh": 0.0034231693330366393,
+     "cool_kwh": 4163.285033583168,
+     "c_m_mj_per_k": 25.015122,
+     "tau_h": 186.99120484777382
+    },
+    "free": {
+     "max_c": 25.429022362257616,
+     "hours_over_26": 0,
+     "hours_over_28": 0
+    }
+   }
+  },
+  "carpet": {
+   "fabric_only": {
+    "hourly": {
+     "heat_kwh": 0,
+     "cool_kwh": 4044.1320640710487,
+     "peak_cool_w": 2494.1151881731093
+    },
+    "monthly": {
+     "heat_kwh": 1.3124205766343078,
+     "cool_kwh": 4179.690874779609,
+     "c_m_mj_per_k": 11.136402,
+     "tau_h": 83.2460152562581
+    },
+    "free": {
+     "max_c": 28.9953217163657,
+     "hours_over_26": 238,
+     "hours_over_28": 26
+    }
+   },
+   "app_default_250k": {
+    "hourly": {
+     "heat_kwh": 0,
+     "cool_kwh": 3998.183118653238,
+     "peak_cool_w": 2495.3124687229792
+    },
+    "monthly": {
+     "heat_kwh": 0.02595593160121644,
+     "cool_kwh": 4164.13406543092,
+     "c_m_mj_per_k": 20.136402,
+     "tau_h": 150.52215501004238
+    },
+    "free": {
+     "max_c": 25.538341143421725,
+     "hours_over_26": 0,
+     "hours_over_28": 0
+    }
+   }
+  },
+  "ceiling_void": {
+   "fabric_only": {
+    "hourly": {
+     "heat_kwh": 0.1498240082746438,
+     "cool_kwh": 4105.655457923608,
+     "peak_cool_w": 2620.847080941948
+    },
+    "monthly": {
+     "heat_kwh": 3.7524372315687797,
+     "cool_kwh": 4197.652311445986,
+     "c_m_mj_per_k": 8.890722,
+     "tau_h": 66.45927286489383
+    },
+    "free": {
+     "max_c": 30.90082373058366,
+     "hours_over_26": 436,
+     "hours_over_28": 138
+    }
+   },
+   "app_default_250k": {
+    "hourly": {
+     "heat_kwh": 0,
+     "cool_kwh": 4010.323186090704,
+     "peak_cool_w": 2623.3978583599237
+    },
+    "monthly": {
+     "heat_kwh": 0.06707733445048507,
+     "cool_kwh": 4165.1588110312005,
+     "c_m_mj_per_k": 17.890722,
+     "tau_h": 133.73541261867814
+    },
+    "free": {
+     "max_c": 26.010095650622738,
+     "hours_over_26": 1,
+     "hours_over_28": 0
+    }
+   }
+  },
+  "carpet_and_void": {
+   "fabric_only": {
+    "hourly": {
+     "heat_kwh": 0.6092522045256764,
+     "cool_kwh": 4161.796833368118,
+     "peak_cool_w": 2829.90535357799
+    },
+    "monthly": {
+     "heat_kwh": 43.942640864198445,
+     "cool_kwh": 4356.177382245725,
+     "c_m_mj_per_k": 4.012002,
+     "tau_h": 29.990223027162457
+    },
+    "free": {
+     "max_c": 31.711248906491214,
+     "hours_over_26": 527,
+     "hours_over_28": 219
+    }
+   },
+   "app_default_250k": {
+    "hourly": {
+     "heat_kwh": 0,
+     "cool_kwh": 4023.2165056932595,
+     "peak_cool_w": 2835.7471233934702
+    },
+    "monthly": {
+     "heat_kwh": 0.5613121258008469,
+     "cool_kwh": 4172.266089285742,
+     "c_m_mj_per_k": 13.012002,
+     "tau_h": 97.26636278094676
+    },
+    "free": {
+     "max_c": 26.217421240204065,
+     "hours_over_26": 7,
+     "hours_over_28": 0
+    }
+   }
+  },
+  "lightweight": {
+   "fabric_only": {
+    "hourly": {
+     "heat_kwh": 78.69585125776085,
+     "cool_kwh": 4444.282349429403,
+     "peak_cool_w": 3410.1478495001315
+    },
+    "monthly": {
+     "heat_kwh": 37.129926856599994,
+     "cool_kwh": 4334.6257646869935,
+     "c_m_mj_per_k": 4.327002,
+     "tau_h": 32.3448879185449
+    },
+    "free": {
+     "max_c": 35.33976332077966,
+     "hours_over_26": 876,
+     "hours_over_28": 486
+    }
+   },
+   "app_default_250k": {
+    "hourly": {
+     "heat_kwh": 0,
+     "cool_kwh": 4086.380693333919,
+     "peak_cool_w": 3444.9095741690326
+    },
+    "monthly": {
+     "heat_kwh": 0.48771931246836914,
+     "cool_kwh": 4171.408609054997,
+     "c_m_mj_per_k": 13.327002,
+     "tau_h": 99.62102767232918
+    },
+    "free": {
+     "max_c": 27.615988803762505,
+     "hours_over_26": 45,
+     "hours_over_28": 0
+    }
+   }
+  }
+ }
+}

@@ -9,10 +9,11 @@
  */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../../auth/AuthGate'
-import { RunClient, type RunAnswer, type WeatherAnswer } from './client'
+import { RunClient, type InstantAnswer, type RunAnswer, type WeatherAnswer } from './client'
 import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
-import type { Level, Summary, WhatIf } from './seam'
+import type { InstantEstimate, Level, Missing, Summary, WhatIf } from './seam'
 import { EmitterSizing } from './EmitterSizing'
+import { EnergyPlusButton, EnergyPlusCompare, useEnergyPlus } from './EnergyPlusCompare'
 // @ts-expect-error untyped JS from today's app (Brief 110b: reused, not redrawn)
 import LiveResultsStrip from '../../components/shared/LiveResultsStrip.jsx'
 // @ts-expect-error untyped JS from today's app
@@ -28,6 +29,9 @@ export const TERMS: Record<string, string> = {
   glazing_solar_absorbed: 'Sun absorbed in the glass', other_gains: 'Other gains', storage: 'Heat stored in the building',
   occupancy_gains: 'People', lighting_gains: 'Lighting', equipment_gains: 'Equipment', auxiliary_gains: 'Other equipment',
   mechanical_ventilation: 'Ventilation', interzone: 'From other zones',
+  window_ventilation: 'Open windows', single_sided_turbulence: 'Open windows (gusts, one side)',
+  gains_not_used: 'Gains not used (room above setpoint)',
+  intermittent_heating: 'Heat not lost while heating is off or set back',
 }
 const FUEL_WORDS: Record<string, string> = { electricity: 'Electricity', gas: 'Gas', oil: 'Oil', biomass: 'Biomass', district_heating: 'District heat', district_cooling: 'District cooling' }
 const END_USE_WORDS: Record<string, string> = {
@@ -96,7 +100,19 @@ function plainMissing(items: { path: string; what: string }[], doc: unknown) {
   })
 }
 
-export function useRun(doc: unknown, previewDoc: unknown = null) {
+/** Brief 122: the monthly estimate (static), worked out at once on every edit. */
+export type InstantState =
+  | { kind: 'idle' }
+  | { kind: 'missing'; items: Missing[] }
+  | { kind: 'error'; message: string }
+  | { kind: 'done'; estimate: InstantEstimate; ms: number }
+
+/**
+ * `hold` (Brief 122, Linzie 17 Nov 08:20: "instantaneous calculations and the ability to run"): on Site, Shape and
+ * Fabric each edit works out the monthly estimate (static) at once, and the hourly year waits for Run. Elsewhere the
+ * hourly year reruns after each edit, as before.
+ */
+export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
   const auth = useAuth()
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [weather, setWeather] = useState<{ file_name: string; station: string } | null>(null)
@@ -107,6 +123,13 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
   const client = useRef<RunClient | null>(null)
   const latestDoc = useRef(doc)
   latestDoc.current = doc
+  const latestHold = useRef(hold)
+  latestHold.current = hold
+  const instClient = useRef<RunClient | null>(null)
+  const [instant, setInstant] = useState<InstantState>({ kind: 'idle' })
+  /** The document the shown hourly result is of; on a held step, a newer edit makes that result out of date. */
+  const ranDoc = useRef<unknown>(null)
+  const [ranFor, setRanFor] = useState<unknown>(null)
   // Brief 108 P5: a second flow and return pair, run on the same rooms beside the first.
   const [whatIf, setWhatIf] = useState<WhatIf | null>(null)
   const latestWhatIf = useRef(whatIf)
@@ -118,6 +141,10 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
   const opts = () => ({ level: latestLevel.current.level, fabric_heat_c: latestLevel.current.level === 'fabric' ? latestLevel.current.c : null, what_if: latestWhatIf.current })
   const latestLevel = useRef({ level, c: fabricC })
   latestLevel.current = { level, c: fabricC }
+  function askInstant() {
+    const l = latestLevel.current
+    instClient.current?.instant(latestDoc.current, l.level, l.level === 'fabric' ? l.c : null)
+  }
 
   useEffect(() => {
     let c: RunClient
@@ -129,11 +156,14 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
         if (r.ok) setState({ kind: 'done', summary: r.summary, ms: a.ms })
         else if ('missing' in r) setState({ kind: 'missing', items: plainMissing(r.missing, latestDoc.current) })
         else setState({ kind: 'error', message: r.error })
+        setRanFor(ranDoc.current)
       },
       (w: WeatherAnswer) => {
         if (w.ok) { setWeather({ file_name: w.file_name, station: w.station }); setWeatherError(null) }
         else { setWeather(null); setWeatherError(w.error) }
+        if (latestHold.current) { askInstant(); return }
         setState({ kind: 'running' })
+        ranDoc.current = latestDoc.current
         c.run(latestDoc.current, 0, opts())
       },
       failed,
@@ -143,9 +173,18 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
       return
     }
     client.current = c
+    // Brief 122: its own worker, so the estimate never waits behind an hourly year.
+    try {
+      instClient.current = new RunClient(() => {}, () => askInstant(), () => {}, (a: InstantAnswer) => {
+        const r = a.result
+        if (r.ok) setInstant({ kind: 'done', estimate: r.estimate, ms: a.ms })
+        else if ('missing' in r) setInstant({ kind: 'missing', items: plainMissing(r.missing, latestDoc.current) })
+        else setInstant({ kind: 'error', message: r.error })
+      })
+    } catch (e) { instClient.current = null; setInstant({ kind: 'error', message: `it cannot run in this view (${(e as Error).message || 'the browser blocked the background worker'})` }) }
     // Preview, then apply (Linzie, 16 Nov 00:22): a second worker runs the change being previewed, on the same weather,
     // so the strip can show where the numbers stand now and where they would go. It is not started until asked for.
-    return () => { c.dispose(); preview.current?.dispose(); preview.current = null }
+    return () => { c.dispose(); preview.current?.dispose(); preview.current = null; instClient.current?.dispose(); instClient.current = null }
   }, [])
 
   const preview = useRef<RunClient | null>(null)
@@ -179,6 +218,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
     weatherBytes.current = { bytes, name, source }
     client.current?.setWeather(bytes.slice(), name, source)
     preview.current?.setWeather(bytes.slice(), name, source)
+    instClient.current?.setWeather(bytes.slice(), name, source)
   }
   useEffect(() => {
     if (!previewDoc) { setPreviewState({ kind: 'idle' }); return }
@@ -190,9 +230,18 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
 
   useEffect(() => {
     if (!client.current) return
+    if (hold) { askInstant(); return }
     setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
+    ranDoc.current = doc
     client.current.run(doc, 250, opts())
-  }, [doc, whatIf, level, fabricC])
+  }, [doc, whatIf, level, fabricC, hold])
+  /** Brief 122: the hourly year, on Run (held steps). */
+  const runHourly = () => {
+    if (!client.current) return
+    setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
+    ranDoc.current = latestDoc.current
+    client.current.run(latestDoc.current, 0, opts())
+  }
 
   // The organisation's weather files, when signed in.
   useEffect(() => {
@@ -230,7 +279,14 @@ export function useRun(doc: unknown, previewDoc: unknown = null) {
     } catch (e) { setSaveNote(`Not saved: ${(e as Error).message}.`) }
   }
 
-  return { auth, state, previewState, level, setLevel, fabricC, setFabricC, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
+  // On a held step, an hourly result of an older document is out of date until Run.
+  const hourlyStale = hold && state.kind === 'done' && ranFor !== doc
+  // Brief 123: the third tier, EnergyPlus, on the document and weather as they stand.
+  const energyPlus = useEnergyPlus(() => {
+    const l = latestLevel.current
+    return { doc: latestDoc.current, level: l.level, fabric_heat_c: l.level === 'fabric' ? l.c : null, weather: weatherBytes.current }
+  })
+  return { auth, doc, energyPlus, state, previewState, instant, hold, hourlyStale, runHourly, level, setLevel, fabricC, setFabricC, whatIf, setWhatIf, weather, weatherError, orgFiles, saveNote, onLocal, onOrg, canSave, onSave, hasLocalFile: () => !!localFile.current }
 }
 export type Run = ReturnType<typeof useRun>
 
@@ -332,9 +388,51 @@ export function LevelSwitch({ run }: { run: Run }) {
   )
 }
 
+/** Brief 122: the monthly estimate (static)'s two figures, in the top bar's Per m² / Total. */
+export function instantItems(e: InstantEstimate, unit: 'kwh' | 'kwh_per_m2') {
+  const a = e.building.floor_m2
+  const pair = (kwh: number) => (unit === 'kwh_per_m2'
+    ? { value: perM2(kwh, a), unit: 'kWh/m²', sub: `${mwh(kwh)} MWh a year` }
+    : { value: mwh(kwh), unit: 'MWh', sub: `${perM2(kwh, a)} kWh/m² a year` })
+  return [
+    { label: 'Heating', ...pair(e.building.heating_kwh), accent: HEATING_COLOUR },
+    { label: 'Cooling', ...pair(e.building.cooling_kwh), accent: COOLING_COLOUR },
+  ]
+}
+
+/**
+ * Brief 122, on Site, Shape and Fabric: the monthly estimate (static) as you edit, and the hourly year on Run. The two
+ * are never one figure (Rule 11): the estimate is labelled as the static engine's, the hourly year as the run's.
+ */
+function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit: 'kwh' | 'kwh_per_m2' }) {
+  const { instant, state, weather, hourlyStale, runHourly } = run
+  const s = state.kind === 'done' ? state.summary : null
+  return (
+    <div className="rp-strip rp-strip-held" role="status" aria-label="Results">
+      <div className="rp-strip-live" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen?.() }} title="Open the heat flow">
+        <span className="rp-strip-tag" title={instant.kind === 'done' ? `Worked out in ${Math.round(instant.ms)} ms` : undefined}>Monthly estimate<br />(static)</span>
+        {instant.kind === 'done' ? <LiveResultsStrip items={instantItems(instant.estimate, unit)} />
+          : <span className="rp-strip-msg">{instant.kind === 'missing' ? `No estimate yet: ${instant.items.length} ${instant.items.length === 1 ? 'input' : 'inputs'} to set. See them on Heat flow.` : instant.kind === 'error' ? `The estimate failed: ${instant.message}` : !weather ? 'No estimate yet: choose a weather file (Site).' : 'Working it out…'}</span>}
+      </div>
+      <div className="rp-strip-hourly">
+        <span className="rp-strip-tag">Full year<br />(15 min)</span>
+        {state.kind === 'running' ? <span className="rp-strip-msg">Running…</span>
+          : s ? <span className={`rp-strip-hv${hourlyStale ? ' rp-stale' : ''}`} title={hourlyStale ? 'Out of date: the model has changed since this run' : undefined}>
+              heating {unit === 'kwh_per_m2' ? `${perM2(s.building.heating_kwh, s.building.floor_m2)} kWh/m²` : `${mwh(s.building.heating_kwh)} MWh`}{hourlyStale ? ' · out of date' : ''}
+            </span>
+          : state.kind === 'missing' ? <span className="rp-strip-msg">{state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set</span>
+          : state.kind === 'error' ? <span className="rp-strip-msg rp-error" title={state.message}>{/cannot run in this view/.test(state.message) ? "can't run in this view" : 'stopped with an error (see Heat flow)'}</span> : null}
+        <button type="button" className="rp-btn rp-run" disabled={!weather || state.kind === 'running'} onClick={runHourly}>{s ? 'Run again' : 'Run'}</button>
+        <EnergyPlusButton ep={run.energyPlus} disabled={!weather} onRan={onOpen} />
+      </div>
+    </div>
+  )
+}
+
 export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void }) {
   const { state, weather, previewState } = run
   const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
+  if (run.hold) return <HeldStrip run={run} onOpen={onOpen} unit={unit} />
   const s = state.kind === 'done' ? state.summary : null
   const last = useRef<Summary | null>(null)
   if (s) last.current = s
@@ -391,6 +489,8 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
       )}
       {state.kind === 'error' && <p className="rp-error" role="alert">The run failed: {state.message}</p>}
       {(state.kind === 'idle' || (state.kind === 'running' && !s)) && <p className="rp-wait">Working it out…</p>}
+      {/* Brief 123: kept apart from the hourly figures below (Rule 11), each column named. */}
+      <EnergyPlusCompare ep={run.energyPlus} current={run.doc} disabled={!run.weather} />
 
       {s && (
         <div className={state.kind === 'running' ? 'rp-stale' : undefined}>
@@ -407,7 +507,7 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
             </div>
           </div>
           {/* Brief 112 (Rule 8): lighting heat needs the luminaires' efficacy, a Systems object. */}
-          {run.level === 'spaces' && <p className="rp-none">Lighting heat appears at + Systems, because it depends on the luminaires.</p>}
+          {run.level === 'spaces' && <p className="rp-none">Lighting heat appears at + Systems, because it depends on the luminaires. Window ventilation appears at + Systems too, with its controls.</p>}
 
           <h3>Energy used <i>estimate</i></h3>
           {s.energy === null ? (
@@ -477,9 +577,15 @@ export function ResultsBody({ run, focusZone }: { run: Run; focusZone?: string |
                   <td>{z.cooled ? mwh(z.cooling_kwh) : <span className="rp-none">not cooled</span>}</td>
                 </tr>,
                 ...(zoneOpen === z.id ? [<BalanceRows key={`${z.id}-balance`} lines={z.breakdown} indent />] : []),
+                ...(zoneOpen === z.id && z.air && z.air.hours_windows_open > 0 ? [<tr key={`${z.id}-win`} className="rp-zone-line"><td colSpan={3} className="rp-none">Windows open in {z.air.hours_windows_open.toLocaleString('en-GB')} hours of the year</td></tr>] : []),
               ])}
             </tbody>
           </table>
+          {/* Brief 115 review F4: a room with no outside wall keeps today's air leakage under weather-driven air. */}
+          {(() => {
+            const inner = s.zones.filter((z) => z.air?.leakage === 'q50_over_20')
+            return inner.length > 0 && <p className="rp-foot">{inner.map((z) => z.name || z.id).join(', ')} {inner.length === 1 ? 'has' : 'have'} no outside wall, so {inner.length === 1 ? 'its' : 'their'} air leakage stays at q50 ÷ 20 air changes, as in the fixed method; the wind and stack work only on rooms with outside walls.</p>
+          })()}
 
           <h3>Where the heat goes <i>estimate</i></h3>
           <table className="rp-table rp-breakdown">

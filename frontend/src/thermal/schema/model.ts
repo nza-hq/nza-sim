@@ -105,6 +105,24 @@ export const ScheduleProfile = z
     id,
     kind: z.literal('schedule'),
     label: z.string().optional(),
+    /** Brief 115: what the editor offers it as (recorded for lists; the engine reads a schedule the same way for all). */
+    purpose: z.enum(['window_opening', 'availability']).nullable().default(null),
+    day_types: z.object({ weekday: Day24, saturday: Day24, sunday: Day24 }).strict(),
+  })
+  .strict()
+
+/**
+ * Schema 2.11 (Brief 115): a named temperature for each hour, °C, by day type (weekday / saturday / sunday, index i the
+ * hour from i:00). A window that opens by temperature may open above one (`open_above_ref`) instead of one fixed
+ * `open_above_c`, so the threshold can follow the day (IES-style daily and weekly profiles).
+ */
+export const TemperatureProfile = z
+  .object({
+    id,
+    kind: z.literal('temperature'),
+    label: z.string().optional(),
+    /** What the editor offers it as (recorded for lists). Setpoint profiles are named here; zones read them in a follow-up brief. */
+    purpose: z.enum(['heating_setpoint', 'cooling_setpoint', 'window_threshold']).nullable().default(null),
     day_types: z.object({ weekday: Day24, saturday: Day24, sunday: Day24 }).strict(),
   })
   .strict()
@@ -115,6 +133,7 @@ export const Profile = z.discriminatedUnion('kind', [
   EquipmentProfile,
   AuxiliaryProfile,
   ScheduleProfile,
+  TemperatureProfile,
 ])
 export type Profile = z.infer<typeof Profile>
 
@@ -148,7 +167,23 @@ export const ConstructionRef = z
 
 // ─── Surfaces ───────────────────────────────────────────────────────────────────────────────────
 
-/** An opening in a wall surface: a permanent vent (always open) or an operable opening (controlled). */
+/**
+ * Schema 2.11 (Brief 115): how a window opens. The effective area is worked out in one place
+ * (thermal/engine/airflow.ts `windowEffectiveArea`, Rule 11).
+ */
+export const WINDOW_STYLES = ['side_hung', 'top_hung', 'bottom_hung', 'centre_pivot', 'sliding', 'louvre'] as const
+
+/**
+ * An opening in a wall surface: a permanent vent (always open) or an operable opening (controlled).
+ *
+ * Schema 2.11 (Brief 115), read only when `building.air.method` is 'weather_driven':
+ * - A permanent vent states `height_m`, its centre's height above the zone's floor. Its `flow_mode` is not used: the
+ *   room's pressure balance decides which way air goes through each opening.
+ * - An operable opening is a window: it sits on a glazing surface and opens the glazing area × `openable_fraction`.
+ *   It states its `style`, its opening angle (`opening_angle_deg`, for hung and pivot windows), its discharge
+ *   coefficient `cd`, and `sill_m` / `head_m`, the bottom and top of the opening above the zone's floor. When it opens
+ *   is the zone's window entry on the control map (`controls[]`, target kind 'window').
+ */
 export const Opening = z.discriminatedUnion('kind', [
   z
     .object({
@@ -156,6 +191,7 @@ export const Opening = z.discriminatedUnion('kind', [
       area_m2: nonNeg,
       cd: finite.optional(),
       flow_mode: z.string().optional(),
+      height_m: nonNeg.nullable().optional(),
     })
     .strict(),
   z
@@ -165,6 +201,10 @@ export const Opening = z.discriminatedUnion('kind', [
       cd: finite.optional(),
       flow_mode: z.string().optional(),
       control_ref: z.string().nullable().optional(),
+      style: z.enum(WINDOW_STYLES).optional(),
+      opening_angle_deg: finite.min(0).max(180).nullable().optional(),
+      sill_m: nonNeg.optional(),
+      head_m: nonNeg.optional(),
     })
     .strict(),
 ])
@@ -240,6 +280,15 @@ export const Surface = z
     inside_solar_absorptance_b: finite.gt(0).max(1).nullable(),
     /** Schema 2.2: internal mass only. True: flat, zone_a face up (takes the beam). False: upright. Null otherwise. */
     faces_up: z.boolean().nullable(),
+    /**
+     * Schema 2.12 (Brief 124 D3, Linzie 17 Nov): a finish on zone_a's inside face (carpet on a floor, a suspended
+     * ceiling under a slab or roof), a library construction whose layers are added on that face, inside the structure.
+     * A stated U stays the structure's; the finish adds its resistance. Absent or null: none (a hard floor, an exposed
+     * soffit). Not on glazing.
+     */
+    inside_finish: z.object({ key: id }).strict().nullable().optional(),
+    /** Schema 2.12: the same on zone_b's face, for a surface between zones or internal mass only. */
+    inside_finish_b: z.object({ key: id }).strict().nullable().optional(),
   })
   .strict()
 export type Surface = z.infer<typeof Surface>
@@ -380,6 +429,14 @@ export const Zone = z
         cool_c: finite.nullable(),
         setback_c: finite.nullable(),
         hours_ref: z.string().nullable(),
+        /**
+         * Brief 121: the heating setpoint each hour from a temperature profile (in every hour; the profile carries any
+         * setback, so setback_c is empty). heat_c stays the in-use setpoint (emitter rating, design heat loss) and must
+         * be the profile's highest value.
+         */
+        heat_ref: id.nullable().default(null),
+        /** Brief 121: the cooling setpoint each hour from a temperature profile (cooling still only in hours_ref's hours); cool_c its lowest value. */
+        cool_ref: id.nullable().default(null),
         /** Today's `control_strategy` ('active_setpoint' or free running). */
         control_strategy: z.string().nullable(),
       })
@@ -402,6 +459,14 @@ export const Zone = z
      * it is taken to sit at, for the heat lost to it from the rooms next to it. Left out reads as null; nothing is filled.
      */
     design_internal_c: z.union([finite, z.literal('follow_heat_c')]).nullable().default(null),
+    /**
+     * Brief 123 P4: 'unconditioned', a space nothing heats or cools (a ventilated loft under a cold roof). It floats:
+     * no setpoints, emitters, ventilation entries, profile references, systems or controls (Rule 8: absent, refused if
+     * present). Its air is its own `infiltration_ach`; its floor area is not the building's. Left out: 'conditioned'.
+     */
+    conditioning: z.enum(['conditioned', 'unconditioned']).default('conditioned'),
+    /** Brief 123: what the unconditioned space is ('ventilated_loft'); null for a conditioned zone. */
+    unconditioned_kind: z.enum(['ventilated_loft']).nullable().default(null),
   })
   .strict()
 export type Zone = z.infer<typeof Zone>
@@ -535,6 +600,8 @@ export const DESIGN_FROM_WEATHER = ['heating_99_6', 'heating_99'] as const
  * - `warm_up_w_per_m2`: an allowance for warming the room up after a setback, W per m² of floor; null for none.
  * - `vent_wind_m_s`: the wind speed at which permanent vents are counted; required only when a zone has vents.
  */
+export const AIR_TERRAINS = ['open', 'suburban', 'urban', 'city'] as const
+
 export const DesignConditions = z
   .object({
     outdoor: z.union([
@@ -563,6 +630,27 @@ export const Building = z
          * (a constant equal to the EPW's annual mean dry bulb); ISO 13370 methods are later options.
          */
         ground: z.object({ method: z.literal('annual_mean_outdoor') }).strict(),
+        /**
+         * Schema 2.11 (Brief 115): the terrain around the site, for the wind's profile with height (EnergyPlus's
+         * terrain classes). Required by weather-driven air; null otherwise.
+         */
+        terrain: z.enum(AIR_TERRAINS).nullable().default(null),
+      })
+      .strict(),
+    /**
+     * Schema 2.11 (Brief 115): how air leakage and openings are worked out.
+     * - 'today': today's NZA Sim, n = q50 × envelope area ÷ volume ÷ 20, and wind-only vents (air.ts). Every older
+     *   document is upgraded to it, so Bridgewater stays 133.2.
+     * - 'weather_driven': each room's pressure balance every step, with wind by terrain and height, stack from its own
+     *   and the outdoor temperature, power-law cracks from its q50 (exponent stated), vents and windows as orifices,
+     *   windows opened by the zone's window rule (thermal/engine/airflow.ts). `single_sided_turbulence`: add EN 16798-7's
+     *   single-sided wind term for rooms whose open windows are all on one facade, as its own line.
+     */
+    air: z
+      .object({
+        method: z.enum(['today', 'weather_driven']),
+        exponent: finite.positive().max(1).nullable(),
+        single_sided_turbulence: z.boolean().nullable(),
       })
       .strict(),
     /** The box's orientation: degrees the north facade is turned clockwise from true north. */
@@ -617,7 +705,9 @@ export type OtherLoad = z.infer<typeof OtherLoad>
  * trend logs. The figures it controls stay where they live (a zone's setpoints and hours, a system's pumps, a
  * ventilation entry's `runs`): the Controls step edits them there, so each field still has one place.
  * A `window` entry carries the window rule (Brief 115 owns the meanings and the physics; until it lands the rule is
- * recorded, not used). Its `ref` is a zone; `hours_ref` is the allowed opening hours (window entries only).
+ * recorded, not used). Its `ref` is a zone; `hours_ref` is the window's opening profile (window entries only): each hour's value, 0 to 1,
+ * is how far the windows may open that hour (0 shut), × `open_fraction`; a temperature rule opens only when its
+ * conditions hold, above `open_above_c` or the hour's value of the temperature profile `open_above_ref`.
  */
 export const CONTROL_TARGETS = ['system', 'ventilation', 'lighting', 'window'] as const
 export const CONTROLLERS = ['central_bms', 'local', 'time_clock', 'manual', 'photocell'] as const
@@ -631,6 +721,8 @@ export const ControlEntry = z
     rule: z.enum(['temperature', 'adaptive', 'timetable']).nullable().default(null),
     open_fraction: fraction.nullable().default(null),
     open_above_ref: id.nullable().default(null),
+    /** Schema 2.11 (Brief 115): a window that opens by temperature opens when the room is above this, °C, and warmer than outside. */
+    open_above_c: finite.nullable().default(null),
     min_open_h: nonNeg.nullable().default(null),
     min_closed_h: nonNeg.nullable().default(null),
     operation: z.enum(['by_hand', 'automated']).nullable().default(null),
@@ -639,9 +731,9 @@ export const ControlEntry = z
   })
   .strict()
 export type ControlEntry = z.infer<typeof ControlEntry>
-const WINDOW_FIELDS = ['rule', 'open_fraction', 'open_above_ref', 'min_open_h', 'min_closed_h', 'operation', 'modulation', 'adaptive_category'] as const
+const WINDOW_FIELDS = ['rule', 'open_fraction', 'open_above_ref', 'open_above_c', 'min_open_h', 'min_closed_h', 'operation', 'modulation', 'adaptive_category'] as const
 
-export const SCHEMA_VERSION = '2.10' as const
+export const SCHEMA_VERSION = '2.12' as const
 
 export const ModelDocument = z
   .object({
@@ -687,8 +779,10 @@ export const ModelDocument = z
         ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `glazing "${s.id}" needs frame_fraction and thermal_emissivity` })
       }
       s.openings.forEach((o, j) => {
-        if (o.kind === 'permanent_vent' && (o.cd == null || o.flow_mode == null)) {
-          ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'openings', j], message: `permanent vent on "${s.id}" needs cd and flow_mode` })
+        // Brief 115: flow_mode is today's wind-only vent formula; weather-driven air works the flow out itself (cd and height_m).
+        const today = doc.building.air?.method !== 'weather_driven'
+        if (o.kind === 'permanent_vent' && (o.cd == null || (today && o.flow_mode == null))) {
+          ctx.addIssue({ code: 'custom', path: ['surfaces', i, 'openings', j], message: today ? `permanent vent on "${s.id}" needs cd and flow_mode` : `permanent vent on "${s.id}" needs cd` })
         }
       })
       if (isZoneId(s.zone_b) && !zoneIds.has(s.zone_b)) {
@@ -708,6 +802,8 @@ export const ModelDocument = z
       if (internalMass && s.faces_up == null) issue(`internal mass "${s.id}" needs faces_up`, ['faces_up'])
       if (internalMass && s.faces_up != null && s.tilt_deg !== (s.faces_up ? 180 : 90)) issue(`internal mass "${s.id}" with faces_up ${s.faces_up} must have tilt ${s.faces_up ? 180 : 90}`, ['tilt_deg'])
       if (!internalMass && s.faces_up != null) issue(`faces_up is for internal mass only ("${s.id}")`, ['faces_up'])
+      if (s.kind === 'glazing' && s.inside_finish) issue(`glazing "${s.id}" takes no inside finish`, ['inside_finish'])
+      if (!internalMass && !interzone && s.inside_finish_b) issue(`inside_finish_b is for a surface between zones or internal mass only ("${s.id}")`, ['inside_finish_b'])
       if (interzone || internalMass) {
         if (s.solar_absorptance != null || s.thermal_emissivity != null || s.frame_fraction != null || s.g_value != null || s.azimuth_deg != null || s.facade != null) {
           issue(`surface "${s.id}" has no outside face: solar_absorptance, thermal_emissivity, frame_fraction, g_value, azimuth_deg and facade must be null`)
@@ -739,8 +835,27 @@ export const ModelDocument = z
         if (!want.has(zid)) ctx.addIssue({ code: 'custom', path: ['surfaces', i], message: `surface "${s.id}" is listed by zone "${zid}", which it does not face` })
       }
     })
+    // Brief 123 P4: an unconditioned zone is absent from everything that conditions or occupies it (Rule 8), each named.
+    const uncond = new Set(doc.zones.filter((z0) => z0.conditioning === 'unconditioned').map((z0) => z0.id))
+    doc.zones.forEach((z0, i) => {
+      const at = (k: (string | number)[], m: string) => ctx.addIssue({ code: 'custom', path: ['zones', i, ...k], message: m })
+      if (z0.conditioning !== 'unconditioned') {
+        if (z0.unconditioned_kind != null) at(['unconditioned_kind'], 'only an unconditioned zone has an unconditioned_kind')
+        return
+      }
+      if (z0.unconditioned_kind == null) at(['unconditioned_kind'], "required for an unconditioned zone ('ventilated_loft')")
+      const sp = z0.setpoints
+      for (const k of ['heat_c', 'cool_c', 'setback_c', 'hours_ref', 'heat_ref', 'cool_ref', 'control_strategy'] as const) if (sp[k] != null) at(['setpoints', k], 'an unconditioned zone has no setpoints: nothing heats or cools it')
+      if (z0.emitters.length) at(['emitters'], 'an unconditioned zone has no emitters')
+      if (z0.ventilation.length) at(['ventilation'], 'an unconditioned zone has no ventilation entries: its air is its infiltration_ach')
+      const pr = z0.profile_refs
+      if (pr.occupancy != null || pr.lighting.length || pr.equipment.length || pr.auxiliary.length) at(['profile_refs'], 'an unconditioned zone has no people, lighting or equipment')
+      if (z0.infiltration_q50 != null) at(['infiltration_q50'], 'an unconditioned zone states its air as infiltration_ach')
+      if (z0.infiltration_ach == null) at(['infiltration_ach'], 'required: the unconditioned space\'s air changes an hour')
+    })
     doc.system_groups.forEach((g, i) => {
       g.zones.forEach((zid, j) => {
+        if (uncond.has(zid)) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'zones', j], message: `zone "${zid}" is unconditioned: no system serves it` })
         if (!zoneIds.has(zid)) ctx.addIssue({ code: 'custom', path: ['system_groups', i, 'zones', j], message: `system group "${g.id}" serves zone "${zid}", which does not exist` })
       })
     })
@@ -829,6 +944,18 @@ export const ModelDocument = z
       if (v.runs === 'schedule' && (v.control_schedule_ref == null || !schedIds.has(v.control_schedule_ref))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans that run to a schedule need a schedule profile' })
       if (v.runs === 'demand' && (v.control_schedule_ref == null || (v.control_schedule_ref !== 'always_on' && !schedIds.has(v.control_schedule_ref)))) ctx.addIssue({ code: 'custom', path: [...at, 'control_schedule_ref'], message: 'fans on demand need the hours they may run: always_on or a schedule profile' })
     }))
+    // Brief 115: weather-driven air states its terrain, crack exponent and the single-sided choice; 'today' none of them.
+    {
+      const air = doc.building.air, at = ['building', 'air']
+      if (air.method === 'weather_driven') {
+        if (doc.building.site.terrain == null) ctx.addIssue({ code: 'custom', path: ['building', 'site', 'terrain'], message: 'weather-driven air needs the terrain (open, suburban, urban or city)' })
+        if (air.exponent == null) ctx.addIssue({ code: 'custom', path: [...at, 'exponent'], message: 'weather-driven air needs the cracks\' flow exponent (0.67 is usual)' })
+        if (air.single_sided_turbulence == null) ctx.addIssue({ code: 'custom', path: [...at, 'single_sided_turbulence'], message: 'say whether single-sided rooms take EN 16798-7\'s wind turbulence term' })
+      } else {
+        if (air.exponent != null) ctx.addIssue({ code: 'custom', path: [...at, 'exponent'], message: 'today\'s air method has no crack exponent; leave empty' })
+        if (air.single_sided_turbulence != null) ctx.addIssue({ code: 'custom', path: [...at, 'single_sided_turbulence'], message: 'today\'s air method has no single-sided term; leave empty' })
+      }
+    }
     // Brief 114: the control map. One entry per target, which must exist; window fields only on a window entry.
     const ventIds = new Set(doc.zones.flatMap((z0) => z0.ventilation.map((v) => v.id)))
     const ctlIds = new Set<string>(), targets = new Set<string>()
@@ -837,6 +964,7 @@ export const ModelDocument = z
       if (ctlIds.has(c.id)) ctx.addIssue({ code: 'custom', path: [...at, 'id'], message: `control id "${c.id}" is used twice` })
       ctlIds.add(c.id)
       const key = `${c.target.kind}|${c.target.ref}`
+      if (c.target.kind === 'window' && uncond.has(c.target.ref)) ctx.addIssue({ code: 'custom', path: [...at, 'target', 'ref'], message: `zone "${c.target.ref}" is unconditioned: its windows have no rule` })
       if (targets.has(key)) ctx.addIssue({ code: 'custom', path: [...at, 'target'], message: `${c.target.kind} "${c.target.ref}" has two control entries; keep one` })
       targets.add(key)
       const g = doc.system_groups.find((x) => x.id === c.target.ref)
@@ -850,6 +978,9 @@ export const ModelDocument = z
         for (const f of WINDOW_FIELDS) if (c[f] != null) ctx.addIssue({ code: 'custom', path: [...at, f], message: 'a window rule field; only on a window entry' })
       } else {
         if (c.hours_ref != null && !schedIds.has(c.hours_ref)) ctx.addIssue({ code: 'custom', path: [...at, 'hours_ref'], message: `schedule "${c.hours_ref}" does not exist` })
+        if (c.open_above_ref != null && !doc.profiles.some((p) => p.id === c.open_above_ref && p.kind === 'temperature')) ctx.addIssue({ code: 'custom', path: [...at, 'open_above_ref'], message: `temperature profile "${c.open_above_ref}" does not exist` })
+        if (c.open_above_ref != null && c.open_above_c != null) ctx.addIssue({ code: 'custom', path: [...at, 'open_above_c'], message: 'the windows open above a temperature profile or one temperature: keep one' })
+        if (c.rule === 'timetable' && (c.open_above_ref != null || c.open_above_c != null)) ctx.addIssue({ code: 'custom', path: [...at, c.open_above_ref != null ? 'open_above_ref' : 'open_above_c'], message: 'a window on a timetable opens by its hours, not by temperature; leave empty' })
         if (c.rule === 'adaptive' && c.adaptive_category == null) ctx.addIssue({ code: 'custom', path: [...at, 'adaptive_category'], message: 'an adaptive window rule needs its EN 16798-1 category (I, II or III)' })
       }
     })
@@ -857,7 +988,12 @@ export const ModelDocument = z
       if (p.kind === 'lighting' && p.lux != null && p.magnitude != null) ctx.addIssue({ code: 'custom', path: ['profiles', i], message: `lighting "${p.id}" states both lux and a W/m²: keep one` })
     })
     const profileIds = new Set(doc.profiles.map((p) => p.id))
+    const tempIds = new Set(doc.profiles.filter((p) => p.kind === 'temperature').map((p) => p.id))
     doc.zones.forEach((z0, i) => {
+      for (const k of ['heat_ref', 'cool_ref'] as const) {
+        const r = z0.setpoints[k]
+        if (r != null && !tempIds.has(r)) ctx.addIssue({ code: 'custom', path: ['zones', i, 'setpoints', k], message: `temperature profile "${r}" does not exist` })
+      }
       const refs = [z0.profile_refs.occupancy, ...z0.profile_refs.lighting, ...z0.profile_refs.equipment, ...z0.profile_refs.auxiliary]
       refs.forEach((r) => {
         if (r != null && !profileIds.has(r)) ctx.addIssue({ code: 'custom', path: ['zones', i, 'profile_refs'], message: `zone "${z0.id}" refers to profile "${r}", which does not exist` })

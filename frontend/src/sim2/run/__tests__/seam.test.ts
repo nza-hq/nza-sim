@@ -36,7 +36,7 @@ describe('simulate', () => {
     const r = simulate(d, { weather: WEATHER })
     if (!r.ok) throw new Error(JSON.stringify(r.missing))
     const lib = Object.fromEntries(CONSTRUCTIONS.map((c) => [c.key, bodyFromLibrary(c.body)]))
-    const direct = runModel(d, W, lib, RUN_OPTIONS)
+    const direct = runModel(d, W, lib, QUARTER_HOUR_OPTIONS)  // the product's run (runOptionsFor)
     expect(r.summary.zones.map((z) => z.heating_kwh)).toEqual(direct.zones.map((z) => z.annual.heating_kwh))
     expect(r.summary.building.heating_kwh).toBeCloseTo(direct.zones.reduce((s, z) => s + z.annual.heating_kwh, 0), 9)
     expect(r.summary.building.cooling_kwh).toBeGreaterThan(0)
@@ -137,13 +137,14 @@ describe('simulate', () => {
     // Monday-morning recovery; and their hours below are the hours in use (review F6).
     const steady = structuredClone(d)
     for (const z of steady.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null }
-    // Review F3: a limited zone heated to hours runs in quarter hours; the same building unlimited keeps one step.
-    expect(r.summary.steps_per_hour).toBe(1); expect(c.summary.steps_per_hour).toBe(4)
+    // Linzie 17 Nov 10:27: every product run is in quarter hours (it was only limited zones heated to hours, review F3).
+    expect(r.summary.steps_per_hour).toBe(4); expect(c.summary.steps_per_hour).toBe(4)
     const s = simulate(steady, { weather: WEATHER, options: QUARTER_HOUR_OPTIONS })
     if (!s.ok) throw new Error(JSON.stringify(s.missing))
     c.summary.emitters!.zones.forEach((z, i) => {
       expect(z.peak_w).toBe(s.summary.emitters!.zones[i].peak_w)
-      expect(z.peak_w).toBeLessThan(r.summary.zones[i].hours!.morning_peak!.w / 2)
+      // Brief 126 (TARP inside, EnergyPlus's sky): the steady peak is about 0.51 of the Monday-morning peak (0.45 before).
+      expect(z.peak_w).toBeLessThan(r.summary.zones[i].hours!.morning_peak!.w * 0.6)
       expect(z.in_use).toBe(true); expect(s.summary.emitters!.zones[i].in_use).toBe(false)
       expect(z.unmet_hours).toBe(c.results.zones[i].annual.unmet_heating_hours_in_use)
       expect(z.min_c).toBe(c.results.zones[i].annual.min_control_in_use_c)
@@ -217,6 +218,13 @@ describe('simulate', () => {
     expect(e.end_uses.reduce((a, l) => a + l.kwh, 0)).toBeCloseTo(e.total_kwh, 6)
     expect(e.eui_kwh_per_m2).toBeCloseTo(e.total_kwh / r.summary.building.floor_m2, 9)
     expect(e.systems.find((s) => s.service === 'heating' && s.fuel === 'electricity' && s.efficiency === 3)).toBeDefined()
+    // Load profiles (17 Nov 2026): each hourly line sums to its end-use row (Rule 9: the profile and the table are one quantity).
+    for (const l of e.end_uses) {
+      const h = e.hourly.filter((x) => x.end_use === l.end_use && x.fuel === l.fuel)
+      const kwh = h.reduce((a, x) => a + x.w.reduce((b, w) => b + w, 0), 0) / 1000
+      expect(kwh).toBeCloseTo(l.kwh, 3)
+    }
+    expect(e.hourly.every((x) => x.w.length === 8760)).toBe(true)
     const d = await doc()
     d.system_groups = d.system_groups.filter((g: any) => g.service !== 'heating')
     const r2 = simulate(d, { weather: WEATHER })
@@ -348,7 +356,7 @@ describe('simulate', () => {
     const r2 = simulate(await withRads((zi) => need[zi]), { weather: WEATHER })
     if (!r2.ok) throw new Error(JSON.stringify(r2.missing))
     for (const z of r2.summary.emitters!.zones) { expect(z.unmet_hours).toBe(0); expect(z.shortfall_w).toBe(0) }
-  })
+  }, 30000)
   it('a what-if that cannot run says why, and the run itself still shows', async () => {
     const d = await doc()
     const hp = d.system_groups.find((g: any) => g.service === 'heating' && g.source === 'ambient_air')
@@ -482,7 +490,7 @@ describe('Brief 119: cooling units in the emitter summary', () => {
     expect(em.zones).toEqual([])  // a cooling-only unit is not a heating emitter
     expect(em.cooling).toHaveLength(1)
     const c = em.cooling[0], z = r.results.zones[2]
-    const free = simulate(d, { weather: WEATHER, options: { ...RUN_OPTIONS, emitter_limit: 'none' } })
+    const free = simulate(d, { weather: WEATHER, options: { ...QUARTER_HOUR_OPTIONS, emitter_limit: 'none' } })
     if (!free.ok) throw new Error('free run')
     expect(c).toMatchObject({ id: z3.id, cap_w: 12000, unmet_hours: z.annual.unmet_cooling_hours, max_c: z.annual.max_control_c, hours_at_cap: z.cooling_units!.hours_at_cap })
     expect(c.peak_w).toBe(free.results.zones[2].annual.peak_cooling_w)
@@ -583,4 +591,26 @@ describe('Brief 120 P3: system capacity in the summary', () => {
     expect(r.summary.plants).toEqual([])
     expect(r.summary.zones.every((z) => z.short.heating === null && z.short.cooling === null)).toBe(true)
   })
+})
+
+describe('Brief 125: the outside film in the run', () => {
+  it("the product's run takes EnergyPlus's film and says so; the referee options keep ISO's fixed film and say nothing", async () => {
+    expect(QUARTER_HOUR_OPTIONS.surface_physics?.outside_convection).toBe('doe2')
+    expect(RUN_OPTIONS.surface_physics?.outside_convection).toBe('fixed')
+    // Brief 126: the inside film, the sky, the window and the outdoor air, EnergyPlus's way too.
+    expect(QUARTER_HOUR_OPTIONS.surface_physics).toMatchObject({ inside_convection: 'tarp', outside_longwave: 'energyplus', window: 'energyplus' })
+    expect(QUARTER_HOUR_OPTIONS.air_heat_capacity).toBe('outdoor')
+    expect(RUN_OPTIONS.surface_physics).toMatchObject({ inside_convection: 'by_tilt' })
+    const r = simulate(await doc(), { weather: WEATHER })
+    if (!r.ok) throw new Error(JSON.stringify(r.missing))
+    expect(r.summary.method_notes).toHaveLength(5)
+    expect(r.summary.method_notes[0]).toMatch(/^Outside surfaces lose heat to the air as EnergyPlus works it out \(its DOE-2 method\)/)
+    // This weather (Denver, from a .mos file) carries no present weather or precipitation.
+    expect(r.summary.method_notes[0]).toMatch(/no rain information/)
+    expect(r.summary.method_notes[1]).toMatch(/sky's temperature from the weather file's own sky radiation/)
+    expect(r.summary.method_notes.slice(2).join(' ')).toMatch(/TARP.*ISO 15099.*simple glazing.*0\.84.*density and humidity/)
+    const f = simulate(await doc(), { weather: WEATHER, options: RUN_OPTIONS })
+    if (!f.ok) throw new Error('ran')
+    expect(f.summary.method_notes).toEqual([])
+  }, 60000)
 })

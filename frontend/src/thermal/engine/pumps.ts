@@ -60,6 +60,17 @@ export function scheduleFractions(doc: ModelDocument, ref: string, hours: Weathe
   return out
 }
 
+/** Brief 115: a temperature profile's value for each hour, °C (the same calendar as `scheduleFractions`). */
+export function temperatureHours(doc: ModelDocument, ref: string, hours: Weather['hours'], path: string): Float64Array {
+  const i = doc.profiles.findIndex((p) => p.id === ref && p.kind === 'temperature')
+  if (i < 0) throw new ScheduleError(`temperature profile "${ref}" does not exist`, path)
+  const p = doc.profiles[i] as Extract<ModelDocument['profiles'][number], { kind: 'temperature' }>
+  const c = calendar(hours)
+  const out = new Float64Array(hours.count)
+  for (let h = 0; h < hours.count; h++) out[h] = p.day_types[c.day[h]][c.hourOfDay[h]]
+  return out
+}
+
 export interface PumpRun {
   /** Electricity each hour, W. */
   w: Float64Array

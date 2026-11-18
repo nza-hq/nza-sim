@@ -20,6 +20,7 @@ export const DESIGN_TERM_WORDS: Record<DesignTerm, string> = {
   bridging: 'Thermal bridging',
   ground: 'Floor on the ground',
   to_room: 'To rooms at other temperatures',
+  to_loft: 'Ceiling to the loft',
   infiltration: 'Air leakage',
   vents: 'Permanent vents',
   mechanical_ventilation: 'Ventilation',

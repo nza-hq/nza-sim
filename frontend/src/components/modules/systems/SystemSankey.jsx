@@ -113,11 +113,6 @@ export default function SystemSankey({ openSection, setOpenSection, libraryData 
   const { weatherData } = useWeather()
   const orientationDeg = Number(params?.orientation ?? 0)
   const hourlySolar = useHourlySolar(weatherData, orientationDeg)
-  const containerRef = useRef(null)
-  const [dims, setDims] = useState({ width: 600, height: 400 })
-  const [tooltip, setTooltip] = useState(null)        // { x, y, node } | { x, y, link, srcLabel, tgtLabel }
-  const [hoveredNodeId, setHoveredNodeId] = useState(null)
-  const [hoveredLinkIdx, setHoveredLinkIdx] = useState(null)
 
   const result = useMemo(
     // Brief 44 Part 5d (2026-05-21): _skipInterventions per perf audit D.1.
@@ -133,6 +128,64 @@ export default function SystemSankey({ openSection, setOpenSection, libraryData 
   const dhwSec  = systems.dhw?.secondary?.system      ?? systems.dhw_preheat      ?? 'none'
   const isMVHR  = ventSys.startsWith('mvhr')
   const hasASHP = dhwSec && dhwSec !== 'none' && (dhwSec.includes('ashp') || dhwSec.includes('heat_pump'))
+
+  // ── Click on node → expand demand accordion ──────────────────────────────
+  // Node IDs from instantCalc use prefixes: sh_ sc_ dhw_ dhw_sec_ vent_
+  // Legacy IDs (vrf, mvhr, boiler) are also handled for backward compat.
+  const handleNodeClick = useCallback((node) => {
+    if (!setOpenSection) return
+    const id = node.id ?? ''
+    let section = null
+    if (id.startsWith('sh_'))      section = 'space_heating'
+    else if (id.startsWith('sc_')) section = 'space_cooling'
+    else if (id.startsWith('dhw_sec_')) section = 'dhw'
+    else if (id.startsWith('dhw_'))    section = 'dhw'
+    else if (id.startsWith('vent_'))   section = 'ventilation'
+    else if (id === 'lighting')        section = 'lighting'
+    else if (id === 'small_power')     section = 'smallpower'
+    // Legacy fallbacks
+    else if (id === 'vrf')    section = 'space_heating'
+    else if (id === 'mvhr')   section = 'ventilation'
+    else if (id === 'boiler') section = 'dhw'
+    if (section) setOpenSection(section)
+  }, [setOpenSection])
+
+  // ── Badge list ────────────────────────────────────────────────────────────
+  const badges = [
+    { label: isIdeal ? 'Ideal Loads' : 'Detailed', color: isIdeal ? '#F59E0B' : '#00AEEF', bg: isIdeal ? '#FFFBEB' : '#EEF8FF' },
+    isMVHR  ? { label: 'MVHR ✓',         color: '#16A34A', bg: '#ECFDF5' }
+            : { label: 'MEV',             color: '#9CA3AF', bg: '#F9FAFB' },
+    hasASHP ? { label: 'ASHP Preheat ✓', color: '#16A34A', bg: '#ECFDF5' } : null,
+  ].filter(Boolean)
+
+  return (
+    <SystemSankeyChart
+      systemsFlow={systemsFlow}
+      fuelSplit={result.fuel_split}
+      badges={badges}
+      onNodeClick={handleNodeClick}
+      clickable={!!setOpenSection}
+    />
+  )
+}
+
+/**
+ * The Sankey itself, drawn from a systems_flow ({ nodes, links }) and a fuel split, with no calculation of its own:
+ * today's Systems module passes calculateInstant's flow; Simulate v2 passes one built from its run's energy summary
+ * (sim2/run/energyFlow.ts). Split out of SystemSankey on 17 Nov 2026 so both draw the same chart; today's drawing is
+ * unchanged.
+ */
+export function SystemSankeyChart({
+  systemsFlow, fuelSplit, badges = [], onNodeClick = null, clickable = false,
+  title = 'Energy Flow — Systems', subtitle = 'Proportional energy flows · hover nodes for details · click to edit',
+  exportTitle = 'Systems energy flow',
+}) {
+  const handleNodeClick = useCallback((node) => { if (onNodeClick) onNodeClick(node) }, [onNodeClick])
+  const containerRef = useRef(null)
+  const [dims, setDims] = useState({ width: 600, height: 400 })
+  const [tooltip, setTooltip] = useState(null)        // { x, y, node } | { x, y, link, srcLabel, tgtLabel }
+  const [hoveredNodeId, setHoveredNodeId] = useState(null)
+  const [hoveredLinkIdx, setHoveredLinkIdx] = useState(null)
 
   // ResizeObserver
   useEffect(() => {
@@ -347,42 +400,13 @@ export default function SystemSankey({ openSection, setOpenSection, libraryData 
     setHoveredLinkIdx(null)
   }, [])
 
-  // ── Click on node → expand demand accordion ──────────────────────────────
-  // Node IDs from instantCalc use prefixes: sh_ sc_ dhw_ dhw_sec_ vent_
-  // Legacy IDs (vrf, mvhr, boiler) are also handled for backward compat.
-  const handleNodeClick = useCallback((node) => {
-    if (!setOpenSection) return
-    const id = node.id ?? ''
-    let section = null
-    if (id.startsWith('sh_'))      section = 'space_heating'
-    else if (id.startsWith('sc_')) section = 'space_cooling'
-    else if (id.startsWith('dhw_sec_')) section = 'dhw'
-    else if (id.startsWith('dhw_'))    section = 'dhw'
-    else if (id.startsWith('vent_'))   section = 'ventilation'
-    else if (id === 'lighting')        section = 'lighting'
-    else if (id === 'small_power')     section = 'smallpower'
-    // Legacy fallbacks
-    else if (id === 'vrf')    section = 'space_heating'
-    else if (id === 'mvhr')   section = 'ventilation'
-    else if (id === 'boiler') section = 'dhw'
-    if (section) setOpenSection(section)
-  }, [setOpenSection])
-
-  // ── Badge list ────────────────────────────────────────────────────────────
-  const badges = [
-    { label: isIdeal ? 'Ideal Loads' : 'Detailed', color: isIdeal ? '#F59E0B' : '#00AEEF', bg: isIdeal ? '#FFFBEB' : '#EEF8FF' },
-    isMVHR  ? { label: 'MVHR ✓',         color: '#16A34A', bg: '#ECFDF5' }
-            : { label: 'MEV',             color: '#9CA3AF', bg: '#F9FAFB' },
-    hasASHP ? { label: 'ASHP Preheat ✓', color: '#16A34A', bg: '#ECFDF5' } : null,
-  ].filter(Boolean)
-
   return (
     <div className="w-full h-full flex flex-col bg-white select-none">
       {/* Header */}
       <div className="px-4 pt-3 pb-2 border-b border-light-grey flex items-center justify-between flex-shrink-0">
         <div>
-          <p className="text-caption font-medium text-navy">Energy Flow — Systems</p>
-          <p className="text-xxs text-mid-grey">Proportional energy flows · hover nodes for details · click to edit</p>
+          <p className="text-caption font-medium text-navy">{title}</p>
+          <p className="text-xxs text-mid-grey">{subtitle}</p>
         </div>
         <div className="flex gap-1.5 flex-wrap justify-end">
           {badges.map(b => (
@@ -397,7 +421,7 @@ export default function SystemSankey({ openSection, setOpenSection, libraryData 
       </div>
 
       {/* Sankey canvas */}
-      <ChartExportCard noChrome title="Systems energy flow" className="flex-1 min-h-0">
+      <ChartExportCard noChrome title={exportTitle} className="flex-1 min-h-0">
       <div ref={containerRef} className="w-full h-full relative overflow-hidden">
         {!sankeyResult && (
           <div className="absolute inset-0 flex items-center justify-center text-xxs text-mid-grey">
@@ -503,11 +527,11 @@ export default function SystemSankey({ openSection, setOpenSection, libraryData 
               const h  = type === 'source' ? (y1 - y0) : Math.max(24, y1 - y0)
               const c  = NODE_COLORS[type] ?? NODE_COLORS.system
               const nid = node.id ?? ''
-              const isClickable = nid.startsWith('sh_') || nid.startsWith('sc_') ||
+              const isClickable = clickable && (nid.startsWith('sh_') || nid.startsWith('sc_') ||
                 nid.startsWith('dhw_') || nid.startsWith('vent_') ||
                 nid === 'lighting' || nid === 'small_power' ||
                 // legacy IDs
-                nid === 'vrf' || nid === 'mvhr' || nid === 'boiler'
+                nid === 'vrf' || nid === 'mvhr' || nid === 'boiler')
               const labelX = x1 + 5
               const isNodeDimmed = (() => {
                 if (hoveredNodeId) {
@@ -649,17 +673,17 @@ export default function SystemSankey({ openSection, setOpenSection, libraryData 
       </ChartExportCard>
 
       {/* Footer — energy balance */}
-      <div className="px-4 py-2 border-t border-light-grey flex-shrink-0">
+      {fuelSplit && <div className="px-4 py-2 border-t border-light-grey flex-shrink-0">
         <p className="text-xxs text-mid-grey">
           Total site energy:{' '}
-          <span className="font-medium text-navy">{fmtMWh(result.fuel_split.total_kWh)}/yr</span>
+          <span className="font-medium text-navy">{fmtMWh(fuelSplit.total_kWh)}/yr</span>
           {' — '}
-          <span style={{ color: '#ECB01F' }}>Electricity {result.fuel_split.electricity_pct}% · {fmtMWh(result.fuel_split.electricity_kWh)}</span>
-          {result.fuel_split.gas_kWh > 0 && (
-            <span style={{ color: '#E74C3C' }}> / Gas {result.fuel_split.gas_pct}% · {fmtMWh(result.fuel_split.gas_kWh)}</span>
+          <span style={{ color: '#ECB01F' }}>Electricity {fuelSplit.electricity_pct}% · {fmtMWh(fuelSplit.electricity_kWh)}</span>
+          {fuelSplit.gas_kWh > 0 && (
+            <span style={{ color: '#E74C3C' }}> / Gas {fuelSplit.gas_pct}% · {fmtMWh(fuelSplit.gas_kWh)}</span>
           )}
         </p>
-      </div>
+      </div>}
     </div>
   )
 }

@@ -222,7 +222,7 @@ describe('(f) refusals by name, nothing filled', () => {
     d.schema_version = '2.6'
     d.zones[0].emitters = [{ id: 'e', kind: 'electric', count: 1, rated_output_w: 500, radiant_fraction: 0, system_group_id: null, rated_flow_c: null, rated_return_c: null, rated_room_c: null, exponent_n: null, source_surface_id: null, source_layer_index: null }]
     const up = upgradeDocument(d)
-    expect(up.schema_version).toBe('2.10')
+    expect(up.schema_version).toBe('2.12')
     expect(up.zones[0].emitters[0]).toMatchObject({ heats: true, cooling_output_w: null, catalogue_ref: null, rated_output_w: 500 })
   })
 })

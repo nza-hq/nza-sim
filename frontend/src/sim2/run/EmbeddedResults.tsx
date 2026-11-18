@@ -12,10 +12,14 @@ import { useEffect, useMemo, useRef } from 'react'
 import { shareModel, type ModelShare } from './modelChannel'
 // @ts-expect-error untyped JS component from today's app (Brief 110b: reused, not redrawn)
 import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
+// @ts-expect-error untyped JS component from today's app (17 Nov 2026: today's Systems Sankey, reused, not redrawn)
+import { SystemSankeyChart } from '../../components/modules/systems/SystemSankey.jsx'
+import { energyFlow, fuelSplit } from './energyFlow'
+import { LoadProfiles } from './LoadProfiles'
 import { createPortal } from '../workspace/portal'
 import { DesignHeatLoss } from './DesignHeatLoss'
 import { EmitterSizing } from './EmitterSizing'
-import { MonthlyDemand } from './MonthlyDemand'
+import { MonthlyDemand, MonthlyEstimate } from './MonthlyDemand'
 import { balanceLines } from './balanceLines'
 import { LevelSwitch, ResultsBody, ResultsStrip, WeatherPick, useRun } from './ResultsPanel'
 import type { StepId } from '../workspace/steps'
@@ -24,9 +28,11 @@ import type { Summary } from './seam'
 import './run.css'
 
 /** Brief 111 P4: each step opens at its natural level; the person can change it at any time. */
+/** Brief 122: the steps where each edit gives the monthly estimate (static) at once and the hourly year waits for Run. */
+const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric'])
 const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
 
-export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
+export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */
   step?: StepId
   doc: unknown
@@ -40,13 +46,18 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   showBody: boolean
   /** The Monthly centre tab: today's diverging monthly chart, fed by this run's months. */
   showMonthly?: boolean
+  /** The Load profiles centre tab: the run's energy hour by hour, by end use and fuel (today's full-year chart). */
+  showProfiles?: boolean
   focusZone: string | null
   weatherEl: HTMLElement | null
   /** Brief 118 P4: where a heating system's passport wants its design heat loss and emitter check. */
   sizingEl?: HTMLElement | null
   onOpen: () => void
 }) {
-  const run = useRun(doc, previewDoc)
+  const run = useRun(doc, previewDoc, !!step && HELD.has(step))
+  const est = run.instant.kind === 'done' ? run.instant.estimate : null
+  const estZone = est && focusZone ? est.zones.find((z) => z.id === focusZone) ?? null : null
+  const estLines = useMemo(() => (est ? (estZone ? balanceLines(estZone.breakdown, estZone.floor_m2) : balanceLines(est.breakdown, est.building.floor_m2)) : null), [est, estZone])
   const s = run.state.kind === 'done' ? run.state.summary : null
   const ps = run.previewState.kind === 'done' ? run.previewState.summary : null
   const pwhy = run.previewState.kind === 'missing' ? 'This change leaves inputs unset: no figures for it yet.' : run.previewState.kind === 'error' ? 'The preview could not run.' : null
@@ -61,6 +72,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   // The chosen zone's balance (heat from other zones included), or the building's.
   const zone = s && focusZone ? s.zones.find((z) => z.id === focusZone) ?? null : null
   const lines = useMemo(() => (s ? (zone ? balanceLines(zone.breakdown, zone.floor_m2) : balanceLines(s.breakdown, s.building.floor_m2)) : null), [s, zone])
+  // The building's energy, fuel to system to what it delivers (energy is building-wide, so not per zone).
+  const flow = useMemo(() => (s?.energy?.ok ? { flow: energyFlow(s.energy), split: fuelSplit(s.energy) } : null), [s])
   return (
     <>
       {createPortal(<><LevelSwitch run={run} /><ResultsStrip run={run} onOpen={onOpen} /></>, strip)}
@@ -69,10 +82,27 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
           <div className="rp-flow-in">
             <h2>Heating and cooling demand{focusZone ? '' : ', whole building'}</h2>
             <WeatherPick run={run} />
+            {run.hold && (
+              <div className="rp-hb rp-est">
+                <p className="rp-hb-for">{estZone ? `${estZone.name || estZone.id}` : 'Whole building'} · <b>Monthly estimate (static)</b>, as you edit</p>
+                {estLines ? <HeatBalance lines={estLines} />
+                  : <p className="gl-hint">{run.instant.kind === 'missing' ? `No estimate yet. To set: ${run.instant.items.map((m) => m.what).join(' ')}` : run.instant.kind === 'error' ? `The estimate failed: ${run.instant.message}` : 'No estimate yet: choose a weather file (Site).'}</p>}
+                {est && est.notes.length > 0 && <ul className="rp-est-notes">{est.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+                <h3 className="rp-est-h">The full year, every 15 minutes{run.hourlyStale ? ' (out of date: press Run in the bar above)' : run.state.kind === 'idle' ? ' (press Run in the bar above)' : ''}</h3>
+              </div>
+            )}
             {lines && (
               <div className="rp-hb">
                 <p className="rp-hb-for">{zone ? `${zone.name || zone.id}, heat from the other zones included` : 'Whole building'} <i>estimate</i></p>
                 <HeatBalance lines={lines} />
+                {s && s.method_notes.length > 0 && <ul className="rp-est-notes">{s.method_notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+              </div>
+            )}
+            {flow && !zone && (
+              <div className="rp-hb rp-sankey">
+                <SystemSankeyChart systemsFlow={flow.flow} fuelSplit={flow.split} title="Energy flow, whole building"
+                  subtitle="Each fuel, the systems that use it and what they give · plant losses and heat from outside shown, so each box balances · hover for figures"
+                  exportTitle="Energy flow" />
               </div>
             )}
             <ResultsBody run={run} focusZone={focusZone} />
@@ -84,7 +114,17 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
         <div className="rp-flow" role="tabpanel" aria-label="Monthly">
           <div className="rp-flow-in">
             <h2>Monthly heating and cooling{zone ? `, ${zone.name || zone.id}` : ', whole building'}</h2>
-            {s ? <MonthlyDemand summary={s} zone={zone} /> : <p className="gl-hint">{run.state.kind === 'missing' ? 'The months need a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The months need a run: choose a weather file on Site.'}</p>}
+            {run.hold && est ? <MonthlyEstimate estimate={est} zone={estZone} /> : s ? <MonthlyDemand summary={s} zone={zone} /> : <p className="gl-hint">{run.state.kind === 'missing' ? 'The months need a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The months need a run: choose a weather file on Site.'}</p>}
+          </div>
+        </div>,
+        centre,
+      )}
+      {showProfiles && createPortal(
+        <div className="rp-flow" role="tabpanel" aria-label="Load profiles">
+          <div className="rp-flow-in">
+            <h2>Load profiles, whole building</h2>
+            {s?.energy?.ok ? <LoadProfiles energy={s.energy} />
+              : <p className="gl-hint">{s && s.energy && !s.energy.ok ? 'Load profiles need the energy: some system inputs are still unset (see Heat flow).' : s ? 'Load profiles are energy, so they need the systems: choose "+ Systems" above the results.' : run.state.kind === 'running' ? 'Working it out…' : 'Load profiles need a full-year run: press Run in the bar above.'}</p>}
           </div>
         </div>,
         centre,

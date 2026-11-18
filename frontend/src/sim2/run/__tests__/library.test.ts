@@ -18,7 +18,19 @@ describe('epJSON layers to engine layers', () => {
   const exported = CONSTRUCTIONS.filter((c) => !c.draft)
   it('the library has the fixture\'s fifteen constructions, and the drafts on top', () => {
     expect(exported.map((c) => c.key).sort()).toEqual([...fx.keys()].sort())
-    expect(CONSTRUCTIONS.filter((c) => c.draft).map((c) => c.key)).toEqual(['interior_wall_block_plastered', 'timber_door_solid'])
+    expect(CONSTRUCTIONS.filter((c) => c.draft).map((c) => c.key)).toEqual(['interior_wall_block_plastered', 'timber_door_solid', 'finish_carpet', 'finish_suspended_ceiling',
+      // 17 Nov 2026, the example school's older fabric and a hard ground floor.
+      'cavity_wall_unfilled_1960s', 'glazing_double_1990s', 'glazing_single_metal', 'loft_ceiling_100mm', 'pitched_roof_uninsulated', 'ground_floor_uninsulated', 'ground_floor_slab_hard'])
+  })
+  it('the example school\'s drafts: U from their layers as stated in their provenance', () => {
+    const u = (key: string) => {
+      const b = bodyFromLibrary(CONSTRUCTIONS.find((c) => c.key === key)!.body, key)
+      const r = b.layers!.reduce((t: number, l: any) => t + (l.thermal_resistance ?? l.thickness / l.conductivity), 0)
+      return 1 / (0.13 + r + 0.04)
+    }
+    expect(u('cavity_wall_unfilled_1960s')).toBeCloseTo(1.42, 1)
+    expect(u('loft_ceiling_100mm')).toBeGreaterThan(0.3)
+    expect(u('loft_ceiling_100mm')).toBeLessThan(0.4)
   })
   it('the draft internal wall: plaster, 100 mm block, plaster, copied from library rows', () => {
     const got = bodyFromLibrary(CONSTRUCTIONS.find((c) => c.draft)!.body, 'draft')

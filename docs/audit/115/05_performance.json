@@ -1,0 +1,102 @@
+{
+ "source": "scripts/115_perf.mts",
+ "node": "v22.23.4",
+ "cases": [
+  {
+   "name": "one_room",
+   "zones": 1,
+   "median_ms": 93,
+   "ms": [
+    144,
+    93,
+    71,
+    79,
+    139
+   ],
+   "budget_ms": null,
+   "heating_kwh": 3750.6574915315837,
+   "cooling_kwh": 0,
+   "room_hours_windows_open": 1457
+  },
+  {
+   "name": "fifty_rooms",
+   "zones": 50,
+   "median_ms": 3508,
+   "ms": [
+    3508,
+    3471,
+    3683,
+    3271,
+    3686
+   ],
+   "budget_ms": null,
+   "heating_kwh": 178916.311760191,
+   "cooling_kwh": 13819.617044193234,
+   "room_hours_windows_open": 51453
+  },
+  {
+   "name": "one_room_4",
+   "zones": 1,
+   "median_ms": 216,
+   "ms": [
+    216,
+    213,
+    212,
+    230,
+    228
+   ],
+   "budget_ms": 100,
+   "heating_kwh": 3742.354829909966,
+   "cooling_kwh": 0,
+   "room_hours_windows_open": 1810
+  },
+  {
+   "name": "fifty_rooms_4",
+   "zones": 50,
+   "median_ms": 11014,
+   "ms": [
+    11014,
+    11269,
+    11738,
+    10732,
+    10890
+   ],
+   "budget_ms": 2000,
+   "heating_kwh": 178598.49904054552,
+   "cooling_kwh": 14304.987405656408,
+   "room_hours_windows_open": 73749
+  },
+  {
+   "name": "fifty_rooms_today",
+   "zones": 50,
+   "median_ms": 2081,
+   "ms": [
+    1839,
+    2081,
+    2089,
+    2097,
+    1799
+   ],
+   "budget_ms": null,
+   "heating_kwh": 182396.85532927784,
+   "cooling_kwh": 50280.63786741328,
+   "room_hours_windows_open": 0
+  },
+  {
+   "name": "fifty_rooms_today_4",
+   "zones": 50,
+   "median_ms": 5477,
+   "ms": [
+    5068,
+    5556,
+    5575,
+    5477,
+    5391
+   ],
+   "budget_ms": null,
+   "heating_kwh": 182395.43205022084,
+   "cooling_kwh": 50275.045998925736,
+   "room_hours_windows_open": 0
+  }
+ ]
+}

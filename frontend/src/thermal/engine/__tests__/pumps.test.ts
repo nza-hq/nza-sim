@@ -316,7 +316,7 @@ describe('Brief 114 P1: the control map and the upgrade', () => {
     expect(s.by_fuel).toEqual(base.by_fuel)
     expect(s.not_modelled).toEqual(expect.arrayContaining([
       { path: 'controls[0].controller', what: 'controller (recorded, not yet used in the calculation)' },
-      { path: 'controls[1]', what: 'window rule (Brief 115)' },
+      { path: 'controls[1]', what: 'window rule (used only with weather-driven air)' },
     ]))
   })
   it('2.9 upgrades to 2.10 with nothing filled: no pumps, fans as their schedule says, no other loads, no controls', () => {
@@ -324,7 +324,7 @@ describe('Brief 114 P1: the control map and the upgrade', () => {
     d.schema_version = '2.9'
     for (const g of d.system_groups) delete g.pumps
     const up = upgradeDocument(d)
-    expect(up.schema_version).toBe('2.10')
+    expect(up.schema_version).toBe('2.12')
     expect(up.system_groups.every((g) => g.pumps === null)).toBe(true)
     expect(up.zones[0].ventilation[0]).toMatchObject({ runs: null, demand_min_fraction: null, control_schedule_ref: 'always_on' })
     expect(up.other_loads).toEqual([])

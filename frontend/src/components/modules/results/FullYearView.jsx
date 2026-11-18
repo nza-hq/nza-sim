@@ -51,11 +51,11 @@ function hourToLabel(d, h) {
 }
 
 /** Aggregate 8760-hour raw data into 365 daily totals. */
-function buildDailyData(raw) {
+function buildDailyData(raw, series = ALL_SERIES) {
   const days = []
   for (let d = 0; d < 365; d++) {
     const row = { day: d, label: dayToLabel(d) }
-    for (const s of ALL_SERIES) {
+    for (const s of series) {
       let sum = 0
       for (let h = 0; h < 24; h++) {
         sum += raw[s.key]?.[d * 24 + h] ?? 0
@@ -68,13 +68,13 @@ function buildDailyData(raw) {
 }
 
 /** Extract hourly rows for a given day range from raw 8760 data. */
-function buildHourlySlice(raw, startDay, endDay) {
+function buildHourlySlice(raw, startDay, endDay, series = ALL_SERIES) {
   const rows = []
   for (let d = startDay; d <= Math.min(endDay, 364); d++) {
     for (let h = 0; h < 24; h++) {
       const i = d * 24 + h
       const row = { label: hourToLabel(d, h) }
-      for (const s of ALL_SERIES) {
+      for (const s of series) {
         row[s.key] = raw[s.key]?.[i] ?? 0
       }
       rows.push(row)
@@ -111,8 +111,6 @@ export default function FullYearView({ results, fuelFilter }) {
   const [loading,    setLoading]    = useState(false)
   const [fetchError, setFetchError] = useState(null)
   const [rawData,    setRawData]    = useState(null)
-  const [brushStart, setBrushStart] = useState(0)
-  const [brushEnd,   setBrushEnd]   = useState(364)
 
   const runId = results?.run_id
 
@@ -122,8 +120,6 @@ export default function FullYearView({ results, fuelFilter }) {
     setLoading(true)
     setFetchError(null)
     setRawData(null)
-    setBrushStart(0)
-    setBrushEnd(364)
     fetch(`/api/simulate/${runId}/hourly`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -133,43 +129,6 @@ export default function FullYearView({ results, fuelFilter }) {
       .catch(err => setFetchError(err.message))
       .finally(() => setLoading(false))
   }, [runId])
-
-  const dailyData = useMemo(() => rawData ? buildDailyData(rawData) : [], [rawData])
-
-  const visibleSeries = fuelFilter === 'all'
-    ? ALL_SERIES
-    : ALL_SERIES.filter(s => s.fuel === fuelFilter)
-
-  const rangeSize = brushEnd - brushStart   // number of days
-  const isHourly  = rangeSize <= 13
-
-  // Detail chart data: hourly when zoomed in (≤13 days), daily slice otherwise
-  const detailData = useMemo(() => {
-    if (!rawData) return []
-    if (isHourly) return buildHourlySlice(rawData, brushStart, brushEnd)
-    return dailyData.slice(brushStart, brushEnd + 1)
-  }, [rawData, dailyData, brushStart, brushEnd, isHourly])
-
-  // Summary metrics for the selected range
-  const { totalEnergy, peakDemand, avgDemand } = useMemo(() => {
-    if (!detailData.length) return { totalEnergy: 0, peakDemand: 0, avgDemand: 0 }
-    let total = 0, peak = 0
-    for (const row of detailData) {
-      const rowTotal = visibleSeries.reduce((s, ser) => s + (row[ser.key] ?? 0), 0)
-      total += rowTotal
-      if (rowTotal > peak) peak = rowTotal
-    }
-    return { totalEnergy: total, peakDemand: peak, avgDemand: total / detailData.length }
-  }, [detailData, visibleSeries])
-
-  const selectedLabel = `${dayToLabel(brushStart)} — ${dayToLabel(brushEnd)}`
-
-  // X-axis interval for the detail chart
-  const detailInterval = isHourly
-    ? 23                                          // one label per day (every 24 hours)
-    : Math.max(0, Math.floor(rangeSize / 7))     // ~7 ticks across the range
-
-  // ── Render ──
 
   if (loading) return (
     <div className="flex items-center justify-center py-12 text-mid-grey gap-2">
@@ -193,6 +152,54 @@ export default function FullYearView({ results, fuelFilter }) {
     </div>
   )
 
+  return <FullYearChart rawData={rawData} fuelFilter={fuelFilter} />
+}
+
+/**
+ * The full-year chart itself, drawn from hourly data with no fetch of its own: { [series key]: 8,760 kWh values } and
+ * the series to stack. Today's Results tab passes the backend's hourly file; Simulate v2 passes its run's hourly energy
+ * by end use (sim2/run/LoadProfiles.tsx). Split out of FullYearView on 17 Nov 2026; today's drawing is unchanged.
+ */
+export function FullYearChart({ rawData, fuelFilter = 'all', series = ALL_SERIES }) {
+  const [brushStart, setBrushStart] = useState(0)
+  const [brushEnd,   setBrushEnd]   = useState(364)
+  const dailyData = useMemo(() => rawData ? buildDailyData(rawData, series) : [], [rawData, series])
+
+  const visibleSeries = fuelFilter === 'all'
+    ? series
+    : series.filter(s => s.fuel === fuelFilter)
+
+  const rangeSize = brushEnd - brushStart   // number of days
+  const isHourly  = rangeSize <= 13
+
+  // Detail chart data: hourly when zoomed in (≤13 days), daily slice otherwise
+  const detailData = useMemo(() => {
+    if (!rawData) return []
+    if (isHourly) return buildHourlySlice(rawData, brushStart, brushEnd, series)
+    return dailyData.slice(brushStart, brushEnd + 1)
+  }, [rawData, dailyData, brushStart, brushEnd, isHourly, series])
+
+  // Summary metrics for the selected range
+  const { totalEnergy, peakDemand, avgDemand } = useMemo(() => {
+    if (!detailData.length) return { totalEnergy: 0, peakDemand: 0, avgDemand: 0 }
+    let total = 0, peak = 0
+    for (const row of detailData) {
+      const rowTotal = visibleSeries.reduce((s, ser) => s + (row[ser.key] ?? 0), 0)
+      total += rowTotal
+      if (rowTotal > peak) peak = rowTotal
+    }
+    return { totalEnergy: total, peakDemand: peak, avgDemand: total / detailData.length }
+  }, [detailData, visibleSeries])
+
+  const selectedLabel = `${dayToLabel(brushStart)} — ${dayToLabel(brushEnd)}`
+
+  // X-axis interval for the detail chart
+  const detailInterval = isHourly
+    ? 23                                          // one label per day (every 24 hours)
+    : Math.max(0, Math.floor(rangeSize / 7))     // ~7 ticks across the range
+
+  // ── Render ──
+
   return (
     <div className="space-y-3">
 
@@ -214,7 +221,7 @@ export default function FullYearView({ results, fuelFilter }) {
           <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={detailData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
             <defs>
-              {ALL_SERIES.map(s => (
+              {series.map(s => (
                 <linearGradient key={s.key} id={`grad-fy-det-${s.key}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor={s.color} stopOpacity={0.5} />
                   <stop offset="95%" stopColor={s.color} stopOpacity={0.05} />
@@ -263,7 +270,7 @@ export default function FullYearView({ results, fuelFilter }) {
               margin={{ top: 2, right: 8, left: 0, bottom: 20 }}
             >
               <defs>
-                {ALL_SERIES.map(s => (
+                {series.map(s => (
                   <linearGradient key={s.key} id={`grad-fy-nav-${s.key}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor={s.color} stopOpacity={0.4} />
                     <stop offset="95%" stopColor={s.color} stopOpacity={0.05} />

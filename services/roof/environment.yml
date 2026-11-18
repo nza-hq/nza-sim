@@ -1,0 +1,39 @@
+# Copied from nza-twin-lab @ 4da46dc (services/roof/environment.yml) on 2026-10-01.
+# Diverged: yes — the Route A spike's dependencies are removed (cmake, ninja, pkg-config, fmt,
+# eigen, nlohmann_json, spdlog, geos, libgdal-core, proj, lastools, and the pip block: laspy,
+# lazrs, shapely). decodED does not copy services/route-a (Brief 20, docs/audit/20/copy-manifest.md
+# §2), so carrying its build toolchain here would install ~1 GB and two more GPL/LGPL components
+# for code that does not exist in this repo. Brief 20 D4: change one of them rather than carry
+# baggage. The roof service's own dependencies are untouched.
+#
+# decodED roof service (Brief 20 P2, from nza-twin-lab Brief 07 D28). Create with:
+#   conda env create -f services/roof/environment.yml
+#
+# CGAL is GPL-3: it stays in this env, server-side, reached only by decodED's Express.
+# Nothing here ships to a browser or into public/. See docs/dependencies.md §0.
+name: roof
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - cgal-cpp=6.2.*        # CGAL headers (Straight_skeleton_2); the Python bindings lack it
+  - cxx-compiler          # builds skel/skel.cpp on first run (on Windows, MSVC is used instead)
+  - libboost-headers
+  - gmp
+  - mpfr
+  - fastapi=0.141.*
+  - uvicorn=0.54.*
+  - httpx                 # FastAPI's test client; Brief 56: the EA tile downloads
+  - pytest
+  # Brief 56 Part 2 — the roofer job (services/roof/roofer/): the point cloud and the geometry. These are
+  # what nza-roofer-spike's scripts used (run_site.py, terrain.py), less geopandas/GDAL (the footprints
+  # are written as a GeoPackage with sqlite3 alone). roofer itself is NOT here: it is a GPL-3 executable
+  # the Dockerfile installs from its pinned release; a laptop without it still serves /roof/*.
+  - numpy
+  - scipy
+  - shapely>=2
+  - pyproj
+  - pip
+  - pip:
+      - laspy[lazrs]      # LAZ read/write (lazrs is the Rust decoder; no LASzip C library needed)
+      - mapbox_earcut     # the face triangulation the spike used (cj_to_mesh.py)

@@ -1,0 +1,155 @@
+{
+ "about": "Brief 123 P5: a 20 x 10 m single-storey box at Chicago O'Hare with a gable cold loft (L1, L2), a warm mono-pitch (M1, M2) and a flat roof (F0, F0c). Read by validation/energyplus/123_roof_referee.py (EnergyPlus) and frontend/src/thermal/engine/__tests__/loftBox.ts (the engine), so both are built from these inputs. Committed before the first run. Layers outside first ([thickness m, conductivity W/mK, specific heat J/kgK, density kg/m3]; density 0 = no-mass, R = thickness/conductivity). The ceiling's layers run loft side first. Walls, floor and window are the Brief 104 cooled room's (104_cooled_room_spec.json).",
+ "weather": {
+  "file": "validation/fixtures/weather/USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw",
+  "sha256": "3cc3dc0c7bcc93e7203e8d9aab657d384315f5a0c86cdede23f792d437a0309f"
+ },
+ "width_x_m": 20.0,
+ "depth_y_m": 10.0,
+ "height_m": 3.0,
+ "gable": {
+  "pitch_deg": 35.0,
+  "ridge": "along x (east-west): slopes face south and north, triangular gable walls east and west"
+ },
+ "mono": {
+  "pitch_deg": 10.0,
+  "high_side": "north"
+ },
+ "windows": [
+  {
+   "facade": "south",
+   "width_m": 6.0,
+   "height_m": 1.5,
+   "sill_m": 0.9
+  },
+  {
+   "facade": "north",
+   "width_m": 4.0,
+   "height_m": 1.5,
+   "sill_m": 0.9
+  }
+ ],
+ "constructions": {
+  "ceiling": [
+   [
+    0.27,
+    0.04,
+    1030,
+    25
+   ],
+   [
+    0.0125,
+    0.25,
+    1000,
+    900
+   ]
+  ],
+  "tiles": [
+   [
+    0.012,
+    0.84,
+    800,
+    1900
+   ],
+   [
+    0.0005,
+    0.01,
+    0,
+    0
+   ]
+  ],
+  "warm_slope": [
+   [
+    0.012,
+    0.84,
+    800,
+    1900
+   ],
+   [
+    0.0005,
+    0.01,
+    0,
+    0
+   ],
+   [
+    0.15,
+    0.022,
+    1400,
+    30
+   ],
+   [
+    0.0125,
+    0.25,
+    1000,
+    900
+   ]
+  ],
+  "flat_roof": [
+   [
+    0.27,
+    0.04,
+    1030,
+    25
+   ],
+   [
+    0.0125,
+    0.25,
+    1000,
+    900
+   ]
+  ]
+ },
+ "room_ach": 0.3,
+ "loft_ach": 3.0,
+ "heat_c": 21.0,
+ "cool_c": 24.0,
+ "cases": {
+  "F0": {
+   "roof": "flat",
+   "cool": false
+  },
+  "F0c": {
+   "roof": "flat",
+   "cool": true
+  },
+  "L1": {
+   "roof": "gable_cold",
+   "cool": false
+  },
+  "L2": {
+   "roof": "gable_cold",
+   "cool": true
+  },
+  "M1": {
+   "roof": "mono_warm",
+   "cool": false
+  },
+  "M2": {
+   "roof": "mono_warm",
+   "cool": true
+  }
+ },
+ "convection": "iso_conv: outside 20 W/m2K on every exterior face; inside by tilt as the engine's REFEREE_OPTIONS (walls, gable walls and windows 2.5; faces whose heat flows upward from the zone, tilt < 60: 5.0; downward, tilt > 120: 0.7). Engine at 4 steps an hour, EnergyPlus Timestep 4, EulerMethod.",
+ "gates": {
+  "L1": {
+   "heating_pct": 5,
+   "ceiling_heat_pct": 10,
+   "loft_mean_k": 0.5,
+   "loft_rmse_k": 1.0,
+   "loft_peak_k": 1.5,
+   "own_effect_heating_pct": 10
+  },
+  "L2": {
+   "cooling_pct": 10,
+   "own_effect_cooling_pct": 15
+  },
+  "M1": {
+   "heating_pct": 5
+  },
+  "M2": {
+   "cooling_pct": 10
+  },
+  "monthly_vs_run_heating_pct": 10,
+  "note": "Brief 123 P5 table. A miss is reported as a miss, never tuned. Room-level cooling gaps of Briefs 103-108 are reported beside each case's own effect."
+ }
+}

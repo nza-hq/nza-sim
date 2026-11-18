@@ -5,7 +5,7 @@
  * floor. Tap one to nudge it with the arrow keys, turn it into a door or a window, or remove it. A window that crosses
  * into the next room is drawn in red until it is moved clear.
  */
-import { type PointerEvent as RPointerEvent, useEffect, useState } from 'react'
+import { type PointerEvent as RPointerEvent, useEffect, useRef, useState } from 'react'
 import type { WallPiece } from './facade'
 import type { Plan, Span, WallRun, Win } from './plan'
 
@@ -36,10 +36,37 @@ const f2 = (n: number) => (Math.round(n * 100) / 100).toFixed(2)
 export default function FacadeView({ plan, run, pieces, span, whole, crossers, from, setFrom, width, height, roomName, typeName, typeColour, onPick, onChange, onRemove, doorSize, windowSize }: Props) {
   const L = run.length_m
   const H = plan.storey_height_m
-  const s = Math.max(4, Math.min((width - 120) / L, (height - 300) / H))
-  const x0 = (width - L * s) / 2
+  // Fitted to the pane, then the person's zoom (scroll) and pan (right- or middle-drag) on top (Linzie, 17 Nov 10:03:
+  // "the elevation view… I can't zoom in or out").
+  const fit = Math.max(4, Math.min((width - 120) / L, (height - 300) / H))
+  const [view, setView] = useState({ z: 1, dx: 0, dy: 0 })
+  useEffect(() => setView({ z: 1, dx: 0, dy: 0 }), [run.index])
+  const s = fit * view.z
+  const x0 = (width - L * s) / 2 + view.dx
   // The wall sits a little above the middle, clear of the heading.
-  const base = Math.max(150 + H * s, (height + H * s) / 2 - 40)
+  const base = Math.max(150 + H * fit, (height + H * fit) / 2 - 40) + (H * s - H * fit) / 2 + view.dy
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const pan = useRef<{ px: number; py: number; dx: number; dy: number } | null>(null)
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      const cx = e.clientX - r.left, cy = e.clientY - r.top
+      setView((v) => {
+        const z = Math.max(0.5, Math.min(12, v.z * Math.exp(-e.deltaY * 0.0015)))
+        if (z === v.z) return v
+        // Keep the point under the cursor where it is.
+        const k = z / v.z
+        const ox = (width - L * fit * v.z) / 2 + v.dx, oy = Math.max(150 + H * fit, (height + H * fit) / 2 - 40) + (H * fit * v.z - H * fit) / 2 + v.dy
+        const nox = cx - (cx - ox) * k, noy = cy - (cy - oy) * k
+        return { z, dx: nox - (width - L * fit * z) / 2, dy: noy - Math.max(150 + H * fit, (height + H * fit) / 2 - 40) - (H * fit * z - H * fit) / 2 }
+      })
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+    return () => el.removeEventListener('wheel', wheel)
+  }, [width, height, L, H, fit])
   const X = (t: number) => (from === 'out' ? x0 + t * s : x0 + (L - t) * s)
   const Y = (z: number) => base - z * s
   const [drag, setDrag] = useState<{ id: string; t0: number; z0: number; px: number; py: number; t: number; z: number; moved: boolean } | null>(null)
@@ -53,6 +80,7 @@ export default function FacadeView({ plan, run, pieces, span, whole, crossers, f
     setDrag({ id: w.id, t0: w.t_m, z0: w.sill_m, px: e.clientX, py: e.clientY, t: w.t_m, z: w.sill_m, moved: false })
   }
   const move = (e: RPointerEvent) => {
+    if (pan.current) { const p0 = pan.current; setView((v) => ({ ...v, dx: p0.dx + e.clientX - p0.px, dy: p0.dy + e.clientY - p0.py })); return }
     if (!drag) return
     const w = plan.windows.find((x) => x.id === drag.id)
     if (!w) return
@@ -66,6 +94,7 @@ export default function FacadeView({ plan, run, pieces, span, whole, crossers, f
     setDrag({ ...drag, t, z, moved: true })
   }
   const up = () => {
+    if (pan.current) { pan.current = null; return }
     if (!drag) return
     if (!drag.moved) setPicked(drag.id)
     else if (Math.abs(drag.t - drag.t0) > 1e-9 || Math.abs(drag.z - drag.z0) > 1e-9) onChange(drag.id, { t_m: drag.t, sill_m: drag.z })
@@ -112,7 +141,8 @@ export default function FacadeView({ plan, run, pieces, span, whole, crossers, f
           <button type="button" aria-pressed={from === 'in'} onClick={() => setFrom('in')}>Inside</button>
         </div>
       </div>
-      <svg width={width} height={height} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+      <svg ref={svgRef} width={width} height={height} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onContextMenu={(e) => e.preventDefault()}
+        onPointerDownCapture={(e) => { if (e.button === 1 || e.button === 2) { e.stopPropagation(); e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); pan.current = { px: e.clientX, py: e.clientY, dx: view.dx, dy: view.dy } } }}>
         <line x1={x0 - 40} x2={x0 + L * s + 40} y1={base} y2={base} className="gl-ev-ground" />
         {pieces.map((p, i) => {
           const on = whole || (Math.abs(p.t0 - span.t0) < 1e-6 && Math.abs(p.t1 - span.t1) < 1e-6)
@@ -168,6 +198,7 @@ export default function FacadeView({ plan, run, pieces, span, whole, crossers, f
         <text x={x0 - 12} y={(Y(H) + base) / 2} textAnchor="end" className="gl-ev-sub">{f2(H)} m</text>
         <text x={(x0 + x0 + L * s) / 2} y={base + 62} textAnchor="middle" className="gl-ev-sub">{f2(L)} m long · {from === 'out' ? 'as seen from outside' : 'mirrored, as seen from inside'}</text>
       </svg>
+      {(view.z !== 1 || view.dx !== 0 || view.dy !== 0) && <button type="button" className="gl-btn gl-ev-fit" onClick={() => setView({ z: 1, dx: 0, dy: 0 })}>Fit the wall</button>}
       {pick && (() => {
         const px = (X(pick.t_m) + X(pick.t_m + pick.width_m)) / 2
         const py = Y(pick.sill_m + pick.height_m) - 12

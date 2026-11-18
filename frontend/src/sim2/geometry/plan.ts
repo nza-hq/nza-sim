@@ -13,6 +13,7 @@
  * model document is written, each zone's stretch of the run takes the windows whose middles fall on it.
  */
 import { area, ccw, type XY } from './ported/zones'
+import type { RoofPart, RoofRecipe } from './roof'
 import { type Profile, profile as libProfile, profilesFor as libProfilesFor } from '../library/library'
 
 export type { XY }
@@ -184,7 +185,47 @@ export type Win = {
 export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition'
 /** A fabric type: a library construction (by key) and, optionally, a U-value the user typed over it (W/m²K). Both
  * null: not set yet, and the model document says so (`unassigned:…`). */
-export type FabricType = { id: string; element: FabricElement; name: string; construction: string | null; u: number | null; /** Brief 118: the construction set it came from, until changed by hand. */ template?: string | null }
+export type FabricType = {
+  id: string; element: FabricElement; name: string; construction: string | null; u: number | null
+  /** Brief 118: the construction set it came from, until changed by hand. */ template?: string | null
+  /** Brief 115 (windows only): how the window opens. Null or left out: it does not open. Every figure typed; null not set. */
+  opening?: WindowOpening | null
+  /** Brief 115 (windows only): a trickle vent in each window's frame. Null or left out: none. */
+  trickle?: TrickleVent | null
+}
+export const WINDOW_STYLES = [
+  { key: 'side_hung', name: 'Side-hung', angle: true },
+  { key: 'top_hung', name: 'Top-hung', angle: true },
+  { key: 'bottom_hung', name: 'Bottom-hung', angle: true },
+  { key: 'centre_pivot', name: 'Centre-pivot', angle: true },
+  { key: 'sliding', name: 'Sliding', angle: false },
+  { key: 'louvre', name: 'Louvre', angle: false },
+] as const
+export type WindowStyle = (typeof WINDOW_STYLES)[number]['key']
+/** The opening part of a window type: its style, the share of the glass that opens, its widest angle (hung and pivot
+ * windows) and its discharge coefficient. */
+export type WindowOpening = { style: WindowStyle | null; openable_fraction: number | null; opening_angle_deg: number | null; cd: number | null }
+/** A trickle vent in every window of the type: its equivalent area (mm², as the maker states it), discharge
+ * coefficient, and, for today's fixed air method only, whether air crosses the room or stays on one side. */
+export type TrickleVent = { area_mm2: number | null; cd: number | null; flow_mode: 'single_sided' | 'cross' | null }
+/** Brief 115: when a space type's windows open (Controls step). One rule for every room of the space type. */
+export type WindowRule = {
+  rule: 'temperature' | 'timetable' | null
+  /** A temperature rule opens above this, °C, when warmer than outside. */
+  open_above_c: number | null
+  /** How far they open, 0 to 1 of their widest. */
+  open_fraction: number | null
+  /** The hours they may open (a schedule profile key), or null: any hour. */
+  hours: string | null
+  /** Who opens them: by hand (manual), local controls or the BMS. */
+  controller: Controller | null
+}
+export const AIR_TERRAINS = [
+  { key: 'open', name: 'Open country (flat, few obstructions)' },
+  { key: 'suburban', name: 'Suburban (low buildings, trees)' },
+  { key: 'urban', name: 'Urban (town centre)' },
+  { key: 'city', name: 'City (tall buildings around)' },
+] as const
 /** A stretch [t0, t1] of run `wall` given fabric type `type` for an element on walls (walls, windows, doors; absent
  * element = wall). Later stretches win where they overlap. */
 export type TypeSpan = { wall: number; t0: number; t1: number; type: string; element?: 'wall' | 'glazing' | 'door'; at?: { a: XY; b: XY } }
@@ -201,6 +242,26 @@ export const defaultFabric = (): FabricType[] => FABRIC_ELEMENTS.map((e) => ({ i
 
 /** A space type (archetype): what a kind of room is used for, and its comfort band. Rooms are given one; every value
  * is a library key, a typed number, or null (not set). Its systems are given separately (Systems step). */
+// ─── Brief 124: finishes on a room's floor and ceiling ───────────────────────────────────────────────────────────────
+export type FloorFinish = 'carpet' | 'hard'
+export type CeilingFinish = 'suspended' | 'exposed'
+/** The library finishes (Brief 124 D3); a hard floor and an exposed soffit add no layer. */
+export const FINISH_KEY: Record<FloorFinish | CeilingFinish, string | null> = { carpet: 'finish_carpet', hard: null, suspended: 'finish_suspended_ceiling', exposed: null }
+export const FINISH_NAME: Record<FloorFinish | CeilingFinish, string> = { carpet: 'Carpet', hard: 'Hard floor', suspended: 'Suspended ceiling', exposed: 'Exposed soffit' }
+/** Brief 124 D4: offices, meeting rooms, classrooms and hotel bedrooms are carpeted with a suspended ceiling; anything
+ * else (halls, kitchens, WCs, plant, stores and the rest) has a hard floor and an exposed ceiling. Read from the space
+ * type's "Used for" choice, its name and its use. */
+const CARPETED = /office|meeting|class|teaching|bedroom/i
+export function finishesOf(sp: Pick<SpaceType, 'name' | 'use' | 'borrowed' | 'floor_finish' | 'ceiling'> | undefined): { floor: FloorFinish; ceiling: CeilingFinish; floor_typical: boolean; ceiling_typical: boolean } {
+  const typical = !!sp && CARPETED.test(`${sp.borrowed ?? ''} ${sp.name} ${sp.use ?? ''}`)
+  return {
+    floor: sp?.floor_finish ?? (typical ? 'carpet' : 'hard'),
+    ceiling: sp?.ceiling ?? (typical ? 'suspended' : 'exposed'),
+    floor_typical: sp?.floor_finish == null,
+    ceiling_typical: sp?.ceiling == null,
+  }
+}
+
 export type SpaceType = {
   id: string
   name: string
@@ -226,6 +287,10 @@ export type SpaceType = {
   hot_water_litres?: number | null
   equipment_w_per_m2?: number | null
   equipment_baseload_w_per_m2?: number | null
+  /** Brief 124 (Linzie 17 Nov 16:35): the floor finish and the ceiling, typed. Null or absent: typical for the space
+   * (finishesOf), so every room always has both. */
+  floor_finish?: FloorFinish | null
+  ceiling?: CeilingFinish | null
   /** Comfort band the systems hold, °C, typed. */
   heat_c?: number | null
   cool_c?: number | null
@@ -234,6 +299,13 @@ export type SpaceType = {
    * the temperature outside them, °C (null: off outside them). */
   heat_hours?: string | null
   setback_c?: number | null
+  /** Brief 121 (edited on Controls): the heating / cooling setpoint follows this temperature profile (°C each hour)
+   * instead of one figure. heat_c / cool_c are then written as its highest / lowest value; the profile carries any
+   * setback, so setback_c is not used. Null or left out: one figure. */
+  heat_profile?: string | null
+  cool_profile?: string | null
+  /** Brief 115 (edited on Controls): when this space type's opening windows open. Null or left out: not stated. */
+  windows?: WindowRule | null
   /** How the gains enter the zone (schema 2.3 profile fields), visible and editable on the space type. A new space
    * type starts from today's engine values (TODAY in thermal/schema/upgrade.ts). */
   radiant_fraction?: number | null
@@ -258,6 +330,13 @@ export type BuildingInputs = {
   /** Brief 117: warm-up allowance after a setback, W/m² (null: none), and the wind for permanent vents, m/s. */
   warm_up_w_per_m2?: number | null
   vent_wind_m_s?: number | null
+  /** Brief 115: how air leakage and openings are worked out. Left out: 'today' (a plan saved before 115). */
+  air_method?: 'today' | 'weather_driven'
+  /** Weather-driven only: the cracks' flow exponent n, and whether single-sided rooms take EN 16798-7's wind term. */
+  air_exponent?: number | null
+  single_sided_turbulence?: boolean | null
+  /** Weather-driven only: the terrain around the site (the wind's profile with height). */
+  terrain?: 'open' | 'suburban' | 'urban' | 'city' | null
 }
 /** Hot water, for the whole building (the schema's service-level fields): stored, tap and cold-supply temperatures,
  * daily demand per person or per m² of floor, a circulation pump, and when it is used (shown as 'flat' until changed). Typed; null is not stated. */
@@ -268,10 +347,28 @@ export const noBuildingInputs = (): BuildingInputs => ({ q50: null, tb_multiplie
 /** Brief 118 P5: a project's own profile, made by editing one (Profiles step, today's schedule editor). A library
  * profile is never changed: editing one makes this copy, and the project's space types and systems move to it.
  * Same shape as a library profile's (hourly fractions by day type, monthly multipliers). */
+/** The kinds a profile can be (Linzie, 17 Nov 00:31: setpoints and window opening are profiles too, IES-style).
+ * 'ventilation' is shown as Availability: on/off hours for ventilation, pumps and windows. Setpoints are °C. */
+export const PROFILE_TYPES = ['occupancy', 'lighting', 'equipment', 'dhw', 'heating_setpoint', 'cooling_setpoint', 'window_opening', 'ventilation'] as const
+export type ProfileType = (typeof PROFILE_TYPES)[number]
+export const isTemperature = (t: string | null | undefined) => t === 'heating_setpoint' || t === 'cooling_setpoint'
+/** A temperature profile's in-use and lowest values, °C, over every hour of every day type. */
+export const tempRange = (d: { weekday: number[]; saturday: number[]; sunday: number[] }) => {
+  const all = [...d.weekday, ...d.saturday, ...d.sunday]
+  return { hi: Math.max(...all), lo: Math.min(...all) }
+}
+/** A new profile of the project's own: every hour at one value the person states (a fraction, or °C). */
+export function newOwnProfile(plan: Pick<Plan, 'own_profiles' | 'profiles'>, t: ProfileType, name: string, value: number): { key: string; own: OwnProfile } {
+  const owns = plan.own_profiles ?? []
+  let n = owns.length + 1
+  while (owns.some((x) => x.key === `own_${n}`)) n++
+  const day = () => Array(24).fill(value) as number[]
+  return { key: `own_${n}`, own: { key: `own_${n}`, name, schedule_type: t, from: null, day_types: { weekday: day(), saturday: day(), sunday: day() }, monthly_multipliers: null } }
+}
 export type OwnProfile = {
   key: string
   name: string
-  schedule_type: 'occupancy' | 'lighting' | 'equipment' | 'ventilation'
+  schedule_type: ProfileType
   /** The library profile it was copied from, or null. */
   from: string | null
   day_types: { weekday: number[]; saturday: number[]; sunday: number[] }
@@ -317,6 +414,11 @@ export type Plan = {
   emitter_types?: EmitterType[]
   /** Hot water for the whole building, typed (Systems step). */
   dhw?: DhwInputs
+  /** Brief 123: the roof's shape, applied to each block (absent: flat, as before). */
+  roof?: RoofRecipe
+  /** 17 Nov 2026: parts of a block's roof, each a rectangle with its own shape (a wing's own roof); a block with parts
+   * takes its roof from them, any other block from `roof` (roof.ts, roofPieces). */
+  roof_parts?: RoofPart[]
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
@@ -369,6 +471,10 @@ export function hotWaterOnSpaces(plan: Plan): Plan {
   return { ...plan, spaces, dhw: { ...hw, basis: null, litres: null } }
 }
 
+/** A new model in the workspace: empty, with weather-driven air (Linzie, 16 Nov 08:34: new models default to it; a
+ * plan saved before keeps today's). Its exponent (0.67) and the one-sided wind term (on) are the method's usual
+ * values, shown and editable on Fabric, Air leakage; the terrain stays unset. */
+export const newPlan = (): Plan => ({ ...emptyPlan(), building: { ...noBuildingInputs(), air_method: 'weather_driven', air_exponent: 0.67, single_sided_turbulence: true } })
 export const emptyPlan = (): Plan => ({ blocks: [], rooms: [], zones: [], systems: [], storey_height_m: 3, windows: [], fabric_types: defaultFabric(), wall_spans: [], spaces: [], building: noBuildingInputs(), next: { room: 1, zone: 1, system: 1 } })
 
 /** A new zone with nothing assigned. */

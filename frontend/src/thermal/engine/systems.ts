@@ -169,7 +169,8 @@ export function checkServed(groups: readonly GroupResult[], heatingKwh: number, 
 export type SystemsAnswer = { ok: true; systems: SystemsResults } | { ok: false; missing: SystemsMissing[] }
 
 /** The building's floor area, m²: the zones' summed. One place, read by the systems and the seam (review F8). */
-export const readDocFloorM2 = (doc: ModelDocument) => doc.zones.reduce((s, z) => s + z.area_m2, 0)
+/** The building's floor area: conditioned zones only (Brief 123: an unheated loft is not floor area). */
+export const readDocFloorM2 = (doc: ModelDocument) => doc.zones.reduce((s, z) => s + (z.conditioning === 'unconditioned' ? 0 : z.area_m2), 0)
 export const readSystemsTotalKwh = (s: SystemsResults) => FUELS.reduce((a, f) => a + s.by_fuel[f], 0)
 /** The v2 delivered-energy EUI, kWh/m² a year (Rule 11: read only here; not the instant engine's, not EnergyPlus's). */
 export const readSystemsEui = (s: SystemsResults) => readSystemsTotalKwh(s) / s.floor_m2  // runSystems refuses a zero floor
@@ -322,11 +323,13 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
   }))
   const floor_m2 = readDocFloorM2(doc)
   if (!(floor_m2 > 0)) miss('zones', 'the building has no floor area, so it has no EUI')
-  // Brief 114: the controller on each entry is recorded and shown, and changes no number yet; a window rule waits for
-  // Brief 115. One line each, so nothing stated is silently dropped.
+  // Brief 114: the controller on each entry is recorded and shown, and changes no number yet. A window rule is used
+  // under weather-driven air (Brief 115); under today's method it is stated and not used. One line each, so nothing
+  // stated is silently dropped.
+  const weatherAir = doc.building.air.method === 'weather_driven'
   doc.controls.forEach((c, i) => {
     not_modelled.push({ path: `controls[${i}].controller`, what: 'controller (recorded, not yet used in the calculation)' })
-    if (c.target.kind === 'window') not_modelled.push({ path: `controls[${i}]`, what: 'window rule (Brief 115)' })
+    if (c.target.kind === 'window' && !weatherAir) not_modelled.push({ path: `controls[${i}]`, what: 'window rule (used only with weather-driven air)' })
   })
   // Brief 114, no double count (review F6): an old auxiliary load named for pumps (or circulators) beside system pumps,
   // or for lifts or external lighting beside an other load of that kind, is refused by name. Names are all an old

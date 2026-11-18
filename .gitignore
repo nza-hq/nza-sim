@@ -61,3 +61,9 @@ start.bat
 # Environment variables
 .env
 .env.local
+
+# services/roof (Brief 123, copied from decodED): the CGAL bridge is built from skel.cpp on first run, never committed
+services/roof/skel/skel
+services/roof/skel/skel.exe
+services/roof/skel/*.obj
+services/roof/skel/*.pdb

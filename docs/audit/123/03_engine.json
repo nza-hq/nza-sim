@@ -1,0 +1,137 @@
+{
+ "spec_sha256": "68ca6704f383a166cf389d20392f705aa31192a954298fed80c7d7f7fc340790",
+ "weather_sha256": "3cc3dc0c7bcc93e7203e8d9aab657d384315f5a0c86cdede23f792d437a0309f",
+ "options": "REFEREE_OPTIONS, 4 steps an hour, linear",
+ "gates": {
+  "L1_heating": {
+   "engine": 15323.667339417405,
+   "energyplus": 15657.644106310938,
+   "gate_pct": 5,
+   "diff_pct": -2.132995006310821,
+   "pass": true
+  },
+  "L1_ceiling": {
+   "engine": -2662.4157666323044,
+   "energyplus": -2679.7028854958644,
+   "gate_pct": 10,
+   "diff_pct": -0.6451132682331335,
+   "pass": true
+  },
+  "L1_own_effect_heating": {
+   "engine": -86.5930933706295,
+   "energyplus": -78.83987417205026,
+   "gate_pct": 10,
+   "diff_pct": 9.83413441485154,
+   "pass": true
+  },
+  "L2_cooling": {
+   "engine": 1566.6266301419491,
+   "energyplus": 1595.266085135331,
+   "gate_pct": 10,
+   "diff_pct": -1.7952776192162492,
+   "pass": true
+  },
+  "L2_own_effect_cooling": {
+   "engine": -94.05713587539458,
+   "energyplus": -64.55366766873772,
+   "gate_pct": 15,
+   "diff_pct": 45.70378302601838,
+   "pass": false
+  },
+  "M1_heating": {
+   "engine": 19446.917415639222,
+   "energyplus": 19887.42911009298,
+   "gate_pct": 5,
+   "diff_pct": -2.215025843788911,
+   "pass": true
+  },
+  "M2_cooling": {
+   "engine": 1633.6983650810528,
+   "energyplus": 1637.89567910712,
+   "gate_pct": 10,
+   "diff_pct": -0.2562625983820519,
+   "pass": true
+  },
+  "F0_heating": {
+   "engine": 15410.260432788034,
+   "energyplus": 15736.483980482988,
+   "gate_pct": null,
+   "diff_pct": -2.073039619902063,
+   "pass": null
+  },
+  "F0c_cooling": {
+   "engine": 1660.6837660173437,
+   "energyplus": 1659.8197528040687,
+   "gate_pct": null,
+   "diff_pct": 0.05205464098227423,
+   "pass": null
+  }
+ },
+ "loft_air_l1": {
+  "mean": {
+   "engine": 11.433470467103673,
+   "energyplus": 11.413074543379032
+  },
+  "peak": {
+   "engine": 44.55860233138715,
+   "energyplus": 43.39
+  },
+  "rmse_k": 0.511606088772049,
+  "pass": {
+   "mean": true,
+   "rmse": true,
+   "peak": true
+  }
+ },
+ "monthly_vs_run_heating": {
+  "F0": {
+   "monthly": 15611.033434336485,
+   "run": 15410.260432788034,
+   "pct": 1.3028527481681655
+  },
+  "L1": {
+   "monthly": 15683.142825835017,
+   "run": 15323.667339417405,
+   "pct": 2.345884170252935
+  },
+  "M1": {
+   "monthly": 19788.95258040942,
+   "run": 19446.917415639222,
+   "pct": 1.7588143018241669
+  }
+ },
+ "monthly_ceiling_l1_kwh": -2680.2435061829487,
+ "monthly_l2_cooling_kwh": 1249.910043669246,
+ "monthly_cases": {
+  "F0": {
+   "heat_kwh": 15611.033434336485,
+   "cool_kwh": 0,
+   "ceiling_into_room_kwh": null
+  },
+  "F0c": {
+   "heat_kwh": 15611.033434336485,
+   "cool_kwh": 1528.9251437487035,
+   "ceiling_into_room_kwh": null
+  },
+  "L1": {
+   "heat_kwh": 15683.142825835017,
+   "cool_kwh": 0,
+   "ceiling_into_room_kwh": -2680.2435061829487
+  },
+  "L2": {
+   "heat_kwh": 15683.142825835017,
+   "cool_kwh": 1249.910043669246,
+   "ceiling_into_room_kwh": -2680.2435061829487
+  },
+  "M1": {
+   "heat_kwh": 19788.95258040942,
+   "cool_kwh": 0,
+   "ceiling_into_room_kwh": null
+  },
+  "M2": {
+   "heat_kwh": 19788.95258040942,
+   "cool_kwh": 1458.3153428309602,
+   "ceiling_into_room_kwh": null
+  }
+ }
+}

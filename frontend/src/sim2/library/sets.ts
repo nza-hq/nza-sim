@@ -16,6 +16,9 @@ export const CONSTRUCTION_SETS: readonly ConstructionSet[] = [
   { id: 'set_standard', name: 'Standard new build', line: 'Insulated cavity wall, double low-e glazing, flat roof, slab floor', wall: 'cavity_wall_standard', glazing: 'double_low_e', door: DEFAULT_DOOR, roof: 'flat_roof_standard', floor: 'ground_floor_slab' },
   { id: 'set_enhanced', name: 'Enhanced fabric', line: '150 mm PIR cavity, triple glazing, 200 mm PIR roof, 150 mm XPS floor', wall: 'cavity_wall_enhanced', glazing: 'triple_glazing', door: DEFAULT_DOOR, roof: 'flat_roof_enhanced', floor: 'ground_floor_enhanced' },
   { id: 'set_timber', name: 'Timber frame, pitched roof', line: 'Timber frame wall, double low-e glazing, pitched roof, slab floor', wall: 'timber_frame_standard', glazing: 'double_low_e', door: DEFAULT_DOOR, roof: 'pitched_roof_standard', floor: 'ground_floor_slab' },
+  // 17 Nov 2026 (example school): drafts awaiting Chris (library_additions.json), as the note above asks.
+  { id: 'set_standard_hard', name: 'Standard new build, hard floors', line: 'As Standard new build, with a ground floor that has no carpet in it (halls, kitchens, corridors)', wall: 'cavity_wall_standard', glazing: 'double_low_e', door: DEFAULT_DOOR, roof: 'flat_roof_standard', floor: 'ground_floor_slab_hard' },
+  { id: 'set_1960s', name: '1960s school or office, as built', line: 'Unfilled cavity wall, 1990s replacement double glazing, 100 mm loft insulation, uninsulated slab', wall: 'cavity_wall_unfilled_1960s', glazing: 'glazing_double_1990s', door: DEFAULT_DOOR, roof: 'loft_ceiling_100mm', floor: 'ground_floor_uninsulated' },
   { id: 'set_bridgwater', name: 'Bridgwater hotel (BRUKL)', line: 'The constructions from the Bridgwater BRUKL', wall: 'bridgwater_ext_wall', glazing: 'bridgwater_glazing', door: DEFAULT_DOOR, roof: 'bridgwater_roof', floor: 'bridgwater_ground_floor' },
 ]
 

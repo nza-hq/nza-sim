@@ -21,7 +21,10 @@
  * cooling, per zone and for the building, the building's breakdown (Rule 9: every term, summed over the zones;
  * heat between zones cancels and is left out) and each zone's own breakdown, heat from the other zones included (Brief 106).
  */
+import { siteTerrain } from '../../thermal/engine/airflow'
+import { rainInputs, skyInfrared } from '../../thermal/engine/outsideConvection'
 import { REFEREE_OPTIONS, runModel, UNMET_K, zoneSetpointHours, type RunOptions, type ZoneSetpointHours } from '../../thermal/engine/model'
+import { runMonthly, type MonthlyOptions, type MonthlyResults } from '../../thermal/engine/monthly'
 import { zoneEmitters, zoneSizing, type ZoneSizing as EngineZoneSizing } from '../../thermal/engine/emitters'
 import { CATALOGUES, checkCatalogueRefs, suggestItem } from '../../thermal/catalogue'
 import { DesignError, designHeatLoss, systemRoomsDesignW, type DesignTerm } from '../../thermal/engine/designHeatLoss'
@@ -34,6 +37,7 @@ type SurfaceKind = Surface['kind']
 import { upgradeDocument } from '../../thermal/schema/upgrade'
 import { CONSTRUCTIONS, resolveConstructions, type LibraryItem, type Missing } from './library'
 import type { WeatherChoice } from './weather'
+import type { Weather } from '../../thermal/engine/types'
 
 export type { Missing } from './library'
 
@@ -44,11 +48,25 @@ export const RUN_OPTIONS: RunOptions = { ...REFEREE_OPTIONS, internal_gains: 'pr
  * below in use are undercounted (cooled room, mild: −54 h of EnergyPlus's 248 at 1 step, −31 h at 4; the gate is
  * ±50 h). Every other document keeps one step an hour, Brief 104's speed budget.
  */
-export const QUARTER_HOUR_OPTIONS: RunOptions = { ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' } }
+// Brief 125 (Linzie 17 Nov 23:50, "Follow EnergyPlus's method"): the run's outside film is EnergyPlus's own (DOE-2
+// from the wind at each face's height, wet faces in rain), so old fabric at a sheltered site reads as EnergyPlus does.
+// RUN_OPTIONS keeps ISO 52016-1's fixed film for the Brief 103/104 referees.
+export const QUARTER_HOUR_OPTIONS: RunOptions = {
+  ...RUN_OPTIONS, time_step: { steps_per_hour: 4, theta_e_between: 'linear' },
+  // Brief 125 (Linzie 17 Nov 23:50) and Brief 126 (Linzie 18 Nov 10:57, "Please fix"): the surfaces and the air as
+  // EnergyPlus works them out: DOE-2 outside film, its outside long-wave and sky, TARP inside (ISO 15099 on windows),
+  // its Simple Window Model's glass, and outdoor air's own heat capacity.
+  surface_physics: { ...RUN_OPTIONS.surface_physics!, outside_convection: 'doe2', inside_convection: 'tarp', outside_longwave: 'energyplus', window: 'energyplus' },
+  air_heat_capacity: 'outdoor',
+}
 export function runOptionsFor(doc: ModelDocument): RunOptions {
-  // Brief 120: a zone on a system with a stated capacity is limited too, so it steps in quarter hours the same way.
-  const onPlant = (zid: string) => doc.system_groups.some((g) => g.enabled && (g.service === 'heating' || g.service === 'cooling') && g.capacity_kw != null && g.zones.includes(zid))
-  return doc.zones.some((z) => (z.emitters.length > 0 || onPlant(z.id)) && z.setpoints.hours_ref != null) ? QUARTER_HOUR_OPTIONS : RUN_OPTIONS
+  // Linzie 17 Nov 10:27, "Instant, 15 minutes, then Energy+": the monthly estimate is the instant tier (Brief 122), so
+  // the run is the accurate tier and every document runs in quarter hours: windows decide every 15 minutes (Brief 115
+  // review F1: the office referee passes every gate at 4 steps an hour and fails them at 1), as do heating hours with
+  // limited emitters or plant (Brief 109 review F3, Brief 120). Fifty rooms with opening windows take about 11 s in
+  // the container (budget about 15 s, Linzie). RUN_OPTIONS (1 step) stays for the referees and speed scripts.
+  void doc
+  return QUARTER_HOUR_OPTIONS
 }
 
 /** Heating and cooling by calendar month, kWh, January first (Brief 109, for the editor's charts). Sums to the year. */
@@ -113,11 +131,20 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
     z.profile_refs.lighting = []
   }
   d.profiles = d.profiles.filter((p) => p.kind !== 'lighting')
+  // Brief 115 Rule 8: opening windows are Operation; they arrive with their controls at + Systems. Removed, not closed.
+  for (const s of d.surfaces) s.openings = s.openings.filter((o) => o.kind !== 'operable')
+  d.controls = d.controls.filter((c) => c.target.kind !== 'window')
+  // 17 Nov 2026 (example school): the control map names systems; at these levels the systems are gone, so their entries
+  // go too (they are recorded only and change no number). Without this, any plan with a control map failed the instant
+  // estimate on Site, Shape and Fabric ("no heating, cooling, hot water or other system").
+  const kept = new Set(d.zones.flatMap((z) => z.ventilation.map((v) => v.id)))
+  d.controls = d.controls.filter((c) => c.target.kind === 'window' || (c.target.kind === 'ventilation' && kept.has(c.target.ref)))
   if (level === 'fabric') {
     if (heatC == null || !Number.isFinite(heatC)) throw new Error('fabric level needs the heating setpoint')
     d.profiles = d.profiles.filter((p) => p.kind === 'schedule')
     for (const z of d.zones) {
       z.profile_refs = { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
+      if (z.conditioning === 'unconditioned') continue  // Brief 123: the loft stays unheated at every level
       z.setpoints = { heat_c: heatC, cool_c: null, setback_c: null, hours_ref: null, control_strategy: 'active_setpoint' }
     }
   }
@@ -127,13 +154,17 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
 export interface Summary {
   engine: ModelResults['engine']
   run_ms: number
-  /** Steps the year was run in per hour: 1, or 4 when a limited zone is heated to hours (review F3, runOptionsFor). */
+  /** Steps the year was run in per hour: 4 from the product (runOptionsFor, Linzie 17 Nov 10:27); a caller's own options may differ. */
   steps_per_hour: number
   weather: { file_name: string; station: string; sha256: string }
+  /** Brief 125: how the run treated what is not in the model's inputs, in words (shown under its balance). */
+  method_notes: string[]
   building: { floor_m2: number; heating_kwh: number; cooling_kwh: number; peak_heating_w: number; peak_cooling_w: number; monthly: Monthly }
   /** `heated` / `cooled`: false where the zone has no setpoint for it (heated only, or cooled only). */
   zones: {
     id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; heated: boolean; cooled: boolean
+    /** Brief 123: true for an unheated loft (floats; not in the building's floor area). */
+    unconditioned: boolean
     /** The zone's own balance by term, kWh a year (Brief 106 P2, review F3): every term, heat from the other zones included. */
     breakdown: { term: BreakdownLine['term']; kwh: number }[]
     monthly: Monthly
@@ -147,6 +178,11 @@ export interface Summary {
      * service no system with a capacity serves in the zone.
      */
     short: { heating: ShortSplit | null; cooling: ShortSplit | null }
+    /**
+     * Brief 115 review F4: the zone's air under weather-driven air, read from the run (Rule 11). `leakage` 'q50_over_20':
+     * a room with no outside wall keeps today's leakage. Null under the fixed method.
+     */
+    air: { leakage: 'weather' | 'q50_over_20'; hours_windows_open: number } | null
   }[]
   /** Brief 120 P3: each heating or cooling system with a capacity, in the document's order (empty: none states one). */
   plants: PlantSummary[]
@@ -182,6 +218,12 @@ export interface Summary {
         pumps: (PumpResult & { label: string; kwh: number })[]
         /** Brief 114: lifts, external lighting and other loads outside the rooms. */
         other_loads: (OtherLoadResult & { kwh: number })[]
+        /**
+         * 17 Nov 2026 (load profiles, Linzie's end goal): each end use's energy by fuel hour by hour, W (8,760 values),
+         * regrouped from the systems engine's own hourly draws in the same way as `end_uses` (each line sums to its
+         * `end_uses` kWh; Rule 9, Rule 11). Not a second calculation.
+         */
+        hourly: { end_use: EndUse; fuel: Fuel; w: Float64Array }[]
       }
     | { ok: false; missing: Missing[] }
     /** Brief 111: no systems at this level, so no energy. */
@@ -375,6 +417,17 @@ const EMITTER_FIELD: Record<string, string> = {
   source_surface_id: 'the floor its pipes are in', source_layer_index: 'the layer its pipes run along',
 }
 const zoneName = (d: ModelDocument | null, i: string) => `"${d?.zones[Number(i)]?.name || `zone ${Number(i) + 1}`}"`
+/** Who a control map entry is about, in the person's words: the windows of a room by its name, a system by its label. */
+function controlOwner(d: ModelDocument, i: number): string {
+  const c = d.controls[i]
+  if (!c) return `controls[${i}]`
+  const zi = d.zones.findIndex((z) => z.id === c.target.ref)
+  if (c.target.kind === 'window' && zi >= 0) return `the windows in ${zoneName(d, String(zi))}`
+  if (c.target.kind === 'system' || c.target.kind === 'lighting') { const g = d.system_groups.find((x) => x.id === c.target.ref); if (g) return `"${g.label || g.id}"` }
+  // A ventilation system's control names its zone entries (`${id}_vent`, toDocument), which carry its label.
+  if (c.target.kind === 'ventilation') { const v = d.zones.flatMap((z) => z.ventilation).find((x) => x.id === c.target.ref); if (v) return `"${v.label || v.id}"` }
+  return `the control of "${c.target.ref}"`
+}
 const profileLabel = (d: ModelDocument | null, i: string) => d?.profiles[Number(i)]?.label || d?.profiles[Number(i)]?.id || `profile ${i}`
 
 /** One missing input in plain words; the engine's own message when there is no wording for its path. */
@@ -413,7 +466,7 @@ export function explain(path: string, message: string, doc: ModelDocument | null
 }
 
 /** What a run needs that the document does not state yet, all at once. */
-function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: readonly LibraryItem[]) {
+export function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: readonly LibraryItem[]) {
   const missing: Missing[] = []
   if (!weather) missing.push({ path: 'weather', what: 'Choose a weather file.' })
   const lib = resolveConstructions(doc, items)
@@ -423,6 +476,8 @@ function preflight(doc: ModelDocument, weather: WeatherChoice | null, items: rea
     // A zone that states its control and one setpoint is heated only (or cooled only): the other side floats, and the
     // engine is told so by a null setpoint (no system for it, Rule 8). With no control stated, both are still to set.
     const sp = z.setpoints
+    // Brief 123: an unheated loft has no setpoints (the schema refuses them); it needs only its air.
+    if (z.conditioning === 'unconditioned') return
     if (sp.control_strategy == null || (sp.heat_c == null && sp.cool_c == null)) {
       if (sp.heat_c == null) missing.push(explain(`zones[${i}].setpoints.heat_c`, 'required', doc))
       if (sp.cool_c == null) missing.push(explain(`zones[${i}].setpoints.cool_c`, 'required', doc))
@@ -453,6 +508,50 @@ function withCatalogue(doc: ModelDocument, zi: number, s: EngineZoneSizing): Zon
   return { ...s, catalogue: { catalogue: c.id, title: c.title, item: it.id, type: it.type, height_mm: it.height_mm, length_mm: it.length_mm, output_w: it.output_w, count: sug.count, extra_rated_w: extra } }
 }
 
+/**
+ * The document a run reads (simulate, and Brief 123's EnergyPlus input): checked against the schema, an older version
+ * upgraded where that fills nothing, else refused in words.
+ */
+export function readRunDocument(input: unknown): { ok: true; doc: ModelDocument } | { ok: false; missing: Missing[] } {
+  let doc: ModelDocument
+  try {
+    const v = (input as { schema_version?: unknown })?.schema_version
+    const parsed = ModelDocument.safeParse(input)
+    if (parsed.success) doc = parsed.data
+    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7' || v === '2.8' || v === '2.9' || v === '2.10' || v === '2.11') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2), 2.8 → 2.9 no DHW priority (Brief 120), 2.9 → 2.10 no pumps, other loads or control entries (Brief 114), 2.10 → 2.11 today's air method written explicitly (Brief 115), 2.11 → 2.12 today's 250 kJ/K·m² contents to ISO 52016-1's 10 kJ/K·m² (Brief 124 D2); nothing else is filled
+    else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
+      // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
+      // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
+      // current version; an older saved plan is brought up to date by the editor, which shows what it fills.
+      upgradeDocument(input)  // still read, so a document that cannot be read says why
+      return { ok: false as const, missing: [{ path: 'schema_version', what: `This building was saved in an older format (${String(v)}). Open it in the editor and save it again before results can be shown.` }] }
+    } else return { ok: false as const, missing: parsed.error.issues.slice(0, 12).map((i) => explain(i.path.join('.'), i.message, null)) }
+  } catch (e) {
+    return { ok: false as const, missing: [{ path: 'schema_version', what: `The building cannot be read (${(e as Error).message}).` }] }
+  }
+  return { ok: true, doc }
+}
+
+/** Brief 125: the run's outside film in words: how it was worked out, the terrain it took, and whether rain was known. */
+function methodNotes(doc: ModelDocument, w: Weather, options: RunOptions): string[] {
+  if (options.surface_physics?.outside_convection !== 'doe2') return []
+  const { terrain, stated } = siteTerrain(doc.building.site)
+  const words = { Country: 'open country', Suburbs: 'suburbs', City: 'a city centre' }[terrain]
+  const rain = rainInputs(w.hours)
+  const notes = [
+    `Outside surfaces lose heat to the air as EnergyPlus works it out (its DOE-2 method): from the wind at each surface's height${stated ? `, for ${words}` : `, for ${words} (the site states no terrain; set it on Site)`}, and whether the wind is on that face.`
+      + (rain.rain_code || rain.precipitation_mm ? ' Surfaces are wet while it rains, from the weather file.' : ' This weather file has no rain information, so surfaces are never wet.'),
+  ]
+  if (options.surface_physics?.outside_longwave === 'energyplus') {
+    const est = skyInfrared(w.hours).estimated
+    notes.push(`Outside surfaces see the sky, the ground and the air as EnergyPlus works it out, with the sky's temperature from the weather file's own sky radiation${est ? ` (${est.toLocaleString('en-GB')} hours missing it are estimated from cloud and humidity, as EnergyPlus does)` : ''}.`)
+  }
+  if (options.surface_physics?.inside_convection === 'tarp') notes.push("Inside surfaces give heat to the room's air as EnergyPlus works it out (its TARP method, and ISO 15099 for windows), from each surface's temperature.")
+  if (options.surface_physics?.window === 'energyplus') notes.push("Windows are modelled as EnergyPlus's simple glazing: the glass's own resistance from the stated U, and a glass emissivity of 0.84.")
+  if (options.air_heat_capacity === 'outdoor') notes.push('Outdoor air coming in carries heat by its own density and humidity each quarter hour, as EnergyPlus does.')
+  return notes
+}
+
 export function simulate(
   input: unknown,
   deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean },
@@ -461,22 +560,9 @@ export function simulate(
   if (!LEVELS.includes(level)) return { ok: false, missing: [{ path: 'level', what: `Unknown results level "${String(level)}".` }] }
   const fabricC = level === 'fabric' ? deps.fabric_heat_c ?? null : null
   if (level === 'fabric' && (fabricC == null || !Number.isFinite(fabricC))) return { ok: false, missing: [{ path: 'fabric_heat_c', what: 'Fabric only needs the temperature every room is heated to.' }] }
-  let doc: ModelDocument
-  try {
-    const v = (input as { schema_version?: unknown })?.schema_version
-    const parsed = ModelDocument.safeParse(input)
-    if (parsed.success) doc = parsed.data
-    else if (v === '2.3' || v === '2.4' || v === '2.5' || v === '2.6' || v === '2.7' || v === '2.8' || v === '2.9') doc = upgradeDocument(input)  // 2.3 → 2.4 adds empty emitter lists (Brief 108), 2.4 → 2.5 null source fields (Brief 109), 2.5 → 2.6 null design conditions (Brief 117), 2.6 → 2.7 no cooling units (Brief 119), 2.7 → 2.8 hot water use onto the spaces, no lux guessed (Brief 112, review F2), 2.8 → 2.9 no DHW priority (Brief 120), 2.9 → 2.10 no pumps, other loads or control entries (Brief 114); nothing is filled
-    else if (v !== undefined && parsed.error.issues.some((i) => i.path[0] === 'schema_version')) {
-      // An older document is not run here (review F1): the 2.2 → 2.3 upgrade states today's gain fallbacks, which is
-      // right for a document converted from today's tool and wrong for one drawn in the editor. The editor writes the
-      // current version; an older saved plan is brought up to date by the editor, which shows what it fills.
-      upgradeDocument(input)  // still read, so a document that cannot be read says why
-      return { ok: false, missing: [{ path: 'schema_version', what: `This building was saved in an older format (${String(v)}). Open it in the editor and save it again before results can be shown.` }] }
-    } else return { ok: false, missing: parsed.error.issues.slice(0, 12).map((i) => explain(i.path.join('.'), i.message, null)) }
-  } catch (e) {
-    return { ok: false, missing: [{ path: 'schema_version', what: `The building cannot be read (${(e as Error).message}).` }] }
-  }
+  const read = readRunDocument(input)
+  if (!read.ok) return read
+  let doc = read.doc
   doc = levelDocument(doc, level, fabricC)
   const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
   if (pre.missing.length) return { ok: false, missing: pre.missing }
@@ -532,6 +618,7 @@ export function simulate(
   const summary: Summary = {
     engine: results.engine, run_ms: results.run_ms, steps_per_hour: options.time_step?.steps_per_hour ?? 1,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
+    method_notes: methodNotes(doc, weather.weather, options),
     building: {
       floor_m2: readDocFloorM2(doc),
       heating_kwh: readBuildingHeatingKwh(results), cooling_kwh: readBuildingCoolingKwh(results),
@@ -540,13 +627,14 @@ export function simulate(
     },
     zones: results.zones.map((z, i) => ({
       id: z.zone_id, name: doc.zones[i].name, floor_m2: doc.zones[i].area_m2, heating_kwh: z.annual.heating_kwh, cooling_kwh: z.annual.cooling_kwh,
-      heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, breakdown: byTerm([z], true),
+      heated: doc.zones[i].setpoints.heat_c != null, cooled: doc.zones[i].setpoints.cool_c != null, unconditioned: doc.zones[i].conditioning === 'unconditioned', breakdown: byTerm([z], true),
       monthly: monthly(z.hourly.heating_w, z.hourly.cooling_w), by_surface: bySurface([z], true), window_solar: windowSolar([z]),
       hours: hoursOf[i] && doc.zones[i].setpoints.heat_c != null ? zoneHours(z, doc.zones[i].setpoints, hoursOf[i]!, weather.weather.hours.dry_bulb, options.control) : null,
       short: {
         heating: z.annual.system_short_heating_hours_in_use == null ? null : split(z.annual.unmet_heating_hours_in_use ?? 0, z.annual.system_short_heating_hours_in_use, z.annual.both_short_heating_hours_in_use ?? 0),
         cooling: z.annual.system_short_cooling_hours_in_use == null ? null : split(z.annual.unmet_cooling_hours_in_use ?? 0, z.annual.system_short_cooling_hours_in_use, z.annual.both_short_cooling_hours_in_use ?? 0),
       },
+      air: z.air ? { leakage: z.air.leakage, hours_windows_open: z.air.hours_windows_open } : null,
     })),
     plants: results.plants.map((p) => {
       const g = doc.system_groups.find((x) => x.id === p.id)!
@@ -627,7 +715,7 @@ export function facingOf(s: { azimuth_deg: number | null; tilt_deg: number }): F
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 /** Hourly W (one non-leap year, 8,760 hours from 1 January) to kWh by month. */
-function monthly(heat: ArrayLike<number>, cool: ArrayLike<number>): Monthly {
+export function monthly(heat: ArrayLike<number>, cool: ArrayLike<number>): Monthly {
   if (heat.length !== 8760 || cool.length !== 8760) throw new Error(`monthly totals need 8,760 hours, not ${heat.length}`)
   const out: Monthly = { heating_kwh: [], cooling_kwh: [] }
   let h = 0
@@ -658,9 +746,10 @@ function engineMissing(e: unknown, doc: ModelDocument): Missing | null {
  * its setback is the capped run's, shown by the heating hours panel.
  */
 export function steadyDocument(doc: ModelDocument): ModelDocument {
-  if (!doc.zones.some((z) => z.setpoints.hours_ref != null)) return doc
+  if (!doc.zones.some((z) => z.setpoints.hours_ref != null || z.setpoints.heat_ref != null || z.setpoints.cool_ref != null)) return doc
   const d = structuredClone(doc)
-  for (const z of d.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null }
+  // Brief 121: setpoint profiles go too; heat_c and cool_c are their in-use values.
+  for (const z of d.zones) { z.setpoints.hours_ref = null; z.setpoints.setback_c = null; z.setpoints.heat_ref = null; z.setpoints.cool_ref = null }
   return d
 }
 
@@ -823,7 +912,7 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
   return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
 }
 
-function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
+export function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
   let a: ReturnType<typeof runSystems>
   // Brief 114 review F4: a heating system's pumps with no capacity are sized on its rooms' design heat loss, when the
   // building states its design conditions (one calculation, designHeatLoss; a refusal there is the design line's).
@@ -850,7 +939,7 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
       const m = n.path.match(/^system_groups\[(\d+)\]/)
       const v = n.path.match(/^zones\[(\d+)\]\.ventilation/)
       const c = n.path.match(/^controls\[(\d+)\]/)
-      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : c ? `the control of "${doc.controls[Number(c[1])]?.target.ref}"` : n.path
+      const owner = m ? `"${doc.system_groups[Number(m[1])]?.label || doc.system_groups[Number(m[1])]?.id}"` : v ? `the ventilation in ${zoneName(doc, v[1])}` : c ? controlOwner(doc, Number(c[1])) : n.path
       return `${owner}: ${n.what}`
     }),
     no_hot_water: s.dhw == null,
@@ -858,5 +947,68 @@ function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherCho
     // Review F8: the kWh is the end-use line's (Rule 11), read through readEntryKwh.
     pumps: s.pumps.map((p) => { const g = doc.system_groups.find((x) => x.id === p.id)!; return { ...p, kwh: readEntryKwh(s, 'pumps', p.id), label: g.label || `${SERVICE_WORDS[g.service] ?? g.service} system` } }),
     other_loads: s.other_loads.map((o) => ({ ...o, kwh: readEntryKwh(s, 'auxiliary', o.id) })),
+    hourly: hourlyLines(s),
+  }
+}
+
+/** The systems engine's hourly draws grouped as its end-use lines are (systems.ts, Totals): groups by service and fuel, the rest as electricity. */
+function hourlyLines(s: Extract<ReturnType<typeof runSystems>, { ok: true }>['systems']): { end_use: EndUse; fuel: Fuel; w: Float64Array }[] {
+  const H = s.electricity_w.length
+  const m = new Map<string, { end_use: EndUse; fuel: Fuel; w: Float64Array }>()
+  const at = (end_use: EndUse, fuel: Fuel) => { const k = `${end_use}|${fuel}`; let l = m.get(k); if (!l) { l = { end_use, fuel, w: new Float64Array(H) }; m.set(k, l) } return l.w }
+  for (const g of s.groups) { const w = at(g.service, g.fuel); for (let h = 0; h < H; h++) w[h] += g.fuel_w[h] }
+  for (const u of s.ungrouped) { const w = at(u.end_use, 'electricity'); for (let h = 0; h < H; h++) w[h] += u.w[h] }
+  const order = s.end_uses.map((l) => `${l.end_use}|${l.fuel}`)
+  return [...m.entries()].filter(([k, l]) => order.includes(k) && l.w.some((v) => v > 0)).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0])).map(([, l]) => l)
+}
+
+/**
+ * Brief 122 P3: the monthly estimate (static), the instant tier on Site, Shape and Fabric. Rule 7: a Static engine,
+ * labelled as such; Rule 11: its own result, never merged with the hourly run's `Summary`. The shapes mirror Summary's
+ * so the workspace can reuse its balance rows and Monthly chart. The caller passes the document as the level it shows
+ * (`levelDocument(doc, 'fabric', heatC)` on Fabric only): nothing is levelled here.
+ */
+export interface InstantEstimate {
+  label: 'Monthly estimate (static)'
+  engine: 'monthly-static'
+  run_ms: number
+  building: { floor_m2: number; heating_kwh: number; cooling_kwh: number }
+  monthly: Monthly
+  /** The building's balance by term, kWh a year, positive into the building; heating, cooling and gains not used included. */
+  breakdown: { term: BreakdownLine['term']; kwh: number }[]
+  zones: { id: string; name: string; floor_m2: number; heating_kwh: number; cooling_kwh: number; monthly: Monthly; breakdown: { term: BreakdownLine['term']; kwh: number }[] }[]
+  /** What the estimate leaves out, in words (shown with it). */
+  notes: string[]
+}
+export type InstantResult = { ok: true; estimate: InstantEstimate } | { ok: false; missing: Missing[] }
+
+export const MONTHLY_OPTIONS: MonthlyOptions = { solar: RUN_OPTIONS.solar, glazing_solar: RUN_OPTIONS.glazing_solar ?? 'g_value', internal_gains: 'profiles' }
+
+export function instantEstimate(doc: ModelDocument, deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[] }): InstantResult {
+  const pre = preflight(doc, deps.weather, deps.constructions ?? CONSTRUCTIONS)
+  if (pre.missing.length) return { ok: false, missing: pre.missing }
+  let r: MonthlyResults
+  try { r = runMonthly(doc, deps.weather!.weather, pre.library, MONTHLY_OPTIONS) } catch (e) {
+    const m = engineMissing(e, doc)
+    if (m) return { ok: false, missing: [m] }
+    throw e
+  }
+  const byTerm = (zs: MonthlyResults['zones']) => {
+    const m = new Map<BreakdownLine['term'], number>()
+    for (const z of zs) for (const l of z.breakdown) m.set(l.term, (m.get(l.term) ?? 0) + l.kwh)
+    return [...m].map(([term, kwh]) => ({ term, kwh }))
+  }
+  const sum12 = (f: (z: MonthlyResults['zones'][number]) => number[]) => Array.from({ length: 12 }, (_, m) => r.zones.reduce((s, z) => s + f(z)[m], 0))
+  return {
+    ok: true,
+    estimate: {
+      label: 'Monthly estimate (static)', engine: r.engine, run_ms: r.run_ms,
+      building: { floor_m2: readDocFloorM2(doc), heating_kwh: r.zones.reduce((s, z) => s + z.heating_kwh, 0), cooling_kwh: r.zones.reduce((s, z) => s + z.cooling_kwh, 0) },
+      monthly: { heating_kwh: sum12((z) => z.monthly.heating_kwh), cooling_kwh: sum12((z) => z.monthly.cooling_kwh) },
+      breakdown: byTerm(r.zones),
+      zones: r.zones.map((z, i) => ({ id: z.zone_id, name: doc.zones[i].name, floor_m2: z.floor_m2, heating_kwh: z.heating_kwh, cooling_kwh: z.cooling_kwh, monthly: z.monthly, breakdown: byTerm([z]) })),
+      // Brief 125: the full-year run takes the outside film from the wind and rain; this estimate keeps ISO's fixed one.
+      notes: [...r.notes, 'Surfaces give and lose heat at ISO\'s fixed rates here, with a sky 11 °C below the air; the full-year run and EnergyPlus work them out from the wind, rain, the sky and each surface\'s temperature, so old, single-glazed or uninsulated fabric at a sheltered site can read lower there.'],
+    },
   }
 }

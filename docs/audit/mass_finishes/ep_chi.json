@@ -1,0 +1,125 @@
+{
+ "epw": "USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw",
+ "cases": {
+  "exposed": {
+   "base": {
+    "heat_kwh": 492.51261135379065,
+    "cool_kwh": 3126.524423230472,
+    "peak_cool_w": 2379.665430231883,
+    "free": {
+     "max_c": 37.55921082282209,
+     "hours_over_26": 1571,
+     "hours_over_28": 919
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 515.7878583294906,
+    "cool_kwh": 2998.626374162991,
+    "peak_cool_w": 2269.8661867006745,
+    "free": {
+     "max_c": 36.81922556216615,
+     "hours_over_26": 1552,
+     "hours_over_28": 870
+    },
+    "warnings": 3
+   }
+  },
+  "carpet": {
+   "base": {
+    "heat_kwh": 549.7326821548704,
+    "cool_kwh": 3199.887349836905,
+    "peak_cool_w": 2521.938074677719,
+    "free": {
+     "max_c": 37.76626734048466,
+     "hours_over_26": 1563,
+     "hours_over_28": 957
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 554.6483246585042,
+    "cool_kwh": 3048.4964185105973,
+    "peak_cool_w": 2368.809919685325,
+    "free": {
+     "max_c": 36.99478571513984,
+     "hours_over_26": 1556,
+     "hours_over_28": 886
+    },
+    "warnings": 3
+   }
+  },
+  "ceiling_void": {
+   "base": {
+    "heat_kwh": 627.2639840423606,
+    "cool_kwh": 3300.6310252468847,
+    "peak_cool_w": 2628.5895682119876,
+    "free": {
+     "max_c": 38.449529198052225,
+     "hours_over_26": 1560,
+     "hours_over_28": 1004
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 711.5763540472157,
+    "cool_kwh": 3238.1245266439923,
+    "peak_cool_w": 2482.8625441245,
+    "free": {
+     "max_c": 38.05954606384773,
+     "hours_over_26": 1566,
+     "hours_over_28": 994
+    },
+    "warnings": 3
+   }
+  },
+  "carpet_and_void": {
+   "base": {
+    "heat_kwh": 735.8661665764756,
+    "cool_kwh": 3435.9463677623594,
+    "peak_cool_w": 2808.534326085066,
+    "free": {
+     "max_c": 38.86947741932063,
+     "hours_over_26": 1570,
+     "hours_over_28": 1049
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 808.5467897701567,
+    "cool_kwh": 3355.8233039863294,
+    "peak_cool_w": 2652.142946818825,
+    "free": {
+     "max_c": 38.46722772339193,
+     "hours_over_26": 1558,
+     "hours_over_28": 1027
+    },
+    "warnings": 3
+   }
+  },
+  "lightweight": {
+   "base": {
+    "heat_kwh": 1066.4217813468324,
+    "cool_kwh": 3827.9180190583356,
+    "peak_cool_w": 3419.0924324613384,
+    "free": {
+     "max_c": 41.19142075110803,
+     "hours_over_26": 1682,
+     "hours_over_28": 1208
+    },
+    "warnings": 3
+   },
+   "iso_conv": {
+    "heat_kwh": 1195.5317877431814,
+    "cool_kwh": 3788.1027453498405,
+    "peak_cool_w": 3298.9317547837604,
+    "free": {
+     "max_c": 40.91593775865577,
+     "hours_over_26": 1667,
+     "hours_over_28": 1193
+    },
+    "warnings": 3
+   }
+  }
+ }
+}

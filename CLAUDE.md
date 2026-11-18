@@ -87,6 +87,10 @@ These rules were learned the hard way during the May 2026 audit and dynamic-engi
 4. **The anon key is public by design**, safe only because every table has RLS and every write goes through a security-definer function. **No service-role key** in the repo, a laptop `.env`, a log or Notion. Scripts (e.g. `scripts/102_seed_library.mjs`) use the anon key plus a signed-in user's own session.
 5. **Sign-in** is an email magic link. Organisations, roles (admin / editor / viewer) and invitations come from `my_access()` and the tenancy functions in `0001_tenancy.sql`; the current organisation is `useAuth().org` (`frontend/src/auth/AuthGate.tsx`).
 
+## EnergyPlus runs in Simulate v2 (Brief 123, Nov 2026)
+
+"Run in EnergyPlus" is the third tier (instant monthly estimate, NZA Sim hourly run, EnergyPlus). The translator is TypeScript (`frontend/src/thermal/energyplus/toEnergyPlus.ts`) and the runner is Node (`frontend/plugins/energyplusRunner.js`, mounted by the Vite dev server), a stated exception to Rule 5 because v2's model and engine are TypeScript; today's Python `nza_engine/` path is unchanged. EnergyPlus's result is its own (Rule 11): room loads and temperatures read from EnergyPlus (Rule 7), energy through the same system conversion as the hourly run, labelled. Never commit EPW files. Brief 125 (Linzie 17 Nov 23:50, "Follow EnergyPlus's method"): the 15-minute run's outside surface film is EnergyPlus's own DOE-2 (wind at each face's height and the site's terrain, wet faces in rain; `thermal/engine/outsideConvection.ts`), with one read of terrain (`airflow.ts siteTerrain`) and face height (`outsideFaceZ`) shared with the translator; the instant estimate and the referee options keep ISO 52016-1's fixed film, labelled. Brief 126 (Linzie 18 Nov 10:57, "Please fix"): the run's inside film (TARP; ISO 15099 on windows), outside long-wave and sky (from the weather file's infrared), window glass (EnergyPlus's simple glazing) and outdoor air's heat capacity are EnergyPlus's too, each checked against its own outputs; the translator carries thermal bridging as its own conductance, H·(θ_e − θ_air), not folded into the walls.
+
 ## Module scopes
 
 These statements define what each module computes and what it does not.
@@ -194,7 +198,9 @@ which of these scope items they affect.
 - Heating hours and setbacks per zone (Brief 109): a zone's heating
   setpoint follows its schedule between heat_c and setback_c, and
   cooling runs only in its hours; underfloor heating can put its heat
-  into a floor layer. Simulate v2 only.
+  into a floor layer. Brief 121 (Linzie 17 Nov 00:31): a zone's heating
+  and cooling setpoints may instead follow temperature profiles, with
+  heat_c / cool_c the profile's highest / lowest value. Simulate v2 only.
 - Design heat loss per room (Brief 117): steady transmission and air
   heat loss at a stated design outdoor temperature, after MCS MIS 3005-D
   Issue 3.0 and the MCS calculator's public method (not the text of

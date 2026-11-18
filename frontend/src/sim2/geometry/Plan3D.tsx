@@ -13,9 +13,10 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { type Plan, type PlacedWindow, type Span, type WallRun, type XY, edgesOf } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
+import { type BlockRoof, blockRoof, roofPieces } from './roof'
 
 // Colours from BuildingViewer3D, so the two read as one tool.
-const C = { wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
+const C = { floorOn: '#F2B872', wall: '#EBEBEB', chosen: '#CFE6DB', glazing: '#5E94C2', frame: '#D8D8D8', shading: '#7C8694', slab: '#C9CFCC', ground: '#EEF0ED', partition: '#F7F7F7', select: '#E28F2C', bad: '#B5322B', door: '#9C7B5A' }
 const WALL_T = 0.25 // outside wall thickness, inward from the outside face
 const PART_T = 0.1
 const FD = 0.08 // reveal frame depth, out from the wall face (as today)
@@ -34,9 +35,15 @@ type Props = {
   /** Wall-type colour bands along the foot of the walls (only when there is more than one type). */
   bands: Band[]
   onPickWall: (i: number, t: number) => void
+  /** Linzie, 17 Nov 10:03: the roof is drawn see-through, so the rooms show beneath; solid when the roof is chosen. */
+  roofOn?: boolean
+  /** Linzie, 17 Nov 10:29: the ground floor tinted a lighter orange when it is chosen. */
+  floorOn?: boolean
+  /** Brief 123: one roof per roof piece (roofPieces: each block, or each of its roof parts), from the roof service or the browser; absent, worked out here. */
+  roofs?: BlockRoof[]
 }
 
-export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall }: Props) {
+export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs }: Props) {
   const H = plan.storey_height_m
   // The camera starts on the building as it was when 3D opened; edits after that do not move it.
   const [start] = useState(() => {
@@ -90,10 +97,11 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
         <meshStandardMaterial color={C.ground} roughness={0.95} />
       </mesh>
 
-      {plan.blocks.map((b, i) => <Slab key={`s${i}`} ring={b} />)}
+      {plan.blocks.map((b, i) => <Slab key={`s${i}`} ring={b} on={floorOn} />)}
       {plan.rooms.map((r) => (
         <RoomFloor key={r.id} ring={r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />
       ))}
+      {floorOn && plan.blocks.map((b, i) => <FloorGlow key={`fg${i}`} ring={b} />)}
       {plan.rooms.map((r) => {
         const at = labelAt(r.ring)
         return (
@@ -102,6 +110,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
+      {roofPieces(plan).map((pc, i) => { const br = roofs?.[i] ?? blockRoof(pc.ring, pc.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={pc.ring} H={H} on={roofOn} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {runs.map((run) => (
         <Wall key={run.index} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={chosen?.run === run.index ? chosen : null} crossers={crossers} bands={bands.filter((b) => b.run === run.index)} onPick={(t) => onPickWall(run.index, t)} />
@@ -141,12 +150,61 @@ function shapeOf(ring: readonly XY[]) {
 }
 
 /** Floor slab under a block. A shape in plan (x, y) turned −90° about X lies at (x, 0, −y); the extrusion goes up. */
-function Slab({ ring }: { ring: XY[] }) {
+function Slab({ ring, on = false }: { ring: XY[]; on?: boolean }) {
   const g = useMemo(() => new THREE.ExtrudeGeometry(shapeOf(ring), { depth: SLAB, bevelEnabled: false }), [ring])
   return (
     <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, -SLAB, 0]} receiveShadow castShadow>
-      <meshStandardMaterial color={C.slab} roughness={0.95} />
+      <meshStandardMaterial color={on ? C.floorOn : C.slab} roughness={0.95} />
     </mesh>
+  )
+}
+
+/** The chosen ground floor: a see-through orange wash over the room colours, so the rooms still read. */
+function FloorGlow({ ring }: { ring: XY[] }) {
+  const g = useMemo(() => new THREE.ShapeGeometry(shapeOf(ring)), [ring])
+  return (
+    <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} renderOrder={1}>
+      <meshStandardMaterial color={C.select} roughness={0.9} transparent opacity={0.4} depthWrite={false} />
+    </mesh>
+  )
+}
+
+/** The flat roof over a block: a slab at the storey height, see-through unless the roof is chosen. */
+function Roof({ ring, H, on, hide }: { ring: XY[]; H: number; on: boolean; hide: boolean }) {
+  const g = useMemo(() => new THREE.ExtrudeGeometry(shapeOf(ring), { depth: SLAB, bevelEnabled: false }), [ring])
+  // With the ground floor chosen the roof is left off, so the floor can be seen.
+  if (hide) return null
+  return (
+    <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, H, 0]} castShadow={on} receiveShadow={on} renderOrder={on ? 0 : 2}>
+      <meshStandardMaterial color={on ? C.select : C.slab} roughness={0.8} transparent={!on} opacity={on ? 1 : 0.16} depthWrite={on} />
+    </mesh>
+  )
+}
+
+/** Brief 123: a pitched roof's faces (slopes and gable walls) from roof.ts; see-through unless the roof is chosen. */
+function Pitched({ roof, H, on, hide }: { roof: BlockRoof; H: number; on: boolean; hide: boolean }) {
+  const g = useMemo(() => {
+    const pos: number[] = []
+    for (const f of roof.faces) {
+      const p = f.pts.map(([x, y, z]) => [x, H + z, -y])
+      for (let i = 1; i + 1 < p.length; i++) pos.push(...p[0]!, ...p[i]!, ...p[i + 1]!) // every face is convex
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    geo.computeVertexNormals()
+    return geo
+  }, [roof, H])
+  const edges = useMemo(() => new THREE.EdgesGeometry(g, 1), [g])
+  if (hide) return null
+  return (
+    <group renderOrder={on ? 0 : 2}>
+      <mesh geometry={g} castShadow={on} receiveShadow={on}>
+        <meshStandardMaterial color={on ? C.select : C.slab} roughness={0.8} side={THREE.DoubleSide} transparent={!on} opacity={on ? 1 : 0.22} depthWrite={on} />
+      </mesh>
+      <lineSegments geometry={edges}>
+        <lineBasicMaterial color={on ? '#9A5A12' : '#7C8694'} transparent opacity={on ? 1 : 0.6} />
+      </lineSegments>
+    </group>
   )
 }
 
@@ -178,12 +236,12 @@ function Partition({ a, b, H }: { a: XY; b: XY; H: number }) {
 }
 
 /** Box in a wall group's frame: x from x0 to x1 along, y from y0 to y1 up, z from z0 to z1 (out is +). */
-function Box({ x0, x1, y0, y1, z0, z1, colour, rough = 0.9 }: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; colour: string; rough?: number }) {
+function Box({ x0, x1, y0, y1, z0, z1, colour, rough = 0.9, op = 1 }: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; colour: string; rough?: number; op?: number }) {
   if (x1 - x0 < 1e-4 || y1 - y0 < 1e-4) return null
   return (
-    <mesh position={[(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]} castShadow receiveShadow>
+    <mesh position={[(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]} castShadow={op === 1} receiveShadow>
       <boxGeometry args={[x1 - x0, y1 - y0, z1 - z0]} />
-      <meshStandardMaterial color={colour} roughness={rough} metalness={rough < 0.8 ? 0.05 : 0} />
+      <meshStandardMaterial color={colour} roughness={rough} metalness={rough < 0.8 ? 0.05 : 0} transparent={op < 1} opacity={op} depthWrite={op === 1} />
     </mesh>
   )
 }
@@ -223,11 +281,12 @@ function Wall({ run, H, windows, chosen, crossers, bands, onPick }: { run: WallR
       {bands.map((b, i) => <Box key={`band${i}`} x0={b.t0} x1={b.t1} y0={0} y1={0.25} z0={0} z1={0.012} colour={b.colour} />)}
       {chosen && (
         <>
-          {/* The chosen piece outlined on the outside face. */}
-          <Box x0={chosen.t0} x1={chosen.t1} y0={H - 0.06} y1={H} z0={0} z1={0.03} colour={C.select} rough={0.6} />
-          <Box x0={chosen.t0} x1={chosen.t1} y0={0} y1={0.06} z0={0} z1={0.03} colour={C.select} rough={0.6} />
-          <Box x0={chosen.t0} x1={chosen.t0 + 0.06} y0={0} y1={H} z0={0} z1={0.03} colour={C.select} rough={0.6} />
-          <Box x0={chosen.t1 - 0.06} x1={chosen.t1} y0={0} y1={H} z0={0} z1={0.03} colour={C.select} rough={0.6} />
+          {/* Linzie, 17 Nov 10:29: as obvious as in plan. The chosen piece washed orange on its outside face, with a solid edge. */}
+          <Box x0={chosen.t0} x1={chosen.t1} y0={0} y1={H} z0={0.002} z1={0.02} colour={C.select} rough={0.7} op={0.55} />
+          <Box x0={chosen.t0} x1={chosen.t1} y0={H - 0.12} y1={H} z0={0} z1={0.04} colour={C.select} rough={0.6} />
+          <Box x0={chosen.t0} x1={chosen.t1} y0={0} y1={0.12} z0={0} z1={0.04} colour={C.select} rough={0.6} />
+          <Box x0={chosen.t0} x1={chosen.t0 + 0.12} y0={0} y1={H} z0={0} z1={0.04} colour={C.select} rough={0.6} />
+          <Box x0={chosen.t1 - 0.12} x1={chosen.t1} y0={0} y1={H} z0={0} z1={0.04} colour={C.select} rough={0.6} />
         </>
       )}
     </group>

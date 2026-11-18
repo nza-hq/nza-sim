@@ -1,0 +1,173 @@
+{
+ "spec_sha256": "cf7b317c5db76b19bca1845d8f9a2baf39983b154f270124fb90fa627f50dfb9",
+ "energyplus_spec_sha256": "cf7b317c5db76b19bca1845d8f9a2baf39983b154f270124fb90fa627f50dfb9",
+ "options": "REFEREE_OPTIONS, 4 steps an hour",
+ "cases": {
+  "R1_tight": {
+   "engine": {
+    "heat_kwh": 3549.9473197940843,
+    "cool_kwh": 0,
+    "inflow_t": 0,
+    "hours_open": 0,
+    "max_c": 30.702173908244845,
+    "hours_above_28": 222
+   },
+   "energyplus": {
+    "heat_kwh": 3509.7498215467594,
+    "cool_kwh": 0,
+    "inflow_t": 0,
+    "hours_open": 0,
+    "max_c": 30.469,
+    "hours_above_28": 205
+   },
+   "hourly_inflow_r2": null
+  },
+  "R1_q5": {
+   "engine": {
+    "heat_kwh": 4482.667866029137,
+    "cool_kwh": 0,
+    "inflow_t": 269.72889442435445,
+    "hours_open": 0,
+    "max_c": 31.050270549093526,
+    "hours_above_28": 188
+   },
+   "energyplus": {
+    "heat_kwh": 4443.494850764843,
+    "cool_kwh": 0,
+    "inflow_t": 269.9162956000006,
+    "hours_open": 0,
+    "max_c": 30.811,
+    "hours_above_28": 168
+   },
+   "hourly_inflow_r2": 0.9999419378690534
+  },
+  "R1_q10": {
+   "engine": {
+    "heat_kwh": 5417.861311798901,
+    "cool_kwh": 0,
+    "inflow_t": 539.3011445079677,
+    "hours_open": 0,
+    "max_c": 31.37838921120705,
+    "hours_above_28": 166
+   },
+   "energyplus": {
+    "heat_kwh": 5379.7332429312455,
+    "cool_kwh": 0,
+    "inflow_t": 539.6356822,
+    "hours_open": 0,
+    "max_c": 31.158,
+    "hours_above_28": 149
+   },
+   "hourly_inflow_r2": 0.9999584370343398
+  },
+  "R2_single": {
+   "engine": {
+    "heat_kwh": 3742.354829909966,
+    "cool_kwh": 0,
+    "inflow_t": 469.1242073522589,
+    "hours_open": 1810,
+    "max_c": 31.67720597272197,
+    "hours_above_28": 141
+   },
+   "energyplus": {
+    "heat_kwh": 3700.3469022709837,
+    "cool_kwh": 0,
+    "inflow_t": 468.0934814000009,
+    "hours_open": 1849,
+    "max_c": 31.374,
+    "hours_above_28": 119
+   },
+   "hourly_inflow_r2": 0.9684249350637314
+  },
+  "R2_single_mod": {
+   "engine": {
+    "heat_kwh": 3741.4322755181424,
+    "cool_kwh": 0,
+    "inflow_t": 466.3671350722138,
+    "hours_open": 1816,
+    "max_c": 31.67745851364353,
+    "hours_above_28": 141
+   },
+   "energyplus": {
+    "heat_kwh": 3700.047161401717,
+    "cool_kwh": 0,
+    "inflow_t": 465.6699124000008,
+    "hours_open": 1854,
+    "max_c": 31.375,
+    "hours_above_28": 120
+   },
+   "hourly_inflow_r2": 0.9719938582959937
+  },
+  "R2_cross": {
+   "engine": {
+    "heat_kwh": 3994.1933687390583,
+    "cool_kwh": 0,
+    "inflow_t": 3049.349447138786,
+    "hours_open": 1640,
+    "max_c": 31.183155792655,
+    "hours_above_28": 95
+   },
+   "energyplus": {
+    "heat_kwh": 3824.410691032139,
+    "cool_kwh": 0,
+    "inflow_t": 2730.733620599999,
+    "hours_open": 1680,
+    "max_c": 30.859,
+    "hours_above_28": 82
+   },
+   "hourly_inflow_r2": 0.9151458132313434
+  },
+  "R2_single_cooled": {
+   "engine": {
+    "heat_kwh": 3742.558162717539,
+    "cool_kwh": 79.11993979224663,
+    "inflow_t": 443.9174834848632,
+    "hours_open": 1711,
+    "max_c": 26.000000000000004,
+    "hours_above_28": 0
+   },
+   "energyplus": {
+    "heat_kwh": 3700.6702867129875,
+    "cool_kwh": 74.23875427792564,
+    "inflow_t": 442.91242870000076,
+    "hours_open": 1758,
+    "max_c": 26,
+    "hours_above_28": 0
+   },
+   "hourly_inflow_r2": 0.9620121516346349
+  },
+  "R2_shut_cooled": {
+   "engine": {
+    "heat_kwh": 3732.3651902959614,
+    "cool_kwh": 146.41925652319264,
+    "inflow_t": 161.38634642006534,
+    "hours_open": 0,
+    "max_c": 26.000000000000004,
+    "hours_above_28": 0
+   },
+   "energyplus": {
+    "heat_kwh": 3691.451555611159,
+    "cool_kwh": 143.6643995180657,
+    "inflow_t": 161.51082119999975,
+    "hours_open": 0,
+    "max_c": 26,
+    "hours_above_28": 0
+   },
+   "hourly_inflow_r2": 0.9998725340290435
+  }
+ },
+ "own_effects": {
+  "R1_q5_heating": {
+   "engine": 932.720546235053,
+   "energyplus": 933.7450292180838
+  },
+  "R1_q10_heating": {
+   "engine": 1867.9139920048165,
+   "energyplus": 1869.983421384486
+  },
+  "R2_windows_cooling": {
+   "engine": -67.29931673094602,
+   "energyplus": -69.42564524014006
+  }
+ }
+}

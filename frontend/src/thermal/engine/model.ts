@@ -8,9 +8,12 @@
  * weather and the stated run options; a missing input raises an error naming its path.
  */
 import { infiltration, ventCoefficient, ventConductance, type Vent } from './air'
+import { AIR_LINES, AirflowError, airWeather, buildAirModels, siteTerrain, zoneAirStep, type ZoneAirModel } from './airflow'
+import { outsideFace, outsideFaceZ, rainInputs, skyInfrared, windowLayout } from './outsideConvection'
+import { ScheduleError, scheduleFractions, temperatureHours } from './pumps'
 import { computeBridging } from './bridging'
 import { ENGINE_CONSTANTS as K } from './constants'
-import { ElementError, innerElement, layerFaceNode, opaqueElement, windowElement, type ConstructionBody, type Element } from './elements'
+import { ElementError, innerElement, layerFaceNode, opaqueElement, windowElement, type ConstructionBody, type Element, type Layer } from './elements'
 import { runNetwork } from './network'
 import type { BreakdownLine, ModelResults, PlantResults, ZoneResults } from './results'
 import { shadingFactor } from './shading'
@@ -18,7 +21,7 @@ import { solarOnSurface, type SolarOptions } from './solar'
 import { simpleGlazingAngular, simpleGlazingOptics } from './glazing'
 import type { Weather } from './types'
 import { runZone } from './zone'
-import type { ModelDocument } from '../schema/model'
+import type { ModelDocument, Surface } from '../schema/model'
 import { calendar, GainsError, zoneGains, type ZoneGains } from './gains'
 import { VentilationError, zoneVentilation, type ZoneVentilation } from './ventilation'
 import { EmitterError, zoneCooling, zoneEmitters, type ZoneCooling, type ZoneEmitters } from './emitters'
@@ -66,13 +69,25 @@ export interface RunOptions {
    * Surface physics beyond ISO 52016-1's fixed simplifications (Brief 103 Part 6b). Absent: the simplifications
    * (outside h_ce 20, inside h_ci by tilt, transmitted solar over every inside surface by area).
    * - outside_convection 'wind': h_ce = 4 + 4·v (ISO 6946:2017 Annex C) from the weather's hourly wind speed.
+   * - outside_convection 'doe2' (Brief 125, Linzie 17 Nov 23:50): EnergyPlus's own outside film, DOE-2 from the wind at
+   *   each face's height and the site's terrain, windward or leeward, and the face's temperature; wet faces in rain
+   *   (outsideConvection.ts). Runs on the network solver, one zone included.
    * - inside_convection 'by_heat_flow': ISO 52016-1 Table 25 by the actual direction of heat flow (previous hour).
    * - beam_on_floor: the beam part of transmitted solar lands on the floor-facing inside surfaces, by area.
    * - inside_convection 'tarp' (Brief 105 Part 6): Walton's natural-convection correlations, EnergyPlus's TARP inside
    *   algorithm, from each face's temperature difference with the air at the step before (network.ts). Runs on the
-   *   network solver, one zone included.
+   *   network solver, one zone included. Brief 126: a window's inside face takes ISO 15099, as EnergyPlus's TARP does.
+   * - outside_longwave 'energyplus' (Brief 126, Linzie 18 Nov 10:57): each outside face's long-wave as EnergyPlus,
+   *   ground, sky and air by view, the sky from the weather file's infrared (outsideConvection.ts). Needs 'doe2'.
+   *   Absent or 'iso': ISO 52016-1's h_re to the air and a sky 11 K below it.
+   * - window 'energyplus' (Brief 126): a window as EnergyPlus's Simple Window Model takes it: the glass layer's
+   *   resistance from the stated U less EnergyPlus's rating films, and emissivity 0.84 on the glass. Absent or 'iso':
+   *   the stated U less ISO 6946's films, and the surface's stated emissivity.
    */
-  surface_physics?: { outside_convection: 'fixed' | 'wind'; inside_convection: 'by_tilt' | 'by_heat_flow' | 'tarp'; beam_on_floor: boolean }
+  surface_physics?: {
+    outside_convection: 'fixed' | 'wind' | 'doe2'; inside_convection: 'by_tilt' | 'by_heat_flow' | 'tarp'; beam_on_floor: boolean
+    outside_longwave?: 'iso' | 'energyplus'; window?: 'iso' | 'energyplus'
+  }
   /**
    * Brief 105 Part 6: steps per hour, and the outdoor temperature between the hour's readings ('hold' the hour's, or
    * 'linear' from the hour before's; network.ts). Absent: one step an hour. More than one runs on the network solver,
@@ -94,6 +109,12 @@ export interface RunOptions {
    * the inside surfaces, which pass it on by convection and radiation.
    */
   solar_convective_fraction?: number
+  /**
+   * Brief 126: the heat outdoor air carries in. Absent or 'fixed': ENGINE_CONSTANTS.rho_c_air (0.33 Wh/m³K) all year.
+   * 'outdoor': ρ·c_p of the outdoor air each step, as EnergyPlus takes it for infiltration and ventilation (network.ts
+   * outdoor_air). Runs on the network solver.
+   */
+  air_heat_capacity?: 'fixed' | 'outdoor'
 }
 
 /**
@@ -153,6 +174,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
   const insideAlpha: (number | null)[] = []    // per element: the zone_a face's inside solar absorptance (null on glazing)
   const insideAlphaB: (number | null)[] = []   // per two-faced element: the zone_b face's
   const absorbed: Float64Array[] = []
+  const surfaceOf: number[] = []  // per element: its surface's index in doc.surfaces (Brief 125)
   const zones: ZoneBuild[] = doc.zones.map(() => ({
     transmittedBySurface: [], solarTransmitted: new Float64Array(H), solarBeam: new Float64Array(H), vents: [], glazingInfo: [],
     glazingAreas: [], glazingGroups: [], envelopeArea: 0, hasRoof: false, hasGround: false, sharedSlabs: 0,
@@ -194,10 +216,14 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         const ia = s.inside_solar_absorptance, ib = s.inside_solar_absorptance_b
         if (ia == null) throw new ModelError('required', `${path}.inside_solar_absorptance`)
         if (ib == null) throw new ModelError('required', `${path}.inside_solar_absorptance_b`)
-        elements.push(innerElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, layers: b.layers ?? [], path }))
-        kinds.push(s.kind); zoneA.push(za); zoneB.push(zbZone); insideAlpha.push(ia); insideAlphaB.push(ib)
+        elements.push(innerElement({ id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, layers: surfaceLayers(s, library, path), path }))
+        kinds.push(s.kind); surfaceOf.push(i); zoneA.push(za); zoneB.push(zbZone); insideAlpha.push(ia); insideAlphaB.push(ib)
         absorbed.push(new Float64Array(H))
-        if ((s.kind === 'floor' || s.kind === 'ceiling') && zbZone !== za) { Z.sharedSlabs++; zones[zbZone].sharedSlabs++ }
+        // Brief 123 P4: a ceiling to an unconditioned loft is not a slab between storeys (its junction is the roof's, at the
+        // loft's eaves), and its area is in the room's envelope for leakage: the air barrier is at the ceiling (P4.2).
+        const loftA = doc.zones[za].conditioning === 'unconditioned', loftB = doc.zones[zbZone].conditioning === 'unconditioned'
+        if (loftA !== loftB) zones[loftA ? zbZone : za].envelopeArea += s.area_m2
+        else if ((s.kind === 'floor' || s.kind === 'ceiling') && zbZone !== za) { Z.sharedSlabs++; zones[zbZone].sharedSlabs++ }
         continue
       }
       Z.envelopeArea += s.area_m2
@@ -225,12 +251,12 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
         const fw = K.glazing_angle_factor
         insideAlpha.push(null); insideAlphaB.push(null)
         elements.push(windowElement({
-          id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, u, emissivity: s.thermal_emissivity, path,
+          id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, u, emissivity: s.thermal_emissivity, path, glass: sp?.window === 'energyplus' ? 'energyplus' : 'iso',
           // Solar falling on the window from inside is diffuse: it leaves at the diffuse transmittance and the glass
           // absorbs its diffuse absorptance; the frame share absorbs all of it.
           optics: ang ? { interior_transmitted: (1 - ff) * ang.t_dif, interior_absorbed: (1 - ff) * ang.a_dif + ff } : null,
         }))
-        kinds.push(s.kind); zoneA.push(za); zoneB.push(null)
+        kinds.push(s.kind); surfaceOf.push(i); zoneA.push(za); zoneB.push(null)
         const a = new Float64Array(H)
         absorbed.push(a)
         const sun = s.tilt_deg > 90 + 1e-9 ? null : sunOn(s.azimuth_deg ?? 0, s.tilt_deg)
@@ -281,8 +307,9 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
       elements.push(opaqueElement({
         id: s.id, area_m2: s.area_m2, tilt_deg: s.tilt_deg, boundary: ground ? 'ground' : 'outside',
         layers: b.layers ?? [], stated_u: stated, emissivity: ground ? null : s.thermal_emissivity, path,
+        inside_finish: finishLayers(s.inside_finish, library, `${path}.inside_finish`),
       }))
-      kinds.push(s.kind); zoneA.push(za); zoneB.push(null)
+      kinds.push(s.kind); surfaceOf.push(i); zoneA.push(za); zoneB.push(null)
       const a = new Float64Array(H)
       if (outside) {
         const alpha = s.solar_absorptance
@@ -291,6 +318,8 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
       }
       absorbed.push(a)
       s.openings.forEach((o, j) => {
+        // Brief 115: weather-driven air takes every vent and window itself (airflow.ts).
+        if (doc.building.air.method === 'weather_driven') return
         if (o.kind !== 'permanent_vent') throw new ModelError('operable openings are the Operation module (not Engine 1)', `${path}.openings[${j}]`)
         if (!(o.area_m2 > 0)) return
         const p = `${path}.openings[${j}]`
@@ -301,7 +330,7 @@ function buildElements(doc: ModelDocument, weather: Weather, library: Record<str
       })
     }
   })
-  return { elements, kinds, zoneA, zoneB, insideAlpha, insideAlphaB, absorbed, zones }
+  return { elements, kinds, surfaceOf, zoneA, zoneB, insideAlpha, insideAlphaB, absorbed, zones }
 }
 
 /** One zone's run in a common shape, from either solver. */
@@ -312,6 +341,8 @@ interface Solved {
   theta_air: Float64Array; theta_op: Float64Array; theta_mrt: Float64Array
   bridging_w: Float64Array; ventilation_w: Float64Array; solar_lost_w: Float64Array; other_gains_w: Float64Array; storage_w: Float64Array
   closure_wh: Float64Array
+  /** Brief 115: each weather-driven air line's heat, W (AIR_LINES order). */
+  air_lines_w?: Float64Array[]
   /** Heat into the zone from the others per hour, W (zeros on Engine 1's solver: one zone). */
   interzone_w: Float64Array
   /** Per element of the model: its outside terms over the run, kWh (null when not this zone's). */
@@ -326,6 +357,26 @@ interface Solved {
  * Brief 103 number is unchanged; anything else runs on the network solver (runNetwork). Both take their elements from
  * the same builder and give their results through the same breakdown.
  */
+/** Brief 124 (D3): the layers of a finish named on a surface face, from the structure to the room, from the library given to the engine; none for null. */
+export function finishLayers(ref: { key: string } | null | undefined, library: Record<string, ConstructionBody>, path: string): Layer[] {
+  if (!ref) return []
+  const b = library[ref.key]
+  if (!b) throw new ModelError(`finish "${ref.key}" is not in the library given to the engine`, `${path}.key`)
+  if (!b.layers?.length) throw new ModelError(`finish "${ref.key}" has no layers`, `${path}.key`)
+  return b.layers
+}
+
+/**
+ * Brief 124 (D3): a surface's whole layer stack, first layer first: zone_b's finish (turned room-first), the construction,
+ * zone_a's finish.
+ * For a surface facing outside or the ground there is no zone_b finish (the schema refuses one).
+ */
+export function surfaceLayers(s: Pick<Surface, 'construction_ref' | 'inside_finish' | 'inside_finish_b'>, library: Record<string, ConstructionBody>, path: string): Layer[] {
+  const b = library[s.construction_ref.key]
+  if (!b) throw new ModelError(`construction "${s.construction_ref.key}" is not in the library given to the engine`, `${path}.construction_ref.key`)
+  return [...[...finishLayers(s.inside_finish_b, library, `${path}.inside_finish_b`)].reverse(), ...(b.layers ?? []), ...finishLayers(s.inside_finish, library, `${path}.inside_finish`)]
+}
+
 export function runModel(doc: ModelDocument, weather: Weather, library: Record<string, ConstructionBody>, options: RunOptions): ModelResults {
   const t0 = now()
   const H = weather.hours.count
@@ -341,8 +392,10 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   // Sub-hourly steps and TARP convection run on the network solver (one zone is a network of one: multizone.test (c)).
   // Underfloor heating in a floor (Brief 109) is Engine 2's: its heat enters a node inside the element. So are
   // system capacities (Brief 120): their limits are shared among zones within the step.
-  const network = plantGroups.length > 0 || Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
-    || options.surface_physics?.inside_convection === 'tarp' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
+  // Brief 115: weather-driven air is worked out every step from the room's temperature, on the network solver.
+  const weatherAir = doc.building.air.method === 'weather_driven'
+  const network = weatherAir || plantGroups.length > 0 || Zn > 1 || elements.some((e) => e.boundary === 'zone') || (options.time_step?.steps_per_hour ?? 1) > 1
+    || options.surface_physics?.inside_convection === 'tarp' || options.surface_physics?.outside_convection === 'doe2' || options.air_heat_capacity === 'outdoor' || doc.zones.some((z) => z.emitters.some((e) => e.kind === 'underfloor'))
 
   // The window junction over several zones: 4√A per facade (all its glazing, every zone), shared out by area. On one
   // zone with one glazing surface per facade this is Engine 1's 4√A per surface; cutting a facade into storeys does
@@ -365,18 +418,34 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     throw new ModelError(`unknown value ${JSON.stringify(options.ventilation)} ('none' or 'document')`, 'options.ventilation')
   }
 
+  // Brief 115: weather-driven air, per zone (built before the conductances: a room with no outside wall keeps today's
+  // leakage, review F4).
+  let airModels: ZoneAirModel[] | null = null
+  if (weatherAir) {
+    try {
+      airModels = buildAirModels(doc, built.zones.map((Z) => Z.envelopeArea), (ref, p) => scheduleFractions(doc, ref, weather.hours, p), (ref, p) => temperatureHours(doc, ref, weather.hours, p))
+    } catch (e) {
+      if (e instanceof AirflowError || e instanceof ScheduleError) throw new ModelError(e.message.slice(e.path.length + 2), e.path)
+      throw e
+    }
+  }
+  // Review F3/F4: an extract fan is in the room's air balance when the room has outside paths (leakage on its walls,
+  // vents, windows); an inner room with none keeps today's leakage and its fan's own conductance, as before.
+  const mevInBalance = doc.zones.map((_, zi) => !!airModels && airModels[zi].cracks.length + airModels[zi].vents.length + airModels[zi].windows.length > 0)
   // Air, bridging and ground, per zone.
   const tg = groundTemperature(weather)
   const air = doc.zones.map((zone, zi) => {
     const Z = built.zones[zi]
     const path = `zones[${zi}]`
     const volume = zone.area_m2 * zone.height_m
-    const inf = infiltration({ q50: zone.infiltration_q50, ach: zone.infiltration_ach, envelope_area_m2: Z.envelopeArea, volume_m3: volume, path })
+    // Brief 115: under weather-driven air, leakage and vents are worked out each step (airAt below), not here.
+    const inf = weatherAir && !airModels![zi].fixed_leakage ? { source: 'q50' as const, ach: 0, h_w_per_k: 0 } : infiltration({ q50: zone.infiltration_q50, ach: zone.infiltration_ach, envelope_area_m2: Z.envelopeArea, volume_m3: volume, path })
     const ventH = ventConductance(Z.vents.map((v) => v.m3s_per_ms), weather.hours.wind_speed, H)
     const Hve = new Float64Array(H)
     for (let h = 0; h < H; h++) {
       let m = 0
-      for (const v of mech[zi]) m += v.h_w_per_k[h]
+      // Review F3: under weather-driven air an extract fan is in the pressure balance instead (airAt), not here.
+      for (const v of mech[zi]) if (!(mevInBalance[zi] && v.kind === 'mev')) m += v.h_w_per_k[h]
       Hve[h] = inf.h_w_per_k + ventH[h] + m
     }
     // Σ U·A of the zone's envelope (the legacy α bridging mode only): elements facing outside or the ground.
@@ -388,6 +457,34 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     })
     return { volume, inf, ventH, Hve, bridging }
   })
+
+  // Brief 115: weather-driven air, per zone, and what it recorded each hour.
+  const airInflow: Float64Array[] = [], airOpen: Float64Array[] = []
+  let airAtOf: (zi: number) => ((h: number, room_c: number, te: number, out: Float64Array, w: number, frac: number) => void) | null = () => null
+  if (weatherAir) {
+    // Review F3: under weather-driven air an extract fan (MEV) is a fixed flow out of the room, in its pressure
+    // balance; its air arrives through leakage, vents and windows (their lines), so its own conductance is not added
+    // again. A 'natural' entry beside opening windows would count the windows' air twice: refused by name.
+    doc.zones.forEach((z, zi) => {
+      const mevs = mech[zi].filter((v) => v.kind === 'mev')
+      if (mevs.length && mevInBalance[zi]) {
+        const ex = new Float64Array(H)
+        for (const v of mevs) for (let h = 0; h < H; h++) ex[h] += v.flow_m3s * v.running[h]
+        airModels![zi].extract = ex
+      }
+      const nat = z.ventilation.findIndex((v) => v.enabled && v.kind === 'natural')
+      if (nat >= 0 && airModels![zi].windows.length) throw new ModelError('the room\'s opening windows give its natural ventilation under weather-driven air; remove this entry', `zones[${zi}].ventilation[${nat}]`)
+    })
+    const wx = airWeather(weather.hours, weather.header.elevation)
+    for (let zi = 0; zi < Zn; zi++) { airInflow.push(new Float64Array(H)); airOpen.push(new Float64Array(H)) }
+    airAtOf = (zi) => {
+      const m = airModels![zi]
+      return (h, room, te, out, w, frac) => {
+        const st = zoneAirStep(m, wx, h, room, te, out, frac)
+        if (w > 0) { airInflow[zi][h] += w * st.m_in * 3600; airOpen[zi][h] += w * st.open_factor }
+      }
+    }
+  }
 
   // Internal gains per zone (Brief 105 Part 2).
   let gains: (ZoneGains | null)[] = doc.zones.map(() => null)
@@ -435,6 +532,22 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
   }
   // Brief 109: each zone's heating hours and setback, resolved into its hourly setpoints (null: one setpoint all year).
   const hoursOf = zoneSetpointHours(doc, weather.hours)
+  // Brief 115 P1: a window that opens by temperature must open above the room's heating setpoint in every hour it may
+  // open, or it would open while the room is being heated. Refused by name, not clamped.
+  if (airModels) airModels.forEach((m, zi) => {
+    const r = m.rule
+    if (!m.windows.length || !r || r.rule !== 'temperature') return
+    const sh = hoursOf[zi]?.hourly.heat_c ?? null, fixed = doc.zones[zi].setpoints.heat_c
+    for (let h = 0; h < H; h++) {
+      if (r.hours && !(r.hours[h] > 0)) continue
+      const hc = sh ? sh[h] : fixed
+      const above = r.open_above_h ? r.open_above_h[h] : (r.open_above_c as number)
+      if (hc != null && Number.isFinite(hc) && !(above > hc)) {
+        const ci = doc.controls.findIndex((c) => c.target.kind === 'window' && c.target.ref === doc.zones[zi].id)
+        throw new ModelError(`the windows open above ${above} °C, not above the room's heating setpoint (${hc} °C at hour ${h}): they would open while it is heated`, `controls[${ci}].${r.open_above_h ? 'open_above_ref' : 'open_above_c'}`)
+      }
+    }
+  })
   // Emitters per zone (Brief 108): a zone that states them is limited to their output, and their radiant share sets
   // how heating reaches the room. A zone that states none is not limited, as before.
   let emit: (ZoneEmitters | null)[]
@@ -475,7 +588,9 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     const el = elements[k]
     if (el.kind !== 'opaque') throw new ModelError(`surface "${s.id}" is not an opaque floor`, `zones[${zi}].emitters[${ej}].source_surface_id`)
     let node: number
-    try { node = layerFaceNode(library[s.construction_ref.key].layers ?? [], el.boundary, sl.layer_index, p) } catch (e) {
+    // Brief 124: the layer index counts the construction's own layers; a finish on zone_b's face comes first in the stack.
+    const offset = el.boundary === 'zone' ? finishLayers(s.inside_finish_b, library, p).length : 0
+    try { node = layerFaceNode(surfaceLayers(s, library, p), el.boundary, sl.layer_index + offset, p) } catch (e) {
       if (e instanceof ElementError) throw new ModelError(e.message.slice(e.path.length + 2), p)
       throw e
     }
@@ -492,6 +607,35 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     return g ? { w: g.total_w, convective_fraction: g.convective_fraction } : null
   }
 
+  // Brief 125: each face to outside air as EnergyPlus's film needs it: its height (outsideFaceZ, the translator's too),
+  // the site's terrain (siteTerrain, the translator's too), its azimuth and tilt; the weather's wind, humidity, rain.
+  const outsideFilm = () => {
+    const { terrain } = siteTerrain(doc.building.site)
+    const wx = airWeather(weather.hours, weather.header.elevation)
+    return {
+      faces: elements.map((e, k) => {
+        if (e.boundary !== 'outside') return null
+        const s = doc.surfaces[built.surfaceOf[k]]
+        // Brief 126: the emissivity the element was built with (a window under EnergyPlus's model: its 0.84).
+        return outsideFace(outsideFaceZ(doc.zones[zoneA[k]], s.tilt_deg), terrain, s.azimuth_deg ?? 0, s.tilt_deg, e.kind === 'window', e.h_re / K.h_re_per_emissivity)
+      }),
+      weather: {
+        wind_speed: weather.hours.wind_speed, wind_direction: weather.hours.wind_direction, w: wx.w, pressure: weather.hours.pressure, ...rainInputs(weather.hours),
+        sky_ir: sp?.outside_longwave === 'energyplus' ? skyInfrared(weather.hours).ir : null,
+      },
+    }
+  }
+  // Brief 126: each window's glass height as the translator draws it (windowLayout, one read), for ISO 15099 inside.
+  const surfLite = new Map(doc.surfaces.map((s) => [s.id, s]))
+  const layouts = new Map<number, Map<string, { host: string; height_m: number }>>()
+  const windowHeightOf = (k: number) => {
+    const zi = zoneA[k], s = doc.surfaces[built.surfaceOf[k]]
+    let l = layouts.get(zi)
+    if (!l) { l = windowLayout(doc.zones[zi], surfLite); layouts.set(zi, l) }
+    const got = l.get(s.id)
+    if (!got) throw new ModelError('a window needs a wall or roof of its zone facing the same way to sit in', `surfaces[${built.surfaceOf[k]}]`)
+    return got.height_m
+  }
   const kwhOf = (x: ArrayLike<number>) => { let s = 0; for (let h = 0; h < H; h++) s += x[h]; return s / 1000 }
   let solved: Solved[]
   let solver: ModelResults['solver']
@@ -528,6 +672,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     // factorisation per run in the network); refused rather than ignored.
     if (sp?.outside_convection === 'wind') throw new ModelError("wind-driven outside convection runs on one zone only", 'options.surface_physics.outside_convection')
     if (sp?.inside_convection === 'by_heat_flow') throw new ModelError("inside convection by heat flow runs on one zone only", 'options.surface_physics.inside_convection')
+    if (sp?.outside_longwave === 'energyplus' && sp.outside_convection !== 'doe2') throw new ModelError("EnergyPlus's outside long-wave goes with its outside film ('doe2')", 'options.surface_physics.outside_longwave')
     if (options.other_gains && Zn > 1) throw new ModelError('other gains are a one-zone reference-case input', 'options.other_gains')
     const run = runNetwork({
       zones: doc.zones.map((zone, zi) => ({
@@ -538,16 +683,21 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
         initial_c: zone.setpoints.heat_c ?? weather.hours.dry_bulb[0],
         heating_cap_w: capOf(zi), heating_cap_at: capAtOf(zi), heating_convective_fraction: hcfHeatOf(zi), cooling_cap_w: coolCapOf(zi),
         heating_source: sourceOf(zi),
+        ...(weatherAir ? { air_at: airAtOf(zi), air_lines: AIR_LINES.length } : {}),
       })),
       elements: elements.map((element, k) => ({
         element, zone_a: zoneA[k], zone_b: zoneB[k], solar_absorbed_w_per_m2: absorbed[k],
         inside_solar_absorptance: insideAlpha[k], inside_solar_absorptance_b: insideAlphaB[k],
+        window_height_m: element.kind === 'window' ? windowHeightOf(k) : null,
       })),
       hours: H, theta_e: weather.hours.dry_bulb, theta_ground: tg, control: options.control,
       hc_convective_fraction: options.hc_convective_fraction, solar_convective_fraction: options.solar_convective_fraction,
       warmup_days: options.warmup_days,
       steps_per_hour: options.time_step?.steps_per_hour, theta_e_between: options.time_step?.theta_e_between,
       inside_convection: sp?.inside_convection === 'tarp' ? 'tarp' : 'fixed',
+      inside_air: sp?.inside_convection === 'tarp' ? { pressure: weather.hours.pressure, w: airWeather(weather.hours, weather.header.elevation).w } : null,
+      outdoor_air: options.air_heat_capacity === 'outdoor' ? { pressure: weather.hours.pressure, w: airWeather(weather.hours, weather.header.elevation).w } : null,
+      outside_convection: sp?.outside_convection === 'doe2' ? outsideFilm() : null,
       plants, plant_free_share: plants.length ? freeShare : null,
     })
     plantRun = run.plants
@@ -558,6 +708,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       heating_w: z.heating_w, cooling_w: z.cooling_w, theta_air: z.theta_air, theta_op: z.theta_op, theta_mrt: z.theta_mrt,
       bridging_w: z.terms.bridging_w, ventilation_w: z.terms.ventilation_w, solar_lost_w: z.terms.solar_lost_w,
       other_gains_w: z.terms.other_gains_w, storage_w: z.terms.storage_w, closure_wh: z.closure_wh, interzone_w: z.terms.interzone_w,
+      air_lines_w: z.terms.air_lines_w,
       // The network sums the hours in the same order as kwhOf, so the values are the same sums.
       element: (k) => {
         if (zoneA[k] !== zi || elements[k].boundary === 'zone') return null
@@ -584,15 +735,23 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     // Mechanical ventilation shares it too, one line per entry (Brief 105 Part 3).
     let infW = 0, ventW = 0
     const mechW = mech[zi].map(() => 0)
+    const al = run.air_lines_w
     for (let h = 0; h < H; h++) {
-      const v = run.ventilation_w[h], tot = a.Hve[h]
+      // Brief 115: weather-driven air reports its own lines; the rest of the ventilation is the mechanical entries'.
+      let v = run.ventilation_w[h]
+      if (al) for (const x of al) v -= x[h]
+      const tot = a.Hve[h]
       if (tot > 0) {
         infW += (v * a.inf.h_w_per_k) / tot; ventW += (v * a.ventH[h]) / tot
-        mech[zi].forEach((m, j) => { mechW[j] += (v * m.h_w_per_k[h]) / tot })
+        mech[zi].forEach((m, j) => { if (!(mevInBalance[zi] && m.kind === 'mev')) mechW[j] += (v * m.h_w_per_k[h]) / tot })
       }
     }
-    lines.push({ term: 'heating', surface_id: null, kwh: kwh(run.heating_w) })
-    lines.push({ term: 'cooling', surface_id: null, kwh: -kwh(run.cooling_w) })
+    if (al) { infW += kwh(al[0]) * 1000; ventW += kwh(al[1]) * 1000 }
+    // Brief 123: an unheated loft has no heating or cooling line (nothing serves it), not a zero one.
+    if (doc.zones[zi].conditioning !== 'unconditioned') {
+      lines.push({ term: 'heating', surface_id: null, kwh: kwh(run.heating_w) })
+      lines.push({ term: 'cooling', surface_id: null, kwh: -kwh(run.cooling_w) })
+    }
     const mine: number[] = []
     elements.forEach((e, k) => {
       if (zoneA[k] === zi || zoneB[k] === zi) mine.push(k)
@@ -610,6 +769,8 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
     lines.push({ term: 'infiltration', surface_id: null, kwh: infW / 1000 })
     lines.push({ term: 'permanent_vents', surface_id: null, kwh: ventW / 1000 })
     mech[zi].forEach((m, j) => lines.push({ term: 'mechanical_ventilation', surface_id: null, ventilation_id: m.id, kwh: mechW[j] / 1000 }))
+    if (al && airModels![zi].windows.length) lines.push({ term: 'window_ventilation', surface_id: null, kwh: kwh(al[2]) })
+    if (al && airModels![zi].turbulence && airModels![zi].windows.length) lines.push({ term: 'single_sided_turbulence', surface_id: null, kwh: kwh(al[3]) })
     for (const t of Z.transmittedBySurface) lines.push({ term: 'solar_transmitted', surface_id: t.id, kwh: kwh(t.w) })
     if (options.glazing_solar === 'optical') lines.push({ term: 'solar_lost_through_glazing', surface_id: null, kwh: kwh(run.solar_lost_w) })
     if (options.other_gains) lines.push({ term: 'other_gains', surface_id: null, kwh: kwh(run.other_gains_w) })
@@ -689,6 +850,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       },
       emitters: em ? { cap_w: em.cap_w, radiant_fraction: em.radiant_fraction, hours_at_cap: atCap, emitters: em.emitters, slab: em.slab } : null,
       cooling_units: cu ? { cap_w: cu.cap_w, hours_at_cap: atCoolCap, units: cu.units } : null,
+      ...(weatherAir ? { air: { inflow_kg_per_h: airInflow[zi], window_open_fraction: airOpen[zi], hours_windows_open: airOpen[zi].reduce((t, x) => t + (x > 0 ? 1 : 0), 0), leakage: airModels![zi].fixed_leakage ? 'q50_over_20' as const : 'weather' as const } } : {}),
       breakdown: lines,
       closure,
       run_ms,
@@ -778,12 +940,47 @@ export function zoneSetpointHours(doc: ModelDocument, hours: Weather['hours']): 
   let cal: ReturnType<typeof calendar> | null = null
   return doc.zones.map((z, zi) => {
     const sp = z.setpoints, p = `zones[${zi}].setpoints`
-    if (sp.hours_ref == null) {
+    // Brief 121: setpoints that follow temperature profiles.
+    const heatRef = sp.heat_ref ?? null, coolRef = sp.cool_ref ?? null
+    const tempProfile = (ref: string, k: 'heat_ref' | 'cool_ref') => {
+      const t = doc.profiles.find((q) => q.id === ref)
+      if (!t || t.kind !== 'temperature') throw new ModelError(`no temperature profile "${ref}"`, `${p}.${k}`)
+      return t
+    }
+    const extreme = (t: Extract<ModelDocument['profiles'][number], { kind: 'temperature' }>, f: (...x: number[]) => number) =>
+      f(...t.day_types.weekday, ...t.day_types.saturday, ...t.day_types.sunday)
+    const heatT = heatRef != null ? tempProfile(heatRef, 'heat_ref') : null
+    const coolT = coolRef != null ? tempProfile(coolRef, 'cool_ref') : null
+    if (heatT) {
+      if (sp.setback_c != null) throw new ModelError('the heating profile carries the setback; leave setback_c empty', `${p}.setback_c`)
+      if (sp.heat_c == null) throw new ModelError('a heating profile needs heat_c, the in-use setpoint emitters and design heat loss read: the profile\'s highest value', `${p}.heat_c`)
+      const top = extreme(heatT, Math.max)
+      if (sp.heat_c !== top) throw new ModelError(`heat_c (${sp.heat_c} °C) must be the heating profile's highest value (${top} °C)`, `${p}.heat_c`)
+    }
+    if (coolT) {
+      if (sp.cool_c == null) throw new ModelError('a cooling profile needs cool_c: the profile\'s lowest value', `${p}.cool_c`)
+      const low = extreme(coolT, Math.min)
+      if (sp.cool_c !== low) throw new ModelError(`cool_c (${sp.cool_c} °C) must be the cooling profile's lowest value (${low} °C)`, `${p}.cool_c`)
+    }
+    if (sp.hours_ref == null && !heatT && !coolT) {
       if (sp.setback_c != null) throw new ModelError('a setback needs the hours it applies outside (hours_ref)', `${p}.hours_ref`)
       return null
     }
-    const prof = doc.profiles.find((q) => q.id === sp.hours_ref)
-    if (!prof) throw new ModelError(`no profile "${sp.hours_ref}"`, `${p}.hours_ref`)
+    cal ??= calendar(hours)
+    const prof = sp.hours_ref == null ? null : doc.profiles.find((q) => q.id === sp.hours_ref)
+    if (sp.hours_ref != null && !prof) throw new ModelError(`no profile "${sp.hours_ref}"`, `${p}.hours_ref`)
+    if (prof == null) {
+      // Profiles and no hours: in use every hour; the profiles give each hour's setpoints.
+      const H = hours.count
+      const heat = new Float64Array(H), cool = new Float64Array(H), use = new Uint8Array(H).fill(1)
+      for (let h = 0; h < H; h++) {
+        const d = cal.day[h], hr = cal.hourOfDay[h]
+        heat[h] = heatT ? heatT.day_types[d][hr] : sp.heat_c ?? NaN
+        cool[h] = coolT ? coolT.day_types[d][hr] : sp.cool_c ?? NaN
+        if (heat[h] >= cool[h]) throw new ModelError(`the heating setpoint (${heat[h]} °C) reaches the cooling setpoint (${cool[h]} °C) at hour ${h}`, `${p}.${heatT ? 'heat_ref' : 'cool_ref'}`)
+      }
+      return { hourly: { heat_c: heat, cool_c: cool }, in_use: use, in_use_hours: H }
+    }
     const pi = doc.profiles.indexOf(prof)
     if (prof.kind !== 'schedule') throw new ModelError(`profile "${prof.id}" is ${prof.kind}, not a schedule`, `${p}.hours_ref`)
     if (sp.heat_c == null && sp.cool_c == null) throw new ModelError('hours are given, but neither a heating nor a cooling setpoint', p)
@@ -794,17 +991,18 @@ export function zoneSetpointHours(doc: ModelDocument, hours: Weather['hours']): 
     for (const dt of ['weekday', 'saturday', 'sunday'] as const) {
       prof.day_types[dt].forEach((f, hr) => {
         if (!(f >= 0 && f <= 1)) throw new ModelError(`${dt} hour ${hr}: ${f} must be 0 to 1`, `profiles[${pi}].day_types.${dt}`)
-        if (sp.setback_c == null && sp.heat_c != null && f !== 0 && f !== 1) throw new ModelError(`${dt} hour ${hr}: a part value (${f}) needs a setback to scale from; give 0 (off) or 1 (on), or state setback_c`, `profiles[${pi}].day_types.${dt}`)
+        if (sp.setback_c == null && sp.heat_c != null && !heatT && f !== 0 && f !== 1) throw new ModelError(`${dt} hour ${hr}: a part value (${f}) needs a setback to scale from; give 0 (off) or 1 (on), or state setback_c`, `profiles[${pi}].day_types.${dt}`)
       })
     }
-    cal ??= calendar(hours)
     const H = hours.count
     const heat = new Float64Array(H), cool = new Float64Array(H), use = new Uint8Array(H)
     let n = 0
     for (let h = 0; h < H; h++) {
-      const f = prof.day_types[cal.day[h]][cal.hourOfDay[h]]
-      heat[h] = sp.heat_c == null ? NaN : sp.setback_c != null ? sp.setback_c + f * (sp.heat_c - sp.setback_c) : f > 0 ? sp.heat_c : NaN
-      cool[h] = sp.cool_c != null && f > 0 ? sp.cool_c : NaN
+      const d = cal.day[h], hr = cal.hourOfDay[h]
+      const f = prof.day_types[d][hr]
+      heat[h] = heatT ? heatT.day_types[d][hr] : sp.heat_c == null ? NaN : sp.setback_c != null ? sp.setback_c + f * (sp.heat_c - sp.setback_c) : f > 0 ? sp.heat_c : NaN
+      cool[h] = sp.cool_c != null && f > 0 ? (coolT ? coolT.day_types[d][hr] : sp.cool_c) : NaN
+      if ((heatT || coolT) && heat[h] >= cool[h]) throw new ModelError(`the heating setpoint (${heat[h]} °C) reaches the cooling setpoint (${cool[h]} °C) at hour ${h}`, `${p}.${heatT ? 'heat_ref' : coolT ? 'cool_ref' : 'heat_c'}`)
       if (f === 1) { use[h] = 1; n++ }
     }
     return { hourly: { heat_c: heat, cool_c: cool }, in_use: use, in_use_hours: n }

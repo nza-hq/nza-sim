@@ -1,0 +1,2881 @@
+{
+ "_note": "Worked example 2 (17 Nov 2026): an extended UK primary school, L-shaped, one storey: a 1965 wing and a 2012 extension, 17 rooms in 17 zones, drawn with the editor's own plan shape. Every typed value is an example input chosen for the demonstration, not a real building. Made by scripts/example_school_plan.mts. Load with window.sim2.loadPlan(fixture.plan).",
+ "plan": {
+  "blocks": [
+   [
+    [
+     0,
+     0
+    ],
+    [
+     64,
+     0
+    ],
+    [
+     64,
+     40
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     40,
+     10
+    ],
+    [
+     0,
+     10
+    ]
+   ]
+  ],
+  "rooms": [
+   {
+    "id": "r1",
+    "name": "Entrance and reception",
+    "ring": [
+     [
+      0,
+      0
+     ],
+     [
+      6,
+      0
+     ],
+     [
+      6,
+      10
+     ],
+     [
+      0,
+      10
+     ]
+    ],
+    "zone": "z1",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s5",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 3
+     }
+    ]
+   },
+   {
+    "id": "r2",
+    "name": "School office and head",
+    "ring": [
+     [
+      6,
+      0
+     ],
+     [
+      12,
+      0
+     ],
+     [
+      12,
+      10
+     ],
+     [
+      6,
+      10
+     ]
+    ],
+    "zone": "z2",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s4",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "r3",
+    "name": "Classroom 1",
+    "ring": [
+     [
+      12,
+      0
+     ],
+     [
+      20,
+      0
+     ],
+     [
+      20,
+      7.5
+     ],
+     [
+      12,
+      7.5
+     ]
+    ],
+    "zone": "z3",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s1",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 3
+     }
+    ]
+   },
+   {
+    "id": "r4",
+    "name": "Classroom 2",
+    "ring": [
+     [
+      20,
+      0
+     ],
+     [
+      28,
+      0
+     ],
+     [
+      28,
+      7.5
+     ],
+     [
+      20,
+      7.5
+     ]
+    ],
+    "zone": "z4",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s1",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 3
+     }
+    ]
+   },
+   {
+    "id": "r5",
+    "name": "Classroom 3",
+    "ring": [
+     [
+      28,
+      0
+     ],
+     [
+      36,
+      0
+     ],
+     [
+      36,
+      7.5
+     ],
+     [
+      28,
+      7.5
+     ]
+    ],
+    "zone": "z5",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s1",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 3
+     }
+    ]
+   },
+   {
+    "id": "r6",
+    "name": "Classroom 4",
+    "ring": [
+     [
+      36,
+      0
+     ],
+     [
+      44,
+      0
+     ],
+     [
+      44,
+      7.5
+     ],
+     [
+      36,
+      7.5
+     ]
+    ],
+    "zone": "z6",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s1",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 3
+     }
+    ]
+   },
+   {
+    "id": "r7",
+    "name": "Classroom 5",
+    "ring": [
+     [
+      44,
+      0
+     ],
+     [
+      52,
+      0
+     ],
+     [
+      52,
+      7.5
+     ],
+     [
+      44,
+      7.5
+     ]
+    ],
+    "zone": "z7",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s1",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 3
+     }
+    ]
+   },
+   {
+    "id": "r8",
+    "name": "Staff room",
+    "ring": [
+     [
+      52,
+      0
+     ],
+     [
+      58,
+      0
+     ],
+     [
+      58,
+      7.5
+     ],
+     [
+      52,
+      7.5
+     ]
+    ],
+    "zone": "z8",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s4",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "r9",
+    "name": "Pupil WCs",
+    "ring": [
+     [
+      58,
+      0
+     ],
+     [
+      64,
+      0
+     ],
+     [
+      64,
+      7.5
+     ],
+     [
+      58,
+      7.5
+     ]
+    ],
+    "zone": "z9",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s_wc",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1",
+     "ventilation": "y10",
+     "dhw": "y7"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "r10",
+    "name": "Corridor (original)",
+    "ring": [
+     [
+      12,
+      7.5
+     ],
+     [
+      64,
+      7.5
+     ],
+     [
+      64,
+      10
+     ],
+     [
+      12,
+      10
+     ]
+    ],
+    "zone": "z10",
+    "roof": "f_roof2",
+    "floor": "f_floor2",
+    "space": "s5",
+    "systems": {
+     "lighting": "y11",
+     "heating": "y1"
+    },
+    "emitters": [
+     {
+      "type": "et1",
+      "count": 4
+     }
+    ]
+   },
+   {
+    "id": "r11",
+    "name": "Kitchen",
+    "ring": [
+     [
+      40,
+      10
+     ],
+     [
+      48,
+      10
+     ],
+     [
+      48,
+      20
+     ],
+     [
+      40,
+      20
+     ]
+    ],
+    "zone": "z11",
+    "roof": "f_roof3",
+    "floor": "f_floor3",
+    "space": "s3",
+    "systems": {
+     "lighting": "y12",
+     "heating": "y2",
+     "ventilation": "y9",
+     "dhw": "y8"
+    },
+    "emitters": [
+     {
+      "type": "et2",
+      "count": 4
+     }
+    ]
+   },
+   {
+    "id": "r12",
+    "name": "Store and plant",
+    "ring": [
+     [
+      40,
+      20
+     ],
+     [
+      48,
+      20
+     ],
+     [
+      48,
+      24
+     ],
+     [
+      40,
+      24
+     ]
+    ],
+    "zone": "z12",
+    "roof": "f_roof3",
+    "floor": "f_floor3",
+    "space": "s_store",
+    "systems": {
+     "lighting": "y12",
+     "heating": "y13"
+    },
+    "emitters": [
+     {
+      "type": "et5",
+      "count": 1
+     }
+    ]
+   },
+   {
+    "id": "r13",
+    "name": "Link corridor",
+    "ring": [
+     [
+      48,
+      10
+     ],
+     [
+      51,
+      10
+     ],
+     [
+      51,
+      24
+     ],
+     [
+      48,
+      24
+     ]
+    ],
+    "zone": "z13",
+    "roof": "f_roof3",
+    "floor": "f_floor3",
+    "space": "s5",
+    "systems": {
+     "lighting": "y12",
+     "heating": "y2"
+    },
+    "emitters": [
+     {
+      "type": "et2",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "r14",
+    "name": "ICT suite",
+    "ring": [
+     [
+      51,
+      10
+     ],
+     [
+      64,
+      10
+     ],
+     [
+      64,
+      17
+     ],
+     [
+      51,
+      17
+     ]
+    ],
+    "zone": "z14",
+    "roof": "f_roof3",
+    "floor": "f_floor3",
+    "space": "s_ict",
+    "systems": {
+     "lighting": "y12",
+     "heating": "y3",
+     "cooling": "y4",
+     "ventilation": "y6",
+     "dhw": "y8"
+    },
+    "emitters": [
+     {
+      "type": "et3",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "r15",
+    "name": "Server room",
+    "ring": [
+     [
+      51,
+      17
+     ],
+     [
+      55,
+      17
+     ],
+     [
+      55,
+      24
+     ],
+     [
+      51,
+      24
+     ]
+    ],
+    "zone": "z15",
+    "roof": "f_roof3",
+    "floor": "f_floor3",
+    "space": "s_server",
+    "systems": {
+     "lighting": "y12",
+     "cooling": "y4"
+    },
+    "emitters": [
+     {
+      "type": "et4",
+      "count": 3
+     }
+    ]
+   },
+   {
+    "id": "r16",
+    "name": "Classroom 6",
+    "ring": [
+     [
+      55,
+      17
+     ],
+     [
+      64,
+      17
+     ],
+     [
+      64,
+      24
+     ],
+     [
+      55,
+      24
+     ]
+    ],
+    "zone": "z16",
+    "roof": "f_roof3",
+    "floor": "f_floor3",
+    "space": "s_cl_cooled",
+    "systems": {
+     "lighting": "y12",
+     "heating": "y3",
+     "cooling": "y4",
+     "ventilation": "y6",
+     "dhw": "y8"
+    },
+    "emitters": [
+     {
+      "type": "et3",
+      "count": 2
+     }
+    ]
+   },
+   {
+    "id": "r17",
+    "name": "Hall",
+    "ring": [
+     [
+      40,
+      24
+     ],
+     [
+      64,
+      24
+     ],
+     [
+      64,
+      40
+     ],
+     [
+      40,
+      40
+     ]
+    ],
+    "zone": "z17",
+    "roof": "f_roof3",
+    "floor": "f_floor3",
+    "space": "s2",
+    "systems": {
+     "lighting": "y12",
+     "heating": "y2",
+     "ventilation": "y5"
+    },
+    "emitters": [
+     {
+      "type": "et2",
+      "count": 10
+     }
+    ]
+   }
+  ],
+  "zones": [
+   {
+    "id": "z1",
+    "name": "Entrance and reception",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z2",
+    "name": "School office and head",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z3",
+    "name": "Classroom 1",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z4",
+    "name": "Classroom 2",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z5",
+    "name": "Classroom 3",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z6",
+    "name": "Classroom 4",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z7",
+    "name": "Classroom 5",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z8",
+    "name": "Staff room",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z9",
+    "name": "Pupil WCs",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z10",
+    "name": "Corridor (original)",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z11",
+    "name": "Kitchen",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z12",
+    "name": "Store and plant",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z13",
+    "name": "Link corridor",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z14",
+    "name": "ICT suite",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z15",
+    "name": "Server room",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z16",
+    "name": "Classroom 6",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   },
+   {
+    "id": "z17",
+    "name": "Hall",
+    "use": null,
+    "heating": null,
+    "cooling": null
+   }
+  ],
+  "systems": [
+   {
+    "id": "y1",
+    "service": "heating",
+    "name": "Gas boiler 1 (original wing, 1998)",
+    "template": "gas_boiler_heating",
+    "design_flow_c": 80,
+    "design_return_c": 70,
+    "capacity_kw": 120,
+    "dhw_first": "y7",
+    "pumps": {
+     "basis": "w_per_m2",
+     "value": 0.6,
+     "speed": "fixed",
+     "runs": "with_demand",
+     "schedule": null,
+     "default_from": "NCM Modelling Guide 2021 (England), Table 14 (p. 32), para 103; Notional SFPs paras 66–67; hours: with demand, as the rooms served have no one set of heating hours (NCM pairs the W/m² with the heating hours)"
+    }
+   },
+   {
+    "id": "y2",
+    "service": "heating",
+    "name": "Gas boiler 2 (extension, 2012)",
+    "template": "gas_boiler_heating",
+    "design_flow_c": 70,
+    "design_return_c": 50,
+    "capacity_kw": 90,
+    "dhw_first": "y8",
+    "pumps": {
+     "basis": "w_per_m2",
+     "value": 0.6,
+     "speed": "fixed",
+     "runs": "with_demand",
+     "schedule": null,
+     "default_from": "NCM Modelling Guide 2021 (England), Table 14 (p. 32), para 103; Notional SFPs paras 66–67; hours: with demand, as the rooms served have no one set of heating hours (NCM pairs the W/m² with the heating hours)"
+    }
+   },
+   {
+    "id": "y3",
+    "service": "heating",
+    "name": "VRF heating (ICT suite and classroom 6)",
+    "template": "vrf_heating",
+    "capacity_kw": 28
+   },
+   {
+    "id": "y4",
+    "service": "cooling",
+    "name": "VRF cooling (ICT suite, classroom 6, server room)",
+    "template": "vrf_cooling",
+    "capacity_kw": 28
+   },
+   {
+    "id": "y5",
+    "service": "ventilation",
+    "name": "MVHR (hall)",
+    "template": "mvhr_standard",
+    "flow": 1.5,
+    "schedule": "school_ventilation_day",
+    "runs": "schedule"
+   },
+   {
+    "id": "y6",
+    "service": "ventilation",
+    "name": "MVHR (ICT suite and classroom 6)",
+    "template": "mvhr_standard",
+    "flow": 2.5,
+    "schedule": "school_ventilation_day",
+    "runs": "schedule"
+   },
+   {
+    "id": "y7",
+    "service": "dhw",
+    "name": "Hot water cylinder (boiler 1)",
+    "template": "gas_boiler_dhw"
+   },
+   {
+    "id": "y8",
+    "service": "dhw",
+    "name": "Kitchen hot water (boiler 2)",
+    "template": "gas_boiler_dhw"
+   },
+   {
+    "id": "y9",
+    "service": "ventilation",
+    "name": "Kitchen extract",
+    "template": "mev_standard",
+    "flow": 4,
+    "schedule": "school_ventilation_day",
+    "runs": "schedule"
+   },
+   {
+    "id": "y10",
+    "service": "ventilation",
+    "name": "WC extract",
+    "template": "mev_standard",
+    "flow": 3,
+    "schedule": "school_ventilation_day",
+    "runs": "schedule"
+   },
+   {
+    "id": "y11",
+    "service": "lighting",
+    "name": "T8 fluorescent (original wing)",
+    "template": null,
+    "efficacy": 3.5
+   },
+   {
+    "id": "y12",
+    "service": "lighting",
+    "name": "LED (extension)",
+    "template": null,
+    "efficacy": 1.8
+   },
+   {
+    "id": "y13",
+    "service": "heating",
+    "name": "Frost protection panel heater",
+    "template": "electric_panel_heating",
+    "capacity_kw": 2
+   }
+  ],
+  "storey_height_m": 3.2,
+  "windows": [
+   {
+    "id": "w1",
+    "wall": 0,
+    "t_m": 0.6,
+    "width_m": 1.8,
+    "height_m": 2.1,
+    "sill_m": 0.05,
+    "shading_m": 0
+   },
+   {
+    "id": "w2",
+    "wall": 0,
+    "t_m": 3.2,
+    "width_m": 2,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w3",
+    "wall": 0,
+    "t_m": 7,
+    "width_m": 1.6,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w4",
+    "wall": 0,
+    "t_m": 9.4,
+    "width_m": 1.6,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w5",
+    "wall": 0,
+    "t_m": 12.7,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w6",
+    "wall": 0,
+    "t_m": 15.1,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w7",
+    "wall": 0,
+    "t_m": 17.5,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w8",
+    "wall": 0,
+    "t_m": 20.7,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w9",
+    "wall": 0,
+    "t_m": 23.1,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w10",
+    "wall": 0,
+    "t_m": 25.5,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w11",
+    "wall": 0,
+    "t_m": 28.7,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w12",
+    "wall": 0,
+    "t_m": 31.1,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w13",
+    "wall": 0,
+    "t_m": 33.5,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w14",
+    "wall": 0,
+    "t_m": 36.7,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w15",
+    "wall": 0,
+    "t_m": 39.1,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w16",
+    "wall": 0,
+    "t_m": 41.5,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w17",
+    "wall": 0,
+    "t_m": 44.7,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w18",
+    "wall": 0,
+    "t_m": 47.1,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w19",
+    "wall": 0,
+    "t_m": 49.5,
+    "width_m": 1.8,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w20",
+    "wall": 0,
+    "t_m": 52.8,
+    "width_m": 1.6,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w21",
+    "wall": 0,
+    "t_m": 55.6,
+    "width_m": 1.6,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w22",
+    "wall": 0,
+    "t_m": 59,
+    "width_m": 1.2,
+    "height_m": 0.6,
+    "sill_m": 1.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w23",
+    "wall": 0,
+    "t_m": 61.8,
+    "width_m": 1.2,
+    "height_m": 0.6,
+    "sill_m": 1.8,
+    "shading_m": 0
+   },
+   {
+    "id": "w24",
+    "wall": 1,
+    "t_m": 7.8,
+    "width_m": 1,
+    "height_m": 2.1,
+    "sill_m": 0,
+    "shading_m": 0,
+    "door": true
+   },
+   {
+    "id": "w25",
+    "wall": 1,
+    "t_m": 10.8,
+    "width_m": 2.2,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w26",
+    "wall": 1,
+    "t_m": 13.8,
+    "width_m": 2.2,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w27",
+    "wall": 1,
+    "t_m": 17.8,
+    "width_m": 2.4,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w28",
+    "wall": 1,
+    "t_m": 20.9,
+    "width_m": 2.4,
+    "height_m": 1.5,
+    "sill_m": 0.8,
+    "shading_m": 0.6
+   },
+   {
+    "id": "w29",
+    "wall": 1,
+    "t_m": 25,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w30",
+    "wall": 1,
+    "t_m": 30,
+    "width_m": 1.8,
+    "height_m": 2.1,
+    "sill_m": 0,
+    "shading_m": 0,
+    "door": true
+   },
+   {
+    "id": "w31",
+    "wall": 1,
+    "t_m": 34,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w32",
+    "wall": 2,
+    "t_m": 1.5,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w33",
+    "wall": 2,
+    "t_m": 7.5,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w34",
+    "wall": 2,
+    "t_m": 13.5,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w35",
+    "wall": 2,
+    "t_m": 19.5,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w36",
+    "wall": 3,
+    "t_m": 1.5,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w37",
+    "wall": 3,
+    "t_m": 6.6,
+    "width_m": 1.8,
+    "height_m": 2.1,
+    "sill_m": 0,
+    "shading_m": 0,
+    "door": true
+   },
+   {
+    "id": "w38",
+    "wall": 3,
+    "t_m": 11,
+    "width_m": 3,
+    "height_m": 1,
+    "sill_m": 2,
+    "shading_m": 0
+   },
+   {
+    "id": "w39",
+    "wall": 3,
+    "t_m": 17.5,
+    "width_m": 1,
+    "height_m": 2.1,
+    "sill_m": 0,
+    "shading_m": 0,
+    "door": true
+   },
+   {
+    "id": "w40",
+    "wall": 3,
+    "t_m": 21,
+    "width_m": 1.5,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w41",
+    "wall": 3,
+    "t_m": 24.5,
+    "width_m": 1.5,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w42",
+    "wall": 3,
+    "t_m": 28,
+    "width_m": 1,
+    "height_m": 2.1,
+    "sill_m": 0,
+    "shading_m": 0,
+    "door": true
+   },
+   {
+    "id": "w43",
+    "wall": 4,
+    "t_m": 1.5,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w44",
+    "wall": 4,
+    "t_m": 5.5,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w45",
+    "wall": 4,
+    "t_m": 9.5,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w46",
+    "wall": 4,
+    "t_m": 13.5,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w47",
+    "wall": 4,
+    "t_m": 17.5,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w48",
+    "wall": 4,
+    "t_m": 21.5,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w49",
+    "wall": 4,
+    "t_m": 25.5,
+    "width_m": 1.2,
+    "height_m": 1.2,
+    "sill_m": 1,
+    "shading_m": 0
+   },
+   {
+    "id": "w50",
+    "wall": 4,
+    "t_m": 29.5,
+    "width_m": 1.6,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w51",
+    "wall": 4,
+    "t_m": 35.5,
+    "width_m": 1.6,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   },
+   {
+    "id": "w52",
+    "wall": 5,
+    "t_m": 1.2,
+    "width_m": 1,
+    "height_m": 2.1,
+    "sill_m": 0,
+    "shading_m": 0,
+    "door": true
+   },
+   {
+    "id": "w53",
+    "wall": 5,
+    "t_m": 5.5,
+    "width_m": 1.6,
+    "height_m": 1.2,
+    "sill_m": 0.9,
+    "shading_m": 0
+   }
+  ],
+  "fabric_types": [
+   {
+    "id": "f_wall",
+    "element": "wall",
+    "name": "External wall",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_glazing",
+    "element": "glazing",
+    "name": "Windows",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_door",
+    "element": "door",
+    "name": "Doors",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_roof",
+    "element": "roof",
+    "name": "Roof",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_floor",
+    "element": "floor",
+    "name": "Ground floor",
+    "construction": null,
+    "u": null
+   },
+   {
+    "id": "f_partition",
+    "element": "partition",
+    "name": "Block partition",
+    "construction": "interior_wall_block_plastered",
+    "u": null
+   },
+   {
+    "id": "f_wall2",
+    "element": "wall",
+    "name": "1960s school or office, as built: outside walls",
+    "construction": "cavity_wall_unfilled_1960s",
+    "u": null,
+    "template": "set_1960s"
+   },
+   {
+    "id": "f_glazing2",
+    "element": "glazing",
+    "name": "1960s school or office, as built: windows",
+    "construction": "glazing_double_1990s",
+    "u": null,
+    "template": "set_1960s",
+    "opening": {
+     "style": "top_hung",
+     "openable_fraction": 0.3,
+     "opening_angle_deg": 30,
+     "cd": 0.6
+    }
+   },
+   {
+    "id": "f_door2",
+    "element": "door",
+    "name": "1960s school or office, as built: doors",
+    "construction": "timber_door_solid",
+    "u": null,
+    "template": "set_1960s"
+   },
+   {
+    "id": "f_roof2",
+    "element": "roof",
+    "name": "1960s school or office, as built: roofs",
+    "construction": "loft_ceiling_100mm",
+    "u": null,
+    "template": "set_1960s"
+   },
+   {
+    "id": "f_floor2",
+    "element": "floor",
+    "name": "1960s school, as built: ground floors (U typed, ISO 13370)",
+    "construction": "ground_floor_uninsulated",
+    "u": 0.33,
+    "template": "set_1960s"
+   },
+   {
+    "id": "f_wall3",
+    "element": "wall",
+    "name": "Standard new build, hard floors: outside walls",
+    "construction": "cavity_wall_standard",
+    "u": null,
+    "template": "set_standard_hard"
+   },
+   {
+    "id": "f_glazing3",
+    "element": "glazing",
+    "name": "Standard new build, hard floors: windows",
+    "construction": "double_low_e",
+    "u": null,
+    "template": "set_standard_hard",
+    "opening": {
+     "style": "side_hung",
+     "openable_fraction": 0.25,
+     "opening_angle_deg": 45,
+     "cd": 0.6
+    },
+    "trickle": {
+     "area_mm2": 5000,
+     "cd": 0.6,
+     "flow_mode": "single_sided"
+    }
+   },
+   {
+    "id": "f_door3",
+    "element": "door",
+    "name": "Standard new build, hard floors: doors",
+    "construction": "timber_door_solid",
+    "u": null,
+    "template": "set_standard_hard"
+   },
+   {
+    "id": "f_roof3",
+    "element": "roof",
+    "name": "Standard new build, hard floors: roofs",
+    "construction": "flat_roof_standard",
+    "u": null,
+    "template": "set_standard_hard"
+   },
+   {
+    "id": "f_floor3",
+    "element": "floor",
+    "name": "Standard new build, hard floors: ground floors",
+    "construction": "ground_floor_slab_hard",
+    "u": null,
+    "template": "set_standard_hard"
+   },
+   {
+    "id": "f_glazing_single",
+    "element": "glazing",
+    "name": "Original single glazing (steel frames)",
+    "construction": "glazing_single_metal",
+    "u": null
+   },
+   {
+    "id": "f_glazing_fixed",
+    "element": "glazing",
+    "name": "Double low-e, fixed lights (cooled rooms)",
+    "construction": "double_low_e",
+    "u": null,
+    "trickle": {
+     "area_mm2": 5000,
+     "cd": 0.6,
+     "flow_mode": "single_sided"
+    }
+   },
+   {
+    "id": "f_roof_loft",
+    "element": "roof",
+    "name": "Loft slopes: tiles and felt",
+    "construction": "pitched_roof_uninsulated",
+    "u": null
+   }
+  ],
+  "wall_spans": [
+   {
+    "wall": 0,
+    "t0": 0,
+    "t1": 6,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 6,
+    "t1": 12,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 12,
+    "t1": 20,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 20,
+    "t1": 28,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 28,
+    "t1": 36,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 36,
+    "t1": 44,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 44,
+    "t1": 52,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 52,
+    "t1": 58,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 58,
+    "t1": 64,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 1,
+    "t0": 0,
+    "t1": 7.5,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 1,
+    "t0": 7.5,
+    "t1": 10,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 4,
+    "t0": 0,
+    "t1": 28,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 4,
+    "t0": 28,
+    "t1": 34,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 4,
+    "t0": 34,
+    "t1": 40,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 5,
+    "t0": 0,
+    "t1": 10,
+    "type": "f_wall2",
+    "element": "wall"
+   },
+   {
+    "wall": 0,
+    "t0": 0,
+    "t1": 6,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 6,
+    "t1": 12,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 12,
+    "t1": 20,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 20,
+    "t1": 28,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 28,
+    "t1": 36,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 36,
+    "t1": 44,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 44,
+    "t1": 52,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 52,
+    "t1": 58,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 58,
+    "t1": 64,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 1,
+    "t0": 0,
+    "t1": 7.5,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 1,
+    "t0": 7.5,
+    "t1": 10,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 4,
+    "t0": 28,
+    "t1": 34,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 4,
+    "t0": 34,
+    "t1": 40,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 5,
+    "t0": 0,
+    "t1": 10,
+    "type": "f_glazing2",
+    "element": "glazing"
+   },
+   {
+    "wall": 0,
+    "t0": 0,
+    "t1": 6,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 6,
+    "t1": 12,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 12,
+    "t1": 20,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 20,
+    "t1": 28,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 28,
+    "t1": 36,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 36,
+    "t1": 44,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 44,
+    "t1": 52,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 52,
+    "t1": 58,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 0,
+    "t0": 58,
+    "t1": 64,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 1,
+    "t0": 0,
+    "t1": 7.5,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 1,
+    "t0": 7.5,
+    "t1": 10,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 4,
+    "t0": 0,
+    "t1": 28,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 4,
+    "t0": 28,
+    "t1": 34,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 4,
+    "t0": 34,
+    "t1": 40,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 5,
+    "t0": 0,
+    "t1": 10,
+    "type": "f_door2",
+    "element": "door"
+   },
+   {
+    "wall": 1,
+    "t0": 10,
+    "t1": 17,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 1,
+    "t0": 17,
+    "t1": 24,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 1,
+    "t0": 24,
+    "t1": 40,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 2,
+    "t0": 0,
+    "t1": 24,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 3,
+    "t0": 0,
+    "t1": 16,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 3,
+    "t0": 16,
+    "t1": 20,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 3,
+    "t0": 20,
+    "t1": 30,
+    "type": "f_wall3",
+    "element": "wall"
+   },
+   {
+    "wall": 1,
+    "t0": 24,
+    "t1": 40,
+    "type": "f_glazing3",
+    "element": "glazing"
+   },
+   {
+    "wall": 2,
+    "t0": 0,
+    "t1": 24,
+    "type": "f_glazing3",
+    "element": "glazing"
+   },
+   {
+    "wall": 3,
+    "t0": 0,
+    "t1": 16,
+    "type": "f_glazing3",
+    "element": "glazing"
+   },
+   {
+    "wall": 3,
+    "t0": 16,
+    "t1": 20,
+    "type": "f_glazing3",
+    "element": "glazing"
+   },
+   {
+    "wall": 3,
+    "t0": 20,
+    "t1": 30,
+    "type": "f_glazing3",
+    "element": "glazing"
+   },
+   {
+    "wall": 1,
+    "t0": 10,
+    "t1": 17,
+    "type": "f_door3",
+    "element": "door"
+   },
+   {
+    "wall": 1,
+    "t0": 17,
+    "t1": 24,
+    "type": "f_door3",
+    "element": "door"
+   },
+   {
+    "wall": 1,
+    "t0": 24,
+    "t1": 40,
+    "type": "f_door3",
+    "element": "door"
+   },
+   {
+    "wall": 2,
+    "t0": 0,
+    "t1": 24,
+    "type": "f_door3",
+    "element": "door"
+   },
+   {
+    "wall": 3,
+    "t0": 0,
+    "t1": 16,
+    "type": "f_door3",
+    "element": "door"
+   },
+   {
+    "wall": 3,
+    "t0": 16,
+    "t1": 20,
+    "type": "f_door3",
+    "element": "door"
+   },
+   {
+    "wall": 3,
+    "t0": 20,
+    "t1": 30,
+    "type": "f_door3",
+    "element": "door"
+   },
+   {
+    "wall": 4,
+    "t0": 0,
+    "t1": 28,
+    "type": "f_glazing_single",
+    "element": "glazing"
+   },
+   {
+    "wall": 1,
+    "t0": 10,
+    "t1": 24,
+    "type": "f_glazing_fixed",
+    "element": "glazing"
+   }
+  ],
+  "spaces": [
+   {
+    "id": "s1",
+    "name": "Classroom",
+    "use": "public",
+    "occupancy": "school_classroom_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 1,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_classroom",
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 5,
+    "heat_c": 20,
+    "cool_c": null,
+    "people_per_m2": 0.5,
+    "lux": 300,
+    "hot_water_basis": "per_person",
+    "hot_water_litres": 1.5,
+    "heat_profile": "school_heating_setpoint",
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 23,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    }
+   },
+   {
+    "id": "s2",
+    "name": "School hall",
+    "use": "public",
+    "occupancy": "school_hall_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 0.5,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "independent",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_hall",
+    "lighting_w_per_m2": 6,
+    "heat_c": 20,
+    "cool_c": null,
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 23,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    },
+    "equipment_w_per_m2": 2,
+    "people_per_m2": 0.6,
+    "lux": 300,
+    "hot_water_basis": null,
+    "hot_water_litres": null,
+    "heat_profile": "own_1",
+    "floor_finish": "hard",
+    "ceiling": "exposed"
+   },
+   {
+    "id": "s3",
+    "name": "School kitchen",
+    "use": "other",
+    "occupancy": "school_kitchen_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 3,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "independent",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_kitchen",
+    "lighting_w_per_m2": 8,
+    "equipment_w_per_m2": 15,
+    "heat_c": 18,
+    "cool_c": null,
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 24,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    },
+    "people_per_m2": 0.1,
+    "lux": 500,
+    "hot_water_basis": "per_m2",
+    "hot_water_litres": 8,
+    "heat_profile": "school_heating_setpoint"
+   },
+   {
+    "id": "s4",
+    "name": "School office and staff room",
+    "use": "office",
+    "occupancy": "school_office_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 1,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_office",
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 5,
+    "heat_c": 20,
+    "cool_c": null,
+    "people_per_m2": 0.1,
+    "lux": 300,
+    "hot_water_basis": "per_person",
+    "hot_water_litres": 3,
+    "heat_profile": "school_heating_setpoint",
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 23,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    }
+   },
+   {
+    "id": "s5",
+    "name": "School corridor",
+    "use": "public",
+    "occupancy": "school_corridor_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 0,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 1,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_corridor",
+    "lighting_w_per_m2": 2,
+    "heat_c": 20,
+    "cool_c": null,
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 23,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    },
+    "equipment_w_per_m2": 0,
+    "people_per_m2": 0.1,
+    "lux": 100,
+    "hot_water_basis": null,
+    "hot_water_litres": null,
+    "heat_profile": "school_heating_setpoint"
+   },
+   {
+    "id": "s_ict",
+    "name": "ICT suite",
+    "use": "public",
+    "occupancy": "school_classroom_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 3,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_classroom",
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 15,
+    "heat_c": 20,
+    "cool_c": 25,
+    "people_per_m2": 0.35,
+    "lux": 300,
+    "hot_water_basis": "per_person",
+    "hot_water_litres": 1.5,
+    "heat_profile": "school_heating_setpoint",
+    "windows": null,
+    "cool_profile": "school_cooling_setpoint"
+   },
+   {
+    "id": "s_cl_cooled",
+    "name": "Classroom (cooled)",
+    "use": "public",
+    "occupancy": "school_classroom_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 1,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 0.6,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_classroom",
+    "lighting_w_per_m2": 10,
+    "equipment_w_per_m2": 5,
+    "heat_c": 20,
+    "cool_c": 25,
+    "people_per_m2": 0.5,
+    "lux": 300,
+    "hot_water_basis": "per_person",
+    "hot_water_litres": 1.5,
+    "heat_profile": "school_heating_setpoint",
+    "windows": null,
+    "cool_profile": "school_cooling_setpoint"
+   },
+   {
+    "id": "s_wc",
+    "name": "WCs",
+    "use": "public",
+    "occupancy": "school_corridor_occupancy",
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 0,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "proportional_with_spill",
+    "daylight_factor": 1,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": "school_corridor",
+    "lighting_w_per_m2": 2,
+    "heat_c": 18,
+    "cool_c": null,
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 23,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    },
+    "equipment_w_per_m2": 0,
+    "people_per_m2": 0.05,
+    "lux": 200,
+    "hot_water_basis": "per_m2",
+    "hot_water_litres": 4,
+    "heat_profile": null,
+    "heat_hours": "school_ventilation_day",
+    "setback_c": 12
+   },
+   {
+    "id": "s_server",
+    "name": "Comms room",
+    "use": "other",
+    "occupancy": null,
+    "lighting": "school_lighting",
+    "equipment": "own_3",
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": 50,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "independent",
+    "daylight_factor": 1,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "independent",
+    "standby_factor": 0.1,
+    "borrowed": null,
+    "lighting_w_per_m2": 2,
+    "heat_c": null,
+    "cool_c": 24,
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 23,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    },
+    "equipment_w_per_m2": 50,
+    "people_per_m2": null,
+    "lux": 200,
+    "hot_water_basis": null,
+    "hot_water_litres": null,
+    "heat_profile": null,
+    "cool_profile": "own_2"
+   },
+   {
+    "id": "s_store",
+    "name": "Store and plant",
+    "use": "other",
+    "occupancy": null,
+    "lighting": "school_lighting",
+    "equipment": null,
+    "occupancy_rate": 0.75,
+    "sensible_w_per_person": 75,
+    "equipment_baseload_w_per_m2": null,
+    "radiant_fraction": 0.3,
+    "light_area_share": 1,
+    "light_gain_fraction": 1,
+    "light_relationship": "independent",
+    "daylight_factor": 1,
+    "equip_area_share": 1,
+    "equip_gain_fraction": 1,
+    "equip_relationship": "proportional",
+    "standby_factor": 0.1,
+    "borrowed": null,
+    "lighting_w_per_m2": 2,
+    "heat_c": 10,
+    "cool_c": null,
+    "windows": {
+     "rule": "temperature",
+     "open_above_c": 23,
+     "open_fraction": 0.5,
+     "hours": "school_ventilation_day",
+     "controller": "manual"
+    },
+    "equipment_w_per_m2": null,
+    "people_per_m2": null,
+    "lux": 100,
+    "hot_water_basis": null,
+    "hot_water_litres": null,
+    "heat_profile": null
+   }
+  ],
+  "building": {
+   "q50": 10,
+   "tb_multiplier": 1.5,
+   "exposure": "normal",
+   "air_method": "weather_driven",
+   "air_exponent": 0.67,
+   "single_sided_turbulence": true,
+   "terrain": "suburban",
+   "design_outdoor": "heating_99_6",
+   "warm_up_w_per_m2": null
+  },
+  "next": {
+   "room": 18,
+   "zone": 18,
+   "system": 14
+  },
+  "roof": {
+   "style": "flat"
+  },
+  "roof_parts": [
+   {
+    "id": "rp1",
+    "name": "Original wing",
+    "ring": [
+     [
+      0,
+      0
+     ],
+     [
+      64,
+      0
+     ],
+     [
+      64,
+      10
+     ],
+     [
+      0,
+      10
+     ]
+    ],
+    "recipe": {
+     "style": "gable",
+     "pitch_deg": 30,
+     "ridge_axis": "longest",
+     "insulation": "ceiling",
+     "loft_slope_type": "f_roof_loft",
+     "loft_ach": null
+    }
+   },
+   {
+    "id": "rp2",
+    "name": "Extension",
+    "ring": [
+     [
+      40,
+      10
+     ],
+     [
+      64,
+      10
+     ],
+     [
+      64,
+      40
+     ],
+     [
+      40,
+      40
+     ]
+    ],
+    "recipe": {
+     "style": "mono",
+     "pitch_deg": 5,
+     "high_side": "E",
+     "insulation": "slope"
+    }
+   }
+  ],
+  "own_profiles": [
+   {
+    "key": "own_1",
+    "name": "Hall heating, with evening lets",
+    "schedule_type": "heating_setpoint",
+    "from": "school_heating_setpoint",
+    "day_types": {
+     "weekday": [
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      18,
+      12,
+      12,
+      12
+     ],
+     "saturday": [
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      18,
+      18,
+      18,
+      18,
+      18,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12
+     ],
+     "sunday": [
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12,
+      12
+     ]
+    },
+    "monthly_multipliers": null
+   },
+   {
+    "key": "own_2",
+    "name": "Server room, 24 °C all the time",
+    "schedule_type": "cooling_setpoint",
+    "from": null,
+    "day_types": {
+     "weekday": [
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24
+     ],
+     "saturday": [
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24
+     ],
+     "sunday": [
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24
+     ]
+    },
+    "monthly_multipliers": null
+   },
+   {
+    "key": "own_3",
+    "name": "Server load, all the time",
+    "schedule_type": "equipment",
+    "from": null,
+    "day_types": {
+     "weekday": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "saturday": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "sunday": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ]
+    },
+    "monthly_multipliers": null
+   }
+  ],
+  "profiles": [
+   "school_classroom_occupancy",
+   "school_hall_occupancy",
+   "school_kitchen_occupancy",
+   "school_office_occupancy",
+   "school_corridor_occupancy",
+   "school_lighting",
+   "school_heating_setpoint",
+   "school_cooling_setpoint",
+   "school_ventilation_day"
+  ],
+  "building_use": "use_school",
+  "emitter_types": [
+   {
+    "id": "et1",
+    "name": "Steel panel radiator K2 600×1800 (original)",
+    "kind": "radiator",
+    "rated_output_w": 3020,
+    "radiant_fraction": 0.3,
+    "rated_flow_c": 75,
+    "rated_return_c": 65,
+    "rated_room_c": 20,
+    "exponent_n": 1.3
+   },
+   {
+    "id": "et2",
+    "name": "Radiator K2 600×1400 (extension)",
+    "kind": "radiator",
+    "rated_output_w": 2350,
+    "radiant_fraction": 0.3,
+    "rated_flow_c": 75,
+    "rated_return_c": 65,
+    "rated_room_c": 20,
+    "exponent_n": 1.33
+   },
+   {
+    "id": "et3",
+    "name": "VRF cassette 5.6 kW",
+    "kind": "vrf_indoor",
+    "rated_output_w": 6300,
+    "radiant_fraction": 0,
+    "rated_flow_c": null,
+    "rated_return_c": null,
+    "rated_room_c": null,
+    "exponent_n": null,
+    "heats": true,
+    "cooling_output_w": 4300
+   },
+   {
+    "id": "et5",
+    "name": "Panel heater 2 kW",
+    "kind": "electric",
+    "rated_output_w": 2000,
+    "radiant_fraction": 0.2,
+    "rated_flow_c": null,
+    "rated_return_c": null,
+    "rated_room_c": null,
+    "exponent_n": null
+   },
+   {
+    "id": "et4",
+    "name": "VRF wall unit 3.6 kW (cooling only)",
+    "kind": "vrf_indoor",
+    "rated_output_w": null,
+    "radiant_fraction": 0,
+    "rated_flow_c": null,
+    "rated_return_c": null,
+    "rated_room_c": null,
+    "exponent_n": null,
+    "heats": false,
+    "cooling_output_w": 3200
+   }
+  ],
+  "dhw": {
+   "storage_c": 60,
+   "tap_c": 43,
+   "cold_c": 10,
+   "basis": null,
+   "litres": null,
+   "pump_w": 60,
+   "shape": "follow_occupancy"
+  },
+  "other_loads": [
+   {
+    "id": "ol1",
+    "kind": "external_lighting",
+    "name": "External lighting (car park and paths)",
+    "power_w": 1200,
+    "runs": "dusk_to_dawn",
+    "schedule": null
+   }
+  ],
+  "controls": [
+   {
+    "kind": "system",
+    "ref": "y1",
+    "controller": "time_clock",
+    "note": "Old boiler on a seven-day time clock, set by the caretaker"
+   },
+   {
+    "kind": "system",
+    "ref": "y2",
+    "controller": "central_bms",
+    "note": null
+   },
+   {
+    "kind": "system",
+    "ref": "y3",
+    "controller": "local",
+    "note": "VRF wall controllers in each room"
+   },
+   {
+    "kind": "system",
+    "ref": "y4",
+    "controller": "local",
+    "note": null
+   },
+   {
+    "kind": "ventilation",
+    "ref": "y5",
+    "controller": "central_bms",
+    "note": null
+   },
+   {
+    "kind": "ventilation",
+    "ref": "y6",
+    "controller": "central_bms",
+    "note": null
+   },
+   {
+    "kind": "ventilation",
+    "ref": "y9",
+    "controller": "time_clock",
+    "note": null
+   },
+   {
+    "kind": "ventilation",
+    "ref": "y10",
+    "controller": "time_clock",
+    "note": null
+   },
+   {
+    "kind": "lighting",
+    "ref": "y11",
+    "controller": "manual",
+    "note": null
+   },
+   {
+    "kind": "lighting",
+    "ref": "y12",
+    "controller": "photocell",
+    "note": "Daylight dimming and absence detection (recorded only)"
+   }
+  ]
+ }
+}

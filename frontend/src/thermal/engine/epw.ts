@@ -53,6 +53,9 @@ export async function parseEpw(bytes: Uint8Array): Promise<Weather> {
     dry_bulb: f64(), dew_point: f64(), relative_humidity: f64(), pressure: f64(),
     global_horizontal: f64(), direct_normal: f64(), diffuse_horizontal: f64(),
     wind_direction: f64(), wind_speed: f64(), total_sky_cover: f64(), opaque_sky_cover: f64(),
+    present_weather_observation: f64() as Float64Array | null, present_weather_codes: new Array<string>(n) as string[] | null,
+    liquid_precipitation_mm: f64() as Float64Array | null,
+    horizontal_infrared: f64(),
   }
   for (let i = 0; i < n; i++) {
     const line = i + 9
@@ -68,6 +71,9 @@ export async function parseEpw(bytes: Uint8Array): Promise<Weather> {
     h.dew_point[i] = num(p[7], line, 'dew point')
     h.relative_humidity[i] = num(p[8], line, 'relative humidity')
     h.pressure[i] = num(p[9], line, 'pressure')
+    // Brief 126: horizontal infrared radiation from the sky (field 13), EnergyPlus's sky temperature. 9999 or more,
+    // or blank, is missing: NaN, and that hour's sky comes from Clark and Allen as EnergyPlus does (outsideConvection.ts).
+    { const ir = p[12] != null && p[12].trim() !== '' ? Number(p[12]) : NaN; h.horizontal_infrared[i] = Number.isFinite(ir) && ir < 9999 ? ir : NaN }
     h.global_horizontal[i] = num(p[13], line, 'global horizontal')
     h.direct_normal[i] = num(p[14], line, 'direct normal')
     h.diffuse_horizontal[i] = num(p[15], line, 'diffuse horizontal')
@@ -75,6 +81,17 @@ export async function parseEpw(bytes: Uint8Array): Promise<Weather> {
     h.wind_speed[i] = num(p[21], line, 'wind speed')
     h.total_sky_cover[i] = num(p[22], line, 'total sky cover')
     h.opaque_sky_cover[i] = num(p[23], line, 'opaque sky cover')
+    // Brief 125: present weather (fields 26, 27) and liquid precipitation depth (field 33), for EnergyPlus's wet
+    // surfaces. Optional: a file without them (or with a blank) has no rain information, and the run says so.
+    const obs = Number(p[26]), code = (p[27] ?? '').trim(), pr = Number(p[33])
+    if (h.present_weather_observation && h.present_weather_codes) {
+      if (p[26] != null && p[26].trim() !== '' && Number.isFinite(obs) && code !== '') { h.present_weather_observation[i] = obs; h.present_weather_codes[i] = code.replace(/^'|'$/g, '') }
+      else { h.present_weather_observation = null; h.present_weather_codes = null }
+    }
+    if (h.liquid_precipitation_mm) {
+      if (p[33] != null && p[33].trim() !== '' && Number.isFinite(pr)) h.liquid_precipitation_mm[i] = pr
+      else h.liquid_precipitation_mm = null
+    }
   }
   return { header, hours: h, sha256 }
 }

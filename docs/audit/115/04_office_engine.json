@@ -1,0 +1,129 @@
+{
+ "spec_sha256": "947a2f17ed28f9fb28796a96c73036cb0e21d6abfcaeaf9848759bddc57b687b",
+ "weather_sha256": "c61a0a1ea127529b04380cce1e4fc88553bb7036d11127f7673d4e1e5b4edffc",
+ "options": "REFEREE_OPTIONS, 4 steps an hour, internal_gains 'profiles'",
+ "cases": {
+  "shut": {
+   "engine": {
+    "heat_kwh": 2766.041568380157,
+    "cool_kwh": 0,
+    "heat_djf_kwh": 2038.9163117499484,
+    "hours_above_25_in_use": 1140,
+    "max_in_use_c": 38.74979502292158,
+    "inflow_t": 684.0769764020669,
+    "hours_open": 0
+   },
+   "energyplus": {
+    "heat_kwh": 2777.3026100000025,
+    "cool_kwh": 0,
+    "heat_djf_kwh": 2030.4254899999985,
+    "hours_above_25_in_use": 1104,
+    "max_in_use_c": 37.965,
+    "inflow_t": 685.5548025999977,
+    "hours_open": 0
+   }
+  },
+  "wide": {
+   "engine": {
+    "heat_kwh": 44682.001303538265,
+    "cool_kwh": 0,
+    "heat_djf_kwh": 20795.358703402584,
+    "hours_above_25_in_use": 114,
+    "max_in_use_c": 28.660479977842087,
+    "inflow_t": 21817.31269225637,
+    "hours_open": 8760
+   },
+   "energyplus": {
+    "heat_kwh": 44717.73480000002,
+    "cool_kwh": 0,
+    "heat_djf_kwh": 20779.450089999966,
+    "hours_above_25_in_use": 103,
+    "max_in_use_c": 28.403,
+    "inflow_t": 21807.973110000028,
+    "hours_open": 8760
+   }
+  },
+  "cooled": {
+   "engine": {
+    "heat_kwh": 2791.2832844489444,
+    "cool_kwh": 2360.3854480261166,
+    "heat_djf_kwh": 2038.9163117499484,
+    "hours_above_25_in_use": 0,
+    "max_in_use_c": 24.000000000000004,
+    "inflow_t": 669.1247956636627,
+    "hours_open": 0
+   },
+   "energyplus": {
+    "heat_kwh": 2800.149920000001,
+    "cool_kwh": 2320.5710099999983,
+    "heat_djf_kwh": 2030.4254899999985,
+    "hours_above_25_in_use": 0,
+    "max_in_use_c": 24.02,
+    "inflow_t": 670.669606099998,
+    "hours_open": 0
+   }
+  },
+  "passive": {
+   "engine": {
+    "heat_kwh": 4083.171495363382,
+    "cool_kwh": 0,
+    "heat_djf_kwh": 2065.3491291282753,
+    "hours_above_25_in_use": 203,
+    "max_in_use_c": 30.474901241308515,
+    "inflow_t": 3483.7674089271045,
+    "hours_open": 1479
+   },
+   "energyplus": {
+    "heat_kwh": 3429.2376699999977,
+    "cool_kwh": 0,
+    "heat_djf_kwh": 2038.1131999999982,
+    "hours_above_25_in_use": 197,
+    "max_in_use_c": 30.2,
+    "inflow_t": 3218.7517687000045,
+    "hours_open": 1466
+   }
+  },
+  "mixed": {
+   "engine": {
+    "heat_kwh": 4090.382367137795,
+    "cool_kwh": 614.4513980291713,
+    "heat_djf_kwh": 2065.3491291282753,
+    "hours_above_25_in_use": 0,
+    "max_in_use_c": 24.000000000000007,
+    "inflow_t": 3302.0599103816817,
+    "hours_open": 1437
+   },
+   "energyplus": {
+    "heat_kwh": 3429.6690200000016,
+    "cool_kwh": 578.1527199999997,
+    "heat_djf_kwh": 2038.1131999999982,
+    "hours_above_25_in_use": 0,
+    "max_in_use_c": 24.015,
+    "inflow_t": 3033.8018441999993,
+    "hours_open": 1424
+   }
+  }
+ },
+ "own_effects": {
+  "wide_heating": {
+   "engine": 41915.95973515811,
+   "energyplus": 41940.43219000002,
+   "miss_pct": -0.05835050705020117
+  },
+  "wide_djf_heating": {
+   "engine": 18756.442391652636,
+   "energyplus": 18749.024599999968,
+   "miss_pct": 0.03956361363282768
+  },
+  "mixed_cooling": {
+   "engine": -1745.9340499969453,
+   "energyplus": -1742.4182899999987,
+   "miss_pct": 0.20177474129628206
+  },
+  "passive_heating": {
+   "engine": 1317.1299269832248,
+   "energyplus": 651.9350599999952,
+   "miss_pct": 102.03391530795022
+  }
+ }
+}
