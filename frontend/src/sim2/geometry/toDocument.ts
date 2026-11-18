@@ -463,6 +463,8 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
   const roofSpace = new Map<string, number>()
   const roofFace = (zone: string, i: number, share: number, type: string, f: BlockRoof['faces'][number], n: number, onLoft: boolean) => {
     const wall = f.kind === 'wall'
+    // A zone with only a sliver under a roof part takes no face too small to keep (the schema needs area > 0).
+    if (r3(f.area_m2 * share) <= 0) return
     const id = uid(`${zone}_${wall ? 'gable' : 'slope'}_${n + 1}`)
     add(zone, ext({
       id, kind: wall ? 'wall' : 'roof', zone_a: zone, zone_b: 'outside', facade: wall ? facade4(f.azimuth_deg ?? 0) : null,

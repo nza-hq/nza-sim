@@ -23,8 +23,10 @@ Replace an assumption when better information arrives.
 - **Three floors, stacked 3.0 m apart.** NZA Sim now supports stacked floors. Ground 1,590 m² (two blocks: the
   clubhouse and the pro shop), first 442 m², second 53 m². Total 2,085 m².
 - The Revit rooms are traced onto a 0.25 m grid so that they tile each floor wall to wall, as NZA Sim needs. Walls and
-  small gaps go to the nearest room, and the outline sits 0.15 m outside the rooms' inside faces. Floor areas therefore
-  run about 5–8 % above Revit's room areas, which are measured to the inside faces.
+  small gaps go to the nearest room, and the outline sits 0.15 m outside the rooms' inside faces. The rooms are then
+  straightened together: any step under 0.35 m becomes a straight or diagonal wall, and the two curved bays become a
+  few flat facets. This keeps the false corners out of the thermal bridging. Floor areas run about 5–8 % above
+  Revit's room areas, which are measured to the inside faces.
 - Rooms under 2 m² (WC cubicles, risers, ducts) are folded into the rooms next to them. The Bar (402) and one Toilet
   (381) have no floor faces in the export, so they are recovered from the gaps they leave.
 - **Assumption:** Revit's +y is taken as north (the dining room's large windows face south, as the calcs say).
@@ -34,7 +36,7 @@ Replace an assumption when better information arrives.
   survey, so it is left out.
 - Windows, doors and curtain-wall glass are placed on the nearest outside wall within 1 m (doors within 0.6 m).
   Inside doors are dropped. Where two openings overlap on a wall, the larger is kept (32 dropped). No wall is more than
-  80 % glass, so that EnergyPlus has some wall around its windows. The result is 119 m² of glazing and 68 m² of doors,
+  80 % glass, so that EnergyPlus has some wall around its windows. The result is 128 m² of glazing and 68 m² of doors,
   against 229 m² of windows and doors in CA-1000.
 - **Roofs** come from the survey's 40 Revit roofs (`rwgc_clubhouse.roofs.json`). 26 are kept: 14 over the ground
   floor, 11 over the first floor and 1 over the second.
@@ -124,9 +126,9 @@ On London weather (St James's Park TMYx, 2009–2023; the EPW is not committed).
 
 | | Model (15-minute run) | EnergyPlus | 2025 meter |
 |---|---|---|---|
-| Gas | 344 MWh | 325 MWh | 331 MWh |
+| Gas | 337 MWh | 319 MWh | 331 MWh |
 | Electricity | 204 MWh | 204 MWh | 212 MWh |
-| Peak heating | 116 kW | 106 kW | (calcs: 128 kW design, 130 kW in the strategy) |
+| Peak heating | 116 kW | 104 kW | (calcs: 128 kW design, 130 kW in the strategy) |
 
 The base-load figure, the kitchen's equipment and the extract rates were adjusted towards the meters. Nothing else
 was tuned. Several rooms are short of heat for part of the year: the 1880s changing rooms, the first-floor corridor
