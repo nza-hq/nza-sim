@@ -2,6 +2,17 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 Each step's screen cleaned up — IN REVIEW 19 Nov 2026 on `sim2/module-cleanup` (off `sim2/example-rwgc`)
+
+Linzie, 19 Nov 2026 00:00 ("too much going on … think about what each module should have"). UI only; no engine change.
+- Each step shows only its own middle (`workspace/layout.ts STEP_TABS`): Site one page (project details, weather, wind and terrain, the building's facts); Shape the drawing only; Fabric and Spaces Drawing / Heat flow / Monthly; Systems and Controls add Load profiles; Profiles the profile editor only. No results bar on Site, Shape, Profiles. "Results include" switch only on Systems and Controls (Fabric and Spaces say their level in words).
+- Per m² / Total switch removed from the Model (every figure already gives both).
+- Slowness: `facade.wallPieces` re-cut the floor on every call (≈5 s per step change on the clubhouse); cached per outline and rooms, now ≈0.1 s. Profiles no longer starts a full-year run.
+- Floors: one floor list; "Add floor" (Shape only) says what it does first; "Remove floor" (`plan.removeFloor`, tested; ground floor cannot be removed; Undo brings it back). 3D "Whole building": every floor, roofs solid, nothing chosen.
+- Load profiles: chart first, peaks under it, footnote gone. Profiles: the right pane (a second copy of the list) is shut; name and "used by" in one line above the editor.
+- "ZZ TEST — do not use" kept opening because the newest-changed project opens and our checks touch it: a real project now opens first (`isTestProject`), Home lists test projects last and labels them; "Open an example" opens in its own project ("Example: …").
+- `Plan.project_info` (reference, client, address, building type, notes): words only.
+
 ## 🔧 RWGC clubhouse model and stacked floors — IN REVIEW 18 Nov 2026 on `sim2/example-rwgc`
 
 Linzie 18 Nov ~19:50: build the Royal Wimbledon Golf Club clubhouse in NZA Sim "as close as we can get", from the Revit survey, the energy calcs, the strategy, the survey photos and the RFI dump. She chose stacked floors (three-floor building).
