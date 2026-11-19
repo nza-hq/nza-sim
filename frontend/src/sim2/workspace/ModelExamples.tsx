@@ -1,7 +1,8 @@
 /**
  * "Open an example" (17 Nov 2026, Linzie 21:28: "an example building that I can just open"): loads one of the worked
- * examples in docs/examples into the editor, as if drawn. Each is example input chosen for the demonstration, not a
- * real building, and says so. It replaces what is on screen, so it asks first when something is drawn.
+ * examples in docs/examples into the editor, as if drawn. The school and the community centre are example input chosen
+ * for the demonstration, not real buildings, and say so; the RWGC clubhouse (18 Nov 2026) is a real building, its
+ * assumptions listed beside it. It replaces what is on screen, so it asks first when something is drawn.
  */
 import { useState } from 'react'
 import type { EditorApi } from './ModelSave'
@@ -9,6 +10,8 @@ import type { EditorApi } from './ModelSave'
 const EXAMPLES = [
   { id: 'school', name: 'Extended primary school (L-shaped, 1965 wing + 2012 extension)', load: () => import('../../../../docs/examples/extended_school.plan.json') },
   { id: 'community', name: 'Community centre (one block, eight rooms)', load: () => import('../../../../docs/examples/community_centre.plan.json') },
+  // 18 Nov 2026: a real building (Linzie), three floors from the measured survey; its assumptions are listed beside it.
+  { id: 'rwgc', name: 'Royal Wimbledon Golf Club clubhouse (three floors, real building)', load: () => import('../../../../docs/examples/rwgc_clubhouse.plan.json') },
 ] as const
 
 const drawn = (plan: unknown) => ((plan as { blocks?: unknown[] } | null)?.blocks?.length ?? 0) > 0

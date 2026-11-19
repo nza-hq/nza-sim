@@ -41,7 +41,7 @@ import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
 import { FinishInfo, FinishRows } from './Finishes'
 import { carpetIn } from './toDocument'
-import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
+import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, floorsOf, onFloor, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ApplyBarTarget, ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
@@ -66,6 +66,7 @@ import { CATALOGUES, catalogueItem } from '../../thermal/catalogue'
 import { PUMP_CURVE } from '../../thermal/engine/pumps'
 import { controlMap, hoursOnMonday } from './controls'
 import { buildDocument } from './toDocument'
+import { chainAt } from './curves'
 import { previewItems } from '../run/ResultsPanel'
 import type { Summary } from '../run/seam'
 // @ts-expect-error untyped JS from today's app
@@ -183,6 +184,8 @@ const TOOLS: Record<Mode, Array<{ key: Tool; name: string; glyph: string; line: 
 }
 const FIRST: Record<Mode, Tool> = { outline: 'select', rooms: 'divide', fabric: 'pick', profiles: 'pick', spaces: 'pick', systems: 'pick' }
 const STEP: Record<Mode, string> = { outline: 'Outline', rooms: 'Rooms', fabric: 'Fabric', profiles: 'Profiles', spaces: 'Spaces', systems: 'Systems' }
+/** Stacked floors: the floor switcher's short names (Plan.floors keeps the full ones). */
+const FLOOR_SHORT = ['Ground', 'First', 'Second', 'Third', 'Fourth', 'Fifth']
 const STEP_NO: Record<Mode, number> = { outline: 1, rooms: 2, fabric: 3, profiles: 4, spaces: 5, systems: 6 }
 const MODES: Mode[] = ['outline', 'rooms', 'fabric', 'profiles', 'spaces', 'systems']
 const STEP_ICON: Record<Mode, IconName> = { outline: 'building', rooms: 'rooms', fabric: 'wall', profiles: 'profile', spaces: 'person', systems: 'heating' }
@@ -446,6 +449,13 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const placed = useMemo(() => allWindows(plan).windows, [plan])
   const rings = plan.rooms.map((z) => z.ring)
   const has = plan.blocks.length > 0
+  // Stacked floors (18 Nov 2026): every floor, and the zones whose rooms are on another floor (kept out of this floor's lists).
+  const floors = useMemo(() => floorsOf(plan), [plan])
+  // 3D room names: on for one floor, off for a stacked building until asked for (they hide the building).
+  const [names3dSet, setNames3d] = useState<boolean | null>(null)
+  const names3d = names3dSet ?? floors.length < 2
+  const [solidRoofs, setSolidRoofs] = useState(false)
+  const zonesElsewhere = useMemo(() => new Set(floors.flatMap((f, i) => (i === (plan.active_floor ?? 0) ? [] : f.rooms.map((r) => r.zone)))), [floors, plan.active_floor])
   const inRooms = mode !== 'outline'
   const selBlocks = sel?.kind === 'blocks' ? sel.idx.filter((i) => i < plan.blocks.length) : []
 
@@ -3010,7 +3020,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D roofs={pRoofs} roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D labels={names3d} solidRoofs={solidRoofs} roofs={pRoofs} roofOn={(mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof')} floorOn={(mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor')} plan={plan} runs={runs} placed={placed} chosen={selSpan} crossers={crossers} bands={showTypes ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -3020,6 +3030,15 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         <button type="button" aria-pressed={shownLook === 'plan'} onClick={() => setLook('plan')}>Plan</button>
         <button type="button" aria-pressed={in3d} onClick={() => setLook('3d')} disabled={!plan.blocks.length}>3D</button>
         <button type="button" aria-pressed={shownLook === 'elev'} onClick={() => setLook('elev')} disabled={!selWall} title={selWall ? undefined : 'Choose a wall first'}>Elevation</button>
+        {/* 18 Nov 2026 (RWGC clubhouse, Linzie): stacked floors. Each step works on the floor chosen here. */}
+        {(has || floors.length > 1) && <>
+          <span className="gl-viewsep" aria-hidden />
+          {floors.map((f, i) => (
+            <button key={i} type="button" aria-pressed={(plan.active_floor ?? 0) === i} title={f.name} onClick={() => { if ((plan.active_floor ?? 0) !== i) { commit(onFloor(plan, i)); setSel(null) } }}>{FLOOR_SHORT[i] ?? f.name}</button>
+          ))}
+          <button type="button" title="Add a floor above the top one" onClick={() => { commit(onFloor(plan, floors.length)); setSel(null); toMode('outline'); setTool('rect') }}>+ Floor</button>
+        </>}
+        {in3d && <><span className="gl-viewsep" aria-hidden /><button type="button" aria-pressed={names3d} title="Show the rooms' names in 3D" onClick={() => setNames3d(!names3d)}>Names</button><button type="button" aria-pressed={solidRoofs} title="Draw the roofs solid, to see their shapes" onClick={() => setSolidRoofs(!solidRoofs)}>Roofs</button></>}
       </div>
       {shownLook === 'elev' && selWall && selSpan && (
         <FacadeView
@@ -3346,9 +3365,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               )}
               {mode === 'rooms' && (
                 <div className="gl-sec">
-                  <h3>Zones <small>{plan.zones.length}</small></h3>
+                  <h3>Zones <small>{plan.zones.filter((z) => !zonesElsewhere.has(z.id)).length}</small></h3>
                   <div className="gl-zones">
                     {plan.zones.map((z, i) => {
+                      if (zonesElsewhere.has(z.id)) return null
                       const rs = roomsIn(z.id)
                       const allOn = rs.length > 0 && rs.every((r) => chosen.has(r.id))
                       return (
@@ -3438,6 +3458,24 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <button type="button" className="gl-x" aria-label="Close" onClick={() => setSel(null)}>×</button>
             </div>
             <div className="gl-body">
+              {(() => {
+                // 18 Nov 2026 (Linzie): a curved wall drawn as one in 3D. The model keeps the flat walls.
+                const ring = plan.blocks[selWall.block]
+                const on = (plan.curves ?? []).find((c) => c.block === selWall.block && selWall.side >= c.from && selWall.side <= c.to)
+                const chain = ring ? chainAt(ring, selWall.side) : null
+                if (!on && !chain) return null
+                return (
+                  <div className="gl-sec">
+                    <h3>Curve <small>3D only</small></h3>
+                    {on ? (
+                      <button type="button" className="gl-btn quiet" onClick={() => commit({ ...plan, curves: (plan.curves ?? []).filter((c) => c !== on) })}>Draw these {on.to - on.from + 1} walls straight</button>
+                    ) : (
+                      <button type="button" className="gl-btn quiet" onClick={() => commit({ ...plan, curves: [...(plan.curves ?? []).filter((c) => c.block !== selWall.block || c.to < chain!.from || c.from > chain!.to), { ...chain!, block: selWall.block }] })}>Draw as a curve ({chain!.to - chain!.from + 1} walls)</button>
+                    )}
+                    <p className="gl-hint">Shows this wall and the walls either side that bend with it as one curved wall in 3D. The model keeps the flat walls, so nothing in the results changes.</p>
+                  </div>
+                )
+              })()}
               {runPieces.length > 1 && (
                 <div className="gl-chips" role="group" aria-label="Which part">
                   {runPieces.map((p, i) => (

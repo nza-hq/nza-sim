@@ -221,6 +221,7 @@
 .gl-viewswitch button { border: 0; border-radius: 8px; padding: 6px 16px; background: transparent; font: 600 13px var(--gl-detail); color: var(--gl-soft); cursor: pointer; }
 .gl-viewswitch button[aria-pressed="true"] { background: var(--gl-green); color: #fff; }
 .gl-viewswitch button:disabled { opacity: .4; cursor: default; }
+.gl-viewswitch .gl-viewsep { width: 1px; margin: 4px 4px; background: var(--gl-line); }
 @media (max-width: 760px) { .gl-viewswitch { left: 50%; } }
 
 /* Wall pieces, wall types and the elevation view (FacadeView). */

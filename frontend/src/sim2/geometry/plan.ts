@@ -14,6 +14,7 @@
  */
 import { area, ccw, type XY } from './ported/zones'
 import type { RoofPart, RoofRecipe } from './roof'
+import type { WallCurve } from './curves'
 import { type Profile, profile as libProfile, profilesFor as libProfilesFor } from '../library/library'
 
 export type { XY }
@@ -182,7 +183,8 @@ export type Win = {
 }
 
 /** The fabric elements the Fabric step gives types to. */
-export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition'
+/** 'intermediate': the floor between two storeys (stacked floors only, so not in FABRIC_ELEMENTS' defaults). */
+export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition' | 'intermediate'
 /** A fabric type: a library construction (by key) and, optionally, a U-value the user typed over it (W/m²K). Both
  * null: not set yet, and the model document says so (`unassigned:…`). */
 export type FabricType = {
@@ -419,9 +421,41 @@ export type Plan = {
   /** 17 Nov 2026: parts of a block's roof, each a rectangle with its own shape (a wing's own roof); a block with parts
    * takes its roof from them, any other block from `roof` (roof.ts, roofPieces). */
   roof_parts?: RoofPart[]
+  /** 18 Nov 2026: runs of a block's sides the 3D view draws as one smooth curved wall (drawing only; the model keeps
+   * the facets). See curves.ts. */
+  curves?: WallCurve[]
+  /** 18 Nov 2026 (RWGC clubhouse, Linzie: "add stacked floors"): every floor of a building with more than one, ground
+   * first, each its own outline, rooms and windows (stacked one storey height apart). The floor being edited is the
+   * one in `blocks`, `rooms`, `windows` and `wall_spans` above (its entry here is stale until the next switch), so
+   * every step works on one floor as before. Absent: one floor. See floorsOf / onFloor. */
+  floors?: PlanFloor[]
+  /** The floor being edited (index into `floors`, 0 = ground). */
+  active_floor?: number
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
+
+/** One floor of a building with more than one (Plan.floors). Rooms, zones and windows keep ids unique over the whole
+ * building; a zone's rooms are all on one floor. */
+export type PlanFloor = { name: string; blocks: XY[][]; rooms: PlanRoom[]; windows: Win[]; wall_spans: TypeSpan[]; roof?: RoofRecipe; roof_parts?: RoofPart[]; curves?: WallCurve[] }
+
+/** Every floor, ground first, the one being edited as it is now. A plan with no `floors` is one floor. */
+export function floorsOf(plan: Plan): PlanFloor[] {
+  const here: PlanFloor = { name: plan.floors?.[plan.active_floor ?? 0]?.name ?? 'Ground floor', blocks: plan.blocks, rooms: plan.rooms, windows: plan.windows, wall_spans: plan.wall_spans, ...(plan.roof ? { roof: plan.roof } : {}), ...(plan.roof_parts ? { roof_parts: plan.roof_parts } : {}), ...(plan.curves ? { curves: plan.curves } : {}) }
+  if (!plan.floors?.length) return [here]
+  return plan.floors.map((f, i) => (i === (plan.active_floor ?? 0) ? here : f))
+}
+/** Every room on every floor. */
+export const allRooms = (plan: Plan): PlanRoom[] => floorsOf(plan).flatMap((f) => f.rooms)
+/** The plan with floor i being edited (a floor past the top is added, empty). */
+export function onFloor(plan: Plan, i: number): Plan {
+  const fs = floorsOf(plan)
+  while (fs.length <= i) fs.push({ name: FLOOR_NAMES[fs.length] ?? `Floor ${fs.length}`, blocks: [], rooms: [], windows: [], wall_spans: [] })
+  const f = fs[i]!
+  const { roof_parts: _rp, roof: _r, curves: _c, ...rest } = plan
+  return { ...rest, floors: fs, active_floor: i, blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}), ...(f.curves ? { curves: f.curves } : {}) }
+}
+export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor', 'Fourth floor', 'Fifth floor']
 
 /** A plan saved before systems were their own step (15 Nov 2026) kept them on its space types: each space type's
  * systems become system types, given to the rooms of that space type. Anything else passes through. */
