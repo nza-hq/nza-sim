@@ -12,7 +12,7 @@
 import { useContext, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Plus, Clock, Zap, BarChart3, Copy, Trash2 } from 'lucide-react'
-import { ProjectContext } from '../context/ProjectContext.jsx'
+import { ProjectContext, isTestProject } from '../context/ProjectContext.jsx'
 import { confirm } from '../components/shared/ConfirmDialog.jsx'
 
 function formatDate(ts) {
@@ -99,6 +99,9 @@ function ProjectCard({ project, isCurrent, onLoad, onClone, onDelete, busy }) {
             </p>
             {isCurrent && (
               <p className="text-xxs text-magenta/70">Currently loaded</p>
+            )}
+            {isTestProject(project) && (
+              <p className="text-xxs text-mid-grey">Test project for our automated checks. Not for real work.</p>
             )}
           </div>
         </div>
@@ -247,8 +250,10 @@ export default function HomePage() {
     )
   }
 
-  const recent = projects.slice(0, 3)
-  const older  = projects.slice(3)
+  // 19 Nov 2026: the test project our checks use goes last, so it is never taken for a real one.
+  const ordered = [...projects.filter((p) => !isTestProject(p)), ...projects.filter(isTestProject)]
+  const recent = ordered.slice(0, 3)
+  const older  = ordered.slice(3)
 
   return (
     <div className="h-full overflow-y-auto">

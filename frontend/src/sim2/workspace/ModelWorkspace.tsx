@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ResizeHandle from './ResizeHandle'
-import { LEFT, MODEL_CENTRE_TABS, RIGHT, clamp, loadLayout, saveLayout, type CentreTab, type Layout } from './layout'
+import { LEFT, MODEL_CENTRE_TABS, RIGHT, STEP_HAS_RESULTS, STEP_TABS, clamp, loadLayout, saveLayout, tabFor, type CentreTab, type Layout } from './layout'
 import { DEFAULT_STEP, isStep, type StepId } from './steps'
 import './workspace.css'
 
@@ -45,8 +45,15 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
   const [right, setRightEl] = useState<HTMLElement | null>(null)
   const [strip, setStripEl] = useState<HTMLElement | null>(null)
   const later = LATER[step]
+  // 19 Nov 2026 (Linzie): each step shows only its own tabs, and the steps without results have no results bar.
+  const tabs = MODEL_CENTRE_TABS.filter((t) => STEP_TABS[step].includes(t.id))
+  const centreTab = tabFor(step, layout.centre)
+  const results = STEP_HAS_RESULTS(step)
   // A step that comes later has nothing to give, so its right pane stays shut (18 Nov 2026: it showed an empty column).
-  const rightShown = layout.rightOpen && !later
+  // Site (19 Nov 2026) is one page in the middle, so it has no right pane either; nor has Profiles, whose list is on the
+  // left and whose profile fills the middle (it was listed twice, left and right).
+  const noRight = !!later || step === 'site' || step === 'profiles'
+  const rightShown = layout.rightOpen && !noRight
 
   return (
     <div className="mw-root flex flex-col h-[calc(100vh-3rem)]">
@@ -57,10 +64,10 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
       </aside>
       <ResizeHandle onResize={setLeft} />
       <section className="flex-1 min-w-0 flex flex-col bg-off-white">
-        <div className="mw-strip flex-shrink-0" ref={setStripEl} />
-        <div className="flex-shrink-0 flex items-center border-b border-light-grey bg-white px-2 pt-2" role="tablist" aria-label="View">
-          {MODEL_CENTRE_TABS.map((t) => {
-            const on = t.id === layout.centre
+        <div className="mw-strip flex-shrink-0" ref={setStripEl} hidden={!results} />
+        {tabs.length > 1 && <div className="flex-shrink-0 flex items-center border-b border-light-grey bg-white px-2 pt-2" role="tablist" aria-label="View">
+          {tabs.map((t) => {
+            const on = t.id === centreTab
             return (
               <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => setCentre(t.id)}
                 className={`px-3 py-1.5 text-caption transition-colors border-b-2 -mb-px ${on ? 'border-navy text-navy font-medium' : 'border-transparent text-mid-grey hover:text-navy'}`}>
@@ -68,9 +75,9 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
               </button>
             )
           })}
-        </div>
+        </div>}
         <div className="mw-centre flex-1 min-h-0 relative overflow-hidden" ref={setCentreEl}>
-          {later && layout.centre === 'drawing' && (
+          {later && (
             <div className="mw-empty-over"><div className="mw-empty">
               <h2>{later.title}</h2>
               <p>{later.text}</p>
@@ -84,8 +91,8 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
         <button type="button" className="mw-close" aria-label="Close the right panel" title="Close" onClick={() => setRightOpen(false)}>›</button>
         <div className="mw-slot h-full overflow-hidden" ref={setRightEl} />
       </aside>
-      {!rightShown && !later && <button type="button" className="mw-open" onClick={() => setRightOpen(true)} title="Open the right panel">‹ Details</button>}
-      {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: layout.centre, setCentre, openRight: () => setRightOpen(true) })}
+      {!rightShown && !noRight && <button type="button" className="mw-open" onClick={() => setRightOpen(true)} title="Open the right panel">‹ Details</button>}
+      {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: centreTab, setCentre, openRight: () => setRightOpen(true) })}
      </div>
     </div>
   )

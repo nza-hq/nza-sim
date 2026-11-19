@@ -110,3 +110,13 @@ CREATE INDEX IF NOT EXISTS idx_library_type ON library_items (library_type);
 CREATE INDEX IF NOT EXISTS idx_scenarios_project_id ON scenarios (project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_consumption_project ON consumption_data (project_id);
 CREATE INDEX IF NOT EXISTS idx_records_consumption ON consumption_records (consumption_id, timestamp);
+
+-- 19 Nov 2026 (Linzie: the clubhouse should be a real, saved project): the drawn model (Simulate v2's Plan) saved on
+-- this computer with its project, for when NZA Sim sign-in is not set up (with sign-in, model versions go to the NZA
+-- Sim Supabase project as before). One row per project, overwritten on each save; additive, nothing else reads it.
+CREATE TABLE IF NOT EXISTS model_plans (
+    project_id TEXT PRIMARY KEY,
+    plan JSON NOT NULL,
+    saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);

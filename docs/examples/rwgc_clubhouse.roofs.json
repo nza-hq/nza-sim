@@ -1,0 +1,780 @@
+{
+"0": [
+{
+"id": "rp_3267014",
+"name": "Roof 3267014 (gable, 21deg)",
+"ring": [
+[
+62.63,
+22.451
+],
+[
+62.63,
+35.777
+],
+[
+41.643,
+35.777
+],
+[
+41.643,
+22.451
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 21.0,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 55.33,
+"area": 279.7
+},
+{
+"id": "rp_3663240",
+"name": "Roof 3663240 (hip, 9deg)",
+"ring": [
+[
+9.391,
+8.8
+],
+[
+9.391,
+-3.057
+],
+[
+43.268,
+-3.057
+],
+[
+43.268,
+8.8
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 8.6,
+"insulation": "slope"
+},
+"eaves_z": 56.29,
+"area": 401.7
+},
+{
+"id": "rp_3267046",
+"name": "Roof 3267046 (gable, 21deg)",
+"ring": [
+[
+36.116,
+9.248
+],
+[
+47.893,
+9.248
+],
+[
+47.893,
+30.424
+],
+[
+36.116,
+30.424
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 21.0,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 55.46,
+"area": 249.4
+},
+{
+"id": "rp_3267007",
+"name": "Roof 3267007 (hip, 21deg)",
+"ring": [
+[
+41.663,
+25.07
+],
+[
+41.663,
+35.777
+],
+[
+28.754,
+35.777
+],
+[
+28.754,
+25.07
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 21.0,
+"insulation": "slope"
+},
+"eaves_z": 55.53,
+"area": 138.2
+},
+{
+"id": "rp_3267117",
+"name": "Roof 3267117 (gable, 46deg)",
+"ring": [
+[
+24.832,
+8.74
+],
+[
+24.832,
+17.707
+],
+[
+10.381,
+17.707
+],
+[
+10.381,
+8.74
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 45.7,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 56.64,
+"area": 129.6
+},
+{
+"id": "rp_3267107",
+"name": "Roof 3267107 (gable, 42deg)",
+"ring": [
+[
+20.37,
+12.403
+],
+[
+12.089,
+12.403
+],
+[
+12.089,
+-0.574
+],
+[
+20.37,
+-0.574
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 42.0,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 56.38,
+"area": 107.5
+},
+{
+"id": "rp_3267070",
+"name": "Roof 3267070 (hip, 42deg)",
+"ring": [
+[
+43.813,
+10.75
+],
+[
+35.411,
+10.75
+],
+[
+35.411,
+-0.587
+],
+[
+43.813,
+-0.587
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 41.5,
+"insulation": "slope"
+},
+"eaves_z": 56.35,
+"area": 95.3
+},
+{
+"id": "rp_3278204",
+"name": "Roof 3278204 (hip, 22deg)",
+"ring": [
+[
+52.581,
+13.083
+],
+[
+52.408,
+3.151
+],
+[
+61.911,
+2.985
+],
+[
+62.084,
+12.917
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 21.6,
+"insulation": "slope"
+},
+"eaves_z": 55.92,
+"area": 94.4
+},
+{
+"id": "rp_3267063",
+"name": "Roof 3267063 (hip, 41deg)",
+"ring": [
+[
+41.594,
+11.353
+],
+[
+41.594,
+4.689
+],
+[
+50.333,
+4.689
+],
+[
+50.333,
+11.353
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 41.2,
+"insulation": "slope"
+},
+"eaves_z": 55.44,
+"area": 58.2
+},
+{
+"id": "rp_3267056",
+"name": "Roof 3267056 (hip, 41deg)",
+"ring": [
+[
+42.451,
+4.689
+],
+[
+42.451,
+-0.077
+],
+[
+50.333,
+-0.077
+],
+[
+50.333,
+4.689
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 41.0,
+"insulation": "slope"
+},
+"eaves_z": 55.52,
+"area": 37.6
+},
+{
+"id": "rp_3641462",
+"name": "Roof 3641462 (mono, 12deg)",
+"ring": [
+[
+52.694,
+3.151
+],
+[
+52.664,
+1.415
+],
+[
+61.668,
+1.258
+],
+[
+61.698,
+2.993
+]
+],
+"recipe": {
+"style": "mono",
+"pitch_deg": 12.0,
+"insulation": "slope",
+"high_side": 1
+},
+"eaves_z": 55.57,
+"area": 15.6
+},
+{
+"id": "rp_3665677",
+"name": "Roof 3665677 (mono, 36deg)",
+"ring": [
+[
+28.851,
+19.043
+],
+[
+28.915,
+22.709
+],
+[
+24.366,
+22.788
+],
+[
+24.302,
+19.122
+]
+],
+"recipe": {
+"style": "mono",
+"pitch_deg": 36.0,
+"insulation": "slope",
+"high_side": 181
+},
+"eaves_z": 56.21,
+"area": 16.7
+},
+{
+"id": "rp_3267317",
+"name": "Roof 3267317 (mono, 32deg)",
+"ring": [
+[
+23.12,
+25.928
+],
+[
+25.617,
+25.928
+],
+[
+25.617,
+30.67
+],
+[
+23.12,
+30.67
+]
+],
+"recipe": {
+"style": "mono",
+"pitch_deg": 32.5,
+"insulation": "slope",
+"high_side": 270
+},
+"eaves_z": 54.99,
+"area": 11.8
+},
+{
+"id": "rp_3267329",
+"name": "Roof 3267329 (gable, 39deg)",
+"ring": [
+[
+11.405,
+30.687
+],
+[
+14.635,
+30.687
+],
+[
+14.635,
+33.105
+],
+[
+11.405,
+33.105
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 39.2,
+"insulation": "slope",
+"ridge_axis": "shortest"
+},
+"eaves_z": 55.04,
+"area": 7.8
+}
+],
+"1": [
+{
+"id": "rp_3169369",
+"name": "Roof 3169369 (gable, 41deg)",
+"ring": [
+[
+62.441,
+19.295
+],
+[
+55.799,
+19.411
+],
+[
+55.575,
+6.606
+],
+[
+62.217,
+6.49
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 41.3,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 57.98,
+"area": 85.1
+},
+{
+"id": "rp_3267123",
+"name": "Roof 3267123 (gable, 42deg)",
+"ring": [
+[
+28.807,
+10.652
+],
+[
+36.49,
+10.652
+],
+[
+36.49,
+24.115
+],
+[
+28.807,
+24.115
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 41.7,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 57.06,
+"area": 103.4
+},
+{
+"id": "rp_3267431",
+"name": "Roof 3267431 (hip, 36deg)",
+"ring": [
+[
+5.349,
+30.765
+],
+[
+0.142,
+30.765
+],
+[
+0.142,
+18.891
+],
+[
+5.349,
+18.891
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 36.0,
+"insulation": "slope"
+},
+"eaves_z": 58.95,
+"area": 61.8
+},
+{
+"id": "rp_3640995",
+"name": "Roof 3640995 (hip, 35deg)",
+"ring": [
+[
+6.897,
+28.0
+],
+[
+6.897,
+18.858
+],
+[
+15.377,
+18.858
+],
+[
+15.377,
+28.0
+]
+],
+"recipe": {
+"style": "hip",
+"pitch_deg": 34.6,
+"insulation": "slope"
+},
+"eaves_z": 58.42,
+"area": 77.5
+},
+{
+"id": "rp_3267100",
+"name": "Roof 3267100 (gable, 42deg)",
+"ring": [
+[
+27.949,
+4.271
+],
+[
+34.188,
+4.271
+],
+[
+34.188,
+13.798
+],
+[
+27.949,
+13.798
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 42.1,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 58.38,
+"area": 59.4
+},
+{
+"id": "rp_3267093",
+"name": "Roof 3267093 (gable, 40deg)",
+"ring": [
+[
+27.949,
+13.253
+],
+[
+21.608,
+13.253
+],
+[
+21.608,
+4.271
+],
+[
+27.949,
+4.271
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 40.0,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 58.35,
+"area": 57.0
+},
+{
+"id": "rp_3267297",
+"name": "Roof 3267297 (gable, 39deg)",
+"ring": [
+[
+17.95,
+26.425
+],
+[
+17.95,
+20.265
+],
+[
+25.207,
+20.265
+],
+[
+25.207,
+26.425
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 39.0,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 58.2,
+"area": 44.7
+},
+{
+"id": "rp_3267137",
+"name": "Roof 3267137 (gable, 44deg)",
+"ring": [
+[
+31.792,
+7.821
+],
+[
+31.792,
+15.619
+],
+[
+24.63,
+15.619
+],
+[
+24.63,
+7.821
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 44.0,
+"insulation": "slope",
+"ridge_axis": "shortest"
+},
+"eaves_z": 58.61,
+"area": 55.8
+},
+{
+"id": "rp_3267307",
+"name": "Roof 3267307 (gable, 39deg)",
+"ring": [
+[
+17.735,
+23.513
+],
+[
+23.377,
+23.513
+],
+[
+23.377,
+31.111
+],
+[
+17.735,
+31.111
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 39.0,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 58.31,
+"area": 42.9
+},
+{
+"id": "rp_3267348",
+"name": "Roof 3267348 (gable, 38deg)",
+"ring": [
+[
+20.42,
+25.729
+],
+[
+20.42,
+30.963
+],
+[
+12.687,
+30.963
+],
+[
+12.687,
+25.729
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 37.5,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 58.34,
+"area": 40.5
+},
+{
+"id": "rp_3267342",
+"name": "Roof 3267342 (mono, 38deg)",
+"ring": [
+[
+12.687,
+28.056
+],
+[
+12.687,
+30.963
+],
+[
+5.085,
+30.963
+],
+[
+5.085,
+28.056
+]
+],
+"recipe": {
+"style": "mono",
+"pitch_deg": 37.7,
+"insulation": "slope",
+"high_side": 180
+},
+"eaves_z": 58.34,
+"area": 22.1
+}
+],
+"2": [
+{
+"id": "rp_3267414",
+"name": "Roof 3267414 (gable, 8deg)",
+"ring": [
+[
+2.343,
+28.616
+],
+[
+2.343,
+20.6
+],
+[
+12.758,
+20.6
+],
+[
+12.758,
+28.616
+]
+],
+"recipe": {
+"style": "gable",
+"pitch_deg": 7.8,
+"insulation": "slope",
+"ridge_axis": "longest"
+},
+"eaves_z": 60.65,
+"area": 83.5
+}
+]
+}

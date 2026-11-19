@@ -95,6 +95,9 @@ import { migrateInterventionPatches } from '../utils/interventionsEngine.js'  //
 import { migrateStrategyRefs } from '../utils/strategyModel.js'  // Brief 94 Part 2
 import { migrateCostShape } from '../utils/costModel.js'  // Brief 91b Part 2 — migrate-on-read
 
+/** The test projects our checks run against (scripts/seed_test_project.py names them "ZZ TEST …"). */
+export const isTestProject = (p) => /^ZZ TEST\b/.test(p?.name ?? '')
+
 export const ProjectContext = createContext(null)
 
 // ── Defaults (mirror api/db/database.py) ─────────────────────────────────────
@@ -1329,7 +1332,7 @@ export function ProjectProvider({ children }) {
     })
   }
 
-  // ── Startup: fetch project list, load most recent (or create default) ────
+  // ── Startup: fetch project list, load most recent real project (or create default) ────
 
   useEffect(() => {
     async function bootstrap() {
@@ -1337,8 +1340,12 @@ export function ProjectProvider({ children }) {
         const list = await _apiFetch('/api/projects')
         setProjects(list)
 
+        // 19 Nov 2026 (Linzie: "There's 'ZZ TEST — do not use' always there. Why?"): the most recently changed project
+        // opens, and that was the test project our checks use (CLAUDE.md, Testing reference discipline), so it kept
+        // coming back. A real project opens first; the test project only when there is nothing else.
+        const real = list.filter((p) => !isTestProject(p))
         if (list.length > 0) {
-          const full = await _apiFetch(`/api/projects/${list[0].id}`)
+          const full = await _apiFetch(`/api/projects/${(real[0] ?? list[0]).id}`)
           _applyProject(full)
         } else {
           // No projects yet — create the default

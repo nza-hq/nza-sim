@@ -342,6 +342,46 @@ async def delete_project(project_id: str):
         await db.commit()
 
 
+# ── The drawn model, saved on this computer (19 Nov 2026) ────────────────────
+# Simulate v2's Plan for a project, kept in model_plans when NZA Sim sign-in is not set up. The body is stored as given
+# (the frontend owns the Plan's shape); nothing here reads inside it.
+
+@router.get("/{project_id}/model")
+async def get_model_plan(project_id: str):
+    """The project's saved drawn model, or {"plan": null} when none is saved."""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT plan, saved_at FROM model_plans WHERE project_id = ?", (project_id,))
+        row = await cursor.fetchone()
+    if not row:
+        return {"plan": None, "saved_at": None}
+    return {"plan": json.loads(row["plan"]), "saved_at": row["saved_at"]}
+
+
+@router.put("/{project_id}/model")
+async def save_model_plan(project_id: str, body: dict[str, Any] = Body(...)):
+    """Save (replace) the project's drawn model. Body: {"plan": {...}}."""
+    plan = body.get("plan")
+    if not isinstance(plan, dict):
+        raise HTTPException(status_code=400, detail="Body must be {\"plan\": {...}}")
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM projects WHERE id = ?", (project_id,))
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+        await db.execute(
+            """
+            INSERT INTO model_plans (project_id, plan, saved_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(project_id) DO UPDATE SET plan = excluded.plan, saved_at = CURRENT_TIMESTAMP
+            """,
+            (project_id, json.dumps(plan)),
+        )
+        await db.execute("UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (project_id,))
+        await db.commit()
+        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        cursor = await db.execute("SELECT saved_at FROM model_plans WHERE project_id = ?", (project_id,))
+        row = await cursor.fetchone()
+    return {"saved_at": row["saved_at"]}
+
+
 @router.post("/{project_id}/clone", status_code=201)
 async def clone_project(project_id: str):
     """

@@ -8,8 +8,6 @@ import { useEffect, useMemo, useState } from 'react'
 import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 // @ts-expect-error untyped JS from today's app
 import LiveResultsStrip from '../../components/shared/LiveResultsStrip.jsx'
-// @ts-expect-error untyped JS from today's app
-import { useUISettings } from '../../context/UISettingsContext.jsx'
 import { balanceLines } from './balanceLines'
 import { hearModel, type ModelShare } from './modelChannel'
 import { LEVEL_NAMES, stripItems } from './ResultsPanel'
@@ -17,7 +15,7 @@ import './run.css'
 
 export default function ModelPopout() {
   const [share, setShare] = useState<ModelShare | null>(null)
-  const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
+  const unit = 'kwh' as 'kwh' | 'kwh_per_m2' // 19 Nov 2026 (Linzie): no Per m² / Total switch; totals, with per m² beside each
   useEffect(() => hearModel(setShare), [])
   useEffect(() => { document.title = 'Model results · NZA Sim' }, [])
   const s = share?.summary ?? null

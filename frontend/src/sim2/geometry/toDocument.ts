@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, FINISH_KEY, finishesOf, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, FINISH_KEY, finishesOf, floorsOf, type PlanFloor, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, lightingBy, roomLuminaires, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -50,6 +50,22 @@ export type Built = {
 }
 
 /**
+ * 19 Nov 2026: a space type's fresh air as the engine's flow entries, each a rate and its basis ('per_room' is l/s for
+ * each room, written as the zone's constant flow). Null: the space type states no basis (the system's flow is used).
+ * An empty list: a basis with its figure(s) missing, so the run names the flow as required.
+ */
+export function freshAirOf(sp: SpaceType | undefined | null): Array<{ basis: 'per_person' | 'per_m2' | 'per_room' | 'ach'; rate: number }> | null {
+  const b = sp?.fresh_air_basis
+  if (!sp || !b) return null
+  const one = (basis: 'per_person' | 'per_m2' | 'per_room' | 'ach', rate: number | null | undefined) => (rate != null && rate >= 0 ? [{ basis, rate }] : [])
+  if (b === 'per_person_and_m2') {
+    const both = [...one('per_person', sp.fresh_air_l_s_person), ...one('per_m2', sp.fresh_air_l_s_m2)]
+    return both.length === 2 ? both : []
+  }
+  return b === 'per_person' ? one(b, sp.fresh_air_l_s_person) : b === 'per_m2' ? one(b, sp.fresh_air_l_s_m2) : b === 'per_room' ? one(b, sp.fresh_air_l_s_room) : one(b, sp.fresh_air_ach)
+}
+
+/**
  * Brief 123: a pitched roof. `roofs` are the blocks' roofs as Shape has them (from the roof service, or the browser
  * for rectangles); absent, rectangles are worked out here and any other outline keeps a flat roof (with a note).
  * - Insulated at the ceiling: each pitched block gets an unheated loft zone (no setpoint, no system of any kind; its
@@ -59,6 +75,134 @@ export type Built = {
  *   height grows by its share of the roof space.
  */
 export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Built {
+  const floors = floorsOf(plan0)
+  return floors.length > 1 ? buildStacked(plan0, floors) : buildFloor(plan0, roofsIn)
+}
+
+/**
+ * 18 Nov 2026 (RWGC clubhouse, Linzie: "add stacked floors"): a building of more than one floor. Each floor is built
+ * as one floor is (walls, windows, partitions, a roof and a ground floor for every zone), its zones put on their floor,
+ * and then the floors are joined where they stand on each other: where a zone's rooms lie over another zone's on the
+ * floor below, that much of the lower zone's roof and the upper zone's ground floor become one floor between them
+ * (ceiling from below, the 'intermediate' fabric type); an upper zone's floor over no room below is an exposed floor
+ * to outside air. Floors are one storey height apart. A pitched roof is not stacked yet: every floor's roof is flat
+ * (a note says so when one was chosen). Systems, profiles and controls are the building's, gathered from the floors.
+ */
+function buildStacked(plan0: Plan, floors: PlanFloor[]): Built {
+  const notes: string[] = []
+  const rooms = floors.flatMap((f) => f.rooms)
+  const zoneFloor = new Map<string, number>()
+  floors.forEach((f, k) => f.rooms.forEach((r) => {
+    const was = zoneFloor.get(r.zone)
+    if (was != null && was !== k) notes.push(`${plan0.zones.find((z) => z.id === r.zone)?.name ?? r.zone} has rooms on more than one floor; a zone is on one floor, so its rooms on ${floors[k]!.name.toLowerCase()} are left out`)
+    else zoneFloor.set(r.zone, k)
+  }))
+  const subs = floors.map((f, k) => {
+    const mine = f.rooms.filter((r) => zoneFloor.get(r.zone) === k)
+    // Every room of the building, so space types, systems and emitters see the whole building; the floor's own rooms
+    // for its geometry (buildFloor reads geometry from blocks, windows and the rooms of its zones).
+    // Its roof: the floor's own parts, each over the rooms under it, and the rest flat (roofPieces, partial). A whole
+    // block's pitched roof (no parts) is drawn only on the top floor's blocks; below one it would stand on the floor above.
+    const top = k === floors.length - 1
+    const roof = f.roof && f.roof.style !== 'flat' && !top && !f.roof_parts?.length ? { style: 'flat' as const } : f.roof ?? { style: 'flat' as const }
+    if (roof !== f.roof && f.roof) notes.push(`${f.name}: its pitched roof covers whole blocks, which the floor above stands on; give it roof parts instead (each a rectangle), so it is flat for now`)
+    const sub: Plan = { ...plan0, floors: undefined, active_floor: undefined, blocks: f.blocks, rooms: mine, windows: f.windows, wall_spans: f.wall_spans, roof, roof_parts: f.roof_parts }
+    return buildFloor(sub, undefined, { loftPrefix: `f${k}_`, partialRoof: true })
+  })
+  // Gather: zones (on their floor), surfaces, system groups (their zones joined), profiles, controls, library refs.
+  const docs = subs.map((s) => s.doc as Record<string, unknown> & { zones: Array<Record<string, unknown>>; surfaces: Array<Record<string, unknown>>; system_groups: Array<Record<string, unknown>>; profiles: Array<Record<string, unknown>>; controls?: Array<Record<string, unknown>>; library_refs: Array<Record<string, unknown>>; other_loads?: unknown[] })
+  const zones = docs.flatMap((d, k) => d.zones.map((z) => ({ ...z, floor: z.use_type === 'loft' ? k + 1 : k })))
+  const surfaces = docs.flatMap((d) => d.surfaces.map((s) => ({ ...s })))
+  const groups = new Map<string, Record<string, unknown>>()
+  for (const d of docs) for (const g of d.system_groups) {
+    const was = groups.get(g.id as string)
+    groups.set(g.id as string, was ? { ...g, ...was, zones: [...(was.zones as string[]), ...(g.zones as string[])] } : { ...g })
+  }
+  const byId = <T extends Record<string, unknown>>(xs: T[], key: (x: T) => string) => [...new Map(xs.map((x) => [key(x), x])).values()]
+  const profiles = byId(docs.flatMap((d) => d.profiles), (p) => p.id as string)
+  const controls = byId(docs.flatMap((d) => d.controls ?? []), (c) => c.id as string)
+  // The floors between storeys' construction is pinned too (the floors' own documents never had it).
+  const mid = construction(plan0.fabric_types.find((t) => t.element === 'intermediate')?.construction)
+  const midPin = mid?.body_hash ? [{ kind: 'construction', key: mid.key, version: null, body_hash: mid.body_hash }] : []
+  const library_refs = byId([...docs.flatMap((d) => d.library_refs), ...midPin], (r) => `${r.kind}:${r.key}`).sort((a, b) => (`${a.kind}${a.key}` < `${b.kind}${b.key}` ? -1 : 1))
+
+  // Join the floors. Footprints: each zone's rooms, as polygon-clipping multipolygons.
+  const foot = (zid: string): pc.MultiPolygon => {
+    const rs = rooms.filter((r) => r.zone === zid).map((r) => [[...r.ring.map((p) => [p[0], p[1]] as [number, number]), [r.ring[0]![0], r.ring[0]![1]] as [number, number]]] as pc.Polygon)
+    return rs.length ? pc.union(...(rs as [pc.Polygon, ...pc.Polygon[]])) : []
+  }
+  const mpArea = (mp: pc.MultiPolygon) => mp.reduce((t, poly) => t + poly.reduce((u, ring, i) => u + (i === 0 ? 1 : -1) * Math.abs(ringArea(ring.slice(0, -1) as XY[])), 0), 0)
+  const zonesOn = (k: number) => [...zoneFloor.entries()].filter(([, f]) => f === k).map(([z]) => z)
+  const it = plan0.fabric_types.find((t) => t.element === 'intermediate')
+  const midRef = it ? (it.u != null ? { key: it.construction ?? 'unassigned:interior_floor', u_value_override: it.u } : { key: it.construction ?? 'unassigned:interior_floor' }) : { key: 'unassigned:interior_floor' }
+  if (!it?.construction) notes.push('The floors between storeys have no construction yet (Fabric, Floor between storeys)')
+  const take = (zid: string, kind: 'roof' | 'ground', a: number) => {
+    // Take a m² off the zone's roofs (or ground floors), in proportion to their areas.
+    // The flat roofs first (the floor above stands on them); a pitched roof's slopes only if they are not enough.
+    const own = surfaces.filter((s) => s.zone_a === zid && s.kind === kind).sort((p, q) => (p.tilt_deg as number) - (q.tilt_deg as number))
+    let left = a
+    for (const s of own) {
+      if (left <= 0) break
+      const cut = Math.min(left, s.area_m2 as number)
+      s.area_m2 = r3((s.area_m2 as number) - cut)
+      left -= cut
+    }
+  }
+  const added: Array<{ zone: string; id: string }> = []
+  const zoneFoot = new Map([...zoneFloor.keys()].map((z) => [z, foot(z)]))
+  for (let k = 1; k < floors.length; k++) {
+    for (const up of zonesOn(k)) {
+      let over = 0
+      for (const lo of zonesOn(k - 1)) {
+        const a = r3(mpArea(pc.intersection(zoneFoot.get(up)!, zoneFoot.get(lo)!)))
+        if (a < 0.01) continue
+        over += a
+        take(lo, 'roof', a)
+        const id = `${lo}_ceiling_${up}`
+        surfaces.push({
+          id, kind: 'ceiling', zone_a: lo, zone_b: up, facade: null, area_m2: a, azimuth_deg: null, tilt_deg: 0, construction_ref: midRef, g_value: null, openings: [],
+          ...(is21 ? { solar_absorptance: null, thermal_emissivity: null, frame_fraction: null } : {}),
+          ...(is22 ? { inside_solar_absorptance: TODAY.inside_solar_absorptance, inside_solar_absorptance_b: TODAY.inside_solar_absorptance, faces_up: null } : {}),
+        })
+        added.push({ zone: lo, id }, { zone: up, id })
+      }
+      // The upper zone's ground floor: over a room below it is the floor just made; the rest is open to outside air.
+      const own = surfaces.filter((s) => s.zone_a === up && s.kind === 'ground')
+      const tot = own.reduce((t, s) => t + (s.area_m2 as number), 0)
+      const open = r3(Math.max(0, tot - over))
+      for (const s of own) {
+        s.area_m2 = r3(tot > 0 ? ((s.area_m2 as number) / tot) * open : 0)
+        Object.assign(s, { kind: 'floor', zone_b: 'outside', ...(is21 ? { solar_absorptance: TODAY.roof_solar_absorptance, thermal_emissivity: TODAY.outside_emissivity } : {}), inside_finish: s.inside_finish ?? null })
+      }
+      if (open > 0.5) notes.push(`${plan0.zones.find((z) => z.id === up)?.name ?? up}: ${r3(open)} m² of its floor is over no room below, taken as a floor open to outside air`)
+    }
+  }
+  // Drop what was taken to nothing, and give each zone its new surfaces.
+  const gone = new Set(surfaces.filter((s) => (s.area_m2 as number) < 0.01 && (s.kind === 'roof' || s.kind === 'floor')).map((s) => s.id as string))
+  const kept = surfaces.filter((s) => !gone.has(s.id as string))
+  for (const z of zones) {
+    z.surfaces = [...(z.surfaces as string[]).filter((sid) => !gone.has(sid)), ...added.filter((x) => x.zone === z.id).map((x) => x.id)]
+  }
+  const d0 = docs[0]!
+  const doc = { ...d0, zones, surfaces: kept, system_groups: [...groups.values()], profiles, ...(controls.length ? { controls } : {}), library_refs }
+  const res = ModelDocument.safeParse(doc)
+  const sum = (k: string) => kept.filter((s) => s.kind === k)
+  const t = subs.map((s) => s.totals)
+  const add = (key: keyof Built['totals']) => t.reduce((s, x) => s + x[key], 0)
+  return {
+    doc,
+    ok: res.success,
+    issues: res.success ? [] : res.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+    notes: [...new Set([...notes, ...subs.flatMap((s, k) => s.notes.map((n) => (/^(A window|\d+ window)|separate parts|m of side/.test(n) ? `${floors[k]!.name}: ${n}` : n)))])],
+    totals: {
+      zones: zones.filter((z) => z.use_type !== 'loft').length, rooms: rooms.length, floor_m2: r3(add('floor_m2')),
+      walls: add('walls'), wall_net_m2: r3(add('wall_net_m2')), glazing: add('glazing'), glazing_m2: r3(add('glazing_m2')), windows: add('windows'),
+      doors: add('doors'), door_m2: r3(add('door_m2')), partitions: sum('partition').length, systems: groups.size,
+    },
+  }
+}
+
+function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPrefix?: string; partialRoof?: boolean } = {}): Built {
   // A plan held from before Brief 112 (one building-wide hot water use) is read as its space types' own.
   const plan = hotWaterOnSpaces(plan0)
   // The project's own profiles first, then the library's (Brief 118 P5).
@@ -91,7 +235,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
   // A fabric type's construction: its library key, or `unassigned:<element>` while none is chosen (a type other than
   // the element's first adds its id, so the types stay apart); a U-value the user typed rides on it as an override.
   const typeOf = new Map(plan.fabric_types.map((t) => [t.id, t]))
-  const UNSET: Record<FabricElement, string> = { wall: 'external_wall', glazing: 'glazing', door: 'external_door', roof: 'roof', floor: 'ground_floor', partition: 'internal_wall' }
+  const UNSET: Record<FabricElement, string> = { wall: 'external_wall', glazing: 'glazing', door: 'external_door', roof: 'roof', floor: 'ground_floor', partition: 'internal_wall', intermediate: 'interior_floor' }
   const constructionOf = (type: string) => {
     const t = typeOf.get(type)
     if (!t) return { key: 'unassigned:external_wall' }
@@ -266,7 +410,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
   // Brief 123: the roof's shape. A block whose roof is pitched (and built) is roofed below; any other stays flat.
   // Roof parts (17 Nov 2026): a block may have parts, each a rectangle with its own recipe; `pieces` are the parts and
   // the blocks without parts (whose recipe is plan.roof). With no parts, piece i is block i, as before.
-  const pieces = roofPieces(plan)
+  const pieces = roofPieces(plan, opts.partialRoof)
   const recOf = (i: number) => { const r = pieces[i]?.recipe; return r && r.style !== 'flat' ? r : null }
   const roofs = pieces.map((p, i) => (recOf(i) ? (p.part ? blockRoof(p.ring, p.recipe) : roofsIn?.[p.block] ?? blockRoof(p.ring, p.recipe)) : null))
   roofs.forEach((r, i) => { if (r?.refused) notes.push(`${pieces[i]!.part ? `The ${pieces[i]!.name.toLowerCase()} roof` : `Block ${pieces[i]!.block + 1}`} keeps a flat roof: ${r.refused}`) })
@@ -290,9 +434,18 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     const b = blockOfRoom(ring)
     const mine = pieces.filter((p) => p.block === b)
     if (mine.length === 1) return [{ piece: mine[0]!.index, a: ringArea(ring) }]
-    return mine.map((p) => ({ piece: p.index, a: areaInside(ring, p.ring) })).filter((x) => x.a > 1e-6)
+    const parts = mine.filter((p) => !p.rest).map((p) => ({ piece: p.index, a: areaInside(ring, p.ring) }))
+    // Stacked floors: what no part covers is under the block's flat rest.
+    const rest = mine.find((p) => p.rest)
+    if (rest) {
+      // Parts that overlap share the room's floor between them (never more roof than floor).
+      const room = ringArea(ring), under = parts.reduce((t, x) => t + x.a, 0)
+      if (under > room) for (const x of parts) x.a *= room / under
+      parts.push({ piece: rest.index, a: Math.max(0, room - Math.min(room, under)) })
+    }
+    return parts.filter((x) => x.a > 1e-6)
   }
-  const loftId = (i: number) => (pieces.length > 1 ? `loft_${i + 1}` : 'loft')
+  const loftId = (i: number) => `${opts.loftPrefix ?? ''}${pieces.length > 1 ? `loft_${i + 1}` : 'loft'}`
   /** A gable or raised wall takes the wall type of the outside wall it stands on (at the middle of its foot). */
   /** Roof parts: the length of a run lying along the part's own outline (a part's walls are those of its own rooms). */
   const alongPart = (r: (typeof runs)[number], ring: readonly XY[]) => ring.reduce((t, a, k) => {
@@ -326,6 +479,8 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
   const roofSpace = new Map<string, number>()
   const roofFace = (zone: string, i: number, share: number, type: string, f: BlockRoof['faces'][number], n: number, onLoft: boolean) => {
     const wall = f.kind === 'wall'
+    // A zone with only a sliver under a roof part takes no face too small to keep (the schema needs area > 0).
+    if (r3(f.area_m2 * share) <= 0) return
     const id = uid(`${zone}_${wall ? 'gable' : 'slope'}_${n + 1}`)
     add(zone, ext({
       id, kind: wall ? 'wall' : 'roof', zone_a: zone, zone_b: 'outside', facade: wall ? facade4(f.azimuth_deg ?? 0) : null,
@@ -437,20 +592,30 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     const t = system(v?.template)
     if (!t || !v) return []
     const kind = t.type === 'mvhr' || t.type === 'mev' ? t.type : 'natural'
-    return [{
-      // Flow as typed on the system: l/s per m² of floor (mechanical) or air changes per hour (natural).
-      id: `${v.id}_vent`, label: v.name, kind, enabled: true, share_pct: 100,
-      flow_rate: v.flow ?? null, flow_rate_basis: v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
+    // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
+    // least share, inside its hours: review F1). Not stated: the schedule decides, as before.
+    const runs = (() => {
+      const r = v.runs ?? null
+      if (r === 'demand') return { runs: r, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: scheduleRef(v.schedule) }
+      if (r === 'continuous') return { runs: r, control_schedule_ref: 'always_on' }
+      return { ...(r ? { runs: r } : {}), control_schedule_ref: scheduleRef(v.schedule) }
+    })()
+    const entry = (suffix: string, flow_rate: number | null, flow_rate_basis: string | null) => ({
+      id: `${v.id}_vent${suffix}`, label: v.name, kind, enabled: true, share_pct: 100,
+      flow_rate, flow_rate_basis,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
-      // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
-      // least share, inside its hours: review F1). Not stated: the schedule decides, as before.
-      ...(() => {
-        const runs = v.runs ?? null
-        if (runs === 'demand') return { runs, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: scheduleRef(v.schedule) }
-        if (runs === 'continuous') return { runs, control_schedule_ref: 'always_on' }
-        return { ...(runs ? { runs } : {}), control_schedule_ref: scheduleRef(v.schedule) }
-      })(),
-    }]
+      ...runs,
+    })
+    // 19 Nov 2026: the fresh air the space type needs (demand), counted its way; the engine reads each basis itself.
+    const sp = spaceOf.get(zid)
+    const fa = freshAirOf(sp)
+    if (fa) {
+      if (fa.length === 0) return [entry('', null, null)]
+      const nRooms = plan.rooms.filter((r) => r.zone === zid).length
+      return fa.map((f, i) => entry(i ? `_${f.basis}` : '', f.basis === 'per_room' ? r3(f.rate * nRooms) : f.rate, f.basis === 'per_room' ? 'constant' : f.basis))
+    }
+    // Plans before 19 Nov: the flow typed on the system, l/s per m² of floor (mechanical) or air changes an hour (natural).
+    return [entry('', v.flow ?? null, v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null)]
   }
 
   // Emitters (schema 2.4): per zone, one entry per emitter type in its rooms, the counts added up. A wet one is fed by
@@ -491,6 +656,16 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
     if (!profiles.some((x) => x.id === pr.id)) profiles.push(pr)
   }
   // From schema 2.3 each gain profile carries radiant_fraction, stated on the space type (null until it is).
+  /** 19 Nov 2026: the luminaires in a zone's rooms: their watts added up (null, with a note, if a type has none stated). */
+  const zoneLuminaires = (zid: string) => {
+    const rs = plan.rooms.filter((r) => r.zone === zid).map((r) => roomLuminaires(plan, r))
+    const any = rs.some((r) => r.items.length > 0)
+    const missing = [...new Set(rs.flatMap((r) => r.items.filter((i) => i.type.watts == null).map((i) => i.type.name)))]
+    if (missing.length) notes.push(`${zoneName(zid)}: luminaire${missing.length > 1 ? 's' : ''} ${missing.join(', ')} ha${missing.length > 1 ? 've' : 's'} no watts stated`)
+    if (!any) notes.push(`${zoneName(zid)}: its lighting is counted by luminaires, but its rooms have none`)
+    return { any, watts: missing.length ? null : rs.reduce((t, r) => t + (r.watts ?? 0), 0) }
+  }
+  const zoneName = (zid: string) => plan.zones.find((z) => z.id === zid)?.name ?? zid
   const refsOf = (zid: string) => {
     const sp = spaceOf.get(zid)
     if (!sp) return { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
@@ -499,15 +674,21 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
       const key = sp[k]
       const shape = key && profile(key)?.day_types ? shapeOf(key) : null
       const w = k === 'lighting' ? sp.lighting_w_per_m2 : sp.equipment_w_per_m2
-      if (!shape && w == null && (k === 'lighting' ? sp.lux == null : sp.equipment_baseload_w_per_m2 == null)) return []
-      const id = `${sp.id}_${k}`
+      // 19 Nov 2026: lighting stated three ways (lux × efficacy, a W/m², or the luminaires counted in each room).
+      const by = k === 'lighting' ? lightingBy(sp) : null
+      const lum = by === 'luminaires' ? zoneLuminaires(zid) : null
+      if (!shape && (by === 'luminaires' ? !lum!.any : w == null && (k === 'lighting' ? sp.lux == null : sp.equipment_baseload_w_per_m2 == null))) return []
+      // Luminaires are counted room by room, so each zone has its own lighting profile (its watts are the zone's).
+      const id = by === 'luminaires' ? `${sp.id}_${k}_${zid}` : `${sp.id}_${k}`
       // Today's engine reads lighting from magnitude and equipment from active + baseload.
       const base = sp.equipment_baseload_w_per_m2
       if (k === 'equipment' && (w != null) !== (base != null)) notes.push(`${sp.name}: equipment needs both "in use" and "always on" W/m² (0 is fine)`)
       // Brief 112: lighting states the lux the space needs (its W/m² comes from the lighting system's efficacy), or,
       // while no lux is stated, a W/m² stated directly.
       const size = k === 'lighting'
-        ? (sp.lux != null ? { lux: sp.lux } : w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
+        ? (by === 'luminaires' ? (lum!.watts != null ? { magnitude: { value: r3(lum!.watts), unit: 'total_w' } } : {})
+          : by === 'lux' ? (sp.lux != null ? { lux: sp.lux } : {})
+            : w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
         : w != null && base != null ? { active: { value: w, unit: 'w_per_m2' }, baseload: { value: base, unit: 'w_per_m2' } } : {}
       // Stated detail only: a field left empty on the space type is left out, and the engine names it.
       const L = k === 'lighting'
@@ -521,7 +702,7 @@ export function buildDocument(plan0: Plan, roofsIn?: readonly BlockRoof[]): Buil
         ...(L && rel === 'proportional_with_spill' ? { daylight_factor: sp.daylight_factor } : {}),
         ...(!L && rel !== 'independent' ? { standby_factor: sp.standby_factor } : {}),
       }).filter(([, v]) => v != null))
-      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...size, ...detail, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}) })
+      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name}${by === 'luminaires' ? `, ${zoneName(zid)}'s luminaires` : ''})`, ...(shape ? { schedule: shape } : {}), ...size, ...detail, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}) })
       return [id]
     }
     let occupancy: string | null = null

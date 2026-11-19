@@ -1529,6 +1529,54 @@
     "library_type": "schedule",
     "display_name": "School — Ventilation, school day"
    }
+  },
+  {
+   "kind": "system_template",
+   "key": "gas_boiler_noncondensing_heating",
+   "body": {
+    "display_name": "Gas Boiler — Non-condensing (Heating), 85 %",
+    "type": "gas_boiler",
+    "category": "heating",
+    "serves": "heating",
+    "description": "Non-condensing gas boiler for space heating (e.g. Ideal Concord Super 200V modules, c. 1990s–2000s). 85 % seasonal efficiency, as NZA's RWGC Energy Strategy (RP-1000 §4.2) takes for the clubhouse's Concord boilers.",
+    "efficiency": 0.85,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 0.85,
+    "fuel_type": "gas",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": true,
+    "name": "gas_boiler_noncondensing_heating"
+   },
+   "provenance": {
+    "source": "drafted 18 Nov 2026 for the RWGC clubhouse model (awaiting Chris)",
+    "display_name": "Gas Boiler — Non-condensing (Heating), 85 % (draft, awaiting Chris)",
+    "description": "Non-condensing gas boiler for space heating (e.g. Ideal Concord Super 200V modules, c. 1990s–2000s). 85 % seasonal efficiency, as NZA's RWGC Energy Strategy (RP-1000 §4.2) takes for the clubhouse's Concord boilers.",
+    "brief": "rwgc"
+   }
+  },
+  {
+   "kind": "system_template",
+   "key": "gas_water_heater_direct_dhw",
+   "body": {
+    "display_name": "Gas-fired water heater — direct, storage (DHW), 80 %",
+    "type": "gas_boiler_dhw",
+    "category": "dhw",
+    "serves": "dhw",
+    "description": "Direct gas-fired storage water heater (e.g. Lochinvar/Andrews Beaumont 250, 1992). About 80 % efficiency, as NZA's RWGC Energy Strategy (RP-1000 §4.2) takes for the clubhouse's Beaumont 250.",
+    "efficiency": 0.8,
+    "efficiency_type": "thermal_efficiency",
+    "efficiency_value": 0.8,
+    "fuel_type": "gas",
+    "has_heat_rejection": false,
+    "has_exhaust_waste": true,
+    "name": "gas_water_heater_direct_dhw"
+   },
+   "provenance": {
+    "source": "drafted 18 Nov 2026 for the RWGC clubhouse model (awaiting Chris)",
+    "display_name": "Gas-fired water heater — direct, storage (DHW), 80 % (draft, awaiting Chris)",
+    "description": "Direct gas-fired storage water heater (e.g. Lochinvar/Andrews Beaumont 250, 1992). About 80 % efficiency, as NZA's RWGC Energy Strategy (RP-1000 §4.2) takes for the clubhouse's Beaumont 250.",
+    "brief": "rwgc"
+   }
   }
  ]
 }

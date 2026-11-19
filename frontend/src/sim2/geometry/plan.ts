@@ -14,6 +14,7 @@
  */
 import { area, ccw, type XY } from './ported/zones'
 import type { RoofPart, RoofRecipe } from './roof'
+import type { WallCurve } from './curves'
 import { type Profile, profile as libProfile, profilesFor as libProfilesFor } from '../library/library'
 
 export type { XY }
@@ -33,6 +34,9 @@ export type PlanRoom = {
   systems?: Partial<Record<Service, string>>
   /** Systems step: the room's emitters, how many of each emitter type. */
   emitters?: Array<{ type: string; count: number }>
+  /** 19 Nov 2026 (Linzie: "the number of luminaires and the output of each one"): the room's luminaires, how many of
+   * each luminaire type. Used when its space type's lighting is counted by luminaires. */
+  luminaires?: Array<{ type: string; count: number }>
 }
 /** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
 export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
@@ -130,6 +134,8 @@ export const EMITTER_KINDS = [
 ] as const
 export type EmitterKind = (typeof EMITTER_KINDS)[number]['key']
 /** An emitter type the user has made: one unit's rated output and rating, given to rooms with a count. Null: not set. */
+/** 19 Nov 2026: a luminaire as fitted: its name and the watts one draws, driver included (null: not stated). */
+export type LuminaireType = { id: string; name: string; watts: number | null }
 export type EmitterType = {
   id: string
   name: string
@@ -182,7 +188,8 @@ export type Win = {
 }
 
 /** The fabric elements the Fabric step gives types to. */
-export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition'
+/** 'intermediate': the floor between two storeys (stacked floors only, so not in FABRIC_ELEMENTS' defaults). */
+export type FabricElement = 'wall' | 'glazing' | 'door' | 'roof' | 'floor' | 'partition' | 'intermediate'
 /** A fabric type: a library construction (by key) and, optionally, a U-value the user typed over it (W/m²K). Both
  * null: not set yet, and the model document says so (`unassigned:…`). */
 export type FabricType = {
@@ -262,6 +269,28 @@ export function finishesOf(sp: Pick<SpaceType, 'name' | 'use' | 'borrowed' | 'fl
   }
 }
 
+export const FRESH_AIR_BASES = [
+  { key: 'per_person', name: 'l/s per person' },
+  { key: 'per_m2', name: 'l/s per m² of floor' },
+  { key: 'per_person_and_m2', name: 'l/s per person plus l/s per m²' },
+  { key: 'per_room', name: 'l/s for each room (fixed)' },
+  { key: 'ach', name: 'Air changes an hour' },
+] as const
+export const LIGHTING_BY = [
+  { key: 'lux', name: 'Light needed × the luminaires\' efficacy' },
+  { key: 'w_per_m2', name: 'W/m² stated' },
+  { key: 'luminaires', name: 'Luminaires counted in each room' },
+] as const
+export type LightingBy = (typeof LIGHTING_BY)[number]['key']
+/** A space type's lighting method, as stated or as before 19 Nov (lux when stated, else a W/m²). */
+export const lightingBy = (sp: Pick<SpaceType, 'lighting_by' | 'lux'>): LightingBy => sp.lighting_by ?? (sp.lux != null ? 'lux' : 'w_per_m2')
+/** A room's luminaires: each type with its count and watts, the total W (null if any type's watts are not stated). */
+export function roomLuminaires(plan: Pick<Plan, 'luminaire_types'>, room: Pick<PlanRoom, 'luminaires'>): { items: Array<{ type: LuminaireType; count: number }>; watts: number | null } {
+  const items = (room.luminaires ?? []).flatMap((l) => { const t = plan.luminaire_types?.find((x) => x.id === l.type); return t && l.count > 0 ? [{ type: t, count: l.count }] : [] })
+  const watts = items.some((i) => i.type.watts == null) ? null : items.reduce((w, i) => w + i.count * (i.type.watts as number), 0)
+  return { items, watts }
+}
+export type FreshAirBasis = (typeof FRESH_AIR_BASES)[number]['key']
 export type SpaceType = {
   id: string
   name: string
@@ -280,8 +309,21 @@ export type SpaceType = {
   sensible_w_per_person?: number | null
   /** Brief 112: the light the space needs, lux (demand). Its W/m² comes from the lighting system's efficacy. */
   lux?: number | null
+  /** 19 Nov 2026: how the lighting power is stated: the lux needed × the luminaires' efficacy, a W/m² stated directly,
+   * or the luminaires counted in each room (their watts added up). Null or absent: lux when stated, else the W/m². */
+  lighting_by?: LightingBy | null
   /** A lighting W/m² stated directly, used only while no lux is stated ("stated, not from lux"). */
   lighting_w_per_m2?: number | null
+  /** 19 Nov 2026 (Linzie: "can we set it to L/s/m² or L/s per person ... fixed?"): the fresh air the space needs, as
+   * demand (the ventilation system keeps its kind, fans, heat recovery and hours). How it is counted, and the figure(s)
+   * for that basis: l/s per person (the space type's people at full occupancy), l/s per m² of floor, both added
+   * (EN 16798-1's way), l/s for each room, or air changes an hour. Null or absent: not stated here, and the ventilation
+   * system's own flow is used (plans before 19 Nov). */
+  fresh_air_basis?: FreshAirBasis | null
+  fresh_air_l_s_person?: number | null
+  fresh_air_l_s_m2?: number | null
+  fresh_air_l_s_room?: number | null
+  fresh_air_ach?: number | null
   /** Brief 112: hot water used, litres a day per person or per m² of floor (demand); the heater is on Systems. */
   hot_water_basis?: 'per_person' | 'per_m2' | null
   hot_water_litres?: number | null
@@ -412,6 +454,8 @@ export type Plan = {
   building?: BuildingInputs
   /** Emitter types (Systems step), given to rooms with a count. */
   emitter_types?: EmitterType[]
+  /** 19 Nov 2026: luminaire types (Systems, Luminaires), given to rooms with a count. */
+  luminaire_types?: LuminaireType[]
   /** Hot water for the whole building, typed (Systems step). */
   dhw?: DhwInputs
   /** Brief 123: the roof's shape, applied to each block (absent: flat, as before). */
@@ -419,9 +463,61 @@ export type Plan = {
   /** 17 Nov 2026: parts of a block's roof, each a rectangle with its own shape (a wing's own roof); a block with parts
    * takes its roof from them, any other block from `roof` (roof.ts, roofPieces). */
   roof_parts?: RoofPart[]
+  /** 18 Nov 2026: runs of a block's sides the 3D view draws as one smooth curved wall (drawing only; the model keeps
+   * the facets). See curves.ts. */
+  curves?: WallCurve[]
+  /** 18 Nov 2026 (RWGC clubhouse, Linzie: "add stacked floors"): every floor of a building with more than one, ground
+   * first, each its own outline, rooms and windows (stacked one storey height apart). The floor being edited is the
+   * one in `blocks`, `rooms`, `windows` and `wall_spans` above (its entry here is stale until the next switch), so
+   * every step works on one floor as before. Absent: one floor. See floorsOf / onFloor. */
+  floors?: PlanFloor[]
+  /** The floor being edited (index into `floors`, 0 = ground). */
+  active_floor?: number
+  /** 19 Nov 2026 (Linzie: Site is "site exposure, terrain, weather, and some metadata about the project"): the
+   * project's details, said on Site. Words only; nothing is worked out from them. */
+  project_info?: ProjectInfo
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
+export type ProjectInfo = { reference?: string; client?: string; address?: string; building_type?: string; notes?: string }
+
+/** One floor of a building with more than one (Plan.floors). Rooms, zones and windows keep ids unique over the whole
+ * building; a zone's rooms are all on one floor. */
+export type PlanFloor = { name: string; blocks: XY[][]; rooms: PlanRoom[]; windows: Win[]; wall_spans: TypeSpan[]; roof?: RoofRecipe; roof_parts?: RoofPart[]; curves?: WallCurve[] }
+
+/** Every floor, ground first, the one being edited as it is now. A plan with no `floors` is one floor. */
+export function floorsOf(plan: Plan): PlanFloor[] {
+  const here: PlanFloor = { name: plan.floors?.[plan.active_floor ?? 0]?.name ?? 'Ground floor', blocks: plan.blocks, rooms: plan.rooms, windows: plan.windows, wall_spans: plan.wall_spans, ...(plan.roof ? { roof: plan.roof } : {}), ...(plan.roof_parts ? { roof_parts: plan.roof_parts } : {}), ...(plan.curves ? { curves: plan.curves } : {}) }
+  if (!plan.floors?.length) return [here]
+  return plan.floors.map((f, i) => (i === (plan.active_floor ?? 0) ? here : f))
+}
+/** Every room on every floor. */
+export const allRooms = (plan: Plan): PlanRoom[] => floorsOf(plan).flatMap((f) => f.rooms)
+/** The plan with floor i being edited (a floor past the top is added, empty). */
+export function onFloor(plan: Plan, i: number): Plan {
+  const fs = floorsOf(plan)
+  while (fs.length <= i) fs.push({ name: FLOOR_NAMES[fs.length] ?? `Floor ${fs.length}`, blocks: [], rooms: [], windows: [], wall_spans: [] })
+  const f = fs[i]!
+  const { roof_parts: _rp, roof: _r, curves: _c, ...rest } = plan
+  return { ...rest, floors: fs, active_floor: i, blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}), ...(f.curves ? { curves: f.curves } : {}) }
+}
+/** 19 Nov 2026 (Linzie: "Adding a floor, I think we need to be careful, or I need to be able to delete it"): the plan
+ * without floor i (not the ground floor). Floors above it move down one storey and keep their names in order; its
+ * rooms, and the zones only they used, go with it. The floor below is then the one being edited. One floor left: the
+ * plan is a one-floor plan again. */
+export function removeFloor(plan: Plan, i: number): Plan {
+  const fs = floorsOf(plan)
+  if (i <= 0 || i >= fs.length) return plan
+  const gone = new Set(fs[i]!.rooms.map((r) => r.zone))
+  // A floor still called by its place (First floor, …) is renamed for its new place; a name someone gave it stays.
+  const kept = fs.map((f, j) => ({ f, j })).filter(({ j }) => j !== i).map(({ f, j }, k) => ({ ...f, name: f.name === (FLOOR_NAMES[j] ?? `Floor ${j}`) ? (FLOOR_NAMES[k] ?? `Floor ${k}`) : f.name }))
+  for (const f of kept) for (const r of f.rooms) gone.delete(r.zone)
+  const f = kept[i - 1]!
+  const { roof: _r, roof_parts: _rp, curves: _c, floors: _f, active_floor: _a, ...rest } = plan
+  const on: Plan = { ...rest, zones: plan.zones.filter((z) => !gone.has(z.id)), blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}), ...(f.curves ? { curves: f.curves } : {}) }
+  return kept.length > 1 ? { ...on, floors: kept, active_floor: i - 1 } : on
+}
+export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor', 'Fourth floor', 'Fifth floor']
 
 /** A plan saved before systems were their own step (15 Nov 2026) kept them on its space types: each space type's
  * systems become system types, given to the rooms of that space type. Anything else passes through. */

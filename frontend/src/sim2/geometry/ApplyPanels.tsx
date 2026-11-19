@@ -96,7 +96,7 @@ export function ChooseList(props: {
   )
 }
 
-export type NavItem = { id: string; name: string; swatch: Swatch; rooms: string[]; active?: boolean; onPick?: () => void; onRename?: (name: string) => void; /** Instead of choosing its rooms (walls choose their wall parts). */ choose?: () => void; count?: number; what?: string }
+export type NavItem = { id: string; name: string; swatch: Swatch; rooms: string[]; active?: boolean; onPick?: () => void; onRename?: (name: string) => void; /** Instead of choosing its rooms (walls choose their wall parts). */ choose?: () => void; count?: number; what?: string; /** Rooms with it on other floors (they are chosen from their own floor), e.g. "also 12 on first floor". */ elsewhere?: string }
 export type NavSection = { title?: string; items: NavItem[]; onNew?: { label: string; run: () => void }; /** More ways to add one (from the library). */ add?: ReactNode }
 
 /** A name that a double-click turns into a box: Enter or leaving it keeps the change, Esc drops it. */
@@ -125,7 +125,7 @@ function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]
                 onClick={(e) => { if (it.choose) it.choose(); else onChoose(it.rooms, e.shiftKey || e.ctrlKey || e.metaKey); it.onPick?.() }}>
                 {tick(on, it.rooms.some((id) => chosen.has(id)))}
                 <Sw s={it.swatch} />
-                <span className="ap-name"><EditName name={it.name} onRename={it.onRename} /><small>{it.rooms.length ? it.rooms.map(nameOf).join(', ') : it.count ? '' : 'not used'}</small></span>
+                <span className="ap-name"><EditName name={it.name} onRename={it.onRename} /><small>{it.rooms.length ? it.rooms.map(nameOf).join(', ') : it.count || it.elsewhere ? '' : 'not used'}{it.elsewhere ? `${it.rooms.length ? '; ' : ''}${it.elsewhere}` : ''}</small></span>
                 <span className="ap-count" title={it.what ? `${it.count} ${it.what}s` : `${it.rooms.length} rooms`}>{it.what ? it.count : it.rooms.length}</span>
               </div>
             )
