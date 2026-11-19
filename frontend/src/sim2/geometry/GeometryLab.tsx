@@ -1387,6 +1387,12 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // choosing one shows where it is applied on the drawing and opens its passport on the right.
   const NONE: Swatch = { colour: '#B8C0BC', unset: true }
   const roomsWhere = (f: (r: Plan['rooms'][number]) => boolean) => plan.rooms.filter(f).map((r) => r.id)
+  /** 19 Nov 2026: the rooms with it on the other floors, named by floor (they are chosen from their own floor). */
+  const elsewhere = (f: (r: Plan['rooms'][number]) => boolean): string | undefined => {
+    const act = plan.active_floor ?? 0
+    const parts = floorsOf(plan).flatMap((fl, i) => { const n = i === act ? 0 : fl.rooms.filter(f).length; return n ? [`${n} on the ${fl.name.toLowerCase()}`] : [] })
+    return parts.length ? `also ${parts.join(', ')}` : undefined
+  }
   const noneItem = (id: string, name: string, rooms: string[]) => (rooms.length ? [{ id, name, swatch: NONE, rooms }] : [])
   const newSystemFor = (sv: Service) => {
     let k = plan.systems.length + 1
@@ -1399,7 +1405,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const sysSection = (sv: Service): NavSection => ({
     items: [
       ...systemsOf(sv).map((x) => ({
-        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: sysUnset(x) }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
+        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: sysUnset(x) }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), elsewhere: elsewhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
         active: curSys?.id === x.id, onPick: () => setActiveSys((a) => ({ ...a, [sv]: x.id })),
       })),
       ...noneItem(`none-${sv}`, `No ${SERVICES.find((x) => x.key === sv)!.name.toLowerCase()}`, roomsWhere((r) => !systemsOf(sv).some((x) => x.id === r.systems?.[sv]))),
@@ -1456,7 +1462,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       }
       return [{
         items: [
-          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), active: curSpace?.id === sp.id, onPick: () => setActiveSpace(sp.id), onRename: (name: string) => setSpace(sp.id, { name }) })),
+          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), elsewhere: elsewhere((r) => r.space === sp.id), active: curSpace?.id === sp.id, onPick: () => setActiveSpace(sp.id), onRename: (name: string) => setSpace(sp.id, { name }) })),
           ...noneItem('none-space', 'No space type', roomsWhere((r) => !plan.spaces.some((sp) => sp.id === r.space))),
         ],
         onNew: { label: '+ New space type', run: () => newSpace() },
@@ -1467,7 +1473,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         return [{ items: otherLoads.map((l) => ({ id: l.id, name: l.name, onRename: (name: string) => setLoad(l.id, { name }), swatch: { colour: '#6B7280', unset: l.power_w == null || l.runs == null }, rooms: [], active: curLoad?.id === l.id, onPick: () => setActiveLoad(l.id) })), onNew: { label: '+ New other load', run: () => newLoad() } }]
       }
       if (sysKind === 'emitters') {
-        return [{ items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: activeEmit === t.id, onPick: () => setActiveEmit(t.id) })), onNew: { label: '+ New emitter type', run: () => newEmitter() } }]
+        return [{ items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), elsewhere: elsewhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: activeEmit === t.id, onPick: () => setActiveEmit(t.id) })), onNew: { label: '+ New emitter type', run: () => newEmitter() } }]
       }
       return [sysSection(sysKind)]
     }
@@ -2161,7 +2167,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </div>
     )
     const items: Item[] = plan.spaces.map((x) => {
-      const rs = plan.rooms.filter((r) => r.space === x.id)
+      const rs = floors.flatMap((f) => f.rooms).filter((r) => r.space === x.id)
       return { id: x.id, name: x.name, swatch: { colour: spaceColour(x.id)! }, line: USES.find((u) => u.key === x.use)?.name ?? 'Use not set', used: rs.length ? `${count(rs.length, 'room')}` : 'not used', removable: !rs.length }
     })
     const SPACE_KINDS: Kind[] = [{ key: 'use', name: 'Building use', icon: 'building' }, { key: 'types', name: 'Space types', icon: 'person' }]
@@ -2294,7 +2300,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const emittersPanel = () => {
     const x = curEmit
     const items: Item[] = emitterTypes.map((t) => {
-      const n = plan.rooms.reduce((s2, r) => s2 + (r.emitters ?? []).filter((e) => e.type === t.id).reduce((a, e) => a + e.count, 0), 0)
+      const n = floors.flatMap((f) => f.rooms).reduce((s2, r) => s2 + (r.emitters ?? []).filter((e) => e.type === t.id).reduce((a, e) => a + e.count, 0), 0)
       const kind = EMITTER_KINDS.find((k) => k.key === t.kind)!.name
       return { id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, line: [kind, ...(emitHeats(t) ? [t.rated_output_w != null ? `${t.rated_output_w} W each` : 'output not set'] : []), ...(coolingKind(t.kind) && t.cooling_output_w != null ? [`cools ${t.cooling_output_w} W each`] : []), ...(emitHeats(t) ? [] : ['cools only'])].join(' · '), used: n ? `${n} in rooms` : 'not used', removable: !n }
     })
@@ -2851,7 +2857,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const x = curSys
     const sv = SERVICES.find((s) => s.key === service)!
     const items: Item[] = systemsOf(service).map((y) => {
-      const rs = plan.rooms.filter((r) => r.systems?.[service] === y.id)
+      const rs = floors.flatMap((f) => f.rooms).filter((r) => r.systems?.[service] === y.id)
       return { id: y.id, name: y.name, swatch: { colour: sysColour(y.id)!, unset: sysUnset(y) }, line: service === 'lighting' ? (y.efficacy != null ? `electricity · ${y.efficacy} W/m² per 100 lux` : 'Efficacy not set yet') : sysLine(y.template, service), used: rs.length ? count(rs.length, 'room') : 'not used', removable: !rs.length }
     })
     const mech = ['mvhr', 'mev'].includes(system(x?.template)?.type ?? '')
@@ -3070,7 +3076,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D key={whole3d ? 'whole' : 'edit'} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D key={whole3d ? 'whole' : 'edit'} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roomColour={mode === 'spaces' || mode === 'systems' || mode === 'profiles' ? roomFill : undefined} chosenRooms={whole3d ? undefined : chosen} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
