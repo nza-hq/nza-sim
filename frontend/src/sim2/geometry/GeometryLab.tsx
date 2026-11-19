@@ -41,6 +41,8 @@ import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
 import { FinishInfo, FinishRows } from './Finishes'
 import { carpetIn } from './toDocument'
+import { FRESH_AIR_BASES, LIGHTING_BY, type LightingBy, type LuminaireType, lightingBy, roomLuminaires } from './plan'
+import { roomAsks, roomPeople } from './asks'
 import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, type ProjectInfo, removeFloor, FLOOR_NAMES, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, floorsOf, onFloor, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ApplyBarTarget, ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
@@ -139,7 +141,7 @@ const FABRIC_KINDS: Array<Kind & { key: FabricKind }> = [
   { key: 'partition', name: 'Internal walls', icon: 'rooms' },
 ]
 const SERVICE_ICON: Record<Service, IconName> = { heating: 'boiler', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw', lighting: 'lighting' }
-type SysKind = Service | 'emitters' | 'other'
+type SysKind = Service | 'emitters' | 'luminaires' | 'other'
 const SYSTEM_KINDS: Kind[] = [
   { key: 'heating', name: 'Heating', icon: 'boiler' },
   { key: 'emitters', name: 'Emitters', icon: 'heating' },
@@ -147,6 +149,8 @@ const SYSTEM_KINDS: Kind[] = [
   { key: 'ventilation', name: 'Ventilation', icon: 'ventilation' },
   { key: 'dhw', name: 'Hot water', icon: 'dhw' },
   { key: 'lighting', name: 'Lighting', icon: 'lighting' },
+  // 19 Nov 2026 (Linzie): luminaires counted in each room, the watts of one, like emitters.
+  { key: 'luminaires', name: 'Luminaires', icon: 'lighting' },
   { key: 'other', name: 'Other loads', icon: 'power' },
 ]
 type View = { cx: number; cy: number; k: number }
@@ -358,9 +362,11 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [opening, setOpening] = useState<'glazing' | 'door'>('glazing')
   const elem: FabricElement = fkind === 'openings' ? opening : fkind === 'air' || fkind === 'bridge' || fkind === 'set' ? 'wall' : fkind
   const [sysKind, setSysKind] = useState<SysKind>('heating')
-  const service: Service = sysKind === 'emitters' || sysKind === 'other' ? 'heating' : sysKind
+  const service: Service = sysKind === 'emitters' || sysKind === 'other' ? 'heating' : sysKind === 'luminaires' ? 'lighting' : sysKind
   const [activeLoad, setActiveLoad] = useState<string | null>(null)
   const [activeEmit, setActiveEmit] = useState<string | null>(null)
+  const [activeLum, setActiveLum] = useState<string | null>(null)
+  const [lumCount, setLumCount] = useState(4)
   const [pumpNote, setPumpNote] = useState<string | null>(null)
   const [emitCount, setEmitCount] = useState(1)
   const [active, setActive] = useState<Partial<Record<FabricElement, string>>>({})
@@ -1204,6 +1210,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     mode === 'profiles' ? (profSel && roomUses(r).includes(profSel) ? '#EA580C59' : '#FFFFFF')
     : mode === 'spaces' ? (spaceColour(r.space) ?? '#FFFFFF') + '59'
     : mode === 'systems' && sysKind === 'emitters' ? (emitColour(roomEmitters(r)[0]?.type) ?? '#FFFFFF') + '59'
+    : mode === 'systems' && sysKind === 'luminaires' ? (lumColour(roomLuminaires(plan, r).items[0]?.type.id) ?? '#FFFFFF') + '59'
     : mode === 'systems' ? (sysColour(r.systems?.[service]) ?? '#FFFFFF') + '59'
     : mode === 'fabric' ? (elem === 'roof' || elem === 'floor' ? typeColour(plan, roomType(plan, r.id, elem)) + '40' : '#FFFFFF')
     : tintOf(r.zone).fill
@@ -1219,6 +1226,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     mode === 'profiles' ? (profSel ? (roomUses(r).includes(profSel) ? 'uses it' : '') : `${f1(ringArea(r.ring))} m²`)
     : mode === 'spaces' ? (plan.spaces.find((x) => x.id === r.space)?.name ?? 'No space type')
     : mode === 'systems' && sysKind === 'emitters' ? (emitName(r) || 'No emitters')
+    : mode === 'systems' && sysKind === 'luminaires' ? (lumName(r) || 'No luminaires')
     : mode === 'systems' ? shortMark(r) || (plan.systems.find((x) => x.id === r.systems?.[service])?.name ?? 'None given')
     : mode === 'fabric' && (elem === 'roof' || elem === 'floor') ? typeName(roomType(plan, r.id, elem))
     : `${f1(ringArea(r.ring))} m²`
@@ -1362,6 +1370,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       const sp = plan.spaces.find((x) => x.id === r.space)
       return sp ? { name: sp.name, swatch: { colour: spaceColour(sp.id)! } } : null
     }
+    if (mode === 'systems' && sysKind === 'luminaires') {
+      const ls = roomLuminaires(plan, r).items
+      return ls.length ? { name: lumName(r), swatch: { colour: lumColour(ls[0]!.type.id)!, unset: ls.some((l) => l.type.watts == null) } } : null
+    }
     if (mode === 'systems' && sysKind === 'emitters') {
       const es = roomEmitters(r)
       return es.length ? { name: emitName(r), swatch: { colour: emitColour(es[0]!.type)!, unset: es.some((e) => emitUnset(emitterTypes.find((t) => t.id === e.type)!)) } } : null
@@ -1387,6 +1399,12 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // choosing one shows where it is applied on the drawing and opens its passport on the right.
   const NONE: Swatch = { colour: '#B8C0BC', unset: true }
   const roomsWhere = (f: (r: Plan['rooms'][number]) => boolean) => plan.rooms.filter(f).map((r) => r.id)
+  /** 19 Nov 2026: the rooms with it on the other floors, named by floor (they are chosen from their own floor). */
+  const elsewhere = (f: (r: Plan['rooms'][number]) => boolean): string | undefined => {
+    const act = plan.active_floor ?? 0
+    const parts = floorsOf(plan).flatMap((fl, i) => { const n = i === act ? 0 : fl.rooms.filter(f).length; return n ? [`${n} on the ${fl.name.toLowerCase()}`] : [] })
+    return parts.length ? `also ${parts.join(', ')}` : undefined
+  }
   const noneItem = (id: string, name: string, rooms: string[]) => (rooms.length ? [{ id, name, swatch: NONE, rooms }] : [])
   const newSystemFor = (sv: Service) => {
     let k = plan.systems.length + 1
@@ -1399,7 +1417,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const sysSection = (sv: Service): NavSection => ({
     items: [
       ...systemsOf(sv).map((x) => ({
-        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: sysUnset(x) }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
+        id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: sysUnset(x) }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), elsewhere: elsewhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
         active: curSys?.id === x.id, onPick: () => setActiveSys((a) => ({ ...a, [sv]: x.id })),
       })),
       ...noneItem(`none-${sv}`, `No ${SERVICES.find((x) => x.key === sv)!.name.toLowerCase()}`, roomsWhere((r) => !systemsOf(sv).some((x) => x.id === r.systems?.[sv]))),
@@ -1456,7 +1474,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       }
       return [{
         items: [
-          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), active: curSpace?.id === sp.id, onPick: () => setActiveSpace(sp.id), onRename: (name: string) => setSpace(sp.id, { name }) })),
+          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), elsewhere: elsewhere((r) => r.space === sp.id), active: curSpace?.id === sp.id, onPick: () => setActiveSpace(sp.id), onRename: (name: string) => setSpace(sp.id, { name }) })),
           ...noneItem('none-space', 'No space type', roomsWhere((r) => !plan.spaces.some((sp) => sp.id === r.space))),
         ],
         onNew: { label: '+ New space type', run: () => newSpace() },
@@ -1466,8 +1484,12 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       if (sysKind === 'other') {
         return [{ items: otherLoads.map((l) => ({ id: l.id, name: l.name, onRename: (name: string) => setLoad(l.id, { name }), swatch: { colour: '#6B7280', unset: l.power_w == null || l.runs == null }, rooms: [], active: curLoad?.id === l.id, onPick: () => setActiveLoad(l.id) })), onNew: { label: '+ New other load', run: () => newLoad() } }]
       }
+      if (sysKind === 'luminaires') {
+        const has = (id: string) => (r: Plan['rooms'][number]) => roomLuminaires(plan, r).items.some((l) => l.type.id === id)
+        return [{ items: lumTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setLum(t.id, { name }), swatch: { colour: lumColour(t.id)!, unset: t.watts == null }, rooms: roomsWhere(has(t.id)), elsewhere: elsewhere(has(t.id)), active: curLum?.id === t.id, onPick: () => setActiveLum(t.id) })), onNew: { label: '+ New luminaire', run: () => newLum() } }]
+      }
       if (sysKind === 'emitters') {
-        return [{ items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: activeEmit === t.id, onPick: () => setActiveEmit(t.id) })), onNew: { label: '+ New emitter type', run: () => newEmitter() } }]
+        return [{ items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), elsewhere: elsewhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: activeEmit === t.id, onPick: () => setActiveEmit(t.id) })), onNew: { label: '+ New emitter type', run: () => newEmitter() } }]
       }
       return [sysSection(sysKind)]
     }
@@ -1486,6 +1508,37 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return []
   }
 
+  /** 19 Nov 2026 (Linzie: "how we input information before we run the model"): what the chosen rooms ask for, from
+   * their space types and systems, before any run: people at full occupancy, fresh air and lighting power. */
+  const asksTable = (ids: string[]) => {
+    const rs = plan.rooms.filter((r) => ids.includes(r.id))
+    const rows = rs.map((r) => ({ r, a: roomAsks(plan, r) }))
+    const sum = (f: (a: ReturnType<typeof roomAsks>) => number | null) => { const v = rows.map((x) => f(x.a)); return v.some((x) => x == null) ? null : (v as number[]).reduce((t, x) => t + x, 0) }
+    const n0 = (v: number | null) => (v == null ? '–' : Math.round(v).toString())
+    const n1 = (v: number | null) => (v == null ? '–' : v < 10 ? v.toFixed(1) : Math.round(v).toString())
+    const shown = rows.slice(0, 12)
+    return (
+      <div className="ap-asks">
+        <h4>What {rs.length === 1 ? 'this room asks' : 'these rooms ask'} for</h4>
+        <table>
+          <thead><tr><th>Room</th><th title="People at full occupancy × occupancy rate">People</th><th title="Fresh air">l/s</th><th title="Lighting power while fully lit">Light W</th></tr></thead>
+          <tbody>
+            {shown.map(({ r, a }) => (
+              <tr key={r.id}>
+                <td>{r.name}<small>{f1(a.area_m2)} m²</small></td>
+                <td>{n1(a.people)}</td>
+                <td title={a.fresh_why ?? (a.fresh_from_space ? 'from the space type' : "from the ventilation system's flow")}>{n0(a.fresh_l_s)}</td>
+                <td title={a.light_how ?? 'not stated'}>{n0(a.light_w)}{a.light_wm2 != null && <small>{a.light_wm2.toFixed(1)} W/m²</small>}</td>
+              </tr>
+            ))}
+            {rows.length > shown.length && <tr><td colSpan={4}><small>and {rows.length - shown.length} more</small></td></tr>}
+          </tbody>
+          {rows.length > 1 && <tfoot><tr><td>All {rows.length}</td><td>{n1(sum((a) => a.people))}</td><td>{n0(sum((a) => a.fresh_l_s))}</td><td>{n0(sum((a) => a.light_w))}</td></tr></tfoot>}
+        </table>
+        <p className="gl-hint">From the space types and systems as stated, before the run. A dash: not stated yet (hover for why).</p>
+      </div>
+    )
+  }
   const chooseList = () => (
     <ChooseList
       hint={mode === 'profiles' ? 'Choose one to edit it in the middle; the drawing colours the rooms that use it. Double-click a name to rename it.' : !leftRooms ? 'Tap one to edit it on the right and choose its rooms; tap rooms on the drawing too, then Apply in the middle. Ctrl or Shift adds more.' : undefined}
@@ -1513,6 +1566,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <button type="button" className="ap-link" onClick={() => setChosen(chosenSet.rooms, [])}>Clear</button>
             </p>
           )}
+          {(mode === 'spaces' || mode === 'systems') && chosenSet.rooms.length > 0 && asksTable(chosenSet.rooms)}
           {mode === 'spaces' && mixedZones.map((z) => (
             <div key={z.id} className="gl-mixed">
               <p className="gl-warn">{z.name} has rooms of different space types. The model gives a zone one, so it takes the one with the most floor.</p>
@@ -1555,6 +1609,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     mode === 'fabric' ? typeColour(plan, activeOf(elem))
     : mode === 'spaces' ? spaceColour(curSpace?.id) ?? '#6B7280'
     : mode === 'systems' && sysKind === 'emitters' ? emitColour(curEmit?.id) ?? '#6B7280'
+    : mode === 'systems' && sysKind === 'luminaires' ? lumColour(curLum?.id) ?? '#6B7280'
     : mode === 'systems' ? sysColour(curSys?.id) ?? '#6B7280'
     : '#6B7280'
   /** The previewed figure for the card: heating now → if applied, in the top bar's unit. */
@@ -2141,6 +2196,21 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     )
   }
 
+  /** 19 Nov 2026: what a space type's rooms ask for (every floor), read back beside its inputs: each room's and in all. */
+  const spaceAsksLine = (sp: SpaceType, what: 'people' | 'fresh' | 'light') => {
+    const rs = floors.flatMap((f) => f.rooms).filter((r) => r.space === sp.id)
+    if (!rs.length) return <p className="gl-hint">No rooms have this space type yet.</p>
+    const asks = rs.map((r) => roomAsks(plan, r))
+    const v = asks.map((a) => (what === 'people' ? a.people : what === 'fresh' ? a.fresh_l_s : a.light_w))
+    if (v.some((x) => x == null)) return null
+    const nums = v as number[]
+    const lo = Math.min(...nums), hi = Math.max(...nums), all = nums.reduce((t, x) => t + x, 0)
+    const fmt = (x: number) => (what === 'people' ? (x < 10 ? x.toFixed(1) : Math.round(x).toString()) : Math.round(x).toString())
+    const unit = what === 'people' ? 'people' : what === 'fresh' ? 'l/s' : 'W'
+    const each = lo === hi || fmt(lo) === fmt(hi) ? fmt(lo) : `${fmt(lo)} to ${fmt(hi)}`
+    const name = what === 'people' ? 'People at full occupancy' : what === 'fresh' ? 'Fresh air' : 'Lighting power'
+    return <div className="gl-row"><span>{name}</span><span className="ap-setc">{each} {unit} a room, {fmt(all)} {unit} in its {count(rs.length, 'room')}</span></div>
+  }
   const spacesPanel = () => {
     const sp = curSpace
     const opt = (label: string, k: keyof SpaceType, items: Array<{ key: string; name: string }>) => sp && (
@@ -2153,7 +2223,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </div>
     )
     // A value the library has no number for: typed here; empty stays unset (the document says nothing).
-    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'people_per_room' | 'lux' | 'hot_water_litres'
+    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'people_per_room' | 'lux' | 'hot_water_litres' | 'fresh_air_l_s_person' | 'fresh_air_l_s_m2' | 'fresh_air_l_s_room' | 'fresh_air_ach'
     const typed = (label: string, k: Gk, step: number, unit?: string, max?: number) => sp && (
       <div className="gl-row gl-typed">
         <span>{label}</span>
@@ -2161,7 +2231,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </div>
     )
     const items: Item[] = plan.spaces.map((x) => {
-      const rs = plan.rooms.filter((r) => r.space === x.id)
+      const rs = floors.flatMap((f) => f.rooms).filter((r) => r.space === x.id)
       return { id: x.id, name: x.name, swatch: { colour: spaceColour(x.id)! }, line: USES.find((u) => u.key === x.use)?.name ?? 'Use not set', used: rs.length ? `${count(rs.length, 'room')}` : 'not used', removable: !rs.length }
     })
     const SPACE_KINDS: Kind[] = [{ key: 'use', name: 'Building use', icon: 'building' }, { key: 'types', name: 'Space types', icon: 'person' }]
@@ -2217,15 +2287,37 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {sp.people_basis === 'per_room' ? typed('People in each room', 'people_per_room', 1) : typed('People per m²', 'people_per_m2', 0.01)}
             {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
             {typed('Occupancy rate', 'occupancy_rate', 0.05, undefined, 1)}
+            {spaceAsksLine(sp, 'people')}
+            <h4 className="gl-h4i"><Icon name="ventilation" size={18} />Fresh air</h4>
+            <div className="gl-row gl-librow"><span>Counted</span>
+              <select className="gl-sel" aria-label="Fresh air counted" value={sp.fresh_air_basis ?? ''} onChange={(e) => setSpace(sp.id, { fresh_air_basis: (e.target.value || null) as SpaceType['fresh_air_basis'] })}>
+                <option value="">Not set here (the ventilation system's flow)</option>
+                {FRESH_AIR_BASES.map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}
+              </select>
+            </div>
+            {(sp.fresh_air_basis === 'per_person' || sp.fresh_air_basis === 'per_person_and_m2') && typed('Per person', 'fresh_air_l_s_person', 1, 'l/s')}
+            {(sp.fresh_air_basis === 'per_m2' || sp.fresh_air_basis === 'per_person_and_m2') && typed('Per m² of floor', 'fresh_air_l_s_m2', 0.1, 'l/s')}
+            {sp.fresh_air_basis === 'per_room' && typed('Each room', 'fresh_air_l_s_room', 5, 'l/s')}
+            {sp.fresh_air_basis === 'ach' && typed('Air changes', 'fresh_air_ach', 0.5, 'an hour')}
+            {spaceAsksLine(sp, 'fresh')}
+            {(sp.fresh_air_basis === 'per_person' || sp.fresh_air_basis === 'per_person_and_m2') && roomPeople(sp, 1) == null && <p className="gl-hint gl-warn">Per person needs the people above (and the occupancy rate).</p>}
+            <p className="gl-hint">What the rooms need. The ventilation system (Systems) moves it: its fans, heat recovery and hours.</p>
             <h4 className="gl-h4i"><Icon name="lighting" size={18} />Lighting</h4>
-            {typed('Light needed', 'lux', 50, 'lux')}
-            {sp.lux != null ? (() => {
+            <div className="gl-row gl-librow"><span>Power from</span>
+              <select className="gl-sel" aria-label="Lighting power from" value={lightingBy(sp)} onChange={(e) => setSpace(sp.id, { lighting_by: e.target.value as LightingBy })}>
+                {LIGHTING_BY.map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}
+              </select>
+            </div>
+            {lightingBy(sp) === 'lux' && typed('Light needed', 'lux', 50, 'lux')}
+            {lightingBy(sp) === 'lux' && sp.lux != null && (() => {
               // Read-only: lux ÷ 100 × the efficacy of the luminaires lighting this space type's rooms (Systems).
               const effs = [...new Set(plan.rooms.filter((r) => r.space === sp.id).map((r) => plan.systems.find((y) => y.id === r.systems?.lighting)?.efficacy ?? null))]
               const e = effs.length === 1 ? effs[0] : null
               return <div className="gl-row"><span>Lighting power</span><span className="ap-setc">{e != null ? `${lightingWm2(sp.lux, e).toFixed(1)} W/m², from ${sp.lux} lux × ${e}` : effs.length > 1 ? 'its rooms have luminaires of different efficacies' : 'from the luminaires\' efficacy (Systems, Lighting)'}</span></div>
-            })() : sp.lighting_w_per_m2 != null && typed('Lighting power, stated', 'lighting_w_per_m2', 0.5, 'W/m²')}
-            {sp.lux == null && sp.lighting_w_per_m2 != null && <p className="gl-hint">Stated, not from lux. Type the light needed above to work it out from the luminaires instead.</p>}
+            })()}
+            {lightingBy(sp) === 'w_per_m2' && typed('Lighting power', 'lighting_w_per_m2', 0.5, 'W/m²')}
+            {lightingBy(sp) === 'luminaires' && <p className="gl-hint">Each room's luminaires are given on Systems, Luminaires: how many, and the watts of one. The room's lighting is their watts added up.</p>}
+            {spaceAsksLine(sp, 'light')}
             {onControlsLine('Switched', lightRelName(sp), null)}
             {sp.light_relationship === 'independent' || sp.light_relationship === 'proportional_with_spill'
               ? <Spark label="Lighting" days={profile(sp.lighting ?? '')?.day_types ?? null} onEdit={sp.lighting ? () => setSchedPop(sp.lighting) : undefined} />
@@ -2294,7 +2386,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const emittersPanel = () => {
     const x = curEmit
     const items: Item[] = emitterTypes.map((t) => {
-      const n = plan.rooms.reduce((s2, r) => s2 + (r.emitters ?? []).filter((e) => e.type === t.id).reduce((a, e) => a + e.count, 0), 0)
+      const n = floors.flatMap((f) => f.rooms).reduce((s2, r) => s2 + (r.emitters ?? []).filter((e) => e.type === t.id).reduce((a, e) => a + e.count, 0), 0)
       const kind = EMITTER_KINDS.find((k) => k.key === t.kind)!.name
       return { id: t.id, name: t.name, swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, line: [kind, ...(emitHeats(t) ? [t.rated_output_w != null ? `${t.rated_output_w} W each` : 'output not set'] : []), ...(coolingKind(t.kind) && t.cooling_output_w != null ? [`cools ${t.cooling_output_w} W each`] : []), ...(emitHeats(t) ? [] : ['cools only'])].join(' · '), used: n ? `${n} in rooms` : 'not used', removable: !n }
     })
@@ -2373,6 +2465,54 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </>
         )}
         give={giveFoot({ name: x ? `${emitCount} × ${x.name}` : null, rooms: true, now: chosenSet.rooms.map((id) => emitName(plan.rooms.find((r) => r.id === id)!) || 'none'), onGive: (all) => giveEmitterTo(all ? allRooms() : chosenSet.rooms) })}
+      />
+    )
+  }
+
+  // ─── 19 Nov 2026: luminaires (Linzie: "the number of luminaires and the output of each one"), counted per room ─────
+  const lumTypes = plan.luminaire_types ?? []
+  const lumColour = (id: string | undefined) => {
+    const i = lumTypes.findIndex((x) => x.id === id)
+    return i < 0 ? null : SYSTEM_COLOURS[(i + 5) % SYSTEM_COLOURS.length]!
+  }
+  const curLum = lumTypes.find((x) => x.id === activeLum) ?? lumTypes[0] ?? null
+  const lumName = (r: Plan['rooms'][number]) => roomLuminaires(plan, r).items.map((l) => `${l.count} × ${l.type.name}`).join(', ')
+  const newLum = (from?: LuminaireType) => {
+    let k = lumTypes.length + 1
+    while (lumTypes.some((x) => x.id === `l${k}`)) k++
+    const x: LuminaireType = from ? { ...from, id: `l${k}`, name: `${from.name} (copy)` } : { id: `l${k}`, name: `Luminaire ${lumTypes.length + 1}`, watts: null }
+    commit({ ...plan, luminaire_types: [...lumTypes, x] })
+    setActiveLum(x.id)
+  }
+  const setLum = (id: string, q: Partial<LuminaireType>) => commit({ ...plan, luminaire_types: lumTypes.map((x) => (x.id === id ? { ...x, ...q } : x)) })
+  const giveLumTo = (ids: string[]) => curLum && commit({ ...plan, rooms: plan.rooms.map((r) => (ids.includes(r.id) ? { ...r, luminaires: [...(r.luminaires ?? []).filter((l) => l.type !== curLum.id), ...(lumCount > 0 ? [{ type: curLum.id, count: lumCount }] : [])] } : r)) })
+  const luminairesPanel = () => {
+    const x = curLum
+    const every = floors.flatMap((f) => f.rooms)
+    const items: Item[] = lumTypes.map((t) => {
+      const n = every.reduce((a, r) => a + (r.luminaires ?? []).filter((l) => l.type === t.id).reduce((b, l) => b + l.count, 0), 0)
+      return { id: t.id, name: t.name, swatch: { colour: lumColour(t.id)!, unset: t.watts == null }, line: t.watts != null ? `${t.watts} W each` : 'watts not set', used: n ? `${n} in rooms` : 'not used', removable: !n }
+    })
+    const counted = plan.spaces.filter((sp) => lightingBy(sp) === 'luminaires')
+    return (
+      <GivePanel
+        kinds={SYSTEM_KINDS} kind={sysKind} onKind={(k) => setSysKind(k as SysKind)}
+        title="Luminaires" icon="lighting"
+        items={items} active={x?.id ?? null}
+        onActive={previewOnPick(setActiveLum)}
+        onNew={() => newLum()} newLabel="New luminaire"
+        onCopy={(id) => newLum(lumTypes.find((t) => t.id === id))}
+        onRemove={(id) => commit({ ...plan, luminaire_types: lumTypes.filter((t) => t.id !== id) })}
+        detail={x && (
+          <>
+            <input className="gl-title-in ap-tname" aria-label="Luminaire name" defaultValue={x.name} key={`${x.id}-${x.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== x.name && setLum(x.id, { name: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+            <div className="gl-row gl-typed"><span>Watts of one</span><Num value={x.watts ?? ''} unit="W" step={1} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== x.watts) setLum(x.id, { watts: n }) }} /></div>
+            <p className="gl-hint">What one luminaire draws, its driver included (from the maker's data). A room's lighting is its luminaires' watts added up, on when its space type's switching says (Controls).</p>
+            <div className="gl-row gl-typed ap-count"><span>How many in each room</span><Num value={lumCount} step={1} min={0} onCommit={(v) => setLumCount(Number.isFinite(v) && v >= 0 ? Math.round(v) : 1)} /></div>
+            <p className="gl-hint">Apply puts this many in each chosen room (0 takes them out).{counted.length ? ` Counted for ${counted.map((sp) => sp.name).join(', ')}.` : ' No space type counts its lighting by luminaires yet: choose "Luminaires counted in each room" under Lighting on its space type (Spaces).'}</p>
+          </>
+        )}
+        give={giveFoot({ name: x ? `${lumCount} × ${x.name}` : null, rooms: true, now: chosenSet.rooms.map((id) => lumName(plan.rooms.find((r) => r.id === id)!) || 'none'), onGive: (all) => giveLumTo(all ? allRooms() : chosenSet.rooms) })}
       />
     )
   }
@@ -2847,11 +2987,12 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
 
   const systemsPanel = () => {
     if (sysKind === 'emitters') return emittersPanel()
+    if (sysKind === 'luminaires') return luminairesPanel()
     if (sysKind === 'other') return otherLoadsPanel()
     const x = curSys
     const sv = SERVICES.find((s) => s.key === service)!
     const items: Item[] = systemsOf(service).map((y) => {
-      const rs = plan.rooms.filter((r) => r.systems?.[service] === y.id)
+      const rs = floors.flatMap((f) => f.rooms).filter((r) => r.systems?.[service] === y.id)
       return { id: y.id, name: y.name, swatch: { colour: sysColour(y.id)!, unset: sysUnset(y) }, line: service === 'lighting' ? (y.efficacy != null ? `electricity · ${y.efficacy} W/m² per 100 lux` : 'Efficacy not set yet') : sysLine(y.template, service), used: rs.length ? count(rs.length, 'room') : 'not used', removable: !rs.length }
     })
     const mech = ['mvhr', 'mev'].includes(system(x?.template)?.type ?? '')
@@ -2935,7 +3076,21 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             </>}
             {service === 'ventilation' && x.template && (
               <>
-                <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div>
+                {(() => {
+                  // 19 Nov 2026: fresh air is the space type's (demand); the system's own flow is used only in rooms whose
+                  // space type states none (plans before then).
+                  const rs = floors.flatMap((f) => f.rooms).filter((r) => r.systems?.ventilation === x.id)
+                  const fromSpace = rs.filter((r) => plan.spaces.find((y) => y.id === r.space)?.fresh_air_basis)
+                  const asks = rs.map((r) => roomAsks(plan, r))
+                  const known = asks.filter((a) => a.fresh_l_s != null)
+                  return (
+                    <>
+                      {fromSpace.length < rs.length || x.flow != null ? <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}{fromSpace.length ? ' (other rooms)' : ''}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div> : null}
+                      <div className="gl-row"><span>Moves</span><span className="ap-setc">{known.length ? `${Math.round(known.reduce((t, a) => t + a.fresh_l_s!, 0))} l/s to ${count(known.length, 'room')}` : 'nothing stated yet'}{known.length < rs.length ? `; ${rs.length - known.length} without a figure` : ''}</span></div>
+                      <p className="gl-hint">{fromSpace.length ? `${count(fromSpace.length, 'room')} take${fromSpace.length === 1 ? 's' : ''} the fresh air their space type states (Spaces). ` : ''}Fresh air is best stated on each space type (per person, per m², each room or air changes); this flow is used only where it is not.</p>
+                    </>
+                  )
+                })()}
                 {onControlsLine('Runs', ventRunsText(x), `ventilation:${x.id}`)}
                 {/* Brief 115 review F3: under weather-driven air, extract fans pull their air through the room's cracks, vents
                     and windows, and a natural entry is refused where the room's own windows open. */}
@@ -3070,7 +3225,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D key={whole3d ? 'whole' : 'edit'} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D key={whole3d ? 'whole' : 'edit'} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roomColour={mode === 'spaces' || mode === 'systems' || mode === 'profiles' ? roomFill : undefined} chosenRooms={whole3d ? undefined : chosen} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}

@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, FINISH_KEY, finishesOf, floorsOf, type PlanFloor, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, FINISH_KEY, finishesOf, floorsOf, type PlanFloor, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, lightingBy, roomLuminaires, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -47,6 +47,22 @@ export type Built = {
   /** Plain-words problems from the plan itself (a window set that no longer fits, a gap between zones). */
   notes: string[]
   totals: { zones: number; rooms: number; floor_m2: number; walls: number; wall_net_m2: number; glazing: number; glazing_m2: number; windows: number; doors: number; door_m2: number; partitions: number; systems: number }
+}
+
+/**
+ * 19 Nov 2026: a space type's fresh air as the engine's flow entries, each a rate and its basis ('per_room' is l/s for
+ * each room, written as the zone's constant flow). Null: the space type states no basis (the system's flow is used).
+ * An empty list: a basis with its figure(s) missing, so the run names the flow as required.
+ */
+export function freshAirOf(sp: SpaceType | undefined | null): Array<{ basis: 'per_person' | 'per_m2' | 'per_room' | 'ach'; rate: number }> | null {
+  const b = sp?.fresh_air_basis
+  if (!sp || !b) return null
+  const one = (basis: 'per_person' | 'per_m2' | 'per_room' | 'ach', rate: number | null | undefined) => (rate != null && rate >= 0 ? [{ basis, rate }] : [])
+  if (b === 'per_person_and_m2') {
+    const both = [...one('per_person', sp.fresh_air_l_s_person), ...one('per_m2', sp.fresh_air_l_s_m2)]
+    return both.length === 2 ? both : []
+  }
+  return b === 'per_person' ? one(b, sp.fresh_air_l_s_person) : b === 'per_m2' ? one(b, sp.fresh_air_l_s_m2) : b === 'per_room' ? one(b, sp.fresh_air_l_s_room) : one(b, sp.fresh_air_ach)
 }
 
 /**
@@ -576,20 +592,30 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
     const t = system(v?.template)
     if (!t || !v) return []
     const kind = t.type === 'mvhr' || t.type === 'mev' ? t.type : 'natural'
-    return [{
-      // Flow as typed on the system: l/s per m² of floor (mechanical) or air changes per hour (natural).
-      id: `${v.id}_vent`, label: v.name, kind, enabled: true, share_pct: 100,
-      flow_rate: v.flow ?? null, flow_rate_basis: v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
+    // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
+    // least share, inside its hours: review F1). Not stated: the schedule decides, as before.
+    const runs = (() => {
+      const r = v.runs ?? null
+      if (r === 'demand') return { runs: r, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: scheduleRef(v.schedule) }
+      if (r === 'continuous') return { runs: r, control_schedule_ref: 'always_on' }
+      return { ...(r ? { runs: r } : {}), control_schedule_ref: scheduleRef(v.schedule) }
+    })()
+    const entry = (suffix: string, flow_rate: number | null, flow_rate_basis: string | null) => ({
+      id: `${v.id}_vent${suffix}`, label: v.name, kind, enabled: true, share_pct: 100,
+      flow_rate, flow_rate_basis,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
-      // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
-      // least share, inside its hours: review F1). Not stated: the schedule decides, as before.
-      ...(() => {
-        const runs = v.runs ?? null
-        if (runs === 'demand') return { runs, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: scheduleRef(v.schedule) }
-        if (runs === 'continuous') return { runs, control_schedule_ref: 'always_on' }
-        return { ...(runs ? { runs } : {}), control_schedule_ref: scheduleRef(v.schedule) }
-      })(),
-    }]
+      ...runs,
+    })
+    // 19 Nov 2026: the fresh air the space type needs (demand), counted its way; the engine reads each basis itself.
+    const sp = spaceOf.get(zid)
+    const fa = freshAirOf(sp)
+    if (fa) {
+      if (fa.length === 0) return [entry('', null, null)]
+      const nRooms = plan.rooms.filter((r) => r.zone === zid).length
+      return fa.map((f, i) => entry(i ? `_${f.basis}` : '', f.basis === 'per_room' ? r3(f.rate * nRooms) : f.rate, f.basis === 'per_room' ? 'constant' : f.basis))
+    }
+    // Plans before 19 Nov: the flow typed on the system, l/s per m² of floor (mechanical) or air changes an hour (natural).
+    return [entry('', v.flow ?? null, v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null)]
   }
 
   // Emitters (schema 2.4): per zone, one entry per emitter type in its rooms, the counts added up. A wet one is fed by
@@ -630,6 +656,16 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
     if (!profiles.some((x) => x.id === pr.id)) profiles.push(pr)
   }
   // From schema 2.3 each gain profile carries radiant_fraction, stated on the space type (null until it is).
+  /** 19 Nov 2026: the luminaires in a zone's rooms: their watts added up (null, with a note, if a type has none stated). */
+  const zoneLuminaires = (zid: string) => {
+    const rs = plan.rooms.filter((r) => r.zone === zid).map((r) => roomLuminaires(plan, r))
+    const any = rs.some((r) => r.items.length > 0)
+    const missing = [...new Set(rs.flatMap((r) => r.items.filter((i) => i.type.watts == null).map((i) => i.type.name)))]
+    if (missing.length) notes.push(`${zoneName(zid)}: luminaire${missing.length > 1 ? 's' : ''} ${missing.join(', ')} ha${missing.length > 1 ? 've' : 's'} no watts stated`)
+    if (!any) notes.push(`${zoneName(zid)}: its lighting is counted by luminaires, but its rooms have none`)
+    return { any, watts: missing.length ? null : rs.reduce((t, r) => t + (r.watts ?? 0), 0) }
+  }
+  const zoneName = (zid: string) => plan.zones.find((z) => z.id === zid)?.name ?? zid
   const refsOf = (zid: string) => {
     const sp = spaceOf.get(zid)
     if (!sp) return { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
@@ -638,15 +674,21 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
       const key = sp[k]
       const shape = key && profile(key)?.day_types ? shapeOf(key) : null
       const w = k === 'lighting' ? sp.lighting_w_per_m2 : sp.equipment_w_per_m2
-      if (!shape && w == null && (k === 'lighting' ? sp.lux == null : sp.equipment_baseload_w_per_m2 == null)) return []
-      const id = `${sp.id}_${k}`
+      // 19 Nov 2026: lighting stated three ways (lux × efficacy, a W/m², or the luminaires counted in each room).
+      const by = k === 'lighting' ? lightingBy(sp) : null
+      const lum = by === 'luminaires' ? zoneLuminaires(zid) : null
+      if (!shape && (by === 'luminaires' ? !lum!.any : w == null && (k === 'lighting' ? sp.lux == null : sp.equipment_baseload_w_per_m2 == null))) return []
+      // Luminaires are counted room by room, so each zone has its own lighting profile (its watts are the zone's).
+      const id = by === 'luminaires' ? `${sp.id}_${k}_${zid}` : `${sp.id}_${k}`
       // Today's engine reads lighting from magnitude and equipment from active + baseload.
       const base = sp.equipment_baseload_w_per_m2
       if (k === 'equipment' && (w != null) !== (base != null)) notes.push(`${sp.name}: equipment needs both "in use" and "always on" W/m² (0 is fine)`)
       // Brief 112: lighting states the lux the space needs (its W/m² comes from the lighting system's efficacy), or,
       // while no lux is stated, a W/m² stated directly.
       const size = k === 'lighting'
-        ? (sp.lux != null ? { lux: sp.lux } : w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
+        ? (by === 'luminaires' ? (lum!.watts != null ? { magnitude: { value: r3(lum!.watts), unit: 'total_w' } } : {})
+          : by === 'lux' ? (sp.lux != null ? { lux: sp.lux } : {})
+            : w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
         : w != null && base != null ? { active: { value: w, unit: 'w_per_m2' }, baseload: { value: base, unit: 'w_per_m2' } } : {}
       // Stated detail only: a field left empty on the space type is left out, and the engine names it.
       const L = k === 'lighting'
@@ -660,7 +702,7 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
         ...(L && rel === 'proportional_with_spill' ? { daylight_factor: sp.daylight_factor } : {}),
         ...(!L && rel !== 'independent' ? { standby_factor: sp.standby_factor } : {}),
       }).filter(([, v]) => v != null))
-      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...size, ...detail, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}) })
+      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name}${by === 'luminaires' ? `, ${zoneName(zid)}'s luminaires` : ''})`, ...(shape ? { schedule: shape } : {}), ...size, ...detail, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}) })
       return [id]
     }
     let occupancy: string | null = null

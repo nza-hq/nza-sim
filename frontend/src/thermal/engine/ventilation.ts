@@ -76,14 +76,8 @@ export function zoneVentilation(doc: ModelDocument, hours: Weather['hours']): Zo
       if (rate < 0) throw new VentilationError('must be ≥ 0', `${p}.flow_rate`)
       const basis = v.flow_rate_basis
       if (basis == null) throw new VentilationError('required (constant, per_m2, per_person or ach)', `${p}.flow_rate_basis`)
-      let q: number  // m³/s
-      switch (basis) {
-        case 'constant': q = rate / 1000; break
-        case 'per_m2': q = (rate * zone.area_m2) / 1000; break
-        case 'per_person': q = (rate * designOccupants(doc, zi, p)) / 1000; break
-        case 'ach': q = (rate * zone.area_m2 * zone.height_m) / 3600; break
-        default: throw new VentilationError(`unknown basis "${basis}" (constant, per_m2, per_person or ach)`, `${p}.flow_rate_basis`)
-      }
+      if (!(FLOW_BASES as readonly string[]).includes(basis)) throw new VentilationError(`unknown basis "${basis}" (constant, per_m2, per_person or ach)`, `${p}.flow_rate_basis`)
+      const q = flowLs(rate, basis as FlowBasis, { area_m2: zone.area_m2, height_m: zone.height_m, people: () => designOccupants(doc, zi, p) }) / 1000  // m³/s
       let eta: number
       const r = v.recovery_sensible_pct
       if (v.kind === 'mvhr') {
@@ -141,6 +135,23 @@ export function zoneVentilation(doc: ModelDocument, hours: Weather['hours']): Zo
     })
     return out
   })
+}
+
+export const FLOW_BASES = ['constant', 'per_m2', 'per_person', 'ach'] as const
+export type FlowBasis = (typeof FLOW_BASES)[number]
+
+/**
+ * A flow in l/s from its rate and basis, for a space with this floor, height and design people (people at full presence
+ * × occupancy rate, asked for only on a per-person basis). The one place a basis becomes a flow: the run calls it for
+ * each zone, and the Spaces and Systems cards for each room (19 Nov 2026), so the two cannot drift (Rule 11).
+ */
+export function flowLs(rate: number, basis: FlowBasis, at: { area_m2: number; height_m: number; people: () => number }): number {
+  switch (basis) {
+    case 'constant': return rate
+    case 'per_m2': return rate * at.area_m2
+    case 'per_person': return rate * at.people()
+    case 'ach': return (rate * at.area_m2 * at.height_m * 1000) / 3600
+  }
 }
 
 /** The zone's design occupancy (people at full presence × occupancy rate), as today's designOccupants per zone. */

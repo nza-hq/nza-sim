@@ -12,7 +12,7 @@ import { Canvas, type ThreeEvent, useThree } from '@react-three/fiber'
 import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import pc from 'polygon-clipping'
-import { type Plan, type PlacedWindow, type PlanFloor, type Span, type WallRun, type XY, allWindows, edgesOf, floorsOf, wallRuns } from './plan'
+import { type Plan, type PlacedWindow, type PlanFloor, type PlanRoom, type Span, type WallRun, type XY, allWindows, edgesOf, floorsOf, wallRuns } from './plan'
 import { labelAt, zoneTint } from './ported/zones'
 import { type BlockRoof, type RoofPiece, blockRoof, roofPieces } from './roof'
 import { type WallCurve, curvedWalls, displayRing, displayRoomRing } from './curves'
@@ -48,9 +48,14 @@ type Props = {
   /** 18 Nov 2026 (Linzie: "see the whole building in 3D with all the roof shapes"): every roof drawn solid, in a
    * roof colour, rather than see-through. */
   solidRoofs?: boolean
+  /** 19 Nov 2026 (Linzie: "if I select a heating system ... does it show up in 2D and 3D?"): each room's colour on this
+   * step, the plan's own (space type, system, emitter, profile), on every floor; null or absent: its zone's tint. */
+  roomColour?: (r: PlanRoom) => string | null
+  /** The rooms chosen (on the floor being edited), drawn lit as on the plan. */
+  chosenRooms?: ReadonlySet<string>
 }
 
-export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs, labels = true, solidRoofs = false }: Props) {
+export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs, labels = true, solidRoofs = false, roomColour, chosenRooms }: Props) {
   const H = plan.storey_height_m
   // Stacked floors (18 Nov 2026, Linzie: "see the whole building in 3D"): every floor at its height, the one being
   // edited as before (walls to choose, labels), the others drawn with their walls, windows and roofs.
@@ -113,11 +118,11 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
         <meshStandardMaterial color={C.ground} roughness={0.95} />
       </mesh>
 
-      {floors.map((f, i) => (i === act ? null : <OtherFloor key={`f${i}`} plan={plan} floor={f} above={floors[i + 1]} y={i * H} H={H} solid={solidRoofs} />))}
+      {floors.map((f, i) => (i === act ? null : <OtherFloor key={`f${i}`} plan={plan} floor={f} above={floors[i + 1]} y={i * H} H={H} solid={solidRoofs} roomColour={roomColour} />))}
       <group position={[0, act * H, 0]}>
       {plan.blocks.map((b, i) => <Slab key={`s${i}`} ring={smooth(b, i)} on={floorOn} />)}
       {plan.rooms.map((r) => (
-        <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, plan.blocks, curves) : r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />
+        <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, plan.blocks, curves) : r.ring} colour={roomColour?.(r) ?? zoneTint(zoneIndex(r.zone)).fill} tone={!!roomColour?.(r)} lit={!!chosenRooms?.has(r.id)} />
       ))}
       {floorOn && plan.blocks.map((b, i) => <FloorGlow key={`fg${i}`} ring={smooth(b, i)} />)}
       {labels && plan.rooms.map((r) => {
@@ -243,7 +248,7 @@ function Pitched({ roof, H, on, hide, solid = false }: { roof: BlockRoof; H: num
 
 /** A floor other than the one being edited: slab, room colours, walls with their windows and its roof, drawn at its
  * height and not chosen from here (switch floors to edit it). */
-function OtherFloor({ plan, floor, above, y, H, solid }: { plan: Plan; floor: PlanFloor; above?: PlanFloor; y: number; H: number; solid: boolean }) {
+function OtherFloor({ plan, floor, above, y, H, solid, roomColour }: { plan: Plan; floor: PlanFloor; above?: PlanFloor; y: number; H: number; solid: boolean; roomColour?: (r: PlanRoom) => string | null }) {
   const sub = useMemo(() => ({ ...plan, blocks: floor.blocks, rooms: floor.rooms, windows: floor.windows, wall_spans: floor.wall_spans, roof_parts: floor.roof_parts, roof: floor.roof ?? plan.roof }), [plan, floor])
   const runs = useMemo(() => wallRuns(sub.blocks), [sub])
   const placed = useMemo(() => allWindows(sub).windows, [sub])
@@ -255,7 +260,7 @@ function OtherFloor({ plan, floor, above, y, H, solid }: { plan: Plan; floor: Pl
   return (
     <group position={[0, y, 0]}>
       {sub.blocks.map((b, i) => <Slab key={`s${i}`} ring={smooth(b, i)} />)}
-      {sub.rooms.map((r) => <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, sub.blocks, curves) : r.ring} colour={zoneTint(zoneIndex(r.zone)).fill} />)}
+      {sub.rooms.map((r) => <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, sub.blocks, curves) : r.ring} colour={roomColour?.(r) ?? zoneTint(zoneIndex(r.zone)).fill} tone={!!roomColour?.(r)} />)}
       {roofPieces(sub, true).map((p, i, all) => { const br = blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, above)} H={H} on={false} solid={solid} hide={false} /> : <Pitched key={`r${i}`} roof={br} H={H} on={false} solid={solid} hide={false} /> })}
       {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} join={joins.get(g.run.index)} />)}
       {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => <Wall key={run.index} join={joins.get(run.index)} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
@@ -284,12 +289,22 @@ function ordered(runs: readonly WallRun[], cw: { replaced: Set<number>; segments
 /** What a flat roof piece leaves out: the floor above, and (for a floor's flat rest) its pitched parts. */
 const restCut = (p: RoofPiece, all: readonly RoofPiece[], above?: PlanFloor): XY[][] => [...(above?.blocks ?? []), ...(p.rest ? all.filter((q) => q.block === p.block && !q.rest).map((q) => q.ring) : [])]
 
-function RoomFloor({ ring, colour }: { ring: XY[]; colour: string }) {
+/** A room's floor in its colour. `tone`: a step's colour (a system's, a space type's), softened as the plan's wash is;
+ * `lit`: chosen, washed over in the chosen orange as the plan outlines it. */
+function RoomFloor({ ring, colour, tone = false, lit = false }: { ring: XY[]; colour: string; tone?: boolean; lit?: boolean }) {
   const g = useMemo(() => new THREE.ShapeGeometry(shapeOf(ring)), [ring])
+  const c = useMemo(() => (tone ? new THREE.Color(colour.slice(0, 7)).lerp(new THREE.Color('#FFFFFF'), 0.35) : new THREE.Color(colour.slice(0, 7))), [colour, tone])
   return (
-    <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} receiveShadow>
-      <meshStandardMaterial color={colour} roughness={0.9} />
-    </mesh>
+    <>
+      <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} receiveShadow>
+        <meshStandardMaterial color={c} roughness={0.9} />
+      </mesh>
+      {lit && (
+        <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.014, 0]} renderOrder={1}>
+          <meshStandardMaterial color={C.select} roughness={0.9} transparent opacity={0.45} depthWrite={false} />
+        </mesh>
+      )}
+    </>
   )
 }
 

@@ -2,6 +2,16 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 How inputs drive energy — IN REVIEW 19 Nov 2026 on `sim2/inputs-energy` (off `sim2/module-cleanup`)
+
+Linzie, 19 Nov 2026 00:30: selecting a system should show its rooms in 2D and 3D; lighting by luminaires × watts, W/m², or W/m² per 100 lux at a lux; ventilation fixed, per m² or per person; how profiles drive each load. Review: https://claude.ai/artifact/VsTnnp2LeAjYXRdNtisbAx. No engine physics change.
+- **3D shows what is picked** (`Plan3D` `roomColour`, `chosenRooms`): room floors take the plan's colour on Spaces, Systems and Profiles (they were always zone tints), on every floor; chosen rooms are washed orange. Lists name rooms on other floors ("also 8 on the first floor") and the cards count every floor, so a system used only upstairs is no longer "not used" (and removable).
+- **Fresh air on the space type** (`SpaceType.fresh_air_basis` + figures; `toDocument.freshAirOf`): l/s per person, l/s per m², both added (two entries), l/s for each room (the zone's constant × its rooms) or air changes. The ventilation system keeps kind, SFP, recovery and hours; its own flow is used only where the space type states none (plans before 19 Nov). `thermal/engine/ventilation.ts flowLs` is the one basis-to-flow helper, used by the run and the cards.
+- **Luminaires counted per room** (`Plan.luminaire_types`, `PlanRoom.luminaires`, Systems → Luminaires, like emitters; `SpaceType.lighting_by`: lux × efficacy, W/m², or luminaires). A zone's luminaires go to the engine as its own lighting profile in `total_w`.
+- **What rooms ask for** (`sim2/geometry/asks.ts roomAsks`): people at full occupancy, fresh air l/s and lighting W of the chosen rooms (Spaces, Systems), and per space type beside its inputs.
+- Found, not changed: the "by hand" daylight cut is a fixed 09:00–17:00; `spill_minutes` is carried but not read; people = density × occupancy rate × the profile's hour (a profile that peaks at 0.75 with rate 0.75 gives 56 %). Whole building 3D draws roofs solid, so rooms on other floors are seen by choosing their floor.
+- Checked: `vitest run src/sim2 src/thermal` 628 pass (10 new in `inputs.test.ts`); build clean; browser on the clubhouse (Systems heating/ventilation in plan and 3D, Luminaires, Spaces fresh air), no page errors.
+
 ## 🔧 Each step's screen cleaned up — IN REVIEW 19 Nov 2026 on `sim2/module-cleanup` (off `sim2/example-rwgc`)
 
 Linzie, 19 Nov 2026 00:00 ("too much going on … think about what each module should have"). UI only; no engine change.
