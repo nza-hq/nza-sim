@@ -16,6 +16,7 @@ import HeatBalance from '../../components/modules/balance/HeatBalance.jsx'
 import { SystemSankeyChart } from '../../components/modules/systems/SystemSankey.jsx'
 import { energyFlow, fuelSplit } from './energyFlow'
 import { LoadProfiles } from './LoadProfiles'
+import { Explore } from './Explore'
 import { createPortal } from '../workspace/portal'
 import { DesignHeatLoss } from './DesignHeatLoss'
 import { EmitterSizing } from './EmitterSizing'
@@ -32,7 +33,7 @@ import './run.css'
 const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric'])
 const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
 
-export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
+export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, showExplore = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */
   step?: StepId
   doc: unknown
@@ -48,6 +49,8 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   showMonthly?: boolean
   /** The Load profiles centre tab: the run's energy hour by hour, by end use and fuel (today's full-year chart). */
   showProfiles?: boolean
+  /** Brief 127: the Explore centre tab: any hourly dataset the run holds, layered, in several views. */
+  showExplore?: boolean
   focusZone: string | null
   weatherEl: HTMLElement | null
   /** Brief 118 P4: where a heating system's passport wants its design heat loss and emitter check. */
@@ -65,7 +68,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   useEffect(() => { if (step) run.setLevel(NATURAL[step]) }, [step])
   // Brief 110b row 2: the Pop Out window shows this run.
   const latest = useRef<ModelShare | null>(null)
-  latest.current = s ? { summary: s, level: run.level, fabric_heat_c: run.level === 'fabric' ? run.fabricC : null, weather: run.weather?.file_name ?? null } : null
+  latest.current = s ? { summary: { ...s, series: null }, level: run.level, fabric_heat_c: run.level === 'fabric' ? run.fabricC : null, weather: run.weather?.file_name ?? null } : null
   const channel = useRef<ReturnType<typeof shareModel> | null>(null)
   useEffect(() => { channel.current = shareModel(() => latest.current); return () => channel.current?.close() }, [])
   useEffect(() => { channel.current?.post() }, [s])
@@ -125,6 +128,16 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
             <h2>Load profiles, whole building</h2>
             {s?.energy?.ok ? <LoadProfiles energy={s.energy} />
               : <p className="gl-hint">{s && s.energy && !s.energy.ok ? 'Load profiles need the energy: some system inputs are still unset (see Heat flow).' : s ? 'Load profiles are energy, so they need the systems: choose "+ Systems" above the results.' : run.state.kind === 'running' ? 'Working it out…' : 'Load profiles need a full-year run: press Run in the bar above.'}</p>}
+          </div>
+        </div>,
+        centre,
+      )}
+      {showExplore && createPortal(
+        <div className="rp-flow" role="tabpanel" aria-label="Explore">
+          <div className={`rp-flow-in ex-wide${!run.hold && run.busy ? ' rp-stale' : ''}`}>
+            <h2>Explore the results</h2>
+            {s?.series ? <Explore set={s.series} focusZone={focusZone} />
+              : <p className="gl-hint">{run.state.kind === 'missing' ? 'Exploring needs a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'Exploring needs a full-year run: press Run in the bar above.'}</p>}
           </div>
         </div>,
         centre,

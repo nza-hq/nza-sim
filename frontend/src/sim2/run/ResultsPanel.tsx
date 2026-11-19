@@ -143,6 +143,8 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
   const [busy, setBusy] = useState(false)
   const [fabricC, setFabricC] = useState<number>(21)
   const opts = () => ({ level: latestLevel.current.level, fabric_heat_c: latestLevel.current.level === 'fabric' ? latestLevel.current.c : null, what_if: latestWhatIf.current })
+  /** Brief 127: the shown run also carries every hourly dataset for the explorer; a previewed change does not need them. */
+  const mainOpts = () => ({ ...opts(), series: true })
   const latestLevel = useRef({ level, c: fabricC })
   latestLevel.current = { level, c: fabricC }
   function askInstant() {
@@ -169,7 +171,7 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
         if (latestHold.current) { askInstant(); return }
         setState({ kind: 'running' })
         ranDoc.current = latestDoc.current
-        c.run(latestDoc.current, 0, opts())
+        c.run(latestDoc.current, 0, mainOpts())
       },
       failed,
       )
@@ -239,14 +241,14 @@ export function useRun(doc: unknown, previewDoc: unknown = null, hold = false) {
     setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
     setBusy(true)
     ranDoc.current = doc
-    client.current.run(doc, 250, opts())
+    client.current.run(doc, 250, mainOpts())
   }, [doc, whatIf, level, fabricC, hold])
   /** Brief 122: the hourly year, on Run (held steps). */
   const runHourly = () => {
     if (!client.current) return
     setState((s) => (s.kind === 'done' ? s : { kind: 'running' }))
     ranDoc.current = latestDoc.current
-    client.current.run(latestDoc.current, 0, opts())
+    client.current.run(latestDoc.current, 0, mainOpts())
   }
 
   // The organisation's weather files, when signed in.

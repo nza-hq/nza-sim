@@ -2,6 +2,27 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 Brief 127: the results explorer (Explore tab): IN REVIEW 19 Nov 2026 on `sim2/127-results-explorer`
+
+Linzie asked on 18 Nov at 12:34 and again on 19 Nov at 00:30 to "layer lots of different data points" at room level, IES-style, and to see load shapes to check the tool is working. Brief: `docs/briefs/active/127_results-explorer.md`. Plan page: https://claude.ai/artifact/39XRDnugLYCShBYXxRfiHF.
+
+- **P1 (`sim2/run/series.ts`):** every hourly dataset the run already holds, as one catalogue. That covers weather, building demand, fuels and end uses, each system's fuel drawn, heat given and pumps, and each room's loads, temperatures, setpoints, hours in use, air and windows, its share of each system, and its fans and small power. The catalogue is copied from the engine's arrays; nothing is worked out. It is sent only for the shown run (`series: true`). The tests hold each series to the summary's own figures.
+- **P2 (Explore centre tab):** pick up to 8 datasets and view them as:
+  - Lines (one panel per unit on a shared time axis, by day, week, month or year)
+  - Carpet
+  - Typical day
+  - Against outdoor
+  - Monthly
+  - Duration
+
+  The room chosen on the left sets the defaults. In a narrow middle the picker moves above the chart.
+- **Checks:**
+  - Container at 1440×900, school example with Yeovilton TMYx: all six views drawn with no page errors.
+  - `vitest run src/sim2/run/__tests__/series.test.ts`: 4 pass.
+  - Build clean.
+  - No engine change; anchor 133.2 untouched.
+- **Next:** a page for each system, then the room heat map, then the per-surface hourly balance for element and window-group layering, which needs engine output.
+
 ## ✅ One left navigation — 18 Nov 2026
 
 Linzie 18 Nov 15:11: "get rid of the old stuff and layer this new stuff in the left navigation, and clean everything up." The left navigation (`components/layout/Sidebar.jsx`) is now Projects, then the model's nine steps (Site … Interventions, numbered, with her line icons where the set has one, linking to `/model?step=…`), then Library. It opens with names (208 px) or closes to icons, remembered per computer. The step tabs across the top of `/model` are gone (`ModelWorkspace.tsx`; `STEP_ACCENT`, `DEFAULT_STEP` moved to `steps.ts`), with the shelf links. Today's Overview, Weather, Building, Internal Gains, Operation, Systems, Consumption, Results, Interventions and Roadmap pages are out of the navigation; their routes stay, and the Check and Interventions steps still point at today's pages. Tidy-up: Scenario and Baseline show only on today's pages; Projects page titled "Projects", the old box sizes off the cards; Check and Interventions keep their empty right pane shut; the plan's key sits in the top-left corner as a list; room labels on Spaces/Systems shorten to fit; a long Apply label shortens with "…"; Run and Run in EnergyPlus wrap onto their own line in a narrow middle. No engine change; anchor 133.2; `vitest run src/sim2` 194 passed; build clean.
