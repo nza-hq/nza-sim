@@ -41,6 +41,8 @@ import { CLOSE_PX, SNAP_PX, createDrawCore } from './ported/drawCore'
 import { type Hit, ccw, labelAt, nearestEdge, squareCut, zoneAt, zoneTint } from './ported/zones'
 import { FinishInfo, FinishRows } from './Finishes'
 import { carpetIn } from './toDocument'
+import { FRESH_AIR_BASES } from './plan'
+import { roomAsks, roomPeople } from './asks'
 import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, type ProjectInfo, removeFloor, FLOOR_NAMES, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, floorsOf, onFloor, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
 import { ApplyBarTarget, ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
@@ -2147,6 +2149,21 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     )
   }
 
+  /** 19 Nov 2026: what a space type's rooms ask for (every floor), read back beside its inputs: each room's and in all. */
+  const spaceAsksLine = (sp: SpaceType, what: 'people' | 'fresh' | 'light') => {
+    const rs = floors.flatMap((f) => f.rooms).filter((r) => r.space === sp.id)
+    if (!rs.length) return <p className="gl-hint">No rooms have this space type yet.</p>
+    const asks = rs.map((r) => roomAsks(plan, r))
+    const v = asks.map((a) => (what === 'people' ? a.people : what === 'fresh' ? a.fresh_l_s : a.light_w))
+    if (v.some((x) => x == null)) return null
+    const nums = v as number[]
+    const lo = Math.min(...nums), hi = Math.max(...nums), all = nums.reduce((t, x) => t + x, 0)
+    const fmt = (x: number) => (what === 'people' ? (x < 10 ? x.toFixed(1) : Math.round(x).toString()) : Math.round(x).toString())
+    const unit = what === 'people' ? 'people' : what === 'fresh' ? 'l/s' : 'W'
+    const each = lo === hi || fmt(lo) === fmt(hi) ? fmt(lo) : `${fmt(lo)} to ${fmt(hi)}`
+    const name = what === 'people' ? 'People at full occupancy' : what === 'fresh' ? 'Fresh air' : 'Lighting power'
+    return <div className="gl-row"><span>{name}</span><span className="ap-setc">{each} {unit} a room, {fmt(all)} {unit} in its {count(rs.length, 'room')}</span></div>
+  }
   const spacesPanel = () => {
     const sp = curSpace
     const opt = (label: string, k: keyof SpaceType, items: Array<{ key: string; name: string }>) => sp && (
@@ -2159,7 +2176,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </div>
     )
     // A value the library has no number for: typed here; empty stays unset (the document says nothing).
-    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'people_per_room' | 'lux' | 'hot_water_litres'
+    type Gk = 'radiant_fraction' | 'light_area_share' | 'light_gain_fraction' | 'daylight_factor' | 'equip_area_share' | 'equip_gain_fraction' | 'standby_factor' | 'heat_c' | 'cool_c' | 'people_per_m2' | 'sensible_w_per_person' | 'occupancy_rate' | 'lighting_w_per_m2' | 'equipment_w_per_m2' | 'equipment_baseload_w_per_m2' | 'people_per_room' | 'lux' | 'hot_water_litres' | 'fresh_air_l_s_person' | 'fresh_air_l_s_m2' | 'fresh_air_l_s_room' | 'fresh_air_ach'
     const typed = (label: string, k: Gk, step: number, unit?: string, max?: number) => sp && (
       <div className="gl-row gl-typed">
         <span>{label}</span>
@@ -2223,6 +2240,21 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             {sp.people_basis === 'per_room' ? typed('People in each room', 'people_per_room', 1) : typed('People per m²', 'people_per_m2', 0.01)}
             {typed('Heat per person', 'sensible_w_per_person', 5, 'W')}
             {typed('Occupancy rate', 'occupancy_rate', 0.05, undefined, 1)}
+            {spaceAsksLine(sp, 'people')}
+            <h4 className="gl-h4i"><Icon name="ventilation" size={18} />Fresh air</h4>
+            <div className="gl-row gl-librow"><span>Counted</span>
+              <select className="gl-sel" aria-label="Fresh air counted" value={sp.fresh_air_basis ?? ''} onChange={(e) => setSpace(sp.id, { fresh_air_basis: (e.target.value || null) as SpaceType['fresh_air_basis'] })}>
+                <option value="">Not set here (the ventilation system's flow)</option>
+                {FRESH_AIR_BASES.map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}
+              </select>
+            </div>
+            {(sp.fresh_air_basis === 'per_person' || sp.fresh_air_basis === 'per_person_and_m2') && typed('Per person', 'fresh_air_l_s_person', 1, 'l/s')}
+            {(sp.fresh_air_basis === 'per_m2' || sp.fresh_air_basis === 'per_person_and_m2') && typed('Per m² of floor', 'fresh_air_l_s_m2', 0.1, 'l/s')}
+            {sp.fresh_air_basis === 'per_room' && typed('Each room', 'fresh_air_l_s_room', 5, 'l/s')}
+            {sp.fresh_air_basis === 'ach' && typed('Air changes', 'fresh_air_ach', 0.5, 'an hour')}
+            {spaceAsksLine(sp, 'fresh')}
+            {(sp.fresh_air_basis === 'per_person' || sp.fresh_air_basis === 'per_person_and_m2') && roomPeople(sp, 1) == null && <p className="gl-hint gl-warn">Per person needs the people above (and the occupancy rate).</p>}
+            <p className="gl-hint">What the rooms need. The ventilation system (Systems) moves it: its fans, heat recovery and hours.</p>
             <h4 className="gl-h4i"><Icon name="lighting" size={18} />Lighting</h4>
             {typed('Light needed', 'lux', 50, 'lux')}
             {sp.lux != null ? (() => {
@@ -2941,7 +2973,21 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             </>}
             {service === 'ventilation' && x.template && (
               <>
-                <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div>
+                {(() => {
+                  // 19 Nov 2026: fresh air is the space type's (demand); the system's own flow is used only in rooms whose
+                  // space type states none (plans before then).
+                  const rs = floors.flatMap((f) => f.rooms).filter((r) => r.systems?.ventilation === x.id)
+                  const fromSpace = rs.filter((r) => plan.spaces.find((y) => y.id === r.space)?.fresh_air_basis)
+                  const asks = rs.map((r) => roomAsks(plan, r))
+                  const known = asks.filter((a) => a.fresh_l_s != null)
+                  return (
+                    <>
+                      {fromSpace.length < rs.length || x.flow != null ? <div className="gl-row gl-typed"><span>{mech ? 'Air flow' : 'Air changes'}{fromSpace.length ? ' (other rooms)' : ''}</span><Num value={x.flow ?? ''} unit={mech ? 'l/s per m²' : 'per hour'} step={mech ? 0.1 : 0.5} min={0} onCommit={(v) => { const n = Number.isFinite(v) && v > 0 ? v : null; if (n !== (x.flow ?? null)) setSys(x.id, { flow: n }) }} /></div> : null}
+                      <div className="gl-row"><span>Moves</span><span className="ap-setc">{known.length ? `${Math.round(known.reduce((t, a) => t + a.fresh_l_s!, 0))} l/s to ${count(known.length, 'room')}` : 'nothing stated yet'}{known.length < rs.length ? `; ${rs.length - known.length} without a figure` : ''}</span></div>
+                      <p className="gl-hint">{fromSpace.length ? `${count(fromSpace.length, 'room')} take${fromSpace.length === 1 ? 's' : ''} the fresh air their space type states (Spaces). ` : ''}Fresh air is best stated on each space type (per person, per m², each room or air changes); this flow is used only where it is not.</p>
+                    </>
+                  )
+                })()}
                 {onControlsLine('Runs', ventRunsText(x), `ventilation:${x.id}`)}
                 {/* Brief 115 review F3: under weather-driven air, extract fans pull their air through the room's cracks, vents
                     and windows, and a natural entry is refused where the room's own windows open. */}

@@ -50,6 +50,22 @@ export type Built = {
 }
 
 /**
+ * 19 Nov 2026: a space type's fresh air as the engine's flow entries, each a rate and its basis ('per_room' is l/s for
+ * each room, written as the zone's constant flow). Null: the space type states no basis (the system's flow is used).
+ * An empty list: a basis with its figure(s) missing, so the run names the flow as required.
+ */
+export function freshAirOf(sp: SpaceType | undefined | null): Array<{ basis: 'per_person' | 'per_m2' | 'per_room' | 'ach'; rate: number }> | null {
+  const b = sp?.fresh_air_basis
+  if (!sp || !b) return null
+  const one = (basis: 'per_person' | 'per_m2' | 'per_room' | 'ach', rate: number | null | undefined) => (rate != null && rate >= 0 ? [{ basis, rate }] : [])
+  if (b === 'per_person_and_m2') {
+    const both = [...one('per_person', sp.fresh_air_l_s_person), ...one('per_m2', sp.fresh_air_l_s_m2)]
+    return both.length === 2 ? both : []
+  }
+  return b === 'per_person' ? one(b, sp.fresh_air_l_s_person) : b === 'per_m2' ? one(b, sp.fresh_air_l_s_m2) : b === 'per_room' ? one(b, sp.fresh_air_l_s_room) : one(b, sp.fresh_air_ach)
+}
+
+/**
  * Brief 123: a pitched roof. `roofs` are the blocks' roofs as Shape has them (from the roof service, or the browser
  * for rectangles); absent, rectangles are worked out here and any other outline keeps a flat roof (with a note).
  * - Insulated at the ceiling: each pitched block gets an unheated loft zone (no setpoint, no system of any kind; its
@@ -576,20 +592,30 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
     const t = system(v?.template)
     if (!t || !v) return []
     const kind = t.type === 'mvhr' || t.type === 'mev' ? t.type : 'natural'
-    return [{
-      // Flow as typed on the system: l/s per m² of floor (mechanical) or air changes per hour (natural).
-      id: `${v.id}_vent`, label: v.name, kind, enabled: true, share_pct: 100,
-      flow_rate: v.flow ?? null, flow_rate_basis: v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null,
+    // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
+    // least share, inside its hours: review F1). Not stated: the schedule decides, as before.
+    const runs = (() => {
+      const r = v.runs ?? null
+      if (r === 'demand') return { runs: r, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: scheduleRef(v.schedule) }
+      if (r === 'continuous') return { runs: r, control_schedule_ref: 'always_on' }
+      return { ...(r ? { runs: r } : {}), control_schedule_ref: scheduleRef(v.schedule) }
+    })()
+    const entry = (suffix: string, flow_rate: number | null, flow_rate_basis: string | null) => ({
+      id: `${v.id}_vent${suffix}`, label: v.name, kind, enabled: true, share_pct: 100,
+      flow_rate, flow_rate_basis,
       sfp_w_per_l_s: t.sfp, recovery_sensible_pct: t.heat_recovery != null ? r3(t.heat_recovery * 100) : null, legacy_v25: null,
-      // Brief 114: continuous (every hour), on its schedule, or with demand (the people in the zone, never below its
-      // least share, inside its hours: review F1). Not stated: the schedule decides, as before.
-      ...(() => {
-        const runs = v.runs ?? null
-        if (runs === 'demand') return { runs, demand_min_fraction: v.demand_min ?? null, control_schedule_ref: scheduleRef(v.schedule) }
-        if (runs === 'continuous') return { runs, control_schedule_ref: 'always_on' }
-        return { ...(runs ? { runs } : {}), control_schedule_ref: scheduleRef(v.schedule) }
-      })(),
-    }]
+      ...runs,
+    })
+    // 19 Nov 2026: the fresh air the space type needs (demand), counted its way; the engine reads each basis itself.
+    const sp = spaceOf.get(zid)
+    const fa = freshAirOf(sp)
+    if (fa) {
+      if (fa.length === 0) return [entry('', null, null)]
+      const nRooms = plan.rooms.filter((r) => r.zone === zid).length
+      return fa.map((f, i) => entry(i ? `_${f.basis}` : '', f.basis === 'per_room' ? r3(f.rate * nRooms) : f.rate, f.basis === 'per_room' ? 'constant' : f.basis))
+    }
+    // Plans before 19 Nov: the flow typed on the system, l/s per m² of floor (mechanical) or air changes an hour (natural).
+    return [entry('', v.flow ?? null, v.flow != null ? (kind === 'natural' ? 'ach' : 'per_m2') : null)]
   }
 
   // Emitters (schema 2.4): per zone, one entry per emitter type in its rooms, the counts added up. A wet one is fed by

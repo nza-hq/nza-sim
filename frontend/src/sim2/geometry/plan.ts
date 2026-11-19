@@ -264,6 +264,14 @@ export function finishesOf(sp: Pick<SpaceType, 'name' | 'use' | 'borrowed' | 'fl
   }
 }
 
+export const FRESH_AIR_BASES = [
+  { key: 'per_person', name: 'l/s per person' },
+  { key: 'per_m2', name: 'l/s per m² of floor' },
+  { key: 'per_person_and_m2', name: 'l/s per person plus l/s per m²' },
+  { key: 'per_room', name: 'l/s for each room (fixed)' },
+  { key: 'ach', name: 'Air changes an hour' },
+] as const
+export type FreshAirBasis = (typeof FRESH_AIR_BASES)[number]['key']
 export type SpaceType = {
   id: string
   name: string
@@ -284,6 +292,16 @@ export type SpaceType = {
   lux?: number | null
   /** A lighting W/m² stated directly, used only while no lux is stated ("stated, not from lux"). */
   lighting_w_per_m2?: number | null
+  /** 19 Nov 2026 (Linzie: "can we set it to L/s/m² or L/s per person ... fixed?"): the fresh air the space needs, as
+   * demand (the ventilation system keeps its kind, fans, heat recovery and hours). How it is counted, and the figure(s)
+   * for that basis: l/s per person (the space type's people at full occupancy), l/s per m² of floor, both added
+   * (EN 16798-1's way), l/s for each room, or air changes an hour. Null or absent: not stated here, and the ventilation
+   * system's own flow is used (plans before 19 Nov). */
+  fresh_air_basis?: FreshAirBasis | null
+  fresh_air_l_s_person?: number | null
+  fresh_air_l_s_m2?: number | null
+  fresh_air_l_s_room?: number | null
+  fresh_air_ach?: number | null
   /** Brief 112: hot water used, litres a day per person or per m² of floor (demand); the heater is on Systems. */
   hot_water_basis?: 'per_person' | 'per_m2' | null
   hot_water_litres?: number | null
