@@ -17,7 +17,7 @@ export default function ModelPage() {
   const project = useContext(ProjectContext) as { params?: { name?: string }; updateParam?: (k: string, v: unknown) => void } | null
   return (
     <ModelWorkspace
-      header={<><ModelSave api={api} plan={plan} /><ModelExamples api={api} plan={plan} /></>}
+      header={<div className="mw-head"><ModelSave api={api} plan={plan} /><ModelExamples api={api} plan={plan} /></div>}
       render={({ step, slots, centre, setCentre, openRight }) => <GeometryLab slots={slots} step={step} onStep={onStep} centreTab={centre} onCentreTab={setCentre} onOpenRight={openRight} api={api} onPlan={setPlan} projectName={project?.params?.name ?? ''} renameProject={(n) => project?.updateParam?.('name', n)} />}
     />
   )

@@ -590,3 +590,12 @@
 .ap-asks td { text-align: right; padding: 3px 4px; vertical-align: top; }
 .ap-asks td small { display: block; color: #7A8580; font-size: 10.5px; }
 .ap-asks tfoot td { border-top: 1px solid #DDE3E0; font-weight: 600; }
+
+/* Phase 1 (19 Nov 2026): ⤢ beside an item opens its details; choosing the item only shows it on the drawing. */
+.ap-expand { flex: none; width: 26px; height: 26px; display: grid; place-items: center; margin-left: 6px; border: 1px solid #D7DEDA; border-radius: 6px; background: #fff; color: #1F5C46; font-size: 14px; line-height: 1; cursor: pointer; }
+.ap-expand:hover { border-color: #1F5C46; background: #EEF5F1; }
+.ap-expand:focus-visible { outline: 2px solid #1F5C46; outline-offset: 1px; }
+.gl-undo { position: absolute; bottom: 16px; right: 16px; z-index: 5; display: flex; gap: 4px; }
+.gl-undo button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #D7DEDA; border-radius: 8px; background: #fff; color: #1F5C46; font-size: 16px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.gl-undo button:disabled { color: #B8C2BD; cursor: default; }
+.gl-undo button:not(:disabled):hover { border-color: #1F5C46; }

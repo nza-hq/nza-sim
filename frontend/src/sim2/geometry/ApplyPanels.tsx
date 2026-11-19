@@ -107,11 +107,16 @@ export function EditName({ name, onRename }: { name: string; onRename?: (name: s
   return <input className="ap-rename" autoFocus defaultValue={name} aria-label="Name" onFocus={(e) => e.currentTarget.select()} onClick={(e) => e.stopPropagation()} onBlur={(e) => done(e.currentTarget.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = name; setEd(false) } }} />
 }
 
+/** Opens the details panel (phase 1, Linzie 19 Nov 2026: choosing only shows the thing on the drawing; the ⤢ beside it
+ * opens its details). Null where there is no panel to open. */
+export const ExpandDetails = createContext<(() => void) | null>(null)
+
 /** The navigator's list: each thing with the rooms it reaches. A tap chooses its rooms (and shows it on the right);
  * Ctrl or Shift adds them to what is chosen. Rooms with none of the kind are listed last, so they can be chosen too. */
 function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]; rows: Row[]; chosen: ReadonlySet<string>; onChoose: (ids: string[], add: boolean) => void }) {
   const tick = (on: boolean, part = false) => <span className={`ap-tick${on ? ' on' : part ? ' part' : ''}`} aria-hidden="true" />
   const nameOf = (id: string) => rows.find((r) => r.id === id)?.name ?? id
+  const expand = useContext(ExpandDetails)
   if (!sections.some((s) => s.items.length || s.onNew || s.add)) return <p className="gl-hint">Nothing of this kind in the project yet.</p>
   return (
     <div className="ap-rows" role="listbox" aria-multiselectable="true" aria-label="Navigate">
@@ -120,13 +125,16 @@ function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]
           {s.title && <div className="ap-navsec">{s.title}</div>}
           {s.items.map((it) => {
             const on = it.rooms.length > 0 && it.rooms.every((id) => chosen.has(id))
+            const pickIt = (add: boolean) => { if (it.choose) it.choose(); else onChoose(it.rooms, add); it.onPick?.() }
             return (
               <div key={it.id} className={`ap-row ap-navit${it.active ? ' active' : ''}`} role="option" aria-selected={on}
-                onClick={(e) => { if (it.choose) it.choose(); else onChoose(it.rooms, e.shiftKey || e.ctrlKey || e.metaKey); it.onPick?.() }}>
+                onClick={(e) => pickIt(e.shiftKey || e.ctrlKey || e.metaKey)}>
                 {tick(on, it.rooms.some((id) => chosen.has(id)))}
                 <Sw s={it.swatch} />
                 <span className="ap-name"><EditName name={it.name} onRename={it.onRename} /><small>{it.rooms.length ? it.rooms.map(nameOf).join(', ') : it.count || it.elsewhere ? '' : 'not used'}{it.elsewhere ? `${it.rooms.length ? '; ' : ''}${it.elsewhere}` : ''}</small></span>
                 <span className="ap-count" title={it.what ? `${it.count} ${it.what}s` : `${it.rooms.length} rooms`}>{it.what ? it.count : it.rooms.length}</span>
+                {expand && <button type="button" className="ap-expand" aria-label={`Open the details of ${it.name}`} title="Open its details"
+                  onClick={(e) => { e.stopPropagation(); if (!it.active) pickIt(false); expand() }}>⤢</button>}
               </div>
             )
           })}

@@ -94,28 +94,17 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
   const joins = useMemo(() => wallJoins(ordered(runs, cw)), [runs, cw])
 
   return (
-    <Canvas shadows camera={{ position: cam, fov: 40, near: 0.1, far: 2000 }} gl={{ antialias: true }} style={{ position: 'absolute', inset: 0, background: '#E4EEF2' }}>
-      <ambientLight intensity={0.55} color="#EEF2FF" />
-      <hemisphereLight args={['#F4F8FF', '#D9DDD8', 0.35]} />
-      {/* Sun from the south-west, as in BuildingViewer3D (+Z is south). */}
-      <directionalLight
-        position={[start.c[0] - start.r, start.r * 1.4, -start.c[1] + start.r]}
-        intensity={1.3}
-        color="#FFF8F0"
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-start.r * 1.5}
-        shadow-camera-right={start.r * 1.5}
-        shadow-camera-top={start.r * 1.5}
-        shadow-camera-bottom={-start.r * 1.5}
-        shadow-camera-far={start.r * 5}
-        shadow-bias={-0.0005}
-      />
-      <directionalLight position={[start.c[0] + start.r, start.r * 0.6, -start.c[1] - start.r]} intensity={0.25} color="#D6E8F7" />
+    <Canvas camera={{ position: cam, fov: 40, near: 0.1, far: 2000 }} gl={{ antialias: true }} style={{ position: 'absolute', inset: 0, background: '#E4EEF2' }}>
+      {/* Flat light, no shadows (Linzie, 19 Nov 2026: "really hard to see because of all the shadow"): coloured rooms
+          read the same wherever they are; two soft lights keep the walls' faces apart. */}
+      <ambientLight intensity={1.5} color="#FFFFFF" />
+      <hemisphereLight args={['#FFFFFF', '#E6E9E6', 0.35]} />
+      <directionalLight position={[start.c[0] - start.r, start.r * 1.4, -start.c[1] + start.r]} intensity={0.7} color="#FFFFFF" />
+      <directionalLight position={[start.c[0] + start.r, start.r * 0.6, -start.c[1] - start.r]} intensity={0.2} color="#FFFFFF" />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[start.c[0], -SLAB - 0.01, -start.c[1]]} receiveShadow>
         <planeGeometry args={[start.r * 8, start.r * 8]} />
-        <meshStandardMaterial color={C.ground} roughness={0.95} />
+        <meshBasicMaterial color={C.ground} />
       </mesh>
 
       {floors.map((f, i) => (i === act ? null : <OtherFloor key={`f${i}`} plan={plan} floor={f} above={floors[i + 1]} y={i * H} H={H} solid={solidRoofs} roomColour={roomColour} />))}

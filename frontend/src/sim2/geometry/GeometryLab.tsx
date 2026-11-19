@@ -44,7 +44,7 @@ import { carpetIn } from './toDocument'
 import { FRESH_AIR_BASES, LIGHTING_BY, type LightingBy, type LuminaireType, lightingBy, roomLuminaires } from './plan'
 import { roomAsks, roomPeople } from './asks'
 import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, type ProjectInfo, removeFloor, FLOOR_NAMES, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, floorsOf, onFloor, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
-import { ApplyBarTarget, ChooseList, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
+import { ApplyBarTarget, ChooseList, ExpandDetails, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
@@ -903,14 +903,16 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   /** Profiles step: the kind shown and the profile chosen (Brief 110b). */
   const [profKind, setProfKind] = useState<ProfileKind>('occupancy')
   const [profSel, setProfSel] = useState<string | null>(null)
-  // Choosing something opens the right again if it was closed: its card is where the chosen thing is set.
+  // On Shape, choosing something opens the right again if it was closed: its card is where the chosen thing is set.
+  // Elsewhere (phase 1, Linzie 19 Nov 2026) choosing only shows it on the drawing; the ⤢ beside an item opens its details.
   const openedFor = useRef<unknown[] | null>(null)
   useEffect(() => {
     const now = [sel, profSel, activeSpace, activeSet, activeUse, active, activeSys, activeEmit, activeLoad, shapeTab]
     const was = openedFor.current
     openedFor.current = now
+    if (railStep !== 'shape') return
     if (was && now.some((x, i) => x !== was[i] && x != null)) onOpenRight?.()
-  }, [sel, profSel, activeSpace, activeSet, activeUse, active, activeSys, activeEmit, activeLoad, shapeTab, onOpenRight])
+  }, [sel, profSel, activeSpace, activeSet, activeUse, active, activeSys, activeEmit, activeLoad, shapeTab, onOpenRight, railStep])
   // Walk-through: Profiles opens on the first of the kind, so the editor shows rather than an empty centre.
   useEffect(() => {
     if (mode !== 'profiles' || (profSel && profile(profSel))) return
@@ -934,6 +936,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   // The elevation needs a wall; without one the plan shows.
   const shownLook = look === 'elev' && !selWall ? 'plan' : look
   const in3d = shownLook === '3d'
+  /** Phase 1: the drawing tools show only where there is more than Select to choose from (Shape: outline and rooms). */
+  const drawTools = TOOLS[mode].length > 1
   const roomName = (id: string) => plan.rooms.find((r) => r.id === id)?.name ?? 'a room'
   const spanName = !selSpan ? '' : isWhole ? (runPieces.length > 1 ? `whole wall · ${runPieces.length} rooms` : runPieces[0] ? roomName(runPieces[0].room) : '') : selPiece ? `${roomName(selPiece.room)}'s part` : ''
   // Width, height and area of each window are tied (area = width × height): the two last typed stand and the third is
@@ -1405,6 +1409,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     const parts = floorsOf(plan).flatMap((fl, i) => { const n = i === act ? 0 : fl.rooms.filter(f).length; return n ? [`${n} on the ${fl.name.toLowerCase()}`] : [] })
     return parts.length ? `also ${parts.join(', ')}` : undefined
   }
+  /** Phase 1 (Linzie, 19 Nov 2026: she could not see the caretaker's combi in 3D): choosing a thing with none of its
+   * rooms on this floor moves to the first floor that has them, so its rooms show. */
+  const toFloorOf = (f: (r: Plan['rooms'][number]) => boolean) => {
+    if (plan.rooms.some(f)) return
+    const act = plan.active_floor ?? 0
+    const i = floorsOf(plan).findIndex((fl, k) => k !== act && fl.rooms.some(f))
+    if (i >= 0) commit(onFloor(plan, i))
+  }
   const noneItem = (id: string, name: string, rooms: string[]) => (rooms.length ? [{ id, name, swatch: NONE, rooms }] : [])
   const newSystemFor = (sv: Service) => {
     let k = plan.systems.length + 1
@@ -1418,7 +1430,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     items: [
       ...systemsOf(sv).map((x) => ({
         id: x.id, name: x.name, swatch: { colour: sysColour(x.id)!, unset: sysUnset(x) }, rooms: roomsWhere((r) => r.systems?.[sv] === x.id), elsewhere: elsewhere((r) => r.systems?.[sv] === x.id), onRename: (name: string) => setSys(x.id, { name }),
-        active: curSys?.id === x.id, onPick: () => setActiveSys((a) => ({ ...a, [sv]: x.id })),
+        active: curSys?.id === x.id, onPick: () => { setActiveSys((a) => ({ ...a, [sv]: x.id })); toFloorOf((r) => r.systems?.[sv] === x.id) },
       })),
       ...noneItem(`none-${sv}`, `No ${SERVICES.find((x) => x.key === sv)!.name.toLowerCase()}`, roomsWhere((r) => !systemsOf(sv).some((x) => x.id === r.systems?.[sv]))),
     ],
@@ -1474,7 +1486,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       }
       return [{
         items: [
-          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), elsewhere: elsewhere((r) => r.space === sp.id), active: curSpace?.id === sp.id, onPick: () => setActiveSpace(sp.id), onRename: (name: string) => setSpace(sp.id, { name }) })),
+          ...plan.spaces.map((sp) => ({ id: sp.id, name: sp.name, swatch: { colour: spaceColour(sp.id)! }, rooms: roomsWhere((r) => r.space === sp.id), elsewhere: elsewhere((r) => r.space === sp.id), active: curSpace?.id === sp.id, onPick: () => { setActiveSpace(sp.id); toFloorOf((r) => r.space === sp.id) }, onRename: (name: string) => setSpace(sp.id, { name }) })),
           ...noneItem('none-space', 'No space type', roomsWhere((r) => !plan.spaces.some((sp) => sp.id === r.space))),
         ],
         onNew: { label: '+ New space type', run: () => newSpace() },
@@ -1486,10 +1498,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       }
       if (sysKind === 'luminaires') {
         const has = (id: string) => (r: Plan['rooms'][number]) => roomLuminaires(plan, r).items.some((l) => l.type.id === id)
-        return [{ items: lumTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setLum(t.id, { name }), swatch: { colour: lumColour(t.id)!, unset: t.watts == null }, rooms: roomsWhere(has(t.id)), elsewhere: elsewhere(has(t.id)), active: curLum?.id === t.id, onPick: () => setActiveLum(t.id) })), onNew: { label: '+ New luminaire', run: () => newLum() } }]
+        return [{ items: lumTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setLum(t.id, { name }), swatch: { colour: lumColour(t.id)!, unset: t.watts == null }, rooms: roomsWhere(has(t.id)), elsewhere: elsewhere(has(t.id)), active: curLum?.id === t.id, onPick: () => { setActiveLum(t.id); toFloorOf(has(t.id)) } })), onNew: { label: '+ New luminaire', run: () => newLum() } }]
       }
       if (sysKind === 'emitters') {
-        return [{ items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), elsewhere: elsewhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: activeEmit === t.id, onPick: () => setActiveEmit(t.id) })), onNew: { label: '+ New emitter type', run: () => newEmitter() } }]
+        return [{ items: emitterTypes.map((t) => ({ id: t.id, name: t.name, onRename: (name: string) => setEmit(t.id, { name }), swatch: { colour: emitColour(t.id)!, unset: emitUnset(t) }, rooms: roomsWhere((r) => roomEmitters(r).some((e) => e.type === t.id)), elsewhere: elsewhere((r) => roomEmitters(r).some((e) => e.type === t.id)), active: activeEmit === t.id, onPick: () => { setActiveEmit(t.id); toFloorOf((r) => roomEmitters(r).some((e) => e.type === t.id)) } })), onNew: { label: '+ New emitter type', run: () => newEmitter() } }]
       }
       return [sysSection(sysKind)]
     }
@@ -1541,7 +1553,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   }
   const chooseList = () => (
     <ChooseList
-      hint={mode === 'profiles' ? 'Choose one to edit it in the middle; the drawing colours the rooms that use it. Double-click a name to rename it.' : !leftRooms ? 'Tap one to edit it on the right and choose its rooms; tap rooms on the drawing too, then Apply in the middle. Ctrl or Shift adds more.' : undefined}
+      hint={mode === 'profiles' ? 'Choose one to edit it in the middle; the drawing colours the rooms that use it. Double-click a name to rename it.' : !leftRooms ? 'Tap one to see its rooms; ⤢ opens its details. Tap rooms on the drawing too, then Apply in the middle. Ctrl or Shift adds more.' : undefined}
       nav={{ by: leftRooms ? 'rooms' : leftKind, tabs: [...(mode === 'profiles' ? [] : [{ key: 'rooms', name: 'Rooms', icon: 'rooms' as const }]), ...leftKinds()], onBy: onLeftKind, sections: navSections() }}
       onNewZone={() => {
         const z = blankZone(plan.next.zone)
@@ -3639,7 +3651,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                         </li>
                       ))}
                     </ol>
-                  ) : <p className="gl-hint">Nothing applied yet. Choose rooms or walls, pick a type on the right, and Apply.</p>}
+                  ) : <p className="gl-hint">Nothing applied yet. Choose rooms or walls, pick a type on the left, and Apply.</p>}
                 </div>
               )}
               {/* 19 Nov 2026: in the workspace the building's facts are on Site; this stays only to show a problem. */}
@@ -3895,8 +3907,14 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </>, 'right2')}
 
       {/* ─── bottom: tools ─── */}
-      <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m); tap one to nudge it with the arrow keys. Scroll to zoom, right-drag to pan.' : tipLine}</p>
-      {shownLook === 'plan' && <div className="gl-bar" role="toolbar" aria-label={`${STEP[mode]} tools`}>
+      {/* Phase 1 (Linzie, 19 Nov 2026): the tool bar and its tip only where you draw (Shape); elsewhere Select is the
+          only tool, so the bar shrinks to Undo and Redo in the corner. */}
+      {(drawTools || in3d || shownLook === 'elev') && <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m); tap one to nudge it with the arrow keys. Scroll to zoom, right-drag to pan.' : tipLine}</p>}
+      {shownLook === 'plan' && !drawTools && <div className="gl-undo" role="toolbar" aria-label="Undo and redo">
+        <button type="button" onClick={undo} disabled={!past.length} title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+        <button type="button" onClick={redo} disabled={!future.length} title="Redo" aria-label="Redo">↷</button>
+      </div>}
+      {shownLook === 'plan' && drawTools && <div className="gl-bar" role="toolbar" aria-label={`${STEP[mode]} tools`}>
         <span className="gl-step-tag">{STEP_NO[mode]} {STEP[mode]}</span>
         {TOOLS[mode].map((t, i) => (
           <button key={t.key} type="button" className={`gl-tool${t.key === 'corner' ? ' optional' : ''}`} aria-pressed={tool === t.key} title={`${t.name} (${i + 1})`} onClick={() => pick(t.key)} disabled={(t.key === 'cut' || t.key === 'select' || t.key === 'corner') && !has}>
@@ -3923,7 +3941,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     </div>
   )
   const barTo = embedded && slots && (centreTab ?? 'drawing') === 'drawing' ? slots.centre : null
-  const rooted = <ApplyBarTarget.Provider value={barTo}>{root}</ApplyBarTarget.Provider>
+  const rooted = <ExpandDetails.Provider value={embedded && railStep !== 'shape' ? onOpenRight ?? null : null}><ApplyBarTarget.Provider value={barTo}>{root}</ApplyBarTarget.Provider></ExpandDetails.Provider>
   return embedded && slots ? createPortal(rooted, slots.centre) : rooted
 }
 

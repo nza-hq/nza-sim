@@ -46,7 +46,7 @@ export default function ModelSave({ api, plan }: { api: React.RefObject<EditorAp
   }, [auth?.org.id, currentProjectId])
 
   if (!auth) return <LocalSave api={api} plan={plan} projectId={currentProjectId} />
-  if (!currentProjectId) return <div className="mw-save"><span className="mw-save-state">Open a project to save this model.</span></div>
+  if (!currentProjectId) return <div className="mw-save"><span className="mw-save-state" title="Open or make a project on Projects to save this model">Not saved: no project open</span></div>
 
   const now = plan == null ? null : textOf(plan)
   const changed = !saved || now !== saved.text
@@ -104,7 +104,7 @@ export function LocalSave({ api, plan, projectId }: { api: React.RefObject<Edito
       .catch((e) => setError(`Could not open the saved model: ${(e as Error).message}`))
       .finally(() => setBusy(null))
   }, [projectId])
-  if (!projectId) return <div className="mw-save"><span className="mw-save-state">Open a project to save this model.</span></div>
+  if (!projectId) return <div className="mw-save"><span className="mw-save-state" title="Open or make a project on Projects to save this model">Not saved: no project open</span></div>
   const now = plan == null ? null : textOf(plan)
   const changed = !saved || now !== saved.text
   const save = async () => {

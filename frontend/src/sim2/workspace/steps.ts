@@ -8,10 +8,14 @@ export const STEPS = [
   { id: 'spaces', n: 5, name: 'Spaces', line: 'What each room is used for' },
   { id: 'systems', n: 6, name: 'Systems', line: 'Heating, cooling, air, hot water' },
   { id: 'controls', n: 7, name: 'Controls', line: 'How the systems are told to run' },
-  { id: 'check', n: 8, name: 'Check', line: 'Against the meters' },
-  { id: 'interventions', n: 9, name: 'Interventions', line: 'What to change, in order' },
+  // Not built yet: hidden from the navigation until they are (Linzie, 19 Nov 2026 19:16, "hide the pages that we don't
+  // need until we build them"). Their addresses still open the step's placeholder.
+  { id: 'check', n: 8, name: 'Check', line: 'Against the meters', later: true },
+  { id: 'interventions', n: 9, name: 'Interventions', line: 'What to change, in order', later: true },
 ] as const
 export type StepId = (typeof STEPS)[number]['id']
+/** The steps shown in the navigation: the built ones. */
+export const SHOWN_STEPS = STEPS.filter((s) => !('later' in s && s.later))
 export const isStep = (s: string | null): s is StepId => STEPS.some((x) => x.id === s)
 
 /** Today's pages that hold what the shelf names. */

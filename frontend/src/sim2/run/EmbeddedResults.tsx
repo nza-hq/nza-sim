@@ -35,7 +35,6 @@ import './run.css'
 const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric', 'profiles', 'check', 'interventions'])
 /** The steps with the results bar (workspace/layout.ts STEP_TABS), and the ones whose level is fixed to the step's own. */
 const STRIP: ReadonlySet<StepId> = new Set(['fabric', 'spaces', 'systems', 'controls'])
-const FIXED: ReadonlySet<StepId> = new Set(['fabric', 'spaces'])
 const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
 
 export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, showExplore = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
@@ -84,7 +83,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   const flow = useMemo(() => (s?.energy?.ok ? { flow: energyFlow(s.energy), split: fuelSplit(s.energy) } : null), [s])
   return (
     <>
-      {!!step && STRIP.has(step) && createPortal(<><LevelSwitch run={run} fixed={FIXED.has(step)} /><ResultsStrip run={run} onOpen={onOpen} /></>, strip)}
+      {!!step && STRIP.has(step) && createPortal(<><ResultsStrip run={run} onOpen={onOpen} /><LevelSwitch run={run} /></>, strip)}
       {showBody && createPortal(
         <div className="rp-flow" role="tabpanel" aria-label="Heat flow">
           <div className="rp-flow-in">
@@ -133,7 +132,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
             <h2>Load profiles, whole building</h2>
             {s?.energy?.ok ? <LoadProfiles energy={s.energy} />
               : <p className="gl-hint">{s && s.energy && !s.energy.ok ? 'Some system inputs are still unset, so there is no energy to show yet. Heat flow lists them.'
-                : s ? 'This is energy, so it needs the systems: choose "+ Systems" above.'
+                : s ? 'This is energy, so it shows on Systems and Controls.'
                 : run.state.kind === 'running' ? 'Working out the year…'
                 : run.state.kind === 'missing' ? 'Some inputs are still unset, so the year cannot run yet. Heat flow lists them.'
                 : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).'
