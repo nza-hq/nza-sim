@@ -2,6 +2,10 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## ✅ Merge day: #74, #75, #77, #76 into main — 19 Nov 2026
+
+Linzie 19 Nov 15:27: "merge everything that's been done so far". Merged in order #74 (clubhouse, stacked floors), #75 (step clean-up, saving without sign-in), #77 (inputs), #76 (Explore); 632 tests pass on the combination, build clean; Bridgewater 133.2 on IT15. Fix after the merge: #75's per-step tab lists (`workspace/layout.ts STEP_TABS`) had no 'explore', so the Explore tab showed nowhere; it is now on Systems and Controls beside Load profiles (`workspace/__tests__/layout.test.ts`).
+
 ## 🔧 Brief 127: the results explorer (Explore tab): IN REVIEW 19 Nov 2026 on `sim2/127-results-explorer`
 
 Linzie asked on 18 Nov at 12:34 and again on 19 Nov at 00:30 to "layer lots of different data points" at room level, IES-style, and to see load shapes to check the tool is working. Brief: `docs/briefs/active/127_results-explorer.md`. Plan page: https://claude.ai/artifact/39XRDnugLYCShBYXxRfiHF.

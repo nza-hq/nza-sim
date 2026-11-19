@@ -18,13 +18,13 @@ export type CentreTab = (typeof MODEL_CENTRE_TABS)[number]['id']
 /** What each step shows in the middle (Linzie, 19 Nov 2026 00:00: "think about what it is we want each module to have").
  * Site is site and project only, Shape is geometry only, Profiles is the profile itself: none of them has results, so
  * none has tabs. Fabric and Spaces add Heat flow and Monthly; Load profiles are energy, so only the steps with systems
- * have them. An empty list: no tab row. */
+ * have them, and Explore (Brief 127) sits beside them. An empty list: no tab row. */
 export const STEP_TABS: Record<StepId, readonly CentreTab[]> = {
   site: [], shape: [], profiles: [], check: [], interventions: [],
   fabric: ['drawing', 'heat-flow', 'monthly'],
   spaces: ['drawing', 'heat-flow', 'monthly'],
-  systems: ['drawing', 'heat-flow', 'monthly', 'profiles'],
-  controls: ['drawing', 'heat-flow', 'monthly', 'profiles'],
+  systems: ['drawing', 'heat-flow', 'monthly', 'profiles', 'explore'],
+  controls: ['drawing', 'heat-flow', 'monthly', 'profiles', 'explore'],
 }
 /** The steps with the results bar above the middle (what the results include, the estimate, Run). */
 export const STEP_HAS_RESULTS = (s: StepId) => STEP_TABS[s].length > 0
