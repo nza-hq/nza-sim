@@ -2,6 +2,19 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 Phase 1 clean-up — IN REVIEW 19 Nov 2026 on `sim2/phase1-cleanup` (off `sim2/explore-tab`)
+
+Linzie 19 Nov 19:16 ("Start building phase one"), from the close-out plan (https://claude.ai/artifact/SccdEWHkakPyyQxkhtFX38). UI only; no engine change.
+- No "Results include" switch: the step decides (Fabric the fabric alone, Spaces adds use, Systems/Controls the whole model). Fabric keeps "Rooms at __ °C" in the bar (`ResultsPanel.LevelSwitch`).
+- Status as one chip (`ResultsPanel.StatusChip`): "3 inputs to set", "No weather file", "Run failed"; it opens to the list and the way to fix it (Show on Heat flow, Go to Site).
+- The centre tabs are one "View" dropdown at the end of the results bar (`ModelWorkspace`), wrapping under it when the middle is narrow.
+- Details panel on demand: each step opens with it shut (Shape keeps it); choosing an item only shows it on the drawing; ⤢ beside an item opens its details (`ApplyPanels.ExpandDetails`). Choosing a thing whose rooms are all on another floor moves to that floor (`GeometryLab.toFloorOf`).
+- Flat 3D: no shadows, even light, unlit ground (`Plan3D`).
+- Saving and examples in one row; "Examples" is the one way to open an example (`ModelExamples`).
+- Drawing tool bar and its tip only on Shape; elsewhere Undo/Redo sit in the drawing's corner.
+- Check and Interventions hidden from the navigation until built (`steps.ts SHOWN_STEPS`); their addresses still open the placeholder.
+- Checked: `vitest run` 634 pass; build clean; browser on the clubhouse at 1280×800 (Systems, ⤢ details, 3D caretaker's combi jumps to the first floor, Fabric, Spaces, Site).
+
 ## ✅ Merge day: #74, #75, #77, #76 into main — 19 Nov 2026
 
 Linzie 19 Nov 15:27: "merge everything that's been done so far". Merged in order #74 (clubhouse, stacked floors), #75 (step clean-up, saving without sign-in), #77 (inputs), #76 (Explore); 632 tests pass on the combination, build clean; Bridgewater 133.2 on IT15. Fix after the merge: #75's per-step tab lists (`workspace/layout.ts STEP_TABS`) had no 'explore', so the Explore tab showed nowhere; it is now on Systems and Controls beside Load profiles (`workspace/__tests__/layout.test.ts`).

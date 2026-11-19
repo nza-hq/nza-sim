@@ -38,6 +38,10 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
   const setCentre = (c: CentreTab) => setLayout((l) => ({ ...l, centre: c }))
   // The right closes (Linzie, 17 Nov 00:31: "Shouldn't the right be able to close?"); choosing something opens it again.
   const setRightOpen = (on: boolean) => setLayout((l) => (l.rightOpen === on ? l : { ...l, rightOpen: on }))
+  // Phase 1 (Linzie, 19 Nov 2026 12:44): the details panel is not always there. Choosing something only shows it on the
+  // drawing; the ⤢ button beside an item opens its details. Each step opens with it shut, except Shape, whose panel
+  // holds the drawing's own settings.
+  useEffect(() => { setRightOpen(step === 'shape') }, [step])
 
   // The panes the steps render into (callback refs, so the steps mount once the boxes exist).
   const [left, setLeftEl] = useState<HTMLElement | null>(null)
@@ -64,18 +68,17 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
       </aside>
       <ResizeHandle onResize={setLeft} />
       <section className="flex-1 min-w-0 flex flex-col bg-off-white">
-        <div className="mw-strip flex-shrink-0" ref={setStripEl} hidden={!results} />
-        {tabs.length > 1 && <div className="flex-shrink-0 flex items-center border-b border-light-grey bg-white px-2 pt-2" role="tablist" aria-label="View">
-          {tabs.map((t) => {
-            const on = t.id === centreTab
-            return (
-              <button key={t.id} type="button" role="tab" aria-selected={on} onClick={() => setCentre(t.id)}
-                className={`px-3 py-1.5 text-caption transition-colors border-b-2 -mb-px ${on ? 'border-navy text-navy font-medium' : 'border-transparent text-mid-grey hover:text-navy'}`}>
-                {t.label}
-              </button>
-            )
-          })}
-        </div>}
+        {/* Phase 1 (Linzie, 19 Nov 2026): one bar above the middle: the results (or one status chip) and what the middle
+            shows, as one choice with a sensible default (it was a row of tabs under the results). */}
+        <div className="mw-bar flex-shrink-0 flex items-stretch bg-white border-b border-light-grey" hidden={!results && tabs.length <= 1}>
+          <div className="mw-strip flex-1 min-w-0" ref={setStripEl} hidden={!results} />
+          {tabs.length > 1 && <label className="mw-view">
+            <span>View</span>
+            <select value={centreTab} onChange={(e) => setCentre(e.target.value as CentreTab)} aria-label="What the middle shows">
+              {tabs.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </label>}
+        </div>
         <div className="mw-centre flex-1 min-h-0 relative overflow-hidden" ref={setCentreEl}>
           {later && (
             <div className="mw-empty-over"><div className="mw-empty">

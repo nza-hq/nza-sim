@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { ProjectContext } from '../../context/ProjectContext.jsx'
 import Icon from '../../sim2/icons/Icon'
-import { STEPS, STEP_ACCENT, DEFAULT_STEP, isStep } from '../../sim2/workspace/steps'
+import { SHOWN_STEPS, STEP_ACCENT, DEFAULT_STEP, isStep } from '../../sim2/workspace/steps'
 
 // NZA Sim's left navigation (18 Nov 2026, Linzie 15:11: "get rid of the old stuff and layer this new stuff in the
 // left navigation, and clean everything up"). The model's steps ARE the navigation: they used to be tabs across the
@@ -107,7 +107,7 @@ export default function Sidebar() {
           </div>
         )}
         <ol className="list-none m-0 p-0" aria-label="Model steps">
-          {STEPS.map(s => (
+          {SHOWN_STEPS.map(s => (
             <li key={s.id}>
               <Row to={`/model?step=${s.id}`} active={current === s.id} accent={STEP_ACCENT[s.id]} icon={<StepIcon id={s.id} />} label={s.name} sub={s.line} n={s.n} open={open} />
             </li>

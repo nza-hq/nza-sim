@@ -56,13 +56,11 @@ export default function ModelExamples({ api, plan }: { api: React.RefObject<Edit
   }
   return (
     <div className="mw-examples">
-      <label>
-        <span>Open an example</span>
-        <select value="" disabled={busy} onChange={(e) => { void open(e.target.value) }} aria-label="Open an example building">
-          <option value="">{busy ? 'Opening…' : 'Choose…'}</option>
-          {EXAMPLES.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-        </select>
-      </label>
+      {/* Phase 1 (Linzie, 19 Nov 2026): the one way to open an example, a small menu beside Save. */}
+      <select value="" disabled={busy} onChange={(e) => { void open(e.target.value) }} aria-label="Open an example building" title="Open an example building in its own project">
+        <option value="">{busy ? 'Opening…' : 'Examples'}</option>
+        {EXAMPLES.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+      </select>
       {error && <p className="mw-save-err" role="alert">{error}</p>}
     </div>
   )

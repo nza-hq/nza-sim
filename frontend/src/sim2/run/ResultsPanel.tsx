@@ -8,6 +8,7 @@
  * number (CLAUDE.md rules 2 and 3). The weather file is always named, with its station (decision 4).
  */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthGate'
 import { RunClient, type InstantAnswer, type RunAnswer, type WeatherAnswer } from './client'
 import { BUCKET, listOrganisationWeather, saveToOrganisation } from './weather'
@@ -365,35 +366,68 @@ export function previewItems(a: Summary, b: Summary, unit: 'kwh' | 'kwh_per_m2')
 export const LEVEL_NAMES: Record<Level, string> = { fabric: 'Fabric only', spaces: '+ Spaces', systems: '+ Systems' }
 /** Brief 111 P4: the "Results include" switch, and the level said in words. Fabric only's temperature is edited here,
  * inline with the figures it drives (110b row 8, as today's comfort card does). */
-export function LevelSwitch({ run, fixed = false }: { run: Run; fixed?: boolean }) {
-  const { level, setLevel, fabricC, setFabricC } = run
+/**
+ * What the results include is the step's own (Linzie, 19 Nov 2026 19:16, phase 1: "on Systems surely results are just
+ * with systems"): Fabric is the fabric alone, Spaces adds the rooms' use, Systems and Controls the whole model. There is
+ * no switch. Fabric keeps the one thing it needs: the temperature every room is held at, in the bar.
+ */
+export function LevelSwitch({ run }: { run: Run; fixed?: boolean }) {
+  const { level, fabricC, setFabricC } = run
   const [typed, setTyped] = useState(String(fabricC))
   useEffect(() => setTyped(String(fabricC)), [fabricC])
+  if (level !== 'fabric') return null
   const commitC = () => {
     const v = Number(typed)
     if (typed.trim() !== '' && Number.isFinite(v) && v >= 5 && v <= 35) setFabricC(v)
     else setTyped(String(fabricC))
   }
   return (
-    <div className="rp-level">
-      {/* 19 Nov 2026 (Linzie, "too much going on"): Fabric and Spaces show their own level only, said in words; the
-          switch is kept where it compares something, on Systems and Controls. */}
-      {!fixed && <><span className="rp-level-label">Results include</span>
-      <div className="rp-level-seg" role="radiogroup" aria-label="Results include">
-        {(['fabric', 'spaces', 'systems'] as const).map((l) => (
-          <button key={l} type="button" role="radio" aria-checked={level === l} onClick={() => setLevel(l)}>{LEVEL_NAMES[l]}</button>
-        ))}
-      </div></>}
-      <span className="rp-level-says">
-        {level === 'fabric' ? (
-          <>The fabric alone: every room heated to{' '}
-            <input className="rp-level-c" aria-label="Every room heated to (°C)" inputMode="decimal" value={typed} onChange={(e) => setTyped(e.target.value)} onBlur={commitC} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />{' '}°C, no people, no cooling.</>
-        ) : level === 'spaces'
-          ? (fixed ? 'Each room at its own temperatures, with its people and equipment. No systems yet.' : 'Adds people and equipment from the space types, each at its own temperatures. No systems, so no lighting yet.')
-          : 'The whole model, through to energy used.'}
-      </span>
-    </div>
+    <label className="rp-level rp-level-inline" title="The fabric alone: every room heated to this, no people, no cooling">
+      Rooms at
+      <input className="rp-level-c" aria-label="Every room heated to (°C)" inputMode="decimal" value={typed} onChange={(e) => setTyped(e.target.value)} onBlur={commitC} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
+      °C
+    </label>
   )
+}
+
+/**
+ * Status as one chip (Linzie, 19 Nov 2026 12:44: "If there's an information thing or an error, you click on it to open
+ * it"). The chip says how many things are needed; opening it lists them, with the way to where each is fixed.
+ */
+export function StatusChip({ tone = 'todo', label, items = [], detail, action, onAction }: {
+  tone?: 'todo' | 'error' | 'info'; label: string; items?: string[]; detail?: string; action?: string; onAction?: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const off = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', off); document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', off); document.removeEventListener('keydown', esc) }
+  }, [open])
+  return (
+    <span className="rp-chipwrap" ref={box}>
+      <button type="button" className={`rp-chip rp-chip-${tone}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span aria-hidden="true">{tone === 'error' ? '!' : tone === 'info' ? 'i' : '⚠'}</span>{label}
+      </button>
+      {open && (
+        <span className="rp-chippop" role="dialog" aria-label={label}>
+          {detail && <span className="rp-chippop-p">{detail}</span>}
+          {items.length > 0 && <ul>{items.map((m) => <li key={m}>{m}</li>)}</ul>}
+          {action && onAction && <button type="button" className="rp-btn" onClick={() => { setOpen(false); onAction() }}>{action}</button>}
+        </span>
+      )}
+    </span>
+  )
+}
+
+const toSet = (n: number) => `${n} ${n === 1 ? 'input' : 'inputs'} to set`
+
+/** Go to Site, where the weather file is chosen (the step is in the address). */
+function useToSite() {
+  const [, setParams] = useSearchParams()
+  return () => setParams((p) => { p.set('step', 'site'); return p })
 }
 
 /** Brief 122: the monthly estimate (static)'s two figures, in the top bar's Per m² / Total. */
@@ -415,12 +449,16 @@ export function instantItems(e: InstantEstimate, unit: 'kwh' | 'kwh_per_m2') {
 function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit: 'kwh' | 'kwh_per_m2' }) {
   const { instant, state, weather, hourlyStale, runHourly } = run
   const s = state.kind === 'done' ? state.summary : null
+  const toSite = useToSite()
   return (
     <div className="rp-strip rp-strip-held" role="status" aria-label="Results">
       <div className="rp-strip-live" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen?.() }} title="Open the heat flow">
         <span className="rp-strip-tag" title={instant.kind === 'done' ? `Worked out in ${Math.round(instant.ms)} ms` : undefined}>Monthly estimate<br />(static)</span>
         {instant.kind === 'done' ? <LiveResultsStrip items={instantItems(instant.estimate, unit)} />
-          : <span className="rp-strip-msg">{instant.kind === 'missing' ? `No estimate yet: ${instant.items.length} ${instant.items.length === 1 ? 'input' : 'inputs'} to set. See them on Heat flow.` : instant.kind === 'error' ? `The estimate failed: ${instant.message}` : !weather ? 'No estimate yet: choose a weather file (Site).' : 'Working it out…'}</span>}
+          : instant.kind === 'missing' ? <span className="rp-strip-msg" onClick={(e) => e.stopPropagation()}><StatusChip label={toSet(instant.items.length)} detail="The estimate needs:" items={instant.items.map((m) => m.what)} action="Show on Heat flow" onAction={onOpen} /></span>
+          : instant.kind === 'error' ? <span className="rp-strip-msg" onClick={(e) => e.stopPropagation()}><StatusChip tone="error" label="Estimate failed" detail={instant.message} /></span>
+          : !weather ? <span className="rp-strip-msg" onClick={(e) => e.stopPropagation()}><StatusChip label="No weather file" detail="Choose a weather file on Site, and the figures appear here." action="Go to Site" onAction={toSite} /></span>
+          : <span className="rp-strip-msg">Working it out…</span>}
       </div>
       <div className="rp-strip-hourly">
         <span className="rp-strip-tag">Full year<br />(15 min)</span>
@@ -428,7 +466,7 @@ function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit:
           : s ? <span className={`rp-strip-hv${hourlyStale ? ' rp-stale' : ''}`} title={hourlyStale ? 'Out of date: the model has changed since this run' : undefined}>
               heating {unit === 'kwh_per_m2' ? `${perM2(s.building.heating_kwh, s.building.floor_m2)} kWh/m²` : `${mwh(s.building.heating_kwh)} MWh`}{hourlyStale ? ' · out of date' : ''}
             </span>
-          : state.kind === 'missing' ? <span className="rp-strip-msg">{state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set</span>
+          : state.kind === 'missing' ? <span className="rp-strip-msg"><StatusChip label={toSet(state.items.length)} detail="The year needs:" items={state.items.map((m) => m.what)} action="Show on Heat flow" onAction={onOpen} /></span>
           : state.kind === 'error' ? <span className="rp-strip-msg rp-error" title={state.message}>{/cannot run in this view/.test(state.message) ? "can't run in this view" : 'stopped with an error (see Heat flow)'}</span> : null}
         <button type="button" className="rp-btn rp-run" disabled={!weather || state.kind === 'running'} onClick={runHourly}>{s ? 'Run again' : 'Run'}</button>
         <EnergyPlusButton ep={run.energyPlus} disabled={!weather} onRan={onOpen} />
@@ -442,6 +480,7 @@ export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void })
   const unit = 'kwh' as 'kwh' | 'kwh_per_m2' // 19 Nov 2026 (Linzie): no Per m² / Total switch; totals, with per m² beside each
   if (run.hold) return <HeldStrip run={run} onOpen={onOpen} unit={unit} />
   const s = state.kind === 'done' ? state.summary : null
+  const toSite = useToSite()
   const last = useRef<Summary | null>(null)
   if (s) last.current = s
   const shown = s ?? (state.kind === 'running' ? last.current : null)
@@ -465,11 +504,11 @@ export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void })
           <LiveResultsStrip items={stripItems(shown, unit)} />
         </div>
       ) : state.kind === 'missing' ? (
-        <button type="button" className="rp-strip-msg" onClick={onOpen}>No results yet: {state.items.length} {state.items.length === 1 ? 'input' : 'inputs'} to set. See them on Heat flow.</button>
+        <span className="rp-strip-msg"><StatusChip label={toSet(state.items.length)} detail="The results need:" items={state.items.map((m) => m.what)} action="Show on Heat flow" onAction={onOpen} /></span>
       ) : state.kind === 'error' ? (
-        <span className="rp-strip-msg rp-error">The run failed: {state.message}</span>
+        <span className="rp-strip-msg"><StatusChip tone="error" label="Run failed" detail={state.message} action="Show on Heat flow" onAction={onOpen} /></span>
       ) : !weather ? (
-        <span className="rp-strip-msg">No results yet: choose a weather file (Site).</span>
+        <span className="rp-strip-msg"><StatusChip label="No weather file" detail="Choose a weather file on Site, and the year runs." action="Go to Site" onAction={toSite} /></span>
       ) : (
         <span className="rp-strip-msg">Working it out…</span>
       )}

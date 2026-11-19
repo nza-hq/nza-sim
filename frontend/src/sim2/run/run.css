@@ -178,3 +178,18 @@ button.rp-strip-msg { cursor: pointer; text-decoration: underline; text-underlin
   .ex-side { max-height: 240px; border-right: 0; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); column-gap: 16px; align-content: start; }
   .ex-side > .ex-side-h, .ex-side > .ex-room, .ex-side > .ex-note { grid-column: 1 / -1; }
 }
+
+/* Phase 1 (19 Nov 2026): the results bar is one row: figures or a status chip, the run buttons, and on Fabric the
+   rooms' temperature. No "Results include" switch. */
+.mw-strip:not([hidden]) { display: flex; align-items: stretch; }
+.mw-strip > .rp-strip { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.rp-level.rp-level-inline { flex: none; padding: 0 12px; border: 0; border-left: 1px solid #F0F1F2; background: none; gap: 6px; white-space: nowrap; }
+.rp-chipwrap { position: relative; display: inline-flex; }
+.rp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid #F2C9A6; background: #FDF3EA; color: #8A4513; font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.rp-chip:hover { border-color: #E3A16E; }
+.rp-chip:focus-visible { outline: 2px solid #1F5C46; outline-offset: 2px; }
+.rp-chip-error { border-color: #F3B4B4; background: #FDECEC; color: #9B1C1C; }
+.rp-chip-info { border-color: #CFE0D8; background: #EEF5F1; color: #1F5C46; }
+.rp-chippop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: max-content; max-width: 320px; display: grid; gap: 8px; padding: 12px 14px; background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; box-shadow: 0 8px 24px rgba(17, 24, 39, .12); font-size: 12.5px; color: #374151; white-space: normal; }
+.rp-chippop ul { margin: 0; padding-left: 1.1em; display: grid; gap: 2px; }
+.rp-chippop .rp-btn { justify-self: start; }
