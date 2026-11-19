@@ -1508,6 +1508,37 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     return []
   }
 
+  /** 19 Nov 2026 (Linzie: "how we input information before we run the model"): what the chosen rooms ask for, from
+   * their space types and systems, before any run: people at full occupancy, fresh air and lighting power. */
+  const asksTable = (ids: string[]) => {
+    const rs = plan.rooms.filter((r) => ids.includes(r.id))
+    const rows = rs.map((r) => ({ r, a: roomAsks(plan, r) }))
+    const sum = (f: (a: ReturnType<typeof roomAsks>) => number | null) => { const v = rows.map((x) => f(x.a)); return v.some((x) => x == null) ? null : (v as number[]).reduce((t, x) => t + x, 0) }
+    const n0 = (v: number | null) => (v == null ? '–' : Math.round(v).toString())
+    const n1 = (v: number | null) => (v == null ? '–' : v < 10 ? v.toFixed(1) : Math.round(v).toString())
+    const shown = rows.slice(0, 12)
+    return (
+      <div className="ap-asks">
+        <h4>What {rs.length === 1 ? 'this room asks' : 'these rooms ask'} for</h4>
+        <table>
+          <thead><tr><th>Room</th><th title="People at full occupancy × occupancy rate">People</th><th title="Fresh air">l/s</th><th title="Lighting power while fully lit">Light W</th></tr></thead>
+          <tbody>
+            {shown.map(({ r, a }) => (
+              <tr key={r.id}>
+                <td>{r.name}<small>{f1(a.area_m2)} m²</small></td>
+                <td>{n1(a.people)}</td>
+                <td title={a.fresh_why ?? (a.fresh_from_space ? 'from the space type' : "from the ventilation system's flow")}>{n0(a.fresh_l_s)}</td>
+                <td title={a.light_how ?? 'not stated'}>{n0(a.light_w)}{a.light_wm2 != null && <small>{a.light_wm2.toFixed(1)} W/m²</small>}</td>
+              </tr>
+            ))}
+            {rows.length > shown.length && <tr><td colSpan={4}><small>and {rows.length - shown.length} more</small></td></tr>}
+          </tbody>
+          {rows.length > 1 && <tfoot><tr><td>All {rows.length}</td><td>{n1(sum((a) => a.people))}</td><td>{n0(sum((a) => a.fresh_l_s))}</td><td>{n0(sum((a) => a.light_w))}</td></tr></tfoot>}
+        </table>
+        <p className="gl-hint">From the space types and systems as stated, before the run. A dash: not stated yet (hover for why).</p>
+      </div>
+    )
+  }
   const chooseList = () => (
     <ChooseList
       hint={mode === 'profiles' ? 'Choose one to edit it in the middle; the drawing colours the rooms that use it. Double-click a name to rename it.' : !leftRooms ? 'Tap one to edit it on the right and choose its rooms; tap rooms on the drawing too, then Apply in the middle. Ctrl or Shift adds more.' : undefined}
@@ -1535,6 +1566,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
               <button type="button" className="ap-link" onClick={() => setChosen(chosenSet.rooms, [])}>Clear</button>
             </p>
           )}
+          {(mode === 'spaces' || mode === 'systems') && chosenSet.rooms.length > 0 && asksTable(chosenSet.rooms)}
           {mode === 'spaces' && mixedZones.map((z) => (
             <div key={z.id} className="gl-mixed">
               <p className="gl-warn">{z.name} has rooms of different space types. The model gives a zone one, so it takes the one with the most floor.</p>

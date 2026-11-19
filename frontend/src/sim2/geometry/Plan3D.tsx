@@ -293,7 +293,7 @@ const restCut = (p: RoofPiece, all: readonly RoofPiece[], above?: PlanFloor): XY
  * `lit`: chosen, washed over in the chosen orange as the plan outlines it. */
 function RoomFloor({ ring, colour, tone = false, lit = false }: { ring: XY[]; colour: string; tone?: boolean; lit?: boolean }) {
   const g = useMemo(() => new THREE.ShapeGeometry(shapeOf(ring)), [ring])
-  const c = useMemo(() => (tone ? new THREE.Color(colour.slice(0, 7)).lerp(new THREE.Color('#FFFFFF'), 0.6) : new THREE.Color(colour.slice(0, 7))), [colour, tone])
+  const c = useMemo(() => (tone ? new THREE.Color(colour.slice(0, 7)).lerp(new THREE.Color('#FFFFFF'), 0.35) : new THREE.Color(colour.slice(0, 7))), [colour, tone])
   return (
     <>
       <mesh geometry={g} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} receiveShadow>
