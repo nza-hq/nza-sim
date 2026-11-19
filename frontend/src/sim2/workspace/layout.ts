@@ -10,6 +10,8 @@ export const MODEL_CENTRE_TABS = [
   { id: 'heat-flow', label: 'Heat flow' },
   { id: 'monthly', label: 'Monthly' },
   { id: 'profiles', label: 'Load profiles' },
+  /** Brief 127: the results explorer (layer any hourly dataset, several views). */
+  { id: 'explore', label: 'Explore' },
 ] as const
 export type CentreTab = (typeof MODEL_CENTRE_TABS)[number]['id']
 

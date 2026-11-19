@@ -13,7 +13,7 @@ import { weatherFromBytes, type WeatherChoice } from './weather'
 export type WorkerIn =
   | { type: 'weather'; bytes: Uint8Array; file_name: string; source: WeatherChoice['source'] }
   | { type: 'clear_weather' }
-  | { type: 'run'; id: number; doc: unknown; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf | null; hourly?: boolean }
+  | { type: 'run'; id: number; doc: unknown; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf | null; hourly?: boolean; series?: boolean }
   /** Brief 122: the monthly estimate (static), at the level shown. */
   | { type: 'instant'; id: number; doc: unknown; level: Level; fabric_heat_c: number | null }
 export type WorkerOut =
@@ -40,7 +40,7 @@ self.onmessage = async (ev: MessageEvent<WorkerIn>) => {
   } else if (m.type === 'run') {
     const t0 = performance.now()
     try {
-      const r = simulate(m.doc, { weather, level: m.level, fabric_heat_c: m.fabric_heat_c, what_if: m.what_if ?? undefined, hourly: m.hourly ?? false })
+      const r = simulate(m.doc, { weather, level: m.level, fabric_heat_c: m.fabric_heat_c, what_if: m.what_if ?? undefined, hourly: m.hourly ?? false, series: m.series ?? false })
       post({ type: 'result', id: m.id, ms: performance.now() - t0, result: r.ok ? { ok: true, summary: r.summary } : { ok: false, missing: r.missing } })
     } catch (e) {
       post({ type: 'result', id: m.id, ms: performance.now() - t0, result: { ok: false, error: (e as Error).message } })

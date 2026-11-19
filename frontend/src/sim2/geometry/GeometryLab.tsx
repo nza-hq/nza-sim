@@ -3221,7 +3221,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           </SchedulePopout>
         )
       })()}
-      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} showMonthly={centreTab === 'monthly'} showProfiles={centreTab === 'profiles'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
+      {embedded && slots && <EmbeddedResults step={railStep} doc={built.doc} previewDoc={previewDoc} onFigures={(now, preview, why) => setFigs((f) => (f.now === now && f.preview === preview && f.why === why ? f : { now, preview, why }))} strip={slots.strip} centre={slots.centre} showBody={centreTab === 'heat-flow'} showMonthly={centreTab === 'monthly'} showProfiles={centreTab === 'profiles'} showExplore={centreTab === 'explore'} focusZone={focusZone} weatherEl={onSite ? weatherEl : null} sizingEl={mode === 'systems' && sysKind === 'heating' ? sizingEl : null} onOpen={() => onCentreTab?.('heat-flow')} />}
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>

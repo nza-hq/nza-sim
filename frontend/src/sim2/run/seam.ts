@@ -38,6 +38,8 @@ import { upgradeDocument } from '../../thermal/schema/upgrade'
 import { CONSTRUCTIONS, resolveConstructions, type LibraryItem, type Missing } from './library'
 import type { WeatherChoice } from './weather'
 import type { Weather } from '../../thermal/engine/types'
+import { seriesCatalogue, type SeriesSet } from './series'
+import type { SystemsResults } from '../../thermal/engine/systems'
 
 export type { Missing } from './library'
 
@@ -193,6 +195,11 @@ export interface Summary {
   window_solar: WindowSolar[]
   /** The building's hourly heating and cooling, W, 8,760 values; only when the run asks for it (`hourly: true`), else null. */
   hourly: { heating_w: Float64Array; cooling_w: Float64Array } | null
+  /**
+   * Brief 127: every hourly dataset the run holds (weather, building, systems, rooms), for the results explorer; only
+   * when the run asks for it (`series: true`), else null. Gathered from the engine's own arrays (series.ts), never worked out.
+   */
+  series: SeriesSet | null
   /** Constructions used that are drafts awaiting review (not yet in the library), by display name. */
   drafts: string[]
   /** Brief 111: what this run includes, and for 'fabric' the temperature every zone was heated to. */
@@ -554,7 +561,7 @@ function methodNotes(doc: ModelDocument, w: Weather, options: RunOptions): strin
 
 export function simulate(
   input: unknown,
-  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean },
+  deps: { weather: WeatherChoice | null; constructions?: readonly LibraryItem[]; options?: RunOptions; level?: Level; fabric_heat_c?: number | null; what_if?: WhatIf; hourly?: boolean; series?: boolean },
 ): SimulateResult {
   const level = deps.level ?? 'systems'
   if (!LEVELS.includes(level)) return { ok: false, missing: [{ path: 'level', what: `Unknown results level "${String(level)}".` }] }
@@ -615,6 +622,7 @@ export function simulate(
   const split = (unmet: number, sys: number, both: number): ShortSplit => ({ unmet_hours: unmet, system_short_hours: sys, both_short_hours: both, own_short_hours: unmet - sys - both })
   const bHeat = readBuildingHourlyW(results, 'heating'), bCool = readBuildingHourlyW(results, 'cooling')
   const hoursOf = zoneSetpointHours(doc, weather.weather.hours)
+  const kept: { systems?: SystemsResults } = {}
   const summary: Summary = {
     engine: results.engine, run_ms: results.run_ms, steps_per_hour: options.time_step?.steps_per_hour ?? 1,
     weather: { file_name: weather.file_name, station: weather.station, sha256: weather.sha256 },
@@ -648,13 +656,15 @@ export function simulate(
     by_surface: bySurface(results.zones, false),
     window_solar: windowSolar(results.zones),
     hourly: deps.hourly ? { heating_w: bHeat, cooling_w: bCool } : null,
+    series: null,
     drafts: pre.drafts,
     level, fabric_heat_c: fabricC,
-    energy: level === 'systems' ? energyOf(doc, results, weather) : null,
+    energy: level === 'systems' ? energyOf(doc, results, weather, kept) : null,
     emitters: null,
     design_heat_loss: null,
   }
   summary.emitters = emitterSummary(doc, results, options, run, weather, deps.what_if ?? null)
+  if (deps.series) summary.series = seriesCatalogue(doc, results, weather.weather, hoursOf, kept.systems ?? null)
   // The design heat loss sizes the installed kit, so only the full run has one (as energy): the fabric and spaces copies
   // have no emitters and no mechanical ventilation, and their heat loss would leave those out.
   summary.design_heat_loss = level === 'systems' ? designSummary(doc, results, weather, deps.what_if ?? null) : null
@@ -912,7 +922,8 @@ function explainSystems(path: string, message: string, doc: ModelDocument): Miss
   return { path, what: `${message.charAt(0).toUpperCase()}${message.slice(1)}.` }
 }
 
-export function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice): Summary['energy'] {
+/** `keep` (Brief 127): hands back the systems engine's own result, so the explorer reads the same arrays (no second run). */
+export function energyOf(doc: ModelDocument, results: ModelResults, weather: WeatherChoice, keep?: { systems?: SystemsResults }): Summary['energy'] {
   let a: ReturnType<typeof runSystems>
   // Brief 114 review F4: a heating system's pumps with no capacity are sized on its rooms' design heat loss, when the
   // building states its design conditions (one calculation, designHeatLoss; a refusal there is the design line's).
@@ -930,6 +941,7 @@ export function energyOf(doc: ModelDocument, results: ModelResults, weather: Wea
   }
   if (!a.ok) return { ok: false, missing: a.missing.map((m) => explainSystems(m.path, m.message, doc)) }
   const s = a.systems
+  if (keep) keep.systems = s
   return {
     ok: true, eui_kwh_per_m2: readSystemsEui(s), total_kwh: readSystemsTotalKwh(s),
     by_fuel: FUELS.filter((f) => s.by_fuel[f] > 0).map((fuel) => ({ fuel, kwh: s.by_fuel[fuel] })),
