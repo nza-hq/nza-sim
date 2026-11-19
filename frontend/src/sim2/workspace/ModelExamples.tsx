@@ -7,7 +7,8 @@
 import { useContext, useState } from 'react'
 // @ts-expect-error plain JS context
 import { ProjectContext } from '../../context/ProjectContext.jsx'
-import type { EditorApi } from './ModelSave'
+import { loadLocalPlan, type EditorApi } from './ModelSave'
+import { useAuth } from '../../auth/AuthGate'
 
 type Projects = { projects: Array<{ id: string; name: string }>; currentProjectId: string | null; createProject: (n: string) => Promise<{ id: string }>; loadProject: (id: string) => Promise<void> } | null
 
@@ -15,7 +16,8 @@ const EXAMPLES = [
   { id: 'school', project: 'Example: extended primary school', name: 'Extended primary school (L-shaped, 1965 wing + 2012 extension)', load: () => import('../../../../docs/examples/extended_school.plan.json') },
   { id: 'community', project: 'Example: community centre', name: 'Community centre (one block, eight rooms)', load: () => import('../../../../docs/examples/community_centre.plan.json') },
   // 18 Nov 2026: a real building (Linzie), three floors from the measured survey; its assumptions are listed beside it.
-  { id: 'rwgc', project: 'Example: RWGC clubhouse', name: 'Royal Wimbledon Golf Club clubhouse (three floors, real building)', load: () => import('../../../../docs/examples/rwgc_clubhouse.plan.json') },
+  // A real building, so its project carries its own name rather than "Example:" (Linzie, 19 Nov: a real, saved project).
+  { id: 'rwgc', project: 'Royal Wimbledon Golf Club clubhouse', name: 'Royal Wimbledon Golf Club clubhouse (three floors, real building)', load: () => import('../../../../docs/examples/rwgc_clubhouse.plan.json') },
 ] as const
 
 const drawn = (plan: unknown) => ((plan as { blocks?: unknown[] } | null)?.blocks?.length ?? 0) > 0
@@ -24,11 +26,12 @@ export default function ModelExamples({ api, plan }: { api: React.RefObject<Edit
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const ctx = useContext(ProjectContext) as Projects
+  const auth = useAuth()
   const open = async (id: string) => {
     const ex = EXAMPLES.find((e) => e.id === id)
     if (!ex || !api.current) return
     if (drawn(plan) && !window.confirm(ctx?.createProject
-      ? `Open the example in its own project, "${ex.project}"?\n\nWhat is on screen now stays in its project only if it was saved.`
+      ? `Open "${ex.project}" in its own project?\n\nWhat is on screen now stays in its project only if it was saved.`
       : `Open the example "${ex.name}"? It replaces the building on screen.`)) return
     setBusy(true); setError(null)
     try {
@@ -39,6 +42,11 @@ export default function ModelExamples({ api, plan }: { api: React.RefObject<Edit
         const have = ctx.projects.find((p) => p.name === ex.project)
         if (have && have.id !== ctx.currentProjectId) await ctx.loadProject(have.id)
         else if (!have) await ctx.createProject(ex.project)
+        // Its project already has a saved model (saved on this computer): that opens, not the example as first built.
+        if (have && !auth) {
+          const saved = await loadLocalPlan(have.id).catch(() => null)
+          if (saved) { api.current.loadPlan(saved.plan); setBusy(false); return }
+        }
       }
       const m = (await ex.load()) as { default?: { plan: unknown }; plan?: unknown }
       const file = (m.default ?? m) as { plan: unknown }

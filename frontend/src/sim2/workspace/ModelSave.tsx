@@ -45,7 +45,7 @@ export default function ModelSave({ api, plan }: { api: React.RefObject<EditorAp
     })().catch((e) => setError(`Could not open the saved model: ${(e as Error).message}`)).finally(() => setBusy(null))
   }, [auth?.org.id, currentProjectId])
 
-  if (!auth) return <div className="mw-save"><span className="mw-save-state">Saving needs NZA Sim sign-in, which is not set up here.</span></div>
+  if (!auth) return <LocalSave api={api} plan={plan} projectId={currentProjectId} />
   if (!currentProjectId) return <div className="mw-save"><span className="mw-save-state">Open a project to save this model.</span></div>
 
   const now = plan == null ? null : textOf(plan)
@@ -83,4 +83,57 @@ export default function ModelSave({ api, plan }: { api: React.RefObject<EditorAp
       {error && <p className="mw-save-err" role="alert">{error}</p>}
     </div>
   )
+}
+
+/**
+ * 19 Nov 2026 (Linzie: the clubhouse should be a real, saved project): without NZA Sim sign-in the model is saved on
+ * this computer with its project (PUT /api/projects/{id}/model, one saved model per project, replaced on each save),
+ * and opening the project opens it again.
+ */
+export function LocalSave({ api, plan, projectId }: { api: React.RefObject<EditorApi | null>; plan: unknown; projectId: string | null }) {
+  const [saved, setSaved] = useState<{ text: string; at: string } | null>(null)
+  const [busy, setBusy] = useState<'loading' | 'saving' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const loadedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!projectId || loadedFor.current === projectId) return
+    loadedFor.current = projectId
+    setSaved(null); setBusy('loading'); setError(null)
+    loadLocalPlan(projectId)
+      .then((v) => { if (v && loadedFor.current === projectId) { api.current?.loadPlan(v.plan); setSaved({ text: textOf(v.plan), at: v.saved_at }) } })
+      .catch((e) => setError(`Could not open the saved model: ${(e as Error).message}`))
+      .finally(() => setBusy(null))
+  }, [projectId])
+  if (!projectId) return <div className="mw-save"><span className="mw-save-state">Open a project to save this model.</span></div>
+  const now = plan == null ? null : textOf(plan)
+  const changed = !saved || now !== saved.text
+  const save = async () => {
+    const p = api.current?.getPlan()
+    if (!p) return
+    setBusy('saving'); setError(null)
+    try {
+      const r = await fetch(`/api/projects/${projectId}/model`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: p }) })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = (await r.json()) as { saved_at: string }
+      setSaved({ text: textOf(p), at: j.saved_at })
+    } catch (e) { setError(`Not saved: ${(e as Error).message}`) }
+    setBusy(null)
+  }
+  return (
+    <div className="mw-save">
+      <span className={`mw-save-state${changed ? ' changed' : ''}`} role="status">
+        {busy === 'loading' ? 'Opening the saved model…' : busy === 'saving' ? 'Saving…' : !saved ? 'Not saved yet' : changed ? 'Changed since saved' : `Saved ${when(saved.at.replace(' ', 'T') + 'Z')}`}
+      </span>
+      <button type="button" className="mw-save-btn" onClick={save} disabled={!!busy || !changed || plan == null}>Save</button>
+      {error && <p className="mw-save-err" role="alert">{error}</p>}
+    </div>
+  )
+}
+
+/** The model saved on this computer for a project, or null. */
+export async function loadLocalPlan(projectId: string): Promise<{ plan: unknown; saved_at: string } | null> {
+  const r = await fetch(`/api/projects/${projectId}/model`)
+  if (!r.ok) return null
+  const j = (await r.json()) as { plan: unknown; saved_at: string | null }
+  return j.plan ? { plan: j.plan, saved_at: j.saved_at ?? '' } : null
 }
