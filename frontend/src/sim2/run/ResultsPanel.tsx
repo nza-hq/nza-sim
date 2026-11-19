@@ -17,8 +17,6 @@ import { EnergyPlusButton, EnergyPlusCompare, useEnergyPlus } from './EnergyPlus
 // @ts-expect-error untyped JS from today's app (Brief 110b: reused, not redrawn)
 import LiveResultsStrip from '../../components/shared/LiveResultsStrip.jsx'
 // @ts-expect-error untyped JS from today's app
-import { useUISettings } from '../../context/UISettingsContext.jsx'
-// @ts-expect-error untyped JS from today's app
 import { COOLING_COLOUR, HEATING_COLOUR, SYSTEMS_ACCENT } from '../../data/balanceColours.js'
 import './run.css'
 
@@ -365,7 +363,7 @@ export function previewItems(a: Summary, b: Summary, unit: 'kwh' | 'kwh_per_m2')
 export const LEVEL_NAMES: Record<Level, string> = { fabric: 'Fabric only', spaces: '+ Spaces', systems: '+ Systems' }
 /** Brief 111 P4: the "Results include" switch, and the level said in words. Fabric only's temperature is edited here,
  * inline with the figures it drives (110b row 8, as today's comfort card does). */
-export function LevelSwitch({ run }: { run: Run }) {
+export function LevelSwitch({ run, fixed = false }: { run: Run; fixed?: boolean }) {
   const { level, setLevel, fabricC, setFabricC } = run
   const [typed, setTyped] = useState(String(fabricC))
   useEffect(() => setTyped(String(fabricC)), [fabricC])
@@ -376,18 +374,20 @@ export function LevelSwitch({ run }: { run: Run }) {
   }
   return (
     <div className="rp-level">
-      <span className="rp-level-label">Results include</span>
+      {/* 19 Nov 2026 (Linzie, "too much going on"): Fabric and Spaces show their own level only, said in words; the
+          switch is kept where it compares something, on Systems and Controls. */}
+      {!fixed && <><span className="rp-level-label">Results include</span>
       <div className="rp-level-seg" role="radiogroup" aria-label="Results include">
         {(['fabric', 'spaces', 'systems'] as const).map((l) => (
           <button key={l} type="button" role="radio" aria-checked={level === l} onClick={() => setLevel(l)}>{LEVEL_NAMES[l]}</button>
         ))}
-      </div>
+      </div></>}
       <span className="rp-level-says">
         {level === 'fabric' ? (
           <>The fabric alone: every room heated to{' '}
             <input className="rp-level-c" aria-label="Every room heated to (°C)" inputMode="decimal" value={typed} onChange={(e) => setTyped(e.target.value)} onBlur={commitC} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />{' '}°C, no people, no cooling.</>
         ) : level === 'spaces'
-          ? 'Adds people and equipment from the space types, each at its own temperatures. No systems, so no lighting yet.'
+          ? (fixed ? 'Each room at its own temperatures, with its people and equipment. No systems yet.' : 'Adds people and equipment from the space types, each at its own temperatures. No systems, so no lighting yet.')
           : 'The whole model, through to energy used.'}
       </span>
     </div>
@@ -437,7 +437,7 @@ function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit:
 
 export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void }) {
   const { state, weather, previewState } = run
-  const { unit } = useUISettings() as { unit: 'kwh' | 'kwh_per_m2' }
+  const unit = 'kwh' as 'kwh' | 'kwh_per_m2' // 19 Nov 2026 (Linzie): no Per m² / Total switch; totals, with per m² beside each
   if (run.hold) return <HeldStrip run={run} onOpen={onOpen} unit={unit} />
   const s = state.kind === 'done' ? state.summary : null
   const last = useRef<Summary | null>(null)

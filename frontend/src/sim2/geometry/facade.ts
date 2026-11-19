@@ -13,8 +13,19 @@ export type WallPiece = Span & { room: string; zone: string; length_m: number }
 
 const EPS = 1e-6
 
-/** Every wall piece, in order along each run. A room's stretches that meet on one run are one piece. */
+/** 19 Nov 2026 (Linzie: "it's taking a long time to load"): on the three-floor clubhouse every step change spent about
+ * five seconds here, because the lists ask for each room's pieces and each call cut the whole floor up again. The
+ * pieces depend only on the floor's outline and rooms, which are never changed in place (every edit makes new ones),
+ * so they are worked out once per outline and rooms and handed out as copies. */
+const PIECES = new WeakMap<object, WeakMap<object, WallPiece[]>>()
 export function wallPieces(plan: Plan): WallPiece[] {
+  let byRooms = PIECES.get(plan.blocks)
+  if (!byRooms) PIECES.set(plan.blocks, (byRooms = new WeakMap()))
+  let got = byRooms.get(plan.rooms)
+  if (!got) byRooms.set(plan.rooms, (got = cutPieces(plan)))
+  return got.map((p) => ({ ...p }))
+}
+function cutPieces(plan: Plan): WallPiece[] {
   const zoneOf = new Map(plan.rooms.map((r) => [r.id, r.zone]))
   const bits = edgesOf(plan.blocks, plan.rooms).walls.map((w) => ({ run: w.run, t0: w.t0, t1: w.t1, room: w.piece })).sort((a, b) => a.run - b.run || a.t0 - b.t0)
   const out: WallPiece[] = []

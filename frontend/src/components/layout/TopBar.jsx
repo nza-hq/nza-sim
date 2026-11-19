@@ -468,7 +468,8 @@ export default function TopBar() {
 
         {/* Global engine + unit toggles — Chris UX overhaul (2026-05-17).
             App-wide; replaces per-view toggles in each module's header. */}
-        <GlobalToggles hasSimulation={status === 'complete' && !!results} />
+        {/* 19 Nov 2026 (Linzie: "get rid of" Per m² / Total): not on the Model; every figure there gives both. */}
+        {!onModel && <GlobalToggles hasSimulation={status === 'complete' && !!results} />}
 
         {/* Pop-out results window */}
         <button

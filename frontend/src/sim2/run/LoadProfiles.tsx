@@ -53,26 +53,29 @@ export function LoadProfiles({ energy }: { energy: Energy }) {
     for (let h = 0; h < H; h++) { let s = 0; for (const l of ls) s += l.w[h]!; total += s; if (s > peak) { peak = s; at = h } }
     return { fuel: f, peak_kw: peak / 1000, at, mwh: total / 1e6, load_factor: peak > 0 ? total / (peak * H) : 0 }
   }), [energy, fuels])
+  // 19 Nov 2026 (Linzie: "the first thing we want to default to is the load profile itself"): the chart first, the fuel
+  // choice above it, the peaks under it; no footnote.
   return (
     <div className="lp">
+      {fuels.length > 1 && (
+        <div className="lp-fuels" role="group" aria-label="Fuel">
+          {['all', ...fuels].map((f) => (
+            <button key={f} type="button" className={`lp-chip${fuel === f ? ' on' : ''}`} aria-pressed={fuel === f} onClick={() => setFuel(f)}>
+              {f === 'all' ? 'All energy' : (FUEL_WORDS[f] ?? f).replace(/^./, (c) => c.toUpperCase())}
+            </button>
+          ))}
+        </div>
+      )}
+      <FullYearChart rawData={raw} series={series} fuelFilter={fuel} />
       <div className="lp-peaks">
         {peaks.map((p) => (
           <div key={p.fuel} className="lp-peak">
             <span className="rp-label">Peak {FUEL_WORDS[p.fuel] ?? p.fuel}</span>
             <span className="rp-metric">{p.peak_kw.toLocaleString('en-GB', { maximumFractionDigits: 1 })} <small>kW</small></span>
-            <span className="rp-sub">{when(p.at)} · {p.mwh.toLocaleString('en-GB', { maximumFractionDigits: 1 })} MWh a year · load factor {Math.round(p.load_factor * 100)}%</span>
+            <span className="rp-sub">{when(p.at)} · {p.mwh.toLocaleString('en-GB', { maximumFractionDigits: 1 })} MWh a year</span>
           </div>
         ))}
       </div>
-      <div className="lp-fuels" role="group" aria-label="Fuel">
-        {['all', ...fuels].map((f) => (
-          <button key={f} type="button" className={`lp-chip${fuel === f ? ' on' : ''}`} aria-pressed={fuel === f} onClick={() => setFuel(f)}>
-            {f === 'all' ? 'All energy' : (FUEL_WORDS[f] ?? f).replace(/^./, (c) => c.toUpperCase())}
-          </button>
-        ))}
-      </div>
-      <FullYearChart rawData={raw} series={series} fuelFilter={fuel} />
-      <p className="rp-none">Energy as the meters would see it (fuel drawn, after each system's efficiency), from the 15-minute run, summed to each hour. Each line adds up to its row in Energy used.</p>
     </div>
   )
 }

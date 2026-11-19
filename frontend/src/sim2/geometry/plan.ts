@@ -431,9 +431,13 @@ export type Plan = {
   floors?: PlanFloor[]
   /** The floor being edited (index into `floors`, 0 = ground). */
   active_floor?: number
+  /** 19 Nov 2026 (Linzie: Site is "site exposure, terrain, weather, and some metadata about the project"): the
+   * project's details, said on Site. Words only; nothing is worked out from them. */
+  project_info?: ProjectInfo
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }
 }
+export type ProjectInfo = { reference?: string; client?: string; address?: string; building_type?: string; notes?: string }
 
 /** One floor of a building with more than one (Plan.floors). Rooms, zones and windows keep ids unique over the whole
  * building; a zone's rooms are all on one floor. */
@@ -454,6 +458,22 @@ export function onFloor(plan: Plan, i: number): Plan {
   const f = fs[i]!
   const { roof_parts: _rp, roof: _r, curves: _c, ...rest } = plan
   return { ...rest, floors: fs, active_floor: i, blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}), ...(f.curves ? { curves: f.curves } : {}) }
+}
+/** 19 Nov 2026 (Linzie: "Adding a floor, I think we need to be careful, or I need to be able to delete it"): the plan
+ * without floor i (not the ground floor). Floors above it move down one storey and keep their names in order; its
+ * rooms, and the zones only they used, go with it. The floor below is then the one being edited. One floor left: the
+ * plan is a one-floor plan again. */
+export function removeFloor(plan: Plan, i: number): Plan {
+  const fs = floorsOf(plan)
+  if (i <= 0 || i >= fs.length) return plan
+  const gone = new Set(fs[i]!.rooms.map((r) => r.zone))
+  // A floor still called by its place (First floor, …) is renamed for its new place; a name someone gave it stays.
+  const kept = fs.map((f, j) => ({ f, j })).filter(({ j }) => j !== i).map(({ f, j }, k) => ({ ...f, name: f.name === (FLOOR_NAMES[j] ?? `Floor ${j}`) ? (FLOOR_NAMES[k] ?? `Floor ${k}`) : f.name }))
+  for (const f of kept) for (const r of f.rooms) gone.delete(r.zone)
+  const f = kept[i - 1]!
+  const { roof: _r, roof_parts: _rp, curves: _c, floors: _f, active_floor: _a, ...rest } = plan
+  const on: Plan = { ...rest, zones: plan.zones.filter((z) => !gone.has(z.id)), blocks: f.blocks, rooms: f.rooms, windows: f.windows, wall_spans: f.wall_spans, ...(f.roof ? { roof: f.roof } : {}), ...(f.roof_parts ? { roof_parts: f.roof_parts } : {}), ...(f.curves ? { curves: f.curves } : {}) }
+  return kept.length > 1 ? { ...on, floors: kept, active_floor: i - 1 } : on
 }
 export const FLOOR_NAMES = ['Ground floor', 'First floor', 'Second floor', 'Third floor', 'Fourth floor', 'Fifth floor']
 

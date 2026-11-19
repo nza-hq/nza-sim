@@ -29,7 +29,12 @@ import './run.css'
 
 /** Brief 111 P4: each step opens at its natural level; the person can change it at any time. */
 /** Brief 122: the steps where each edit gives the monthly estimate (static) at once and the hourly year waits for Run. */
-const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric'])
+// 19 Nov 2026: Profiles, Check and Interventions show no results, so nothing runs the year there either (Profiles was
+// slow to open because arriving on it started a full-year run).
+const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric', 'profiles', 'check', 'interventions'])
+/** The steps with the results bar (workspace/layout.ts STEP_TABS), and the ones whose level is fixed to the step's own. */
+const STRIP: ReadonlySet<StepId> = new Set(['fabric', 'spaces', 'systems', 'controls'])
+const FIXED: ReadonlySet<StepId> = new Set(['fabric', 'spaces'])
 const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
 
 export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
@@ -76,7 +81,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
   const flow = useMemo(() => (s?.energy?.ok ? { flow: energyFlow(s.energy), split: fuelSplit(s.energy) } : null), [s])
   return (
     <>
-      {createPortal(<><LevelSwitch run={run} /><ResultsStrip run={run} onOpen={onOpen} /></>, strip)}
+      {!!step && STRIP.has(step) && createPortal(<><LevelSwitch run={run} fixed={FIXED.has(step)} /><ResultsStrip run={run} onOpen={onOpen} /></>, strip)}
       {showBody && createPortal(
         <div className="rp-flow" role="tabpanel" aria-label="Heat flow">
           <div className="rp-flow-in">
@@ -124,7 +129,12 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
           <div className={`rp-flow-in${!run.hold && run.busy ? ' rp-stale' : ''}`}>
             <h2>Load profiles, whole building</h2>
             {s?.energy?.ok ? <LoadProfiles energy={s.energy} />
-              : <p className="gl-hint">{s && s.energy && !s.energy.ok ? 'Load profiles need the energy: some system inputs are still unset (see Heat flow).' : s ? 'Load profiles are energy, so they need the systems: choose "+ Systems" above the results.' : run.state.kind === 'running' ? 'Working it out…' : 'Load profiles need a full-year run: press Run in the bar above.'}</p>}
+              : <p className="gl-hint">{s && s.energy && !s.energy.ok ? 'Some system inputs are still unset, so there is no energy to show yet. Heat flow lists them.'
+                : s ? 'This is energy, so it needs the systems: choose "+ Systems" above.'
+                : run.state.kind === 'running' ? 'Working out the year…'
+                : run.state.kind === 'missing' ? 'Some inputs are still unset, so the year cannot run yet. Heat flow lists them.'
+                : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).'
+                : 'Choose a weather file on Site, and the year runs.'}</p>}
           </div>
         </div>,
         centre,
