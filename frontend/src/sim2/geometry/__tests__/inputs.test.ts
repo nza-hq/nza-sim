@@ -64,3 +64,36 @@ describe('fresh air on the space type', () => {
     expect((b.doc as any).zones[0].ventilation[0]).toMatchObject({ flow_rate: null, flow_rate_basis: null })
   })
 })
+
+describe('lighting stated three ways', () => {
+  const lit = (sp: Partial<SpaceType>, extra: Partial<Plan> = {}, lumRooms?: Array<{ type: string; count: number }>) => {
+    const p = make({ light_relationship: 'always_on', light_area_share: 1, light_gain_fraction: 1, ...sp })
+    return { ...p, ...extra, rooms: p.rooms.map((r) => ({ ...r, ...(lumRooms ? { luminaires: lumRooms } : {}) })) } as Plan
+  }
+  it('luminaires: 12 × 28 W = 336 W for the zone, as a total', () => {
+    const p = lit({ lighting_by: 'luminaires' }, { luminaire_types: [{ id: 'l1', name: 'LED panel', watts: 28 }] }, [{ type: 'l1', count: 12 }])
+    const b = buildDocument(p)
+    expect(b.issues).toEqual([])
+    const d = b.doc as any
+    const prof = d.profiles.find((x: any) => x.kind === 'lighting')
+    expect(prof.magnitude).toEqual({ value: 336, unit: 'total_w' })
+    expect(prof.lux ?? null).toBeNull()
+    expect(d.zones[0].profile_refs.lighting).toEqual([prof.id])
+    expect(roomAsks(p, p.rooms[0]!)).toMatchObject({ light_w: 336, light_how: '12 × 28 W' })
+  })
+  it('luminaires without watts: no magnitude, and a note names it', () => {
+    const b = buildDocument(lit({ lighting_by: 'luminaires' }, { luminaire_types: [{ id: 'l1', name: 'LED panel', watts: null }] }, [{ type: 'l1', count: 12 }]))
+    expect((b.doc as any).profiles.find((x: any) => x.kind === 'lighting').magnitude).toBeUndefined()
+    expect(b.notes.some((n) => /LED panel has no watts/.test(n))).toBe(true)
+  })
+  it('W/m² chosen while a lux is also typed: the W/m² is written, not both', () => {
+    const b = buildDocument(lit({ lighting_by: 'w_per_m2', lighting_w_per_m2: 6, lux: 300 }))
+    const prof = (b.doc as any).profiles.find((x: any) => x.kind === 'lighting')
+    expect(prof.magnitude).toEqual({ value: 6, unit: 'w_per_m2' })
+    expect(prof.lux ?? null).toBeNull()
+  })
+  it('not chosen: lux when typed, as before 19 Nov', () => {
+    const b = buildDocument(lit({ lux: 300 }))
+    expect((b.doc as any).profiles.find((x: any) => x.kind === 'lighting').lux).toBe(300)
+  })
+})

@@ -10,7 +10,7 @@ import { flowLs } from '../../thermal/engine/ventilation'
 import { lightingWm2 } from '../../thermal/engine/lighting'
 import { freshAirOf } from './toDocument'
 import { system } from '../library/library'
-import { type Plan, type PlanRoom, type SpaceType, ringArea } from './plan'
+import { type Plan, type PlanRoom, type SpaceType, lightingBy, ringArea, roomLuminaires } from './plan'
 
 export type RoomAsks = {
   area_m2: number
@@ -52,12 +52,21 @@ export function roomAsks(plan: Plan, room: PlanRoom): RoomAsks {
     const ty = system(vent.template)?.type
     fresh_l_s = flowLs(vent.flow, ty === 'mvhr' || ty === 'mev' ? 'per_m2' : 'ach', at)
   } else fresh_why = 'not stated'
-  // Lighting: lux × the luminaires' efficacy, or a W/m² stated directly.
-  let light_wm2: number | null = null, light_how: string | null = null
+  // Lighting: lux × the luminaires' efficacy, a W/m² stated directly, or the luminaires counted in the room.
+  let light_w: number | null = null, light_how: string | null = null
+  const by = sp ? lightingBy(sp) : null
   const lum = plan.systems.find((y) => y.id === room.systems?.lighting)
-  if (sp?.lux != null) {
-    if (lum?.efficacy != null) { light_wm2 = lightingWm2(sp.lux, lum.efficacy); light_how = `${sp.lux} lux × ${lum.efficacy}` }
+  if (sp && by === 'lux') {
+    if (sp.lux == null) light_how = 'lux not typed'
+    else if (lum?.efficacy != null) { light_w = lightingWm2(sp.lux, lum.efficacy) * area_m2; light_how = `${sp.lux} lux × ${lum.efficacy}` }
     else light_how = 'needs its luminaires\' efficacy'
-  } else if (sp?.lighting_w_per_m2 != null) { light_wm2 = sp.lighting_w_per_m2; light_how = 'W/m² stated' }
-  return { area_m2, people, fresh_l_s, fresh_why, fresh_from_space, light_w: light_wm2 != null ? light_wm2 * area_m2 : null, light_wm2, light_how }
+  } else if (sp && by === 'w_per_m2') {
+    if (sp.lighting_w_per_m2 != null) { light_w = sp.lighting_w_per_m2 * area_m2; light_how = 'W/m² stated' } else light_how = 'W/m² not typed'
+  } else if (sp && by === 'luminaires') {
+    const l = roomLuminaires(plan, room)
+    if (!l.items.length) light_how = 'no luminaires given'
+    else if (l.watts == null) light_how = 'a luminaire has no watts'
+    else { light_w = l.watts; light_how = l.items.map((i) => `${i.count} × ${i.type.watts} W`).join(' + ') }
+  }
+  return { area_m2, people, fresh_l_s, fresh_why, fresh_from_space, light_w, light_wm2: light_w != null ? light_w / area_m2 : null, light_how }
 }

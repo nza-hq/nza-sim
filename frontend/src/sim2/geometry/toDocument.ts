@@ -24,7 +24,7 @@
 import pc from 'polygon-clipping'
 import { ModelDocument, SCHEMA_VERSION } from '../../thermal/schema/model'
 import { TODAY } from '../../thermal/schema/upgrade'
-import { ALWAYS, FINISH_KEY, finishesOf, floorsOf, type PlanFloor, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
+import { ALWAYS, FINISH_KEY, finishesOf, floorsOf, type PlanFloor, WINDOW_STYLES, allWindows, edgesOf, facade4, type FabricElement, hotWaterOnSpaces, isWet, lightingBy, roomLuminaires, coolingKind, profileOf, isTemperature, tempRange, noDhw, type Plan, type PlanSystem, SERVICES, type Service, type SpaceType, ringArea, wallRuns, noBuildingInputs } from './plan'
 import { crossing, firstType, roomType, typeAt, typeOfSpan, wallPieces } from './facade'
 import { construction, efficiencyFor, system } from '../library/library'
 import { cleanRing } from './outline'
@@ -656,6 +656,16 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
     if (!profiles.some((x) => x.id === pr.id)) profiles.push(pr)
   }
   // From schema 2.3 each gain profile carries radiant_fraction, stated on the space type (null until it is).
+  /** 19 Nov 2026: the luminaires in a zone's rooms: their watts added up (null, with a note, if a type has none stated). */
+  const zoneLuminaires = (zid: string) => {
+    const rs = plan.rooms.filter((r) => r.zone === zid).map((r) => roomLuminaires(plan, r))
+    const any = rs.some((r) => r.items.length > 0)
+    const missing = [...new Set(rs.flatMap((r) => r.items.filter((i) => i.type.watts == null).map((i) => i.type.name)))]
+    if (missing.length) notes.push(`${zoneName(zid)}: luminaire${missing.length > 1 ? 's' : ''} ${missing.join(', ')} ha${missing.length > 1 ? 've' : 's'} no watts stated`)
+    if (!any) notes.push(`${zoneName(zid)}: its lighting is counted by luminaires, but its rooms have none`)
+    return { any, watts: missing.length ? null : rs.reduce((t, r) => t + (r.watts ?? 0), 0) }
+  }
+  const zoneName = (zid: string) => plan.zones.find((z) => z.id === zid)?.name ?? zid
   const refsOf = (zid: string) => {
     const sp = spaceOf.get(zid)
     if (!sp) return { occupancy: null, lighting: [], equipment: [], auxiliary: [] }
@@ -664,15 +674,21 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
       const key = sp[k]
       const shape = key && profile(key)?.day_types ? shapeOf(key) : null
       const w = k === 'lighting' ? sp.lighting_w_per_m2 : sp.equipment_w_per_m2
-      if (!shape && w == null && (k === 'lighting' ? sp.lux == null : sp.equipment_baseload_w_per_m2 == null)) return []
-      const id = `${sp.id}_${k}`
+      // 19 Nov 2026: lighting stated three ways (lux × efficacy, a W/m², or the luminaires counted in each room).
+      const by = k === 'lighting' ? lightingBy(sp) : null
+      const lum = by === 'luminaires' ? zoneLuminaires(zid) : null
+      if (!shape && (by === 'luminaires' ? !lum!.any : w == null && (k === 'lighting' ? sp.lux == null : sp.equipment_baseload_w_per_m2 == null))) return []
+      // Luminaires are counted room by room, so each zone has its own lighting profile (its watts are the zone's).
+      const id = by === 'luminaires' ? `${sp.id}_${k}_${zid}` : `${sp.id}_${k}`
       // Today's engine reads lighting from magnitude and equipment from active + baseload.
       const base = sp.equipment_baseload_w_per_m2
       if (k === 'equipment' && (w != null) !== (base != null)) notes.push(`${sp.name}: equipment needs both "in use" and "always on" W/m² (0 is fine)`)
       // Brief 112: lighting states the lux the space needs (its W/m² comes from the lighting system's efficacy), or,
       // while no lux is stated, a W/m² stated directly.
       const size = k === 'lighting'
-        ? (sp.lux != null ? { lux: sp.lux } : w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
+        ? (by === 'luminaires' ? (lum!.watts != null ? { magnitude: { value: r3(lum!.watts), unit: 'total_w' } } : {})
+          : by === 'lux' ? (sp.lux != null ? { lux: sp.lux } : {})
+            : w != null ? { magnitude: { value: w, unit: 'w_per_m2' } } : {})
         : w != null && base != null ? { active: { value: w, unit: 'w_per_m2' }, baseload: { value: base, unit: 'w_per_m2' } } : {}
       // Stated detail only: a field left empty on the space type is left out, and the engine names it.
       const L = k === 'lighting'
@@ -686,7 +702,7 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
         ...(L && rel === 'proportional_with_spill' ? { daylight_factor: sp.daylight_factor } : {}),
         ...(!L && rel !== 'independent' ? { standby_factor: sp.standby_factor } : {}),
       }).filter(([, v]) => v != null))
-      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name})`, ...(shape ? { schedule: shape } : {}), ...size, ...detail, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}) })
+      addProfile({ id, kind: k, label: `${key ? profile(key)!.name : k} (${sp.name}${by === 'luminaires' ? `, ${zoneName(zid)}'s luminaires` : ''})`, ...(shape ? { schedule: shape } : {}), ...size, ...detail, ...(is23 ? { radiant_fraction: sp.radiant_fraction ?? null } : {}) })
       return [id]
     }
     let occupancy: string | null = null

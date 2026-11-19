@@ -34,6 +34,9 @@ export type PlanRoom = {
   systems?: Partial<Record<Service, string>>
   /** Systems step: the room's emitters, how many of each emitter type. */
   emitters?: Array<{ type: string; count: number }>
+  /** 19 Nov 2026 (Linzie: "the number of luminaires and the output of each one"): the room's luminaires, how many of
+   * each luminaire type. Used when its space type's lighting is counted by luminaires. */
+  luminaires?: Array<{ type: string; count: number }>
 }
 /** A zone: a group of rooms that the model treats as one air volume, with what is assigned to it. Null is unset. */
 export type PlanZone = { id: string; name: string; use: string | null; heating: string | null; cooling: string | null }
@@ -131,6 +134,8 @@ export const EMITTER_KINDS = [
 ] as const
 export type EmitterKind = (typeof EMITTER_KINDS)[number]['key']
 /** An emitter type the user has made: one unit's rated output and rating, given to rooms with a count. Null: not set. */
+/** 19 Nov 2026: a luminaire as fitted: its name and the watts one draws, driver included (null: not stated). */
+export type LuminaireType = { id: string; name: string; watts: number | null }
 export type EmitterType = {
   id: string
   name: string
@@ -271,6 +276,20 @@ export const FRESH_AIR_BASES = [
   { key: 'per_room', name: 'l/s for each room (fixed)' },
   { key: 'ach', name: 'Air changes an hour' },
 ] as const
+export const LIGHTING_BY = [
+  { key: 'lux', name: 'Light needed × the luminaires\' efficacy' },
+  { key: 'w_per_m2', name: 'W/m² stated' },
+  { key: 'luminaires', name: 'Luminaires counted in each room' },
+] as const
+export type LightingBy = (typeof LIGHTING_BY)[number]['key']
+/** A space type's lighting method, as stated or as before 19 Nov (lux when stated, else a W/m²). */
+export const lightingBy = (sp: Pick<SpaceType, 'lighting_by' | 'lux'>): LightingBy => sp.lighting_by ?? (sp.lux != null ? 'lux' : 'w_per_m2')
+/** A room's luminaires: each type with its count and watts, the total W (null if any type's watts are not stated). */
+export function roomLuminaires(plan: Pick<Plan, 'luminaire_types'>, room: Pick<PlanRoom, 'luminaires'>): { items: Array<{ type: LuminaireType; count: number }>; watts: number | null } {
+  const items = (room.luminaires ?? []).flatMap((l) => { const t = plan.luminaire_types?.find((x) => x.id === l.type); return t && l.count > 0 ? [{ type: t, count: l.count }] : [] })
+  const watts = items.some((i) => i.type.watts == null) ? null : items.reduce((w, i) => w + i.count * (i.type.watts as number), 0)
+  return { items, watts }
+}
 export type FreshAirBasis = (typeof FRESH_AIR_BASES)[number]['key']
 export type SpaceType = {
   id: string
@@ -290,6 +309,9 @@ export type SpaceType = {
   sensible_w_per_person?: number | null
   /** Brief 112: the light the space needs, lux (demand). Its W/m² comes from the lighting system's efficacy. */
   lux?: number | null
+  /** 19 Nov 2026: how the lighting power is stated: the lux needed × the luminaires' efficacy, a W/m² stated directly,
+   * or the luminaires counted in each room (their watts added up). Null or absent: lux when stated, else the W/m². */
+  lighting_by?: LightingBy | null
   /** A lighting W/m² stated directly, used only while no lux is stated ("stated, not from lux"). */
   lighting_w_per_m2?: number | null
   /** 19 Nov 2026 (Linzie: "can we set it to L/s/m² or L/s per person ... fixed?"): the fresh air the space needs, as
@@ -432,6 +454,8 @@ export type Plan = {
   building?: BuildingInputs
   /** Emitter types (Systems step), given to rooms with a count. */
   emitter_types?: EmitterType[]
+  /** 19 Nov 2026: luminaire types (Systems, Luminaires), given to rooms with a count. */
+  luminaire_types?: LuminaireType[]
   /** Hot water for the whole building, typed (Systems step). */
   dhw?: DhwInputs
   /** Brief 123: the roof's shape, applied to each block (absent: flat, as before). */
