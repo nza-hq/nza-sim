@@ -7,6 +7,11 @@
  * EnergyPlus. Every result is read from the run as it is; nothing is worked out here. Fields the run does not give are
  * left out. The placement (where the plan sits on the map) is fitted separately and passed in as JSON.
  *
+ * 25 Nov 2026 (decodED PR #749): a `geometry` section, so decodED never runs NZA Sim's geometry code. Per floor, in
+ * metres east and north of the placement point (the plan turned by placement.rotation_deg) and up from the ground: the
+ * outline, outer walls (wallRuns), windows and doors (along), rooms, and roof faces (roofPieces, blockRoof). Floors are
+ * stacked as the model is (one storey height); storey_height_m carries the survey's real heights.
+ *
  * Run from frontend/:
  *   npx vite-node ../scripts/rwgc_detailed_export.mts <weather.epw> <placement.json> <out.json> [<runs dir>]
  * Never commit the EPW.
@@ -16,7 +21,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { buildDocument } from '../frontend/src/sim2/geometry/toDocument'
-import { floorsOf, ringArea, upgradePlan, type Plan } from '../frontend/src/sim2/geometry/plan'
+import { along, floorsOf, ringArea, upgradePlan, wallRuns, type Plan, type XY } from '../frontend/src/sim2/geometry/plan'
+import { blockRoof, roofPieces } from '../frontend/src/sim2/geometry/roof'
 import { weatherFromBytes } from '../frontend/src/sim2/run/weather'
 import { runOptionsFor, simulate } from '../frontend/src/sim2/run/seam'
 import { energyPlusInput, energyPlusSummary } from '../frontend/src/sim2/run/energyplus'
@@ -53,10 +59,17 @@ const rooms = floors.flatMap((f, k) => f.rooms.map((r) => {
 }))
 
 // Zones: the run's own figures (control temperature; hours in use below the heating setpoint, as the workspace shows).
+const control = runOptionsFor(doc).control
 const zones = s.zones.map((z, i) => {
-  const a = run.results.zones[i]!.annual
+  const zr = run.results.zones[i]!
+  const a = zr.annual
+  // Hours the run's control temperature (the one max_c and min_c are) is above 25 °C, counted from its hourly values.
+  const ctl = control === 'operative' ? zr.hourly.theta_operative_c : zr.hourly.theta_air_c
+  let above = 0
+  for (let h = 0; h < ctl.length; h++) if (ctl[h]! > 25) above++
   const out: Record<string, unknown> = { id: z.id, name: z.name, floor: floorOfZone.get(z.id), heat_demand_kwh: r0(z.heating_kwh), cooling_demand_kwh: r0(z.cooling_kwh) }
   if (a.unmet_heating_hours_in_use != null) out.hours_below_setpoint = a.unmet_heating_hours_in_use
+  out.hours_above_25c = above
   out.max_c = r1(a.max_control_c)
   out.min_c = r1(a.min_control_c)
   return out
@@ -79,6 +92,37 @@ if (findEnergyPlus()) {
 }
 
 const placement = JSON.parse(readFileSync(placementPath!, 'utf8'))
+
+// Geometry for decodED: the plan turned to true north (rotation_deg is plan +y clockwise from true north).
+const th = (-placement.rotation_deg * Math.PI) / 180
+const r3 = (n: number) => Math.round(n * 1000) / 1000
+const en = ([x, y]: readonly number[]): XY => [r3(x! * Math.cos(th) - y! * Math.sin(th)), r3(x! * Math.sin(th) + y! * Math.cos(th))]
+const zoneName = new Map(plan.zones.map((z) => [z.id, z.name]))
+const H = plan.storey_height_m
+const geometry = {
+  floors: floors.map((f, k) => {
+    const z0 = k * H
+    const runs = wallRuns(f.blocks)
+    const ccwBlocks = [...new Set(runs.map((r) => r.block))].map((b) => runs.filter((r) => r.block === b).map((r) => en(r.a)))
+    const windows = f.windows.map((w) => {
+      const run = runs[w.wall]!
+      return { door: !!w.door, a: en(along(run, w.t_m)), b: en(along(run, w.t_m + w.width_m)), z0: r3(z0 + w.sill_m), z1: r3(z0 + w.sill_m + w.height_m) }
+    })
+    const roofs = roofPieces({ blocks: f.blocks, roof: f.roof ?? null, roof_parts: f.roof_parts ?? null, floors: plan.floors }).flatMap((p) =>
+      blockRoof(p.ring, p.recipe).faces.map((fc) => ({ kind: fc.kind, rest: !!p.rest, pts: fc.pts.map(([x, y, z]) => [...en([x, y]), r3(z0 + H + z)]) })))
+    return {
+      name: f.name, z0, h: H,
+      blocks: ccwBlocks,
+      walls: runs.map((r) => [en(r.a), en(r.b)]),
+      windows,
+      rooms: f.rooms.map((r) => ({ id: r.id, name: r.name, space: r.space ?? null, zone: r.zone, zoneName: zoneName.get(r.zone) ?? null, ring: r.ring.map(en) })),
+      roofs,
+    }
+  }),
+}
+// The survey's storey heights (Revit levels: ground 53.15, first 56.30, second 58.48 m AOD; second floor 2.2 m to its
+// roof); the model stacks every floor 3.0 m apart (docs/examples/rwgc_clubhouse.assumptions.md).
+const SURVEY_STOREYS = [3.3, 2.6, 2.2]
 const t = built.totals
 const result = {
   schema: 'nza-detailed-building/1',
@@ -87,7 +131,7 @@ const result = {
   placement,
   model_version: { hash, engine_version: `${s.engine}@${commit}`, made: new Date().toISOString() },
   plan,
-  storey_height_m: floors.map(() => plan.storey_height_m),
+  storey_height_m: SURVEY_STOREYS,
   results: {
     weather: `${s.weather.file_name} (${s.weather.station}; sha256 ${s.weather.sha256})`,
     building: {
@@ -104,6 +148,7 @@ const result = {
     rooms,
   },
   counts: { floors: floors.length, rooms: rooms.length, zones: s.zones.length, windows: t.windows, doors: t.doors },
+  geometry,
 }
 writeFileSync(outPath!, JSON.stringify(result, null, 1) + '\n')
 console.log(JSON.stringify({ hash, engine: result.model_version.engine_version, building: result.results.building, energyplus, counts: result.counts, totals: t, run_ms: s.run_ms }, null, 1))
