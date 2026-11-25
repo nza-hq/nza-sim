@@ -2,6 +2,18 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 Brief 128 four areas and the building canvas — IN REVIEW 25 Nov 2026 on `sim2/four-areas` (off `sim2/phase1-cleanup`)
+
+Linzie 25 Nov 10:11 ("four areas is right … don't take the prototype's full look … NZA Sim"), from the ChatGPT/Codex design review. UI only; no engine, schema or Plan change. Brief `docs/briefs/active/128_four-areas-canvas.md`.
+- Four areas in the sidebar: Site, Building, Library, Results (`steps.ts AREAS/areaOf`, `Sidebar.jsx`); the bottom link is now "NZA library". Building reopens its last view (localStorage `nza-sim.building-view`). `?step=` addresses unchanged.
+- Building's five views (Shape, Fabric, Spaces, Systems, Controls) are a view switch over the canvas (`ModelWorkspace .mw-views`).
+- Results is a new step `results`: whole model, Heat flow / Monthly / Load profiles / Explore; left list "Results for" whole building or a zone. Load profiles and Explore left the Building views (`layout.ts STEP_TABS`, test updated).
+- Group by: the icon tabs are one list (`ApplyPanels.ChooseList .ap-groupby`).
+- Selection bar: what's chosen, Apply (Linzie's word kept, not "Assign"), Edit (opens the details), Clear, To the whole building (`ClearChoice` context).
+- Details lie over the drawing's edge instead of narrowing it (`.mw-over`).
+- 3D "Floors apart": floors lifted, roofs off, every floor's room colours (`Plan3D apart`).
+- Checks: vitest 635 passed / 6 skipped; vite build clean; browser on the clubhouse at 1440×900 (Systems, Results heat flow + load profiles, Spaces floors apart).
+
 ## 🔧 Phase 1 clean-up — IN REVIEW 19 Nov 2026 on `sim2/phase1-cleanup` (off `sim2/explore-tab`)
 
 Linzie 19 Nov 19:16 ("Start building phase one"), from the close-out plan (https://claude.ai/artifact/SccdEWHkakPyyQxkhtFX38). UI only; no engine change.

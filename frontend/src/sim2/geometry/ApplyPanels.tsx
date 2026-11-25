@@ -46,9 +46,13 @@ export function ChooseList(props: {
   return (
     <div className="gl-sec ap-choose">
       {nav && (
-        <div className="ap-navby" role="tablist" aria-label="Navigate by">
-          {nav.tabs.map((t) => <button key={t.key} type="button" role="tab" aria-selected={nav.by === t.key} onClick={() => nav.onBy(t.key)} title={t.name}>{t.icon && <Icon name={t.icon} size={18} />}<span>{t.name}</span></button>)}
-        </div>
+        // Brief 128: one "Group by" list (it was a row of icon tabs); rooms, or the project's things of one kind.
+        <label className="ap-groupby">
+          <span>Group by</span>
+          <select value={nav.by} onChange={(e) => nav.onBy(e.target.value)} aria-label="Group the rooms by">
+            {nav.tabs.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+          </select>
+        </label>
       )}
       <h3>{nav && nav.by !== 'rooms' ? 'In this project' : 'Choose'} <small>{chosen.size ? `${chosen.size} of ${rows.length} rooms` : nav && nav.by !== 'rooms' ? '' : 'nothing yet'}{chosen.size > 0 && <button type="button" className="ap-link" onClick={props.onNone}>Clear</button>}</small></h3>
       {nav && nav.by !== 'rooms' ? <NavItems sections={nav.sections} rows={rows} chosen={chosen} onChoose={props.onChoose} /> : (
@@ -150,6 +154,8 @@ function NavItems({ sections, rows, chosen, onChoose }: { sections: NavSection[]
 /** Where the Apply bar goes: the middle, over the drawing (Linzie, 17 Nov 00:31: do most of it in the middle). Null:
  * at the foot of the right, as before (the standalone lab, or the middle showing results). */
 export const ApplyBarTarget = createContext<HTMLElement | null>(null)
+/** Brief 128: the selection bar's Clear (chooses nothing). Null: no Clear button. */
+export const ClearChoice = createContext<(() => void) | null>(null)
 
 export type Kind = { key: string; name: string; icon: IconName }
 export type Item = { id: string; name: string; swatch: Swatch; line: string; used: string; removable: boolean }
@@ -181,14 +187,21 @@ export function GivePanel(props: {
 }) {
   const active = props.items.find((x) => x.id === props.active)
   const barTo = useContext(ApplyBarTarget)
+  const expand = useContext(ExpandDetails)
+  const clear = useContext(ClearChoice)
   const g = props.give
   return (
     <aside className="gl-panel gl-right ap-give" aria-label="Give">
       {g && !g.preview && barTo && createPortal(
-        <div className="ap-bar" role="region" aria-label="Apply">
+        // Brief 128: the selection bar: what is chosen, then Apply, Edit (the details), Clear.
+        <div className="ap-bar" role="region" aria-label="Chosen">
           <span className="ap-bar-what">{g.what}{g.now && <small>{g.now}</small>}</span>
           <button type="button" className="gl-btn ap-apply" disabled={!!g.why} onClick={g.onApply} title={g.why ?? g.label}>{g.label}</button>
-          <button type="button" className="ap-link" onClick={g.onAll}>To the whole building</button>
+          <span className="ap-bar-more">
+            {expand && <button type="button" className="ap-link" onClick={expand} title="Open the details of the type in hand">Edit</button>}
+            {clear && !g.why?.startsWith('Choose') && <button type="button" className="ap-link" onClick={clear} title="Choose nothing">Clear</button>}
+            <button type="button" className="ap-link" onClick={g.onAll}>To the whole building</button>
+          </span>
         </div>,
         barTo,
       )}

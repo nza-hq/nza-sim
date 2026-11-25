@@ -34,8 +34,8 @@ import './run.css'
 // slow to open because arriving on it started a full-year run).
 const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric', 'profiles', 'check', 'interventions'])
 /** The steps with the results bar (workspace/layout.ts STEP_TABS), and the ones whose level is fixed to the step's own. */
-const STRIP: ReadonlySet<StepId> = new Set(['fabric', 'spaces', 'systems', 'controls'])
-const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
+const STRIP: ReadonlySet<StepId> = new Set(['fabric', 'spaces', 'systems', 'controls', 'results'])
+const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', results: 'systems', check: 'systems', interventions: 'systems' }
 
 export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, showExplore = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */

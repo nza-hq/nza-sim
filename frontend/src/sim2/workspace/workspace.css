@@ -19,7 +19,7 @@
 .mw-right.mw-shut .mw-close { display: none; }
 .mw-close { position: absolute; top: 10px; left: -12px; z-index: 20; width: 24px; height: 24px; border: 1px solid #E2E8F0; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.1); background: #fff; color: #64748B; font: 600 15px/1 Inter, system-ui, sans-serif; cursor: pointer; }
 .mw-close:hover { color: #0F172A; border-color: #94A3B8; }
-.mw-open { position: absolute; top: 64px; right: 0; z-index: 6; padding: 6px 10px; border: 1px solid #E2E8F0; border-right: 0; border-radius: 8px 0 0 8px; background: #fff; color: #334155; font: 600 12px Inter, system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.mw-open { position: absolute; top: 12px; right: 0; z-index: 6; padding: 6px 10px; border: 1px solid #E2E8F0; border-right: 0; border-radius: 8px 0 0 8px; background: #fff; color: #334155; font: 600 12px Inter, system-ui, sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .mw-open:hover { color: #0F172A; }
 
 /* Phase 1 (19 Nov 2026): what the middle shows is one choice at the end of the results bar. */
@@ -40,3 +40,14 @@
 .mw-bar:not([hidden]) { flex-wrap: wrap; }
 .mw-bar > .mw-strip { flex: 1 1 520px; }
 .mw-bar > .mw-view { flex: 1 0 auto; justify-content: flex-end; min-height: 40px; }
+
+/* Brief 128: the Building area's five views, and the details over the drawing's edge. */
+.mw-views { display: flex; gap: 2px; padding: 6px 12px 0; background: #fff; border-bottom: 1px solid #E5E7EB; }
+.mw-views button { padding: 7px 14px 8px; border: 0; border-bottom: 2px solid transparent; background: none; font: 500 13px Inter, system-ui, sans-serif; color: #6B7280; cursor: pointer; }
+.mw-views button:hover { color: #1F2937; }
+.mw-views button.on { color: #1F2937; font-weight: 600; border-bottom-color: #1F5C46; }
+.mw-views button:focus-visible { outline: 2px solid #1F5C46; outline-offset: -2px; }
+.mw-over { position: absolute; top: 0; right: 0; bottom: 0; z-index: 25; border-left: 1px solid #E5E7EB; box-shadow: -8px 0 24px rgba(15, 23, 42, .08); overflow: visible; }
+.mw-over.mw-shut { box-shadow: none; visibility: hidden; }
+.mw-over-grip { position: absolute; top: 0; bottom: 0; left: -2px; display: flex; z-index: 21; }
+.mw-over .mw-close { top: 10px; }

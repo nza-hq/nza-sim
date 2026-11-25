@@ -23,13 +23,15 @@ export const STEP_TABS: Record<StepId, readonly CentreTab[]> = {
   site: [], shape: [], profiles: [], check: [], interventions: [],
   fabric: ['drawing', 'heat-flow', 'monthly'],
   spaces: ['drawing', 'heat-flow', 'monthly'],
-  systems: ['drawing', 'heat-flow', 'monthly', 'profiles', 'explore'],
-  controls: ['drawing', 'heat-flow', 'monthly', 'profiles', 'explore'],
+  systems: ['drawing', 'heat-flow', 'monthly'],
+  controls: ['drawing', 'heat-flow', 'monthly'],
+  // Brief 128: the whole model's results have their own area; Load profiles and Explore live here.
+  results: ['heat-flow', 'monthly', 'profiles', 'explore'],
 }
 /** The steps with the results bar above the middle (what the results include, the estimate, Run). */
 export const STEP_HAS_RESULTS = (s: StepId) => STEP_TABS[s].length > 0
-/** The tab a step shows: the remembered one if the step has it, else the step's first (the drawing). */
-export const tabFor = (s: StepId, remembered: CentreTab): CentreTab => (STEP_TABS[s].includes(remembered) ? remembered : 'drawing')
+/** The tab a step shows: the remembered one if the step has it, else the step's first (the drawing; Heat flow on Results). */
+export const tabFor = (s: StepId, remembered: CentreTab): CentreTab => (STEP_TABS[s].includes(remembered) ? remembered : STEP_TABS[s][0] ?? 'drawing')
 export type Layout = { left: number; right: number; centre: CentreTab; rightOpen: boolean }
 
 export const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))

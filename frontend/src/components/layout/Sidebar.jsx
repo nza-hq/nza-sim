@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from 'react'
 import { NavLink, Link, useLocation } from 'react-router-dom'
 import {
-  FolderOpen, BookOpen, CloudSun, SlidersHorizontal, Gauge, Layers, PanelLeftClose, PanelLeftOpen,
+  FolderOpen, BookOpen, CloudSun, SlidersHorizontal, Gauge, Layers, PanelLeftClose, PanelLeftOpen, BarChart3, Library,
 } from 'lucide-react'
 import { ProjectContext } from '../../context/ProjectContext.jsx'
 import Icon from '../../sim2/icons/Icon'
-import { SHOWN_STEPS, STEP_ACCENT, DEFAULT_STEP, isStep } from '../../sim2/workspace/steps'
+import { AREAS, STEP_ACCENT, DEFAULT_STEP, isStep, areaOf, lastBuildingView } from '../../sim2/workspace/steps'
 
 // NZA Sim's left navigation (18 Nov 2026, Linzie 15:11: "get rid of the old stuff and layer this new stuff in the
 // left navigation, and clean everything up"). The model's steps ARE the navigation: they used to be tabs across the
@@ -16,7 +16,19 @@ import { SHOWN_STEPS, STEP_ACCENT, DEFAULT_STEP, isStep } from '../../sim2/works
 // It opens out with names, or closes to icons for more drawing room; the choice is remembered on this computer.
 
 // Linzie's own line icons where the set has one (sim2/icons), lucide's otherwise, at the same weight.
+// Brief 128 (Linzie, 25 Nov 2026: "four areas is right"): Site, Building, Library, Results. Building's five views
+// (Shape, Fabric, Spaces, Systems, Controls) switch at the top of its canvas; the steps stay as the address.
+const AREA_ICON = {
+  site:     { lucide: CloudSun },
+  building: { nza: 'building' },
+  library:  { lucide: Library },
+  results:  { lucide: BarChart3 },
+}
+const AREA_ACCENT = { site: STEP_ACCENT.site, building: STEP_ACCENT.shape, library: STEP_ACCENT.profiles, results: STEP_ACCENT.results }
+const areaLink = (id) => `/model?step=${id === 'building' ? lastBuildingView() : id === 'library' ? 'profiles' : id}`
+
 const STEP_ICON = {
+  ...AREA_ICON,
   site:          { lucide: CloudSun },
   shape:         { nza: 'building' },
   fabric:        { nza: 'wall' },
@@ -82,7 +94,7 @@ export default function Sidebar() {
   const [open, setOpen] = useOpen()
   const onModel = location.pathname === '/model'
   const q = new URLSearchParams(location.search).get('step')
-  const current = onModel ? (isStep(q) ? q : DEFAULT_STEP) : null
+  const current = onModel ? areaOf(isStep(q) ? q : DEFAULT_STEP) : null
   const projectName = ctx?.currentProjectId ? (ctx?.params?.name || 'Untitled project') : null
 
   return (
@@ -106,10 +118,10 @@ export default function Sidebar() {
             {projectName && <div className="text-xxs text-white/70 truncate" title={projectName}>{projectName}</div>}
           </div>
         )}
-        <ol className="list-none m-0 p-0" aria-label="Model steps">
-          {SHOWN_STEPS.map(s => (
-            <li key={s.id}>
-              <Row to={`/model?step=${s.id}`} active={current === s.id} accent={STEP_ACCENT[s.id]} icon={<StepIcon id={s.id} />} label={s.name} sub={s.line} n={s.n} open={open} />
+        <ol className="list-none m-0 p-0" aria-label="Model areas">
+          {AREAS.map(a => (
+            <li key={a.id}>
+              <Row to={areaLink(a.id)} active={current === a.id} accent={AREA_ACCENT[a.id]} icon={<StepIcon id={a.id} />} label={a.name} sub={a.line} open={open} />
             </li>
           ))}
         </ol>
@@ -119,7 +131,7 @@ export default function Sidebar() {
 
       {/* Reference, pinned to the bottom */}
       <div className="border-t border-white/12 pt-1">
-        <Row to="/library" active={location.pathname.startsWith('/library')} accent="#16A34A" icon={<BookOpen size={18} strokeWidth={1.6} />} label="Library" open={open} />
+        <Row to="/library" active={location.pathname.startsWith('/library')} accent="#16A34A" icon={<BookOpen size={18} strokeWidth={1.6} />} label="NZA library" sub="Constructions, systems and profiles shared by every project" open={open} />
       </div>
       <button
         type="button"
