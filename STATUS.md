@@ -2,6 +2,14 @@
 
 > **Reconciled 2026-05-28** as part of Brief 72 Part 1. Source: `git log --oneline 9fde212..286f57c` (Brief 64 close → tip-of-main at brief landing). Sections below for Briefs 65–71 are git-grounded — every claim is anchored to one or more commit SHAs from that range. The Brief-64-and-earlier sections that follow stay as a historical snapshot (Brief 23-tagged in CLAUDE.md is now technically out of date for that tag; the canonical sources remain `git log`, `docs/briefs/active/`, `docs/briefs/archive/`).
 
+## 🔧 decodED's look in NZA Sim's 3D — IN REVIEW 25 Nov 2026 on `sim2/decoded-look` (off `sim2/four-areas`, PR #80)
+
+Linzie 25 Nov (decodED's twin of the RWGC clubhouse, decodED PR #749, "Yes perfect!"): NZA Sim's 3D takes the same look. Drawing only; no engine, schema or Plan change.
+- Outside (`Plan3D`): unlit off-white faces (#F7F7F4) in three tones by direction (`look/sketch.ts toneMaterial`: up ×1.0, sun side ×0.87, shade ×0.75); two inks from a depth + normal pass (`look/Ink.tsx`, from decodED's `twin/render/post/outline.js`): #646A68 at 1.75 px only against background/ground, #939994 at 0.85 px for creases and depth steps within the building. No dark roofs. Windows set back in a 0.3 m wall (pane 0.11 m behind the middle line), white sill, mullion about every 1.2 m; glass #B9CBD6; doors sage #A9BDB6; 0.22 m slab set in 0.04 m so it reads as a crease between storeys.
+- Inside (`Inside3D`, new "Inside" button; "Floors apart" now uses it): decodED's inside viewer, walls #FBFAF7 0.18 m cut at 1.5 m, outer walls white 0.3 m, slab #E3E7E5, rooms in decodED's room-type colours from their names (`roomTypeOf`) or the step's own colour, other floors as faint outlines; apart: walls flat, rooms as dots, floor names.
+- Labels (`look/RoomLabels.tsx`): room name and m², a dot where crowded (decodED Brief 261 rule).
+- Checks: vitest src/sim2 225 passed / 1 skipped; vite build clean; clubhouse checked in Chromium at 1440×900 (outside, inside, floors apart, editing view). Pictures: project files nza-sim/decoded-look/.
+
 ## 🔧 Brief 129 left pillar and working profiles — IN REVIEW 25 Nov 2026 on `sim2/four-areas` (PR #80)
 
 Linzie 25 Nov 10:32/10:35: a left pillar exactly like today's NZA Sim, nothing along the top; Site is "Project"; "Group by" just a dropdown; every profile type, window opening included, proven to work in the model; a design system next.

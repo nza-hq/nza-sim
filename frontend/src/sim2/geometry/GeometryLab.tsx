@@ -89,6 +89,7 @@ import { DOOR, type DoorSpec, withDefaultDoor, type WallPiece, type WindowSpec, 
 import { type BlockRoof, LOFT_ACH, ROOF_STYLES, type RoofPart, type RoofRecipe, type RoofStyle, blockRoof, defaultRoof, fetchServedRoofs, pieceRoofs, roofPieces, roofTotals, splitAtCorner } from './roof'
 // three.js only loads when 3D is first opened.
 const Plan3D = lazy(() => import('./Plan3D'))
+const Inside3D = lazy(() => import('./Inside3D'))
 
 type Mode = 'outline' | 'rooms' | 'fabric' | 'profiles' | 'spaces' | 'systems'
 /** Steps 3 to 5: choose, then give (ApplyPanels.tsx). */
@@ -460,6 +461,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const [whole3d, setWhole3d] = useState(false)
   /** Brief 128: the floors lifted apart, roofs off, so every floor's rooms (and their colours) show. */
   const [apart3d, setApart3d] = useState(false)
+  /** 25 Nov 2026 (decodED's inside viewer, Linzie "Yes perfect!"): the floor being edited with its walls cut at 1.5 m. */
+  const [inside3d, setInside3d] = useState(false)
   const zonesElsewhere = useMemo(() => new Set(floors.flatMap((f, i) => (i === (plan.active_floor ?? 0) ? [] : f.rooms.map((r) => r.zone)))), [floors, plan.active_floor])
   const inRooms = mode !== 'outline'
   const selBlocks = sel?.kind === 'blocks' ? sel.idx.filter((i) => i < plan.blocks.length) : []
@@ -3247,7 +3250,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D key={whole3d ? 'whole' : apart3d ? 'apart' : 'edit'} apart={apart3d && floors.length > 1} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roomColour={mode === 'spaces' || mode === 'systems' || mode === 'profiles' ? roomFill : undefined} chosenRooms={whole3d ? undefined : chosen} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            {(inside3d || (apart3d && floors.length > 1)) ? <Inside3D key={apart3d ? 'apart' : 'inside'} plan={plan} mode={apart3d && floors.length > 1 ? 'apart' : 'floor'} roomColour={mode === 'spaces' || mode === 'systems' || mode === 'profiles' ? roomFill : undefined} chosenRooms={chosen} /> : <Plan3D key={whole3d ? 'whole' : 'edit'} apart={apart3d && floors.length > 1} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roomColour={mode === 'spaces' || mode === 'systems' || mode === 'profiles' ? roomFill : undefined} chosenRooms={whole3d ? undefined : chosen} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />}
           </Suspense>
         </div>
       )}
@@ -3287,9 +3290,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {/* 19 Nov 2026 (Linzie: "I want to be able to see everything in 3D"): the whole building, every floor and roof solid,
             nothing chosen and no names. */}
         {in3d && <><span className="gl-viewsep" aria-hidden />
-          <button type="button" aria-pressed={whole3d} title="See the whole building: every floor, roofs solid" onClick={() => { setWhole3d(!whole3d); setApart3d(false) }}>Whole building</button>
-          {floors.length > 1 && <button type="button" aria-pressed={apart3d} title="Lift the floors apart, roofs off, to see every floor's rooms" onClick={() => { setApart3d(!apart3d); setWhole3d(false) }}>Floors apart</button>}
-          {!whole3d && <><button type="button" aria-pressed={names3d} title="Show the rooms' names in 3D" onClick={() => setNames3d(!names3d)}>Names</button><button type="button" aria-pressed={solidRoofs} title="Draw the roofs solid, to see their shapes" onClick={() => setSolidRoofs(!solidRoofs)}>Roofs</button></>}
+          <button type="button" aria-pressed={whole3d} title="See the whole building: every floor, roofs solid" onClick={() => { setWhole3d(!whole3d); setApart3d(false); setInside3d(false) }}>Whole building</button>
+          <button type="button" aria-pressed={inside3d && !apart3d} title="Look inside the floor being edited: walls cut at 1.5 m, the other floors as outlines" onClick={() => { setInside3d(!(inside3d && !apart3d)); setApart3d(false); setWhole3d(false) }}>Inside</button>
+          {floors.length > 1 && <button type="button" aria-pressed={apart3d} title="Lift the floors apart to see every floor's rooms" onClick={() => { setApart3d(!apart3d); setWhole3d(false); setInside3d(false) }}>Floors apart</button>}
+          {!whole3d && !inside3d && !apart3d && <><button type="button" aria-pressed={names3d} title="Show the rooms' names in 3D" onClick={() => setNames3d(!names3d)}>Names</button><button type="button" aria-pressed={solidRoofs} title="Draw the roofs solid, to see their shapes" onClick={() => setSolidRoofs(!solidRoofs)}>Roofs</button></>}
         </>}
       </div>
       {shownLook === 'elev' && selWall && selSpan && (
