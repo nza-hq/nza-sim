@@ -505,7 +505,7 @@ export function runModel(doc: ModelDocument, weather: Weather, library: Record<s
       const d = doc.system_groups.find((x) => x.id === g.dhw_priority_group_id)!
       reserved = new Float64Array(H)
       if (d.enabled) {
-        const a = zoneHotWater(doc, gains, H)
+        const a = zoneHotWater(doc, gains, H, weather.hours)
         if (!a.ok) throw new ModelError(`${a.issues[0].message} (hot water heated first by "${g.id}")`, a.issues[0].path)
         if (a.hw) for (const zid of d.zones) {
           const z = a.hw.zones[zIdx.get(zid)!]

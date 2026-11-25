@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ResizeHandle from './ResizeHandle'
 import { LEFT, MODEL_CENTRE_TABS, RIGHT, STEP_HAS_RESULTS, STEP_TABS, clamp, loadLayout, saveLayout, tabFor, type CentreTab, type Layout } from './layout'
-import { BUILDING_VIEWS, DEFAULT_STEP, STEPS, isBuildingView, isStep, rememberBuildingView, type StepId } from './steps'
+import { DEFAULT_STEP, isStep, type StepId } from './steps'
 import './workspace.css'
 
 export type Slots = { left: HTMLElement; centre: HTMLElement; right: HTMLElement; strip: HTMLElement }
@@ -27,13 +27,9 @@ const LATER: Partial<Record<StepId, { title: string; text: string; to: string; p
 }
 
 export default function ModelWorkspace({ render, header }: { header?: React.ReactNode; render?: (a: { step: StepId; slots: Slots; centre: CentreTab; setCentre: (c: CentreTab) => void; openRight: () => void }) => React.ReactNode }) {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const q = params.get('step')
   const step: StepId = isStep(q) ? q : DEFAULT_STEP
-  // Brief 128: Building is one area with five views; the sidebar's Building reopens the last one.
-  const building = isBuildingView(step)
-  useEffect(() => { rememberBuildingView(step) }, [step])
-  const toView = (v: StepId) => { const p = new URLSearchParams(params); p.set('step', v); setParams(p) }
 
   const [layout, setLayout] = useState<Layout>(loadLayout)
   useEffect(() => saveLayout(layout), [layout])
@@ -72,15 +68,6 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
       </aside>
       <ResizeHandle onResize={setLeft} />
       <section className="flex-1 min-w-0 flex flex-col bg-off-white">
-        {/* Brief 128 (Linzie, 25 Nov 2026: "four areas is right"): the Building area's five views, one canvas. */}
-        {building && (
-          <div className="mw-views flex-shrink-0" role="tablist" aria-label="Building views">
-            {BUILDING_VIEWS.map((v) => (
-              <button key={v} type="button" role="tab" aria-selected={v === step} className={v === step ? 'on' : ''} onClick={() => toView(v)}
-                title={STEPS.find((s) => s.id === v)?.line}>{STEPS.find((s) => s.id === v)?.name}</button>
-            ))}
-          </div>
-        )}
         {/* Phase 1 (Linzie, 19 Nov 2026): one bar above the middle: the results (or one status chip) and what the middle
             shows, as one choice with a sensible default (it was a row of tabs under the results). */}
         <div className="mw-bar flex-shrink-0 flex items-stretch bg-white border-b border-light-grey" hidden={!results && tabs.length <= 1}>

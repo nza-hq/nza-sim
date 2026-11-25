@@ -382,7 +382,7 @@ export type BuildingInputs = {
 }
 /** Hot water, for the whole building (the schema's service-level fields): stored, tap and cold-supply temperatures,
  * daily demand per person or per m² of floor, a circulation pump, and when it is used (shown as 'flat' until changed). Typed; null is not stated. */
-export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c: number | null; basis: 'per_person' | 'per_m2' | null; litres: number | null; pump_w: number | null; shape?: 'flat' | 'follow_occupancy' | null }
+export type DhwInputs = { storage_c: number | null; tap_c: number | null; cold_c: number | null; basis: 'per_person' | 'per_m2' | null; litres: number | null; pump_w: number | null; /** Brief 129: or a hot water profile's key. */ shape?: 'flat' | 'follow_occupancy' | (string & {}) | null }
 export const noDhw = (): DhwInputs => ({ storage_c: null, tap_c: null, cold_c: null, basis: null, litres: null, pump_w: null, shape: 'flat' })
 export const noBuildingInputs = (): BuildingInputs => ({ q50: null, tb_multiplier: null, exposure: null })
 
@@ -474,7 +474,7 @@ export type Plan = {
   /** The floor being edited (index into `floors`, 0 = ground). */
   active_floor?: number
   /** 19 Nov 2026 (Linzie: Site is "site exposure, terrain, weather, and some metadata about the project"): the
-   * project's details, said on Site. Words only; nothing is worked out from them. */
+   * project's details, said on Project. Words only; nothing is worked out from them. */
   project_info?: ProjectInfo
   /** Next numbers, so names and ids are never reused within a plan. */
   next: { room: number; zone: number; system: number }

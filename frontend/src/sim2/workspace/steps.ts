@@ -1,8 +1,8 @@
 /** The steps of the Model workspace (plan agreed with Linzie, 15 Nov 21:53; Profiles added on her ask, 16 Nov 00:12; Controls by Brief 114, between Systems and Check)
  * and the shelf under them. */
 export const STEPS = [
-  { id: 'site', n: 1, name: 'Site', line: 'Weather and exposure' },
-  { id: 'shape', n: 2, name: 'Shape', line: 'Outline, rooms and zones' },
+  { id: 'site', n: 1, name: 'Project', line: 'Project, weather, wind and terrain' },
+  { id: 'shape', n: 2, name: 'Building', line: 'Outline, rooms and zones' },
   { id: 'fabric', n: 3, name: 'Fabric', line: 'Walls, roof, floor, windows, air' },
   { id: 'profiles', n: 4, name: 'Profiles', line: 'When things happen, hour by hour' },
   { id: 'spaces', n: 5, name: 'Spaces', line: 'What each room is used for' },
@@ -20,26 +20,10 @@ export type StepId = (typeof STEPS)[number]['id']
 export const SHOWN_STEPS = STEPS.filter((s) => !('later' in s && s.later))
 export const isStep = (s: string | null): s is StepId => STEPS.some((x) => x.id === s)
 
-/**
- * Brief 128 (Linzie, 25 Nov 2026: "four areas is right"): the navigation is four areas, not nine steps. Building is one
- * canvas with five views; the steps stay as the address (?step=) and as the views, so links and saved layouts still work.
- */
-export const BUILDING_VIEWS = ['shape', 'fabric', 'spaces', 'systems', 'controls'] as const satisfies readonly StepId[]
-export const AREAS = [
-  { id: 'site', name: 'Site', line: 'Place, weather and project', steps: ['site'] },
-  { id: 'building', name: 'Building', line: 'Shape, fabric, spaces, systems, controls', steps: [...BUILDING_VIEWS] },
-  { id: 'library', name: 'Library', line: 'Profiles: when things happen', steps: ['profiles'] },
-  { id: 'results', name: 'Results', line: 'Heat flow, monthly, load profiles, explore', steps: ['results', 'check', 'interventions'] },
-] as const satisfies ReadonlyArray<{ id: string; name: string; line: string; steps: readonly StepId[] }>
-export type AreaId = (typeof AREAS)[number]['id']
-export const areaOf = (s: StepId): AreaId => AREAS.find((a) => (a.steps as readonly StepId[]).includes(s))!.id
-export const isBuildingView = (s: StepId) => (BUILDING_VIEWS as readonly StepId[]).includes(s)
-/** The Building view last open on this computer, so Building reopens where it was left. */
-const VIEW_KEY = 'nza-sim.building-view'
-export const lastBuildingView = (): StepId => {
-  try { const v = localStorage.getItem(VIEW_KEY); return v && isStep(v) && isBuildingView(v) ? v : 'shape' } catch { return 'shape' }
-}
-export const rememberBuildingView = (s: StepId) => { if (isBuildingView(s)) try { localStorage.setItem(VIEW_KEY, s) } catch { /* private window */ } }
+/** The inputs, in the left pillar's top group; Results sits below the line (Linzie, 25 Nov 2026 10:35: "a left-facing
+ * pillar rather than stuff along the top", as today's NZA Sim: inputs, a line, outputs, the library at the bottom). */
+export const INPUT_STEPS = SHOWN_STEPS.filter((s) => s.id !== 'results')
+export const OUTPUT_STEPS = SHOWN_STEPS.filter((s) => s.id === 'results')
 
 /** Today's pages that hold what the shelf names. */
 export const SHELF = [

@@ -6,6 +6,8 @@
  */
 import type { ModelDocument } from '../schema/model'
 import type { ZoneGains } from './gains'
+import type { Weather } from './types'
+import { ScheduleError, scheduleFractions } from './pumps'
 
 /** kWh to warm one litre of water by one kelvin. */
 export const WATER_KWH_PER_L_K = 4.18 / 3600
@@ -29,7 +31,7 @@ export function hotWaterUse(doc: ModelDocument, zi: number) {
  * Each zone's hot water heat. Issues name what is missing (temperatures, load shape, occupancy to follow); nothing is
  * filled. `ok` with hw null: no space states any use.
  */
-export function zoneHotWater(doc: ModelDocument, gains: readonly (ZoneGains | null)[], H: number): { ok: true; hw: HotWater | null } | { ok: false; issues: HotWaterIssue[] } {
+export function zoneHotWater(doc: ModelDocument, gains: readonly (ZoneGains | null)[], H: number, hours?: Weather['hours']): { ok: true; hw: HotWater | null } | { ok: false; issues: HotWaterIssue[] } {
   if (!doc.zones.some((_, zi) => hotWaterUse(doc, zi) != null)) return { ok: true, hw: null }
   const issues: HotWaterIssue[] = []
   const miss = (path: string, message: string) => { if (!issues.some((m) => m.path === path)) issues.push({ path, message }) }
@@ -39,7 +41,17 @@ export function zoneHotWater(doc: ModelDocument, gains: readonly (ZoneGains | nu
   const tap = need(d.tap_outlet_temp_c, 'tap_outlet_temp_c') as number | null
   const cold = need(d.cold_supply_temp_c, 'cold_supply_temp_c') as number | null
   const shape = need(d.load_shape, 'load_shape') as string | null
-  if (shape != null && shape !== 'flat' && shape !== 'follow_occupancy') miss('services.dhw.load_shape', `unknown shape "${shape}" (flat or follow_occupancy)`)
+  // Brief 129 (Linzie, 25 Nov 2026: every profile type must work in the model): the shape may also name a schedule
+  // profile (a hot water profile): the year's hot water is shared out by its hourly fractions.
+  let byProfile: Float64Array | null = null
+  if (shape != null && shape !== 'flat' && shape !== 'follow_occupancy') {
+    if (!doc.profiles.some((p) => p.id === shape && p.kind === 'schedule')) miss('services.dhw.load_shape', `unknown shape "${shape}" (flat, follow_occupancy, or a schedule profile's id)`)
+    else if (!hours) miss('services.dhw.load_shape', 'a hot water profile needs the weather year')
+    else {
+      try { byProfile = scheduleFractions(doc, shape, hours, 'services.dhw.load_shape') } catch (e) { if (e instanceof ScheduleError) miss(e.path, e.message); else throw e }
+      if (byProfile && !(byProfile.reduce((a, b) => a + b, 0) > 0)) miss('services.dhw.load_shape', `hot water profile "${shape}" is zero all year`)
+    }
+  }
   if (store != null && cold != null && !(store > cold)) miss('services.dhw.storage_setpoint_c', 'must be above the cold supply temperature')
   if (store != null && cold != null && tap != null && !(tap >= cold && tap <= store)) miss('services.dhw.tap_outlet_temp_c', 'must be between the cold supply and the store temperatures')
   if (issues.length || store == null || cold == null || tap == null || shape == null) return { ok: false, issues }
@@ -62,6 +74,10 @@ export function zoneHotWater(doc: ModelDocument, gains: readonly (ZoneGains | nu
       for (let h = 0; h < H; h++) ps += occ.presence[h]
       if (!(ps > 0)) { miss('services.dhw.load_shape', `${zone.name || zone.id} is never occupied, so its hot water cannot follow occupancy`); return null }
       for (let h = 0; h < H; h++) w[h] = (kwh * 1000 * occ.presence[h]) / ps
+    } else if (byProfile) {
+      let ps = 0
+      for (let h = 0; h < H; h++) ps += byProfile[h]
+      for (let h = 0; h < H; h++) w[h] = (kwh * 1000 * byProfile[h]) / ps
     } else w.fill((kwh * 1000) / H)
     return { w, kwh }
   })

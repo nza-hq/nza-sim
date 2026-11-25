@@ -3058,6 +3058,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   <option value="">Not set</option>
                   <option value="flat">Evenly through the day</option>
                   <option value="follow_occupancy">With occupancy</option>
+                  {/* Brief 129: or a hot water profile (Profiles, Hot water), hour by hour. */}
+                  {profilesOfKind(plan, 'dhw').length > 0 && <optgroup label="Hot water profile">
+                    {profilesOfKind(plan, 'dhw').map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
+                  </optgroup>}
                 </select>
               </div>
               <p className="gl-hint">One set for the building. How much hot water is used is on each space type (Spaces). The heater only heats the hot share of what runs from the tap. Empty stays unset.</p>
@@ -3255,7 +3259,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {/* 19 Nov 2026: Elevation shows once a wall is chosen (it was a greyed-out button before). */}
         {selWall && <button type="button" aria-pressed={shownLook === 'elev'} onClick={() => setLook('elev')}>Elevation</button>}
         {/* 18 Nov 2026 (RWGC clubhouse, Linzie): stacked floors. Each step works on the floor chosen here.
-            19 Nov 2026 (Linzie: "I don't know what the plus floor button does"): one floor list, and on Shape only, adding a
+            19 Nov 2026 (Linzie: "I don't know what the plus floor button does"): one floor list, and on Building only, adding a
             floor (it says what it does first) and removing the one being edited (Undo brings it back). */}
         {(has || floors.length > 1) && <>
           <span className="gl-viewsep" aria-hidden />
@@ -3315,7 +3319,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {shown.blocks.map((b, i) => <polygon key={`f${i}`} className="gl-floor" points={P(b)} />)}
         {inRooms &&
           shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) && !giving ? ' on' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
-        {/* Linzie, 17 Nov 10:03: on Shape the rooms stay in view under the walls, windows, floor and roof, for context. */}
+        {/* Linzie, 17 Nov 10:03: on Building the rooms stay in view under the walls, windows, floor and roof, for context. */}
         {!inRooms && shown.rooms.map((r) => <polygon key={`cx${r.id}`} className="gl-room-ctx" points={P(r.ring)} />)}
         {liveInner && <line className="gl-wall-hover" x1={toPx(liveInner[0])[0]} y1={toPx(liveInner[0])[1]} x2={toPx(liveInner[1])[0]} y2={toPx(liveInner[1])[1]} />}
         {giving && !drag && shown.rooms.filter((r) => chosen.has(r.id)).map((r) => <polygon key={`pk${r.id}`} className="gl-room-pick" points={P(r.ring)} />)}
@@ -3332,9 +3336,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         )}
         {flash.length > 0 && shown.rooms.filter((r) => flash.includes(r.id)).map((r) => <polygon key={`fl${r.id}`} className="gl-room-flash" points={P(r.ring)} />)}
         {shown.blocks.map((b, i) => <polygon key={`s${i}`} className={`gl-shell${chosenBlocks.has(i) || (drag && drag.kind === 'corner' && drag.block === i) ? ' chosen' : ''}`} points={P(b)} />)}
-        {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Shape turns the whole outline orange (floor lighter, dashed). */}
+        {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Building turns the whole outline orange (floor lighter, dashed). */}
         {mode === 'outline' && (shapeTab === 'roof' || shapeTab === 'floor') && shown.blocks.map((b, i) => <polygon key={`hl${i}`} className={`gl-surf-on ${shapeTab}`} points={P(b)} />)}
-        {/* Brief 123: the ridge and hip lines of a pitched roof, on Shape. */}
+        {/* Brief 123: the ridge and hip lines of a pitched roof, on Building. */}
         {mode === 'outline' && pRoofs.some((br) => br.style !== 'flat') && pRoofs.map((br, i) => br.lines.map(([a, c], j) => <line key={`rg${i}-${j}`} className={`gl-ridge${shapeTab === 'roof' ? ' on' : ''}`} x1={toPx([a[0], a[1]])[0]} y1={toPx([a[0], a[1]])[1]} x2={toPx([c[0], c[1]])[0]} y2={toPx([c[0], c[1]])[1]} />))}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
@@ -3676,7 +3680,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   ) : <p className="gl-hint">Nothing applied yet. Choose rooms or walls, pick a type on the left, and Apply.</p>}
                 </div>
               )}
-              {/* 19 Nov 2026: in the workspace the building's facts are on Site; this stays only to show a problem. */}
+              {/* 19 Nov 2026: in the workspace the building's facts are on Project; this stays only to show a problem. */}
               {(!embedded || !built.ok) && <details className="gl-sec gl-doc">
                 <summary><h3>Model document <span className={`gl-chip ${built.ok ? 'ok' : 'no'}`}>{built.ok ? `✓ Valid · ${(built.doc as { schema_version: string }).schema_version}` : 'Not valid'}</span>{built.notes.length > 0 && <small>{count(built.notes.length, 'note')}</small>}</h3></summary>
                 <table className="gl-facts">
@@ -3706,7 +3710,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           <p className="gl-say"><strong>Nothing drawn yet.</strong> {railStep === 'fabric' ? 'Fabric is given to walls, roofs and floors' : railStep === 'spaces' ? 'Spaces are given to rooms' : railStep === 'controls' ? 'Controls run the systems given to rooms' : 'Systems are given to rooms'}, so the building needs an outline first.</p>
           <div className="gl-needs-btns">
             <button type="button" className="gl-btn" onClick={startExample}>Start from an example</button>
-            <button type="button" className="gl-btn quiet" onClick={() => onStep?.('shape')}>Go to Shape and draw</button>
+            <button type="button" className="gl-btn quiet" onClick={() => onStep?.('shape')}>Go to Building and draw</button>
           </div>
         </div>
       ) : onControls ? controlsRight() : offStep ? null : <>{!onSite && <>
@@ -3929,7 +3933,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </>, 'right2')}
 
       {/* ─── bottom: tools ─── */}
-      {/* Phase 1 (Linzie, 19 Nov 2026): the tool bar and its tip only where you draw (Shape); elsewhere Select is the
+      {/* Phase 1 (Linzie, 19 Nov 2026): the tool bar and its tip only where you draw (Building); elsewhere Select is the
           only tool, so the bar shrinks to Undo and Redo in the corner. */}
       {(drawTools || in3d || shownLook === 'elev') && <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m); tap one to nudge it with the arrow keys. Scroll to zoom, right-drag to pan.' : tipLine}</p>}
       {shownLook === 'plan' && !drawTools && <div className="gl-undo" role="toolbar" aria-label="Undo and redo">

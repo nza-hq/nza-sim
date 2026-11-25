@@ -27,7 +27,7 @@ export type RoofRecipe = (RoofFlat | RoofMono | RoofGable | RoofHip) & {
 }
 
 /** A ventilated loft's air changes an hour: ISO 13789 clause 9.4's conventional rate (the engine thread's P4.2 records
- * what could and could not be verified about it). Shown and editable on Shape, Roof. */
+ * what could and could not be verified about it). Shown and editable on Building, Roof. */
 export const LOFT_ACH = 3
 export type RoofStyle = RoofRecipe['style']
 export const ROOF_STYLES: ReadonlyArray<{ key: RoofStyle; name: string }> = [

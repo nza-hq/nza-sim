@@ -46,10 +46,9 @@ export function ChooseList(props: {
   return (
     <div className="gl-sec ap-choose">
       {nav && (
-        // Brief 128: one "Group by" list (it was a row of icon tabs); rooms, or the project's things of one kind.
+        // One dropdown (it was a row of icon tabs; Linzie 25 Nov: "just have it as a dropdown"): rooms, or one kind.
         <label className="ap-groupby">
-          <span>Group by</span>
-          <select value={nav.by} onChange={(e) => nav.onBy(e.target.value)} aria-label="Group the rooms by">
+          <select value={nav.by} onChange={(e) => nav.onBy(e.target.value)} aria-label="Show">
             {nav.tabs.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
           </select>
         </label>
