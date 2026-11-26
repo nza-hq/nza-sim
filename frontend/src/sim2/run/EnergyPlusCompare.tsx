@@ -33,7 +33,7 @@ export function useEnergyPlus(request: () => EnergyPlusRequest) {
   }, [])
   const run = () => {
     const r = request()
-    if (!r.weather) { setState({ kind: 'error', message: 'Choose a weather file first (Site).' }); return }
+    if (!r.weather) { setState({ kind: 'error', message: 'Choose a weather file first (Project).' }); return }
     if (!worker.current) {
       try {
         const w = new Worker(new URL('./energyplusWorker.ts', import.meta.url), { type: 'module' })

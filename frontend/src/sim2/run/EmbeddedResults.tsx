@@ -34,8 +34,8 @@ import './run.css'
 // slow to open because arriving on it started a full-year run).
 const HELD: ReadonlySet<StepId> = new Set(['site', 'shape', 'fabric', 'profiles', 'check', 'interventions'])
 /** The steps with the results bar (workspace/layout.ts STEP_TABS), and the ones whose level is fixed to the step's own. */
-const STRIP: ReadonlySet<StepId> = new Set(['fabric', 'spaces', 'systems', 'controls'])
-const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', check: 'systems', interventions: 'systems' }
+const STRIP: ReadonlySet<StepId> = new Set(['fabric', 'spaces', 'systems', 'controls', 'results'])
+const NATURAL: Record<StepId, Level> = { site: 'fabric', shape: 'fabric', fabric: 'fabric', profiles: 'spaces', spaces: 'spaces', systems: 'systems', controls: 'systems', results: 'systems', check: 'systems', interventions: 'systems' }
 
 export default function EmbeddedResults({ step, doc, previewDoc = null, onFigures, strip, centre, showBody, showMonthly = false, showProfiles = false, showExplore = false, focusZone, weatherEl, sizingEl = null, onOpen }: {
   /** The workspace step: sets the natural level when it changes. */
@@ -93,7 +93,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
               <div className="rp-hb rp-est">
                 <p className="rp-hb-for">{estZone ? `${estZone.name || estZone.id}` : 'Whole building'} · <b>Monthly estimate (static)</b>, as you edit</p>
                 {estLines ? <HeatBalance lines={estLines} />
-                  : <p className="gl-hint">{run.instant.kind === 'missing' ? `No estimate yet. To set: ${run.instant.items.map((m) => m.what).join(' ')}` : run.instant.kind === 'error' ? `The estimate failed: ${run.instant.message}` : 'No estimate yet: choose a weather file (Site).'}</p>}
+                  : <p className="gl-hint">{run.instant.kind === 'missing' ? `No estimate yet. To set: ${run.instant.items.map((m) => m.what).join(' ')}` : run.instant.kind === 'error' ? `The estimate failed: ${run.instant.message}` : 'No estimate yet: choose a weather file (Project).'}</p>}
                 {est && est.notes.length > 0 && <ul className="rp-est-notes">{est.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
                 <h3 className="rp-est-h">The full year, every 15 minutes{run.hourlyStale ? ' (out of date: press Run in the bar above)' : run.state.kind === 'idle' ? ' (press Run in the bar above)' : ''}</h3>
               </div>
@@ -121,7 +121,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
         <div className="rp-flow" role="tabpanel" aria-label="Monthly">
           <div className={`rp-flow-in${!run.hold && run.busy ? ' rp-stale' : ''}`}>
             <h2>Monthly heating and cooling{zone ? `, ${zone.name || zone.id}` : ', whole building'}</h2>
-            {run.hold && est ? <MonthlyEstimate estimate={est} zone={estZone} /> : s ? <MonthlyDemand summary={s} zone={zone} /> : <p className="gl-hint">{run.state.kind === 'missing' ? 'The months need a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The months need a run: choose a weather file on Site.'}</p>}
+            {run.hold && est ? <MonthlyEstimate estimate={est} zone={estZone} /> : s ? <MonthlyDemand summary={s} zone={zone} /> : <p className="gl-hint">{run.state.kind === 'missing' ? 'The months need a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The months need a run: choose a weather file on Project.'}</p>}
           </div>
         </div>,
         centre,
@@ -136,7 +136,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
                 : run.state.kind === 'running' ? 'Working out the year…'
                 : run.state.kind === 'missing' ? 'Some inputs are still unset, so the year cannot run yet. Heat flow lists them.'
                 : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).'
-                : 'Choose a weather file on Site, and the year runs.'}</p>}
+                : 'Choose a weather file on Project, and the year runs.'}</p>}
           </div>
         </div>,
         centre,
@@ -152,7 +152,7 @@ export default function EmbeddedResults({ step, doc, previewDoc = null, onFigure
         centre,
       )}
       {weatherEl && createPortal(<WeatherPick run={run} />, weatherEl)}
-      {sizingEl && createPortal(!s ? <p className="gl-hint">{run.state.kind === 'missing' ? 'The emitter check needs a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The emitter check needs a run: choose a weather file on Site.'}</p> : !s.emitters && !s.design_heat_loss ? <p className="gl-hint">Give the rooms emitters (with their rated output) to see whether they meet each room's need.</p> : <><DesignHeatLoss summary={s} /><EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} /></>, sizingEl)}
+      {sizingEl && createPortal(!s ? <p className="gl-hint">{run.state.kind === 'missing' ? 'The emitter check needs a run: some inputs are still unset (see Heat flow).' : run.state.kind === 'running' ? 'Working it out…' : run.state.kind === 'error' ? 'The run stopped with an error (see Heat flow).' : 'The emitter check needs a run: choose a weather file on Project.'}</p> : !s.emitters && !s.design_heat_loss ? <p className="gl-hint">Give the rooms emitters (with their rated output) to see whether they meet each room's need.</p> : <><DesignHeatLoss summary={s} /><EmitterSizing summary={s} whatIf={run.whatIf} onWhatIf={run.setWhatIf} /></>, sizingEl)}
     </>
   )
 }

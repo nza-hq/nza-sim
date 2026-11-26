@@ -107,7 +107,7 @@ export type InstantState =
   | { kind: 'done'; estimate: InstantEstimate; ms: number }
 
 /**
- * `hold` (Brief 122, Linzie 17 Nov 08:20: "instantaneous calculations and the ability to run"): on Site, Shape and
+ * `hold` (Brief 122, Linzie 17 Nov 08:20: "instantaneous calculations and the ability to run"): on Project, Shape and
  * Fabric each edit works out the monthly estimate (static) at once, and the hourly year waits for Run. Elsewhere the
  * hourly year reruns after each edit, as before.
  */
@@ -424,7 +424,7 @@ export function StatusChip({ tone = 'todo', label, items = [], detail, action, o
 
 const toSet = (n: number) => `${n} ${n === 1 ? 'input' : 'inputs'} to set`
 
-/** Go to Site, where the weather file is chosen (the step is in the address). */
+/** Go to Project, where the weather file is chosen (the step is in the address). */
 function useToSite() {
   const [, setParams] = useSearchParams()
   return () => setParams((p) => { p.set('step', 'site'); return p })
@@ -443,7 +443,7 @@ export function instantItems(e: InstantEstimate, unit: 'kwh' | 'kwh_per_m2') {
 }
 
 /**
- * Brief 122, on Site, Shape and Fabric: the monthly estimate (static) as you edit, and the hourly year on Run. The two
+ * Brief 122, on Project, Shape and Fabric: the monthly estimate (static) as you edit, and the hourly year on Run. The two
  * are never one figure (Rule 11): the estimate is labelled as the static engine's, the hourly year as the run's.
  */
 function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit: 'kwh' | 'kwh_per_m2' }) {
@@ -457,7 +457,7 @@ function HeldStrip({ run, onOpen, unit }: { run: Run; onOpen?: () => void; unit:
         {instant.kind === 'done' ? <LiveResultsStrip items={instantItems(instant.estimate, unit)} />
           : instant.kind === 'missing' ? <span className="rp-strip-msg" onClick={(e) => e.stopPropagation()}><StatusChip label={toSet(instant.items.length)} detail="The estimate needs:" items={instant.items.map((m) => m.what)} action="Show on Heat flow" onAction={onOpen} /></span>
           : instant.kind === 'error' ? <span className="rp-strip-msg" onClick={(e) => e.stopPropagation()}><StatusChip tone="error" label="Estimate failed" detail={instant.message} /></span>
-          : !weather ? <span className="rp-strip-msg" onClick={(e) => e.stopPropagation()}><StatusChip label="No weather file" detail="Choose a weather file on Site, and the figures appear here." action="Go to Site" onAction={toSite} /></span>
+          : !weather ? <span className="rp-strip-msg" onClick={(e) => e.stopPropagation()}><StatusChip label="No weather file" detail="Choose a weather file on Project, and the figures appear here." action="Go to Project" onAction={toSite} /></span>
           : <span className="rp-strip-msg">Working it out…</span>}
       </div>
       <div className="rp-strip-hourly">
@@ -508,7 +508,7 @@ export function ResultsStrip({ run, onOpen }: { run: Run; onOpen?: () => void })
       ) : state.kind === 'error' ? (
         <span className="rp-strip-msg"><StatusChip tone="error" label="Run failed" detail={state.message} action="Show on Heat flow" onAction={onOpen} /></span>
       ) : !weather ? (
-        <span className="rp-strip-msg"><StatusChip label="No weather file" detail="Choose a weather file on Site, and the year runs." action="Go to Site" onAction={toSite} /></span>
+        <span className="rp-strip-msg"><StatusChip label="No weather file" detail="Choose a weather file on Project, and the year runs." action="Go to Project" onAction={toSite} /></span>
       ) : (
         <span className="rp-strip-msg">Working it out…</span>
       )}

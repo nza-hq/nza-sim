@@ -53,10 +53,15 @@ type Props = {
   roomColour?: (r: PlanRoom) => string | null
   /** The rooms chosen (on the floor being edited), drawn lit as on the plan. */
   chosenRooms?: ReadonlySet<string>
+  /** Brief 128 ("floors separated in 3D"): each floor lifted by a gap and the roofs left off, so every floor's rooms show. */
+  apart?: boolean
 }
 
-export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs, labels = true, solidRoofs = false, roomColour, chosenRooms }: Props) {
+export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, onPickWall, roofOn = false, floorOn = false, roofs, labels = true, solidRoofs = false, roomColour, chosenRooms, apart = false }: Props) {
   const H = plan.storey_height_m
+  /** Each floor's base: stacked, or lifted apart by a storey and a half per floor. */
+  const GAP = apart ? H * 1.5 : 0
+  const baseOf = (i: number) => i * (H + GAP)
   // Stacked floors (18 Nov 2026, Linzie: "see the whole building in 3D"): every floor at its height, the one being
   // edited as before (walls to choose, labels), the others drawn with their walls, windows and roofs.
   const floors = useMemo(() => floorsOf(plan), [plan])
@@ -70,8 +75,12 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
     const c: XY = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
     return { c, r: Math.max(10, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) }
   })
-  const target: [number, number, number] = [start.c[0], (H * floors.length) / 3, -start.c[1]]
-  const cam: [number, number, number] = [start.c[0] + start.r * 0.55, start.r * 0.95, -start.c[1] + start.r * 0.95]
+  const target: [number, number, number] = [start.c[0], ((H + GAP) * floors.length) / 3, -start.c[1]]
+  // Floors apart: a lower, side-on view, so the gaps between the floors read.
+  const tall = (H + GAP) * floors.length
+  const cam: [number, number, number] = apart
+    ? [start.c[0] + start.r * 0.6, start.r * 0.5 + tall * 0.6, -start.c[1] + start.r * 1.1]
+    : [start.c[0] + start.r * 0.55, start.r * 0.95, -start.c[1] + start.r * 0.95]
 
   const partitions = useMemo(() => {
     const seen = new Set<string>()
@@ -107,8 +116,8 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
         <meshBasicMaterial color={C.ground} />
       </mesh>
 
-      {floors.map((f, i) => (i === act ? null : <OtherFloor key={`f${i}`} plan={plan} floor={f} above={floors[i + 1]} y={i * H} H={H} solid={solidRoofs} roomColour={roomColour} />))}
-      <group position={[0, act * H, 0]}>
+      {floors.map((f, i) => (i === act ? null : <OtherFloor key={`f${i}`} plan={plan} floor={f} above={floors[i + 1]} y={baseOf(i)} H={H} solid={solidRoofs} roomColour={roomColour} noRoof={apart} />))}
+      <group position={[0, baseOf(act), 0]}>
       {plan.blocks.map((b, i) => <Slab key={`s${i}`} ring={smooth(b, i)} on={floorOn} />)}
       {plan.rooms.map((r) => (
         <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, plan.blocks, curves) : r.ring} colour={roomColour?.(r) ?? zoneTint(zoneIndex(r.zone)).fill} tone={!!roomColour?.(r)} lit={!!chosenRooms?.has(r.id)} />
@@ -122,7 +131,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
           </Html>
         )
       })}
-      {roofPieces(plan).map((p, i, all) => { const br = roofs?.[i] ?? blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, floors[act + 1])} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> })}
+      {!apart && roofPieces(plan).map((p, i, all) => { const br = roofs?.[i] ?? blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, floors[act + 1])} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> : <Pitched key={`r${i}`} roof={br} H={H} on={roofOn} solid={solidRoofs} hide={floorOn && !roofOn} /> })}
       {partitions.map((p, i) => <Partition key={`p${i}`} a={p.a} b={p.b} H={H} />)}
       {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={crossers} bands={[]} onPick={() => {}} join={joins.get(g.run.index)} />)}
       {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => (
@@ -130,7 +139,7 @@ export default function Plan3D({ plan, runs, placed, chosen, crossers, bands, on
       ))}
       </group>
 
-      <FitToPane target={target} radius={start.r * 0.72} />
+      <FitToPane target={target} radius={apart ? Math.max(start.r * 0.72, tall * 0.75) : start.r * 0.72} />
       <OrbitControls target={target} enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI / 2 - 0.05} minDistance={3} maxDistance={start.r * 6} makeDefault />
     </Canvas>
   )
@@ -237,7 +246,7 @@ function Pitched({ roof, H, on, hide, solid = false }: { roof: BlockRoof; H: num
 
 /** A floor other than the one being edited: slab, room colours, walls with their windows and its roof, drawn at its
  * height and not chosen from here (switch floors to edit it). */
-function OtherFloor({ plan, floor, above, y, H, solid, roomColour }: { plan: Plan; floor: PlanFloor; above?: PlanFloor; y: number; H: number; solid: boolean; roomColour?: (r: PlanRoom) => string | null }) {
+function OtherFloor({ plan, floor, above, y, H, solid, roomColour, noRoof = false }: { plan: Plan; floor: PlanFloor; above?: PlanFloor; y: number; H: number; solid: boolean; roomColour?: (r: PlanRoom) => string | null; noRoof?: boolean }) {
   const sub = useMemo(() => ({ ...plan, blocks: floor.blocks, rooms: floor.rooms, windows: floor.windows, wall_spans: floor.wall_spans, roof_parts: floor.roof_parts, roof: floor.roof ?? plan.roof }), [plan, floor])
   const runs = useMemo(() => wallRuns(sub.blocks), [sub])
   const placed = useMemo(() => allWindows(sub).windows, [sub])
@@ -250,7 +259,7 @@ function OtherFloor({ plan, floor, above, y, H, solid, roomColour }: { plan: Pla
     <group position={[0, y, 0]}>
       {sub.blocks.map((b, i) => <Slab key={`s${i}`} ring={smooth(b, i)} />)}
       {sub.rooms.map((r) => <RoomFloor key={r.id} ring={curves.length ? displayRoomRing(r.ring, sub.blocks, curves) : r.ring} colour={roomColour?.(r) ?? zoneTint(zoneIndex(r.zone)).fill} tone={!!roomColour?.(r)} />)}
-      {roofPieces(sub, true).map((p, i, all) => { const br = blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, above)} H={H} on={false} solid={solid} hide={false} /> : <Pitched key={`r${i}`} roof={br} H={H} on={false} solid={solid} hide={false} /> })}
+      {!noRoof && roofPieces(sub, true).map((p, i, all) => { const br = blockRoof(p.ring, p.recipe); return br.style === 'flat' ? <Roof key={`r${i}`} ring={p.part ? p.ring : smooth(p.ring, p.block)} cut={restCut(p, all, above)} H={H} on={false} solid={solid} hide={false} /> : <Pitched key={`r${i}`} roof={br} H={H} on={false} solid={solid} hide={false} /> })}
       {cw.segments.map((g, i) => <Wall key={`cw${i}`} run={g.run} H={H} windows={g.windows} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} join={joins.get(g.run.index)} />)}
       {runs.filter((run) => !cw.replaced.has(run.index)).map((run) => <Wall key={run.index} join={joins.get(run.index)} run={run} H={H} windows={placed.filter((w) => w.wall === run.index)} chosen={null} crossers={NONE} bands={[]} onPick={() => {}} />)}
     </group>

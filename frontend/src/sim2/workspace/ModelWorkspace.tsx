@@ -56,7 +56,7 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
   // A step that comes later has nothing to give, so its right pane stays shut (18 Nov 2026: it showed an empty column).
   // Site (19 Nov 2026) is one page in the middle, so it has no right pane either; nor has Profiles, whose list is on the
   // left and whose profile fills the middle (it was listed twice, left and right).
-  const noRight = !!later || step === 'site' || step === 'profiles'
+  const noRight = !!later || step === 'site' || step === 'profiles' || step === 'results'
   const rightShown = layout.rightOpen && !noRight
 
   return (
@@ -79,22 +79,25 @@ export default function ModelWorkspace({ render, header }: { header?: React.Reac
             </select>
           </label>}
         </div>
-        <div className="mw-centre flex-1 min-h-0 relative overflow-hidden" ref={setCentreEl}>
-          {later && (
-            <div className="mw-empty-over"><div className="mw-empty">
-              <h2>{later.title}</h2>
-              <p>{later.text}</p>
-              <p>Today's tool does this on the <Link to={later.to}>{later.page}</Link> page.</p>
-            </div></div>
-          )}
+        {/* Brief 128: the details lie over the drawing's edge instead of narrowing it. */}
+        <div className="flex-1 min-h-0 relative">
+          <div className="mw-centre absolute inset-0 overflow-hidden" ref={setCentreEl}>
+            {later && (
+              <div className="mw-empty-over"><div className="mw-empty">
+                <h2>{later.title}</h2>
+                <p>{later.text}</p>
+                <p>Today's tool does this on the <Link to={later.to}>{later.page}</Link> page.</p>
+              </div></div>
+            )}
+          </div>
+          <aside className={`mw-right mw-over bg-white min-h-0${rightShown ? '' : ' mw-shut'}`} style={{ width: rightShown ? layout.right : 0 }} aria-hidden={!rightShown}>
+            {rightShown && <div className="mw-over-grip"><ResizeHandle onResize={setRight} /></div>}
+            <button type="button" className="mw-close" aria-label="Close the details" title="Close" onClick={() => setRightOpen(false)}>›</button>
+            <div className="mw-slot h-full overflow-hidden" ref={setRightEl} />
+          </aside>
+          {!rightShown && !noRight && <button type="button" className="mw-open" onClick={() => setRightOpen(true)} title="Open the details">‹ Details</button>}
         </div>
       </section>
-      {rightShown && <ResizeHandle onResize={setRight} />}
-      <aside className={`mw-right flex-shrink-0 bg-white border-l border-light-grey min-h-0 overflow-visible relative${rightShown ? '' : ' mw-shut'}`} style={{ width: rightShown ? layout.right : 0 }} aria-hidden={!rightShown}>
-        <button type="button" className="mw-close" aria-label="Close the right panel" title="Close" onClick={() => setRightOpen(false)}>›</button>
-        <div className="mw-slot h-full overflow-hidden" ref={setRightEl} />
-      </aside>
-      {!rightShown && !noRight && <button type="button" className="mw-open" onClick={() => setRightOpen(true)} title="Open the right panel">‹ Details</button>}
       {left && centre && right && strip && render?.({ step, slots: { left, centre, right, strip }, centre: centreTab, setCentre, openRight: () => setRightOpen(true) })}
      </div>
     </div>

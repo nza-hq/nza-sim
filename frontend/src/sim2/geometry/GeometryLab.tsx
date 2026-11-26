@@ -44,7 +44,7 @@ import { carpetIn } from './toDocument'
 import { FRESH_AIR_BASES, LIGHTING_BY, type LightingBy, type LuminaireType, lightingBy, roomLuminaires } from './plan'
 import { roomAsks, roomPeople } from './asks'
 import { ALWAYS, newPlan, AIR_TERRAINS, WINDOW_STYLES, type WindowOpening, type WindowRule, type WindowStyle, type TrickleVent, type BuildingInputs, type DhwInputs, EMITTER_KINDS, type EmitterKind, type EmitterType, isWet, coolingKind, noDhw, FABRIC_ELEMENTS, type FabricElement, noBuildingInputs, type FabricType, type OtherLoadInput, type OwnProfile, type ProfileType, type ProjectInfo, removeFloor, FLOOR_NAMES, isTemperature, tempRange, newOwnProfile, type Plan, type PlanControl, type PlanPumps, CONTROLLERS, MONTHS, monthsText, noPumps, type PlanSystem, SERVICES, type Service, type SpaceType, type Span, USES, type XY, floorsOf, onFloor, allWindows, along, blankZone, compass16, dist, emptyPlan, floorArea, ringArea, profileOf, profilesOfKind, upgradePlan, wallRuns } from './plan'
-import { ApplyBarTarget, ChooseList, ExpandDetails, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
+import { ApplyBarTarget, ChooseList, ClearChoice, ExpandDetails, GivePanel, type Item, type Kind, type NavSection, Sw, type Swatch } from './ApplyPanels'
 import Icon, { type IconName } from '../icons/Icon'
 import { LIBRARY, construction, constructionsFor, system, systemsFor } from '../library/library'
 import { BORROWS, borrow, borrowedFrom } from './borrow'
@@ -458,6 +458,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const names3d = names3dSet ?? floors.length < 2
   const [solidRoofs, setSolidRoofs] = useState(false)
   const [whole3d, setWhole3d] = useState(false)
+  /** Brief 128: the floors lifted apart, roofs off, so every floor's rooms (and their colours) show. */
+  const [apart3d, setApart3d] = useState(false)
   const zonesElsewhere = useMemo(() => new Set(floors.flatMap((f, i) => (i === (plan.active_floor ?? 0) ? [] : f.rooms.map((r) => r.zone)))), [floors, plan.active_floor])
   const inRooms = mode !== 'outline'
   const selBlocks = sel?.kind === 'blocks' ? sel.idx.filter((i) => i < plan.blocks.length) : []
@@ -881,12 +883,15 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [railStep, has])
   useEffect(() => {
-    if (embedded && railStep !== 'site' && railStep !== 'check' && railStep !== 'interventions' && railStep !== 'controls' && !(railStep !== 'shape' && railStep !== 'profiles' && !has) && STEP_OF[mode] !== railStep) onStep?.(STEP_OF[mode])
+    if (embedded && railStep !== 'site' && railStep !== 'check' && railStep !== 'interventions' && railStep !== 'controls' && railStep !== 'results' && !(railStep !== 'shape' && railStep !== 'profiles' && !has) && STEP_OF[mode] !== railStep) onStep?.(STEP_OF[mode])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
   const onSite = embedded && railStep === 'site'
   /** Steps 6 and 7 are the workspace's empty states: the editor stays mounted (nothing is lost) with its right side empty. */
-  const offStep = embedded && (railStep === 'check' || railStep === 'interventions')
+  const offStep = embedded && (railStep === 'check' || railStep === 'interventions' || railStep === 'results')
+  /** Brief 128: the Results area's left list: the whole building or one zone (Heat flow and Monthly follow it). */
+  const onResults = embedded && railStep === 'results'
+  const [resultsZone, setResultsZone] = useState<string | null>(null)
   /** Brief 114 P4b: the Controls step (its own left, centre and right; the drawing stays mounted underneath). */
   const onControls = embedded && railStep === 'controls' && has
   const [ctlSel, setCtlSel] = useState<string | null>(null)
@@ -1194,6 +1199,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
   const focusZone = (() => {
     const ids = [...chosenSet.rooms, ...selRooms.map((r) => r.id)]
     const zs = new Set(plan.rooms.filter((r) => ids.includes(r.id)).map((r) => r.zone))
+    if (onResults) return resultsZone && plan.zones.some((z) => z.id === resultsZone) ? resultsZone : null
     return ids.length && zs.size === 1 && ids.length < plan.rooms.length ? [...zs][0]! : null
   })()
   const roomsIn = (zid: string) => plan.rooms.filter((r) => r.zone === zid)
@@ -3052,6 +3058,10 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   <option value="">Not set</option>
                   <option value="flat">Evenly through the day</option>
                   <option value="follow_occupancy">With occupancy</option>
+                  {/* Brief 129: or a hot water profile (Profiles, Hot water), hour by hour. */}
+                  {profilesOfKind(plan, 'dhw').length > 0 && <optgroup label="Hot water profile">
+                    {profilesOfKind(plan, 'dhw').map((p) => <option key={p.key} value={p.key}>{short(p.name)}</option>)}
+                  </optgroup>}
                 </select>
               </div>
               <p className="gl-hint">One set for the building. How much hot water is used is on each space type (Spaces). The heater only heats the hot share of what runs from the tap. Empty stays unset.</p>
@@ -3237,7 +3247,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       {in3d && (
         <div className="gl-3d">
           <Suspense fallback={<p className="gl-3d-wait">Loading 3D…</p>}>
-            <Plan3D key={whole3d ? 'whole' : 'edit'} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roomColour={mode === 'spaces' || mode === 'systems' || mode === 'profiles' ? roomFill : undefined} chosenRooms={whole3d ? undefined : chosen} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
+            <Plan3D key={whole3d ? 'whole' : apart3d ? 'apart' : 'edit'} apart={apart3d && floors.length > 1} labels={names3d && !whole3d} solidRoofs={solidRoofs || whole3d} roofs={pRoofs} roomColour={mode === 'spaces' || mode === 'systems' || mode === 'profiles' ? roomFill : undefined} chosenRooms={whole3d ? undefined : chosen} roofOn={!whole3d && ((mode === 'outline' && shapeTab === 'roof') || (mode === 'fabric' && fkind === 'roof'))} floorOn={!whole3d && ((mode === 'outline' && shapeTab === 'floor') || (mode === 'fabric' && fkind === 'floor'))} plan={plan} runs={runs} placed={placed} chosen={whole3d ? null : selSpan} crossers={crossers} bands={showTypes && !whole3d ? pieces.map((p) => ({ ...p, colour: bandOf(p) })) : []} onPickWall={(i, t) => { if (!giving) return setSel({ kind: 'wall', index: i, t, whole: mode === 'outline' }); const p = mode === 'fabric' && wallsKind ? pieceAt(pieces, i, t) : undefined; if (p) setChosen([], [{ run: p.run, t0: p.t0, t1: p.t1 }]) }} />
           </Suspense>
         </div>
       )}
@@ -3249,7 +3259,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {/* 19 Nov 2026: Elevation shows once a wall is chosen (it was a greyed-out button before). */}
         {selWall && <button type="button" aria-pressed={shownLook === 'elev'} onClick={() => setLook('elev')}>Elevation</button>}
         {/* 18 Nov 2026 (RWGC clubhouse, Linzie): stacked floors. Each step works on the floor chosen here.
-            19 Nov 2026 (Linzie: "I don't know what the plus floor button does"): one floor list, and on Shape only, adding a
+            19 Nov 2026 (Linzie: "I don't know what the plus floor button does"): one floor list, and on Building only, adding a
             floor (it says what it does first) and removing the one being edited (Undo brings it back). */}
         {(has || floors.length > 1) && <>
           <span className="gl-viewsep" aria-hidden />
@@ -3277,7 +3287,8 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {/* 19 Nov 2026 (Linzie: "I want to be able to see everything in 3D"): the whole building, every floor and roof solid,
             nothing chosen and no names. */}
         {in3d && <><span className="gl-viewsep" aria-hidden />
-          <button type="button" aria-pressed={whole3d} title="See the whole building: every floor, roofs solid" onClick={() => setWhole3d(!whole3d)}>Whole building</button>
+          <button type="button" aria-pressed={whole3d} title="See the whole building: every floor, roofs solid" onClick={() => { setWhole3d(!whole3d); setApart3d(false) }}>Whole building</button>
+          {floors.length > 1 && <button type="button" aria-pressed={apart3d} title="Lift the floors apart, roofs off, to see every floor's rooms" onClick={() => { setApart3d(!apart3d); setWhole3d(false) }}>Floors apart</button>}
           {!whole3d && <><button type="button" aria-pressed={names3d} title="Show the rooms' names in 3D" onClick={() => setNames3d(!names3d)}>Names</button><button type="button" aria-pressed={solidRoofs} title="Draw the roofs solid, to see their shapes" onClick={() => setSolidRoofs(!solidRoofs)}>Roofs</button></>}
         </>}
       </div>
@@ -3308,7 +3319,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         {shown.blocks.map((b, i) => <polygon key={`f${i}`} className="gl-floor" points={P(b)} />)}
         {inRooms &&
           shown.rooms.map((r) => <polygon key={r.id} className={`gl-room${chosen.has(r.id) && !giving ? ' on' : ''}`} points={P(r.ring)} fill={roomFill(r)} />)}
-        {/* Linzie, 17 Nov 10:03: on Shape the rooms stay in view under the walls, windows, floor and roof, for context. */}
+        {/* Linzie, 17 Nov 10:03: on Building the rooms stay in view under the walls, windows, floor and roof, for context. */}
         {!inRooms && shown.rooms.map((r) => <polygon key={`cx${r.id}`} className="gl-room-ctx" points={P(r.ring)} />)}
         {liveInner && <line className="gl-wall-hover" x1={toPx(liveInner[0])[0]} y1={toPx(liveInner[0])[1]} x2={toPx(liveInner[1])[0]} y2={toPx(liveInner[1])[1]} />}
         {giving && !drag && shown.rooms.filter((r) => chosen.has(r.id)).map((r) => <polygon key={`pk${r.id}`} className="gl-room-pick" points={P(r.ring)} />)}
@@ -3325,9 +3336,9 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
         )}
         {flash.length > 0 && shown.rooms.filter((r) => flash.includes(r.id)).map((r) => <polygon key={`fl${r.id}`} className="gl-room-flash" points={P(r.ring)} />)}
         {shown.blocks.map((b, i) => <polygon key={`s${i}`} className={`gl-shell${chosenBlocks.has(i) || (drag && drag.kind === 'corner' && drag.block === i) ? ' chosen' : ''}`} points={P(b)} />)}
-        {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Shape turns the whole outline orange (floor lighter, dashed). */}
+        {/* Linzie, 17 Nov 10:29: choosing the roof or the ground floor on Building turns the whole outline orange (floor lighter, dashed). */}
         {mode === 'outline' && (shapeTab === 'roof' || shapeTab === 'floor') && shown.blocks.map((b, i) => <polygon key={`hl${i}`} className={`gl-surf-on ${shapeTab}`} points={P(b)} />)}
-        {/* Brief 123: the ridge and hip lines of a pitched roof, on Shape. */}
+        {/* Brief 123: the ridge and hip lines of a pitched roof, on Building. */}
         {mode === 'outline' && pRoofs.some((br) => br.style !== 'flat') && pRoofs.map((br, i) => br.lines.map(([a, c], j) => <line key={`rg${i}-${j}`} className={`gl-ridge${shapeTab === 'roof' ? ' on' : ''}`} x1={toPx([a[0], a[1]])[0]} y1={toPx([a[0], a[1]])[1]} x2={toPx([c[0], c[1]])[0]} y2={toPx([c[0], c[1]])[1]} />))}
         {hoverWall != null && sel?.kind !== 'wall' && (() => {
           const r = runs[hoverWall]!
@@ -3472,7 +3483,22 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
             ))}
           </nav>
         </div></div></aside>
-      ) : onControls ? controlsLeft() : offStep ? (
+      ) : onControls ? controlsLeft() : onResults ? (
+        <aside className="gl-panel gl-left"><div className="gl-body"><div className="gl-sec">
+          <h3>Results for</h3>
+          <ul className="rs-for" role="listbox" aria-label="Results for">
+            <li><button type="button" role="option" aria-selected={!focusZone} className={!focusZone ? 'on' : ''} onClick={() => setResultsZone(null)}>
+              <span>Whole building</span><small>{plan.rooms.length} rooms</small></button></li>
+            {plan.zones.map((z, i) => {
+              const n = roomsIn(z.id).length
+              if (!n) return null
+              return <li key={z.id}><button type="button" role="option" aria-selected={focusZone === z.id} className={focusZone === z.id ? 'on' : ''} onClick={() => setResultsZone(z.id)}>
+                <i style={{ background: zoneTint(i).fill, borderColor: zoneTint(i).line }} /><span>{z.name || z.id}</span><small>{n} {n === 1 ? 'room' : 'rooms'}</small></button></li>
+            })}
+          </ul>
+          <p className="gl-hint">Heat flow and Monthly follow the choice. Load profiles and Explore are the whole building's energy.</p>
+        </div></div></aside>
+      ) : offStep ? (
         <aside className="gl-panel gl-left"><div className="gl-body"><div className="gl-sec"><p className="gl-say">Nothing to set on this step yet. Heat flow and Monthly show the model as it stands.</p></div></div></aside>
       ) : <aside className="gl-panel gl-left">
         {!embedded && <div className="gl-head">
@@ -3654,7 +3680,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
                   ) : <p className="gl-hint">Nothing applied yet. Choose rooms or walls, pick a type on the left, and Apply.</p>}
                 </div>
               )}
-              {/* 19 Nov 2026: in the workspace the building's facts are on Site; this stays only to show a problem. */}
+              {/* 19 Nov 2026: in the workspace the building's facts are on Project; this stays only to show a problem. */}
               {(!embedded || !built.ok) && <details className="gl-sec gl-doc">
                 <summary><h3>Model document <span className={`gl-chip ${built.ok ? 'ok' : 'no'}`}>{built.ok ? `✓ Valid · ${(built.doc as { schema_version: string }).schema_version}` : 'Not valid'}</span>{built.notes.length > 0 && <small>{count(built.notes.length, 'note')}</small>}</h3></summary>
                 <table className="gl-facts">
@@ -3684,7 +3710,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
           <p className="gl-say"><strong>Nothing drawn yet.</strong> {railStep === 'fabric' ? 'Fabric is given to walls, roofs and floors' : railStep === 'spaces' ? 'Spaces are given to rooms' : railStep === 'controls' ? 'Controls run the systems given to rooms' : 'Systems are given to rooms'}, so the building needs an outline first.</p>
           <div className="gl-needs-btns">
             <button type="button" className="gl-btn" onClick={startExample}>Start from an example</button>
-            <button type="button" className="gl-btn quiet" onClick={() => onStep?.('shape')}>Go to Shape and draw</button>
+            <button type="button" className="gl-btn quiet" onClick={() => onStep?.('shape')}>Go to Building and draw</button>
           </div>
         </div>
       ) : onControls ? controlsRight() : offStep ? null : <>{!onSite && <>
@@ -3907,7 +3933,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
       </>, 'right2')}
 
       {/* ─── bottom: tools ─── */}
-      {/* Phase 1 (Linzie, 19 Nov 2026): the tool bar and its tip only where you draw (Shape); elsewhere Select is the
+      {/* Phase 1 (Linzie, 19 Nov 2026): the tool bar and its tip only where you draw (Building); elsewhere Select is the
           only tool, so the bar shrinks to Undo and Redo in the corner. */}
       {(drawTools || in3d || shownLook === 'elev') && <p className="gl-tip">{in3d ? 'Drag to turn, right-drag to pan, scroll to zoom. Tap a wall to choose it.' : shownLook === 'elev' ? 'Drag a window or door (0.1 m steps; Shift: 0.01 m); tap one to nudge it with the arrow keys. Scroll to zoom, right-drag to pan.' : tipLine}</p>}
       {shownLook === 'plan' && !drawTools && <div className="gl-undo" role="toolbar" aria-label="Undo and redo">
@@ -3941,7 +3967,7 @@ export default function GeometryLab({ slots, step: railStep, onStep, centreTab, 
     </div>
   )
   const barTo = embedded && slots && (centreTab ?? 'drawing') === 'drawing' ? slots.centre : null
-  const rooted = <ExpandDetails.Provider value={embedded && railStep !== 'shape' ? onOpenRight ?? null : null}><ApplyBarTarget.Provider value={barTo}>{root}</ApplyBarTarget.Provider></ExpandDetails.Provider>
+  const rooted = <ExpandDetails.Provider value={embedded && railStep !== 'shape' ? onOpenRight ?? null : null}><ApplyBarTarget.Provider value={barTo}><ClearChoice.Provider value={() => setSel(null)}>{root}</ClearChoice.Provider></ApplyBarTarget.Provider></ExpandDetails.Provider>
   return embedded && slots ? createPortal(rooted, slots.centre) : rooted
 }
 

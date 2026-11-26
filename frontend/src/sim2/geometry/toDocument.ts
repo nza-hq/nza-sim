@@ -474,7 +474,7 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
     return best.run >= 0 ? typeAt(plan, best.run, best.t) : firstType(plan, 'wall')
   }
   const slopeRef = (i: number) => { const t = recOf(i)?.loft_slope_type; return t ? constructionOf(t) : { key: 'unassigned:roof:loft_slopes' } }
-  if (pieces.some((_, i) => pitched(i) && coldOf(i) && !recOf(i)!.loft_slope_type)) notes.push('The loft\'s roof slopes have no construction yet: choose what they are made of on Shape, Roof')
+  if (pieces.some((_, i) => pitched(i) && coldOf(i) && !recOf(i)!.loft_slope_type)) notes.push('The loft\'s roof slopes have no construction yet: choose what they are made of on Building, Roof')
   /** Warm roof: the extra height each zone gets from its share of the roof space. */
   const roofSpace = new Map<string, number>()
   const roofFace = (zone: string, i: number, share: number, type: string, f: BlockRoof['faces'][number], n: number, onLoft: boolean) => {
@@ -914,7 +914,7 @@ function buildFloor(plan0: Plan, roofsIn?: readonly BlockRoof[], opts: { loftPre
     services: {
       heating: { setpoint_mode: 'follow_comfort', setpoint_c: null },
       cooling: { setpoint_mode: 'follow_comfort', setpoint_c: null },
-      dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, load_shape: hw.shape === undefined ? 'flat' : hw.shape, circulation_pump_w: hw.pump_w },
+      dhw: { storage_setpoint_c: hw.storage_c, tap_outlet_temp_c: hw.tap_c, cold_supply_temp_c: hw.cold_c, load_shape: hw.shape === undefined ? 'flat' : hw.shape === null || hw.shape === 'flat' || hw.shape === 'follow_occupancy' ? hw.shape : scheduleRef(hw.shape), circulation_pump_w: hw.pump_w },
     },
     profiles,
     // Brief 114: loads outside the rooms, written once stated; their heat warms no room.

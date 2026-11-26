@@ -48,7 +48,7 @@ export function MonthlyDemand({ summary, zone }: { summary: Summary; zone: Zone 
   )
 }
 
-/** Brief 122: the monthly estimate (static)'s months, on Site, Shape and Fabric. Labelled as the static engine's (Rule 7). */
+/** Brief 122: the monthly estimate (static)'s months, on Project, Shape and Fabric. Labelled as the static engine's (Rule 7). */
 export function MonthlyEstimate({ estimate, zone }: { estimate: InstantEstimate; zone: InstantEstimate['zones'][number] | null }) {
   const m = zone ? zone.monthly : estimate.monthly
   const floor = zone ? zone.floor_m2 : estimate.building.floor_m2

@@ -138,7 +138,7 @@ export function levelDocument(doc: ModelDocument, level: Level, heatC: number | 
   d.controls = d.controls.filter((c) => c.target.kind !== 'window')
   // 17 Nov 2026 (example school): the control map names systems; at these levels the systems are gone, so their entries
   // go too (they are recorded only and change no number). Without this, any plan with a control map failed the instant
-  // estimate on Site, Shape and Fabric ("no heating, cooling, hot water or other system").
+  // estimate on Project, Shape and Fabric ("no heating, cooling, hot water or other system").
   const kept = new Set(d.zones.flatMap((z) => z.ventilation.map((v) => v.id)))
   d.controls = d.controls.filter((c) => c.target.kind === 'window' || (c.target.kind === 'ventilation' && kept.has(c.target.ref)))
   if (level === 'fabric') {
@@ -546,7 +546,7 @@ function methodNotes(doc: ModelDocument, w: Weather, options: RunOptions): strin
   const words = { Country: 'open country', Suburbs: 'suburbs', City: 'a city centre' }[terrain]
   const rain = rainInputs(w.hours)
   const notes = [
-    `Outside surfaces lose heat to the air as EnergyPlus works it out (its DOE-2 method): from the wind at each surface's height${stated ? `, for ${words}` : `, for ${words} (the site states no terrain; set it on Site)`}, and whether the wind is on that face.`
+    `Outside surfaces lose heat to the air as EnergyPlus works it out (its DOE-2 method): from the wind at each surface's height${stated ? `, for ${words}` : `, for ${words} (the site states no terrain; set it on Project)`}, and whether the wind is on that face.`
       + (rain.rain_code || rain.precipitation_mm ? ' Surfaces are wet while it rains, from the weather file.' : ' This weather file has no rain information, so surfaces are never wet.'),
   ]
   if (options.surface_physics?.outside_longwave === 'energyplus') {
@@ -975,7 +975,7 @@ function hourlyLines(s: Extract<ReturnType<typeof runSystems>, { ok: true }>['sy
 }
 
 /**
- * Brief 122 P3: the monthly estimate (static), the instant tier on Site, Shape and Fabric. Rule 7: a Static engine,
+ * Brief 122 P3: the monthly estimate (static), the instant tier on Project, Shape and Fabric. Rule 7: a Static engine,
  * labelled as such; Rule 11: its own result, never merged with the hourly run's `Summary`. The shapes mirror Summary's
  * so the workspace can reuse its balance rows and Monthly chart. The caller passes the document as the level it shows
  * (`levelDocument(doc, 'fabric', heatC)` on Fabric only): nothing is levelled here.

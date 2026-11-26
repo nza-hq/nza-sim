@@ -276,7 +276,7 @@ export function runSystems(doc: ModelDocument, results: ModelResults, hours: Wea
     if (pump == null) miss('services.dhw.circulation_pump_w', 'required: a hot water system is installed')
     else if (!(pump >= 0)) miss('services.dhw.circulation_pump_w', 'must be ≥ 0')
     // Brief 120: one calculation of each zone's hot water (hotWater.ts), shared with the plant that heats it first.
-    const a = zoneHotWater(doc, gains, H)
+    const a = zoneHotWater(doc, gains, H, hours)
     if (!a.ok) for (const m of a.issues) miss(m.path, m.message)
     else if (a.hw) {
       let total = 0
