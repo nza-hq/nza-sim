@@ -37,9 +37,14 @@ export default function ModelSave({ api, plan }: { api: React.RefObject<EditorAp
       const b = await auth.supabase.from('buildings').select('id').eq('local_ref', `${currentProjectId}:model`).limit(1)
       if (b.error) throw new Error(b.error.message)
       const id = b.data?.[0]?.id as string | undefined
-      if (!id) return
-      const v = await loadLatestVersion(auth.supabase, id)
-      if (!v) return
+      const v = id ? await loadLatestVersion(auth.supabase, id) : null
+      if (!v) {
+        // 26 Nov 2026 (Linzie: test the clubhouse as a real saved project): a project whose model was saved on this
+        // computer before sign-in opens with that model, shown as not saved yet, so one Save puts it in the database.
+        const local = await loadLocalPlan(currentProjectId).catch(() => null)
+        if (local && loadedFor.current === `${auth.org.id}/${currentProjectId}`) api.current?.loadPlan(local.plan)
+        return
+      }
       api.current?.loadPlan(v.plan)
       setSaved({ text: textOf(v.plan), id: v.id, at: v.created_at, created: false })
     })().catch((e) => setError(`Could not open the saved model: ${(e as Error).message}`)).finally(() => setBusy(null))
